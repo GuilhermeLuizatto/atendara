@@ -43,10 +43,24 @@ firestore-debug.log*
 ui-debug.log*
 *-firebase-adminsdk-*.json
 serviceAccountKey.json
+firebase-admin-initial-access.txt
+admin-initial-access.txt
 .local/
 .claude/
 functions/node_modules/
 functions/lib/
+
+# credenciais em geral
+# Defesa em profundidade: `.local/` ja cobre os arquivos que geramos hoje, mas
+# uma credencial salva por engano fora dela nao pode virar commit.
+*.key
+*.p12
+*.pfx
+*.jks
+*-adc-*.json
+.firebase-cli-adc-*.json
+*.credentials.json
+gha-creds-*.json
 
 # vercel
 .vercel

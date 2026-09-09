@@ -1,0 +1,18 @@
+# Arquivos binarios nao podem passar por normalizacao de fim de linha.
+# Sem isto, o Git detecta o PDF do relatorio como texto e o corrompe ao
+# converter LF/CRLF no checkout.
+*.pdf   -text
+*.png   -text
+*.jpg   -text
+*.jpeg  -text
+*.gif   -text
+*.ico   -text
+*.webp  -text
+*.zip   -text
+*.woff  -text
+*.woff2 -text
+*.ttf   -text
+*.otf   -text
+
+# package-lock.json e gerado; conflitos devem ser resolvidos regerando.
+package-lock.json -diff

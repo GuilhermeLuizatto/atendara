@@ -1,0 +1,285 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens.
+ *
+ * Nenhum componente usa cor literal do Tailwind (`bg-zinc-100`, `text-red-600`).
+ * Tudo passa por token semantico — `bg-surface`, `text-muted-foreground`,
+ * `bg-danger-soft` — para que tema claro/escuro e ajuste de marca aconteçam em
+ * um lugar so. As cores estao em OKLCH porque a claridade e perceptualmente
+ * uniforme: derivar um tom mais claro/escuro nao muda a cor percebida.
+ */
+
+/* Modo escuro por classe (aplicada em <html>), com fallback para o sistema. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+
+  --background: oklch(0.985 0.003 258);
+  --surface: oklch(1 0 0);
+  --surface-muted: oklch(0.967 0.004 258);
+  --surface-hover: oklch(0.949 0.005 258);
+  --surface-inset: oklch(0.975 0.004 258);
+
+  --border: oklch(0.918 0.006 258);
+  --border-strong: oklch(0.855 0.009 258);
+
+  --foreground: oklch(0.22 0.016 265);
+  --muted-foreground: oklch(0.522 0.014 265);
+  --subtle-foreground: oklch(0.645 0.012 265);
+
+  --primary: oklch(0.518 0.172 264);
+  --primary-hover: oklch(0.455 0.172 264);
+  --primary-foreground: oklch(0.99 0 0);
+  --primary-soft: oklch(0.955 0.028 264);
+  --primary-soft-foreground: oklch(0.41 0.16 264);
+
+  --success: oklch(0.556 0.132 155);
+  --success-soft: oklch(0.955 0.035 155);
+  --success-soft-foreground: oklch(0.43 0.12 155);
+
+  --warning: oklch(0.678 0.145 72);
+  --warning-soft: oklch(0.962 0.045 82);
+  --warning-soft-foreground: oklch(0.475 0.115 65);
+
+  --danger: oklch(0.558 0.208 26);
+  --danger-soft: oklch(0.958 0.03 26);
+  --danger-soft-foreground: oklch(0.475 0.19 26);
+
+  --info: oklch(0.585 0.135 240);
+  --info-soft: oklch(0.955 0.035 240);
+  --info-soft-foreground: oklch(0.44 0.13 240);
+
+  --ring: oklch(0.618 0.16 264);
+
+  --shadow-card: 0 1px 2px 0 oklch(0.22 0.016 265 / 0.05);
+  --shadow-raised:
+    0 1px 3px 0 oklch(0.22 0.016 265 / 0.08),
+    0 8px 24px -8px oklch(0.22 0.016 265 / 0.12);
+  --shadow-overlay:
+    0 8px 16px -6px oklch(0.22 0.016 265 / 0.14),
+    0 24px 48px -12px oklch(0.22 0.016 265 / 0.2);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: oklch(0.158 0.014 265);
+  --surface: oklch(0.199 0.016 265);
+  --surface-muted: oklch(0.238 0.016 265);
+  --surface-hover: oklch(0.268 0.018 265);
+  --surface-inset: oklch(0.178 0.015 265);
+
+  --border: oklch(0.295 0.016 265);
+  --border-strong: oklch(0.375 0.019 265);
+
+  --foreground: oklch(0.965 0.004 260);
+  --muted-foreground: oklch(0.722 0.013 265);
+  --subtle-foreground: oklch(0.598 0.013 265);
+
+  --primary: oklch(0.672 0.158 264);
+  --primary-hover: oklch(0.735 0.148 264);
+  --primary-foreground: oklch(0.16 0.02 265);
+  --primary-soft: oklch(0.288 0.068 264);
+  --primary-soft-foreground: oklch(0.835 0.098 264);
+
+  --success: oklch(0.688 0.135 155);
+  --success-soft: oklch(0.278 0.06 155);
+  --success-soft-foreground: oklch(0.842 0.1 155);
+
+  --warning: oklch(0.788 0.145 78);
+  --warning-soft: oklch(0.302 0.06 72);
+  --warning-soft-foreground: oklch(0.878 0.115 82);
+
+  --danger: oklch(0.665 0.185 26);
+  --danger-soft: oklch(0.305 0.082 26);
+  --danger-soft-foreground: oklch(0.855 0.09 26);
+
+  --info: oklch(0.692 0.125 240);
+  --info-soft: oklch(0.288 0.062 240);
+  --info-soft-foreground: oklch(0.855 0.085 240);
+
+  --ring: oklch(0.672 0.158 264);
+
+  --shadow-card: 0 1px 2px 0 oklch(0 0 0 / 0.3);
+  --shadow-raised:
+    0 1px 3px 0 oklch(0 0 0 / 0.4), 0 8px 24px -8px oklch(0 0 0 / 0.5);
+  --shadow-overlay:
+    0 8px 16px -6px oklch(0 0 0 / 0.5), 0 24px 48px -12px oklch(0 0 0 / 0.6);
+}
+
+/*
+ * Cor de destaque da profissao ativa. O shell aplica `data-accent` no wrapper e
+ * os componentes usam `--accent` sem saber qual profissao esta selecionada.
+ */
+[data-accent="violet"] {
+  --accent: oklch(0.548 0.198 296);
+  --accent-soft: oklch(0.952 0.035 296);
+}
+[data-accent="indigo"] {
+  --accent: oklch(0.522 0.185 276);
+  --accent-soft: oklch(0.952 0.032 276);
+}
+[data-accent="blue"] {
+  --accent: oklch(0.535 0.165 256);
+  --accent-soft: oklch(0.952 0.032 256);
+}
+[data-accent="cyan"] {
+  --accent: oklch(0.578 0.115 218);
+  --accent-soft: oklch(0.952 0.032 218);
+}
+[data-accent="teal"] {
+  --accent: oklch(0.562 0.098 195);
+  --accent-soft: oklch(0.95 0.032 195);
+}
+[data-accent="emerald"] {
+  --accent: oklch(0.556 0.128 158);
+  --accent-soft: oklch(0.95 0.035 158);
+}
+[data-accent="amber"] {
+  --accent: oklch(0.652 0.152 62);
+  --accent-soft: oklch(0.958 0.045 72);
+}
+[data-accent="rose"] {
+  --accent: oklch(0.572 0.192 15);
+  --accent-soft: oklch(0.955 0.032 15);
+}
+
+.dark [data-accent="violet"] {
+  --accent: oklch(0.712 0.168 296);
+  --accent-soft: oklch(0.295 0.075 296);
+}
+.dark [data-accent="indigo"] {
+  --accent: oklch(0.695 0.155 276);
+  --accent-soft: oklch(0.292 0.072 276);
+}
+.dark [data-accent="blue"] {
+  --accent: oklch(0.702 0.135 256);
+  --accent-soft: oklch(0.288 0.068 256);
+}
+.dark [data-accent="cyan"] {
+  --accent: oklch(0.735 0.105 218);
+  --accent-soft: oklch(0.285 0.06 218);
+}
+.dark [data-accent="teal"] {
+  --accent: oklch(0.722 0.092 195);
+  --accent-soft: oklch(0.282 0.055 195);
+}
+.dark [data-accent="emerald"] {
+  --accent: oklch(0.715 0.122 158);
+  --accent-soft: oklch(0.282 0.062 158);
+}
+.dark [data-accent="amber"] {
+  --accent: oklch(0.792 0.142 68);
+  --accent-soft: oklch(0.305 0.06 68);
+}
+.dark [data-accent="rose"] {
+  --accent: oklch(0.715 0.162 15);
+  --accent-soft: oklch(0.302 0.075 15);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-inset: var(--surface-inset);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-foreground: var(--primary-soft-foreground);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-soft-foreground: var(--success-soft-foreground);
+
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-soft-foreground: var(--warning-soft-foreground);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-soft-foreground: var(--danger-soft-foreground);
+
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-soft-foreground: var(--info-soft-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-ring: var(--ring);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --radius-card: 0.875rem;
+
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Foco visivel consistente: requisito de acessibilidade, nao decoracao. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--primary-soft);
+    color: var(--primary-soft-foreground);
+  }
+}
+
+@layer utilities {
+  /* Barra de rolagem discreta nas listas longas (inbox, agenda). */
+  .scrollbar-slim {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    background-color: var(--border-strong);
+    border-radius: 9999px;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,260 @@
+rules_version = '2';
+
+// =============================================================================
+// Regras de seguranca do Firestore
+//
+// Principio: o frontend NUNCA e a barreira. Toda leitura e escrita passa por
+// aqui, e o padrao no fim do arquivo e negar tudo o que nao foi explicitamente
+// liberado.
+//
+// Estas regras espelham a matriz RBAC de `src/config/permissions.ts`. Nao ha
+// como compartilhar codigo entre TypeScript e CEL, entao os dois arquivos
+// precisam ser alterados juntos — o teste `src/config/permissions.test.ts`
+// documenta os invariantes que ambos respeitam.
+//
+// Custo: `isMember()` e `roleOf()` fazem `get()` no documento de membro. Cada
+// `get()` conta como uma leitura. Em troca, o isolamento por tenant nao depende
+// de nada que o cliente envie. E o trade-off correto.
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------- helpers
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function accountRef() {
+      return /databases/$(database)/documents/accounts/$(uid());
+    }
+
+    function activeAccount() {
+      return isSignedIn() && exists(accountRef())
+        && get(accountRef()).data.status == 'ACTIVE'
+        && get(accountRef()).data.mustChangePassword == false
+        && (get(accountRef()).data.platformRole == 'PLATFORM_ADMIN'
+          || (get(accountRef()).data.subscriptionStatus == 'ACTIVE'
+            && get(accountRef()).data.accessUntilMs > request.time.toMillis()));
+    }
+
+    function platformAdmin() {
+      return activeAccount() && get(accountRef()).data.platformRole == 'PLATFORM_ADMIN';
+    }
+
+    function moduleAccess(orgId, moduleName) {
+      return isMember(orgId) && (platformAdmin() || moduleName in get(accountRef()).data.modules);
+    }
+
+    function memberRef(orgId) {
+      return /databases/$(database)/documents/organizations/$(orgId)/members/$(uid());
+    }
+
+    function isMember(orgId) {
+      return platformAdmin() || (activeAccount()
+        && get(accountRef()).data.organizationId == orgId
+        && get(accountRef()).data.professionId == get(/databases/$(database)/documents/organizations/$(orgId)).data.primaryProfession
+        && exists(memberRef(orgId))
+        && get(memberRef(orgId)).data.status == 'ACTIVE');
+    }
+
+    function roleOf(orgId) {
+      return get(memberRef(orgId)).data.role;
+    }
+
+    function hasRole(orgId, roles) {
+      return platformAdmin() || (isMember(orgId) && roleOf(orgId) in roles);
+    }
+
+    // Papeis que podem alterar dados operacionais.
+    function canWriteOperational(orgId) {
+      return hasRole(orgId, ['OWNER', 'ADMIN', 'PROFESSIONAL', 'ASSISTANT']);
+    }
+
+    // Papeis com autonomia sobre a operacao (excluem a secretaria).
+    function canManage(orgId) {
+      return hasRole(orgId, ['OWNER', 'ADMIN', 'PROFESSIONAL']);
+    }
+
+    function isAdmin(orgId) {
+      return hasRole(orgId, ['OWNER', 'ADMIN']);
+    }
+
+    // Defesa em profundidade: o documento carrega o proprio organizationId e
+    // ele precisa bater com o caminho. Impede que um documento de um tenant
+    // seja gravado dentro de outro por engano ou por manipulacao do cliente.
+    function belongsToOrg(orgId) {
+      return request.resource.data.organizationId == orgId;
+    }
+
+    // Verifica que a escrita altera apenas os campos permitidos.
+    function onlyChanges(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(fields);
+    }
+
+    // ------------------------------------------------- indice de organizacoes
+
+    // Responde "de quais organizacoes este usuario participa?" sem exigir uma
+    // collectionGroup query. Cada usuario le e escreve apenas o proprio doc.
+    // Na Fase 2 a manutencao deste documento passa para uma Cloud Function.
+    match /userMemberships/{userId} {
+      allow read: if isSignedIn() && uid() == userId;
+      allow write: if false;
+    }
+
+    // Somente o backend confiavel cria papeis, validade e permissoes.
+    match /accounts/{userId} {
+      allow get: if isSignedIn() && (uid() == userId || platformAdmin());
+      allow list: if platformAdmin();
+      allow write: if false;
+    }
+    match /initialPasswords/{userId} {
+      allow read, write: if false;
+    }
+
+    // ------------------------------------------------------------ organizacao
+
+    match /organizations/{orgId} {
+      allow read: if isMember(orgId);
+
+      // Criacao: quem cria e necessariamente o proprietario declarado.
+      allow create: if platformAdmin();
+
+      // O proprietario nao pode ser trocado por update — isso exigiria um
+      // fluxo de transferencia explicito, fora do alcance do cliente.
+      allow update: if isAdmin(orgId)
+        && request.resource.data.ownerId == resource.data.ownerId;
+
+      allow delete: if hasRole(orgId, ['OWNER']);
+
+      // ------------------------------------------------------------- membros
+
+      match /members/{memberId} {
+        allow read: if isMember(orgId);
+        allow create, update: if platformAdmin();
+        // O proprietario nao pode ser removido enquanto for proprietario.
+        allow delete: if platformAdmin()
+          && get(/databases/$(database)/documents/organizations/$(orgId)).data.ownerId != memberId;
+      }
+
+      // ------------------------------------------------------- profissionais
+
+      match /professionals/{professionalId} {
+        allow read: if isMember(orgId);
+        allow create, update: if isAdmin(orgId) && belongsToOrg(orgId);
+        allow delete: if isAdmin(orgId);
+      }
+
+      // ------------------------------------------------------------ clientes
+
+      match /clients/{clientId} {
+        allow read: if moduleAccess(orgId, 'clientes');
+        allow create, update: if moduleAccess(orgId, 'clientes') && canWriteOperational(orgId) && belongsToOrg(orgId);
+        allow delete: if moduleAccess(orgId, 'clientes') && canManage(orgId);
+      }
+
+      // -------------------------------------------------------- atendimentos
+
+      match /appointments/{appointmentId} {
+        allow read: if moduleAccess(orgId, 'agenda');
+        allow create, update: if moduleAccess(orgId, 'agenda') && canWriteOperational(orgId) && belongsToOrg(orgId);
+        // Atendimento nao e apagado: e cancelado via update, preservando o
+        // historico para o financeiro e para a auditoria.
+        allow delete: if false;
+      }
+
+      // ------------------------------------------------------------ conversas
+
+      match /conversations/{conversationId} {
+        allow read: if moduleAccess(orgId, 'mensagens');
+        allow create, update: if moduleAccess(orgId, 'mensagens') && canWriteOperational(orgId) && belongsToOrg(orgId);
+        allow delete: if false;
+
+        // Mensagens sao imutaveis: registrar o que foi dito e o que permite
+        // auditar as decisoes do agente depois.
+        match /messages/{messageId} {
+          allow read: if moduleAccess(orgId, 'mensagens');
+          allow create: if moduleAccess(orgId, 'mensagens') && canWriteOperational(orgId) && belongsToOrg(orgId);
+          allow update, delete: if false;
+        }
+      }
+
+      // ----------------------------------------------------------- financeiro
+
+      match /transactions/{transactionId} {
+        allow read: if moduleAccess(orgId, 'financeiro');
+        allow create: if moduleAccess(orgId, 'financeiro') && canWriteOperational(orgId) && belongsToOrg(orgId);
+        allow update: if moduleAccess(orgId, 'financeiro') && canManage(orgId) && belongsToOrg(orgId);
+        // transaction:delete acompanha ADMIN/OWNER na matriz TypeScript.
+        allow delete: if moduleAccess(orgId, 'financeiro') && isAdmin(orgId);
+      }
+
+      // ------------------------------------------------- regras do agente IA
+
+      match /aiRules/{ruleId} {
+        allow read: if moduleAccess(orgId, 'agente');
+
+        // Regras fundamentais e da profissao nunca sao criadas pelo cliente:
+        // vem da semente do sistema. E nada pode nascer ja imutavel por aqui.
+        allow create: if moduleAccess(orgId, 'agente') && canManage(orgId)
+          && belongsToOrg(orgId)
+          && request.resource.data.immutable == false
+          && !(request.resource.data.level in ['SECURITY', 'SYSTEM', 'PROFESSION']);
+
+        // Uma regra imutavel nao pode ser editada nem desativada, por ninguem —
+        // inclusive OWNER. E isso que torna "Nivel 1" uma garantia e nao uma
+        // convencao da interface.
+        allow update: if moduleAccess(orgId, 'agente') && canManage(orgId)
+          && belongsToOrg(orgId)
+          && resource.data.immutable == false
+          && request.resource.data.immutable == false
+          && request.resource.data.level == resource.data.level;
+
+        allow delete: if moduleAccess(orgId, 'agente') && canManage(orgId) && resource.data.immutable == false;
+      }
+
+      // ------------------------------------------- decisoes do agente (audit)
+
+      match /aiDecisions/{decisionId} {
+        allow read: if moduleAccess(orgId, 'agente');
+        allow create: if moduleAccess(orgId, 'agente') && belongsToOrg(orgId);
+        // Registro imutavel. Se pudesse ser alterado, nao seria auditoria.
+        allow update, delete: if false;
+      }
+
+      // -------------------------------------------------------- notificacoes
+
+      match /notifications/{notificationId} {
+        allow read: if isMember(orgId);
+        allow create: if isMember(orgId) && belongsToOrg(orgId);
+        // O usuario apenas marca como lida/reconhecida; nao reescreve o alerta.
+        allow update: if canWriteOperational(orgId)
+          && onlyChanges(['status', 'acknowledgedBy', 'acknowledgedAt', 'updatedAt', 'updatedBy']);
+        allow delete: if false;
+      }
+
+      // ------------------------------------------------ trilha de auditoria
+
+      match /auditLogs/{logId} {
+        // Somente administracao le a trilha completa.
+        allow read: if isAdmin(orgId);
+        allow create: if isMember(orgId) && belongsToOrg(orgId);
+        // Append-only, sem excecao de papel.
+        allow update, delete: if false;
+      }
+    }
+
+    // ----------------------------------------------------------------- padrao
+
+    // Tudo o que nao foi liberado acima e negado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

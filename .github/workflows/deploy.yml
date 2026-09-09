@@ -1,0 +1,100 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  deploy:
+    name: Firebase Hosting e Security Rules
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # O contexto `secrets` nao existe no `if` de um job, entao a verificacao
+      # vira uma saida de step. Sem credenciais o workflow termina com sucesso
+      # e apenas informa que o deploy foi pulado — util em forks.
+      - name: Verificar credenciais
+        id: guard
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: |
+          if [ -n "$SERVICE_ACCOUNT" ] && [ -n "$PROJECT_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Deploy pulado: configure os segredos FIREBASE_SERVICE_ACCOUNT e FIREBASE_PROJECT_ID."
+          fi
+
+      - name: Configurar Node
+        if: steps.guard.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Instalar dependencias
+        if: steps.guard.outputs.ready == 'true'
+        run: npm ci
+
+      - name: Instalar dependencias do backend
+        if: steps.guard.outputs.ready == 'true'
+        run: npm ci --prefix functions
+
+      - name: Verificacao completa
+        if: steps.guard.outputs.ready == 'true'
+        run: npm run lint && npm run type-check && npm run test
+
+      - name: Build
+        if: steps.guard.outputs.ready == 'true'
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+        run: npm run build
+
+      - name: Gravar credencial de servico
+        if: steps.guard.outputs.ready == 'true'
+        run: |
+          printf '%s' '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/firebase-key.json"
+
+      # As Security Rules vao antes do Hosting: se as regras falharem, a versao
+      # nova do frontend nao entra no ar com o banco ainda desprotegido.
+      - name: Publicar Security Rules e indices
+        if: steps.guard.outputs.ready == 'true'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-key.json
+        run: |
+          npx --yes firebase-tools@latest deploy \
+            --only firestore:rules,firestore:indexes \
+            --project "${{ secrets.FIREBASE_PROJECT_ID }}" \
+            --non-interactive
+
+      - name: Publicar no Firebase Hosting
+        if: steps.guard.outputs.ready == 'true'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-key.json
+        run: |
+          npx --yes firebase-tools@latest deploy \
+            --only hosting \
+            --project "${{ secrets.FIREBASE_PROJECT_ID }}" \
+            --non-interactive
+
+      - name: Remover credencial
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-key.json"

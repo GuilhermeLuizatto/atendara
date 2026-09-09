@@ -176,6 +176,8 @@ apontam para os emuladores.
 | `npm run format`     | Prettier                                      |
 | `npm run verify`     | lint + type-check + testes + build            |
 
+Relatorios em PDF: `node scripts/render-report.mjs docs/ARQUIVO.md` (usa o Edge, sem dependencias).
+
 Suites que exigem o emulador (Java e `.local/firebase-tools`):
 
 | Comando                  | O que prova                                                  |

@@ -250,6 +250,25 @@ service cloud.firestore {
       }
     }
 
+    // ------------------------------------------ mensagens por collectionGroup
+
+    // A caixa de entrada carrega as mensagens de todas as conversas em UMA
+    // consulta; um listener por conversa nao escala. Uma `collectionGroup` nao
+    // e coberta pela regra aninhada acima, entao precisa desta.
+    //
+    // Isto NAO afrouxa o isolamento. A consulta obrigatoriamente filtra por
+    // `organizationId` (ver `snapshotQueries.messages`): sem esse filtro o
+    // Firestore nao consegue provar que todo documento retornado satisfaz a
+    // condicao e recusa a consulta inteira — nao devolve um subconjunto. O
+    // campo repetido dentro do documento e o que torna a prova possivel.
+    //
+    // Regras se somam: este bloco acrescenta APENAS leitura. A escrita de
+    // mensagem continua sendo decidida pela regra aninhada da conversa, que ja
+    // aceita somente `create`.
+    match /{path=**}/messages/{messageId} {
+      allow read: if moduleAccess(resource.data.organizationId, 'mensagens');
+    }
+
     // ----------------------------------------------------------------- padrao
 
     // Tudo o que nao foi liberado acima e negado.

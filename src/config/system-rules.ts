@@ -1,4 +1,10 @@
-import type { AIRule, ID, ISODateString } from "@/types";
+import type {
+  AIRule,
+  ID,
+  ISODateString,
+  ProfessionConfig,
+  RuleCategory,
+} from "@/types";
 
 /**
  * Regras fundamentais (Nivel 1).
@@ -191,4 +197,63 @@ export function materializeSystemRules(
     createdBy: null,
     updatedBy: null,
   }));
+}
+
+/**
+ * Materializa as regras de nivel PROFESSION a partir do template da profissao.
+ *
+ * Assim como as fundamentais, elas nao sao criadas pelo usuario nem gravadas
+ * pelo cliente: as Security Rules recusam `create` nos niveis SECURITY, SYSTEM
+ * e PROFESSION. Deriva-las da tabela de profissoes garante que toda organizacao
+ * — inclusive uma criada antes de um template mudar — enxergue exatamente o
+ * mesmo conjunto, sem documento a adulterar.
+ */
+export function materializeProfessionRules(
+  organizationId: ID,
+  profession: ProfessionConfig,
+  now: ISODateString,
+): AIRule[] {
+  return profession.suggestedRules.map((seed, index) => ({
+    id: `profession-${profession.id.toLowerCase()}-${index + 1}`,
+    organizationId,
+    createdAt: now,
+    updatedAt: now,
+    createdBy: null,
+    updatedBy: null,
+    professionalId: null,
+    name: seed.name,
+    description: seed.description,
+    level: "PROFESSION",
+    category: seed.category as RuleCategory,
+    enabled: seed.enabled,
+    priority: 500 - index,
+    conditions: {
+      combinator: "AND",
+      conditions: [
+        {
+          field: "message.classification",
+          operator: seed.action === "ALLOW_TOPIC" ? "EQUALS" : "NOT_EQUALS",
+          value: "ADMINISTRATIVE",
+        },
+      ],
+    },
+    actions: [{ type: seed.action, payload: { topic: seed.category } }],
+    source: "PROFESSION_TEMPLATE",
+    immutable: true,
+    version: 1,
+    naturalLanguageInput: null,
+    lastAppliedAt: null,
+  }));
+}
+
+/** Conjunto completo de regras que nao vivem no banco: fundamentais + profissao. */
+export function materializeSeededRules(
+  organizationId: ID,
+  profession: ProfessionConfig,
+  now: ISODateString,
+): AIRule[] {
+  return [
+    ...materializeSystemRules(organizationId, now),
+    ...materializeProfessionRules(organizationId, profession, now),
+  ];
 }

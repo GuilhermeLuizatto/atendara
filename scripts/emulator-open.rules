@@ -1,0 +1,24 @@
+rules_version = '2';
+
+// =============================================================================
+// REGRAS ABERTAS — EXCLUSIVAS DO EMULADOR.
+//
+// NAO PUBLICAR. Nao sao referenciadas por `firebase.json`, entao nenhum deploy
+// as alcanca: `firebase.json` aponta para `firestore.rules`, e so.
+//
+// Existem para a suite de INTEGRACAO do repositorio
+// (`src/services/firestore/repository.emulator-test.ts`), que verifica a
+// fiacao entre planos, conversores e SDK: lote atomico, transacao, conversao
+// Timestamp <-> ISO e listeners.
+//
+// Autorizacao NAO se testa aqui. Isso e assunto de `firestore.rules`, coberto
+// por `scripts/test-firestore-rules.mjs` no emulador com as regras reais.
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

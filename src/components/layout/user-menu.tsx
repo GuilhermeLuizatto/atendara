@@ -15,8 +15,8 @@ import { useWorkspaceActions } from "@/providers/use-workspace-actions";
 import { useWorkspace } from "@/providers/workspace-provider";
 
 export function UserMenu() {
-  const { mode, signOut } = useAuth();
-  const { session, organization } = useWorkspace();
+  const { signOut } = useAuth();
+  const { session, organization, repository } = useWorkspace();
   const { reset } = useWorkspaceActions();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -91,7 +91,7 @@ export function UserMenu() {
             </Link>
             {/* O prototipo guarda as alteracoes no navegador; sem uma saida
                 explicita, um experimento ruim ficaria preso para sempre. */}
-            {mode === "demo" ? (
+            {repository?.mode === "memory" ? (
               <button
                 type="button"
                 role="menuitem"

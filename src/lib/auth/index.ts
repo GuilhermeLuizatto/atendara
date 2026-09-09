@@ -1,4 +1,4 @@
-import { isFirebaseConfigured } from "@/lib/firebase/config";
+import { isDemoMode } from "@/lib/firebase/config";
 
 import { demoAuthAdapter } from "./demo-adapter";
 import { firebaseAuthAdapter } from "./firebase-adapter";
@@ -9,8 +9,8 @@ import type { AuthAdapter } from "./types";
  * Sem projeto Firebase, o prototipo roda em modo demonstracao — que e o
  * caminho padrao para quem clona o repositorio.
  */
-export const authAdapter: AuthAdapter = isFirebaseConfigured && process.env.NEXT_PUBLIC_DEMO_MODE !== "true"
-  ? firebaseAuthAdapter
-  : demoAuthAdapter;
+export const authAdapter: AuthAdapter = isDemoMode
+  ? demoAuthAdapter
+  : firebaseAuthAdapter;
 
 export { AuthError, type AuthAdapter, type AuthMode } from "./types";

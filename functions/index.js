@@ -38,10 +38,15 @@ export const registerProfessional = onCall(options, async request => {
   const organizationId = randomUUID();
   const account = { ...input, accessUntilMs: Date.parse(input.accessUntil), userId: user.uid, organizationId, platformRole: "PROFESSIONAL", status: "ACTIVE", subscriptionStatus: "ACTIVE", mustChangePassword: true, createdAt: new Date().toISOString() };
   const batch = db.batch();
+  const stamp = { createdAt: account.createdAt, updatedAt: account.createdAt, createdBy: request.auth.uid, updatedBy: request.auth.uid };
   batch.create(db.doc(paths.account(user.uid)), account);
   batch.create(db.doc(paths.initialPassword(user.uid)), { salt, hash: scryptSync(temporaryPassword, salt, 32).toString("hex") });
-  batch.create(db.doc(paths.organization(organizationId)), { id: organizationId, name: input.displayName, primaryProfession: input.professionId, ownerId: user.uid, createdAt: account.createdAt });
-  batch.create(db.doc(paths.document(organizationId, "members", user.uid)), { userId: user.uid, organizationId, role: "PROFESSIONAL", status: "ACTIVE" });
+  batch.create(db.doc(paths.organization(organizationId)), { id: organizationId, name: input.displayName, slug: organizationId, primaryProfession: input.professionId, professions: [input.professionId], ownerId: user.uid, ...stamp });
+  batch.create(db.doc(paths.document(organizationId, "members", user.uid)), { id: user.uid, userId: user.uid, organizationId, role: "PROFESSIONAL", status: "ACTIVE", invitedBy: request.auth.uid, ...stamp });
+  // Sem perfil profissional a organizacao nasce sem quem atenda: a agenda
+  // recusaria o primeiro atendimento. O cliente nao pode cria-lo (as regras
+  // exigem papel administrativo), entao ele nasce aqui, junto do resto.
+  batch.create(db.doc(paths.document(organizationId, "professionals", user.uid)), { id: user.uid, organizationId, userId: user.uid, displayName: input.displayName, email: input.email, phone: null, profession: input.professionId, licenseNumber: null, specialties: [], avatarUrl: null, active: true, ...stamp });
   try { await batch.commit(); } catch { await getAuth().deleteUser(user.uid); throw new HttpsError("internal", "Nao foi possivel concluir o cadastro."); }
   return { userId: user.uid, temporaryPassword };
 });

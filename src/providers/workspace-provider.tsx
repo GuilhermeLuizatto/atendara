@@ -88,10 +88,25 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const professionId = isPlatformAdmin(user?.access) ? preferredProfessionId : user?.access?.professionId ?? DEFAULT_PROFESSION;
   const scope = user?.access?.organizationId ?? user?.userId;
 
+  const organizationId = isPlatformAdmin(user?.access)
+    ? null
+    : (user?.access?.organizationId ?? null);
+
   const repository = useMemo(
-    () => (hydrated && hasActiveAccess(user?.access) ? createWorkspaceRepository(professionId, new Date(), scope) : null),
-    [hydrated, professionId, scope, user?.access],
+    () =>
+      hydrated && hasActiveAccess(user?.access)
+        ? createWorkspaceRepository({
+            professionId,
+            organizationId,
+            scope,
+          })
+        : null,
+    [hydrated, professionId, organizationId, scope, user?.access],
   );
+
+  // Trocar de conta, de organizacao ou de profissao cria um repositorio novo;
+  // sem isso os listeners do Firestore do anterior seguiriam abertos e cobrando.
+  useEffect(() => () => repository?.dispose?.(), [repository]);
 
   // Metodos de classe perdem `this` quando passados como referencia; os
   // wrappers abaixo preservam o vinculo e a identidade estavel que o
@@ -130,14 +145,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const session = useMemo<ActiveSession | null>(() => {
     if (!user || !data) return null;
-    // No prototipo o usuario e sempre o titular da organizacao. Com Firebase
-    // real, o papel vem do documento de membership.
+    // O papel do cliente espelha a matriz de `config/permissions.ts`; no
+    // Firestore o papel autoritativo vem do documento de membership, e os dois
+    // precisam concordar — ver a nota em firestore.rules.
     return {
       user,
       organizationId: data.organization.id,
       role: isPlatformAdmin(user.access) ? "OWNER" : "PROFESSIONAL",
       permissions: accountPermissions(user.access),
-      professionalId: data.professionals[0]?.id ?? null,
+      // Em uma clinica ha varios perfis na organizacao; o do usuario e o que
+      // carrega o proprio uid. O primeiro da lista so serve de retomada para a
+      // demonstracao, onde o titular e o unico profissional.
+      professionalId:
+        data.professionals.find(
+          (professional) => professional.userId === user.userId,
+        )?.id ??
+        data.professionals[0]?.id ??
+        null,
     };
   }, [user, data]);
 

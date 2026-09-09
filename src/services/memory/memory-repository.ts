@@ -1,5 +1,5 @@
 import { toDateKey, type DateKey } from "@/lib/utils/datetime";
-import { hasPermission, permissionsForRole } from "@/config/permissions";
+import { permissionsForRole } from "@/config/permissions";
 import { getProfession } from "@/config/professions";
 import { ruleInputSchema, validateRuleInput } from "@/lib/rules/validation";
 import { decide } from "@/lib/ai/decision-engine";
@@ -33,11 +33,12 @@ import {
   type WorkspaceRepository,
   type WorkspaceSnapshot,
 } from "../types";
+import { assertPermission, validateMessageBody } from "../guards";
 import {
   findConflict,
   markOverdue,
   recomputeClientAggregates,
-} from "./aggregates";
+} from "../aggregates";
 import { createStateWriter, loadState } from "./persistence";
 
 /**
@@ -1179,8 +1180,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
   // ------------------------------------------------------------ guardas
 
   private assertPermission(permission: import("@/types").Permission): void {
-    if (!(this.actor.permissions ? this.actor.permissions.includes(permission) : hasPermission(this.actor.role ?? "VIEWER", permission)))
-      throw new RepositoryError("Sem permissao para esta acao.");
+    assertPermission(this.actor, permission);
   }
 
   private validateRule(input: RuleInput): RuleInput {
@@ -1193,10 +1193,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
   }
 
   private validateMessage(text: string): string {
-    const body = text.trim();
-    if (!body || body.length > 4000)
-      throw new RepositoryError("Escreva uma mensagem de 1 a 4000 caracteres.");
-    return body;
+    return validateMessageBody(text);
   }
 
   private requireConversation(id: ID): Conversation {

@@ -224,6 +224,13 @@ export interface WorkspaceRepository {
 
   /** Descarta alteracoes e volta ao estado inicial. Apenas em memoria. */
   reset(): Promise<void>;
+
+  /**
+   * Encerra assinaturas abertas. So a implementacao do Firestore precisa —
+   * a versao em memoria nao tem nada a liberar — mas quem cria o repositorio
+   * chama sempre, para nao ter de saber qual das duas esta ativa.
+   */
+  dispose?(): void;
 }
 
 /**

@@ -1,0 +1,8 @@
+{
+  "firestore": { "rules": "scripts/emulator-open.rules" },
+  "emulators": {
+    "firestore": { "port": 8086 },
+    "ui": { "enabled": false },
+    "singleProjectMode": true
+  }
+}

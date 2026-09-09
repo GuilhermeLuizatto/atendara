@@ -78,6 +78,17 @@ src/
 │   └── random.ts             PRNG deterministico
 │
 ├── providers/                Contextos globais (tema, auth, workspace)
+│
+├── services/                 Persistencia
+│   ├── types.ts              Contrato `WorkspaceRepository`
+│   ├── aggregates.ts         Derivados puros (saldo, atraso, conflito)
+│   ├── guards.ts             Permissao e validacao comuns as duas versoes
+│   ├── memory/               Prototipo e demonstracao
+│   └── firestore/            Producao
+│       ├── plans/            O QUE muda: funcoes puras -> lista de escritas
+│       ├── queries.ts        Consultas e limites do snapshot
+│       └── snapshot.ts       Montagem, regras semeadas e derivados
+│
 └── types/                    Dominio
 ```
 
@@ -129,6 +140,15 @@ query — que as Security Rules teriam dificuldade de restringir com seguranca.
 - **Campos de integracao ja previstos.** `Appointment.externalCalendar` e
   `Transaction.gateway` nascem nulos, para que Google Calendar e gateways de
   pagamento nao exijam migracao de dados depois.
+- **Regras fundamentais nao sao documento.** `SECURITY`, `SYSTEM` e
+  `PROFESSION` sao materializadas de `src/config` a cada leitura. Regra que nao
+  esta no banco nao tem o que adulterar.
+- **Agregados do cadastro sao derivados na leitura.** `totalAppointments` e o
+  saldo em aberto saem da agenda e do financeiro carregados, em vez de reescrever
+  todo cadastro afetado a cada mutacao.
+
+A forma exata dos documentos, as consultas, os indices e os limites estao em
+[FIRESTORE-DATA-MODEL.md](FIRESTORE-DATA-MODEL.md).
 
 ---
 
@@ -169,6 +189,11 @@ Garantias implementadas:
   negam `update`/`delete` sem excecao. Um registro alteravel nao seria auditoria.
 - **Mensagens imutaveis.** Preservar o que foi dito e o que permite auditar as
   decisoes do agente depois.
+- **`collectionGroup` de mensagens com filtro de tenant.** A caixa de entrada le
+  todas as conversas em uma consulta. Regras nao filtram resultado: o Firestore
+  so aprova a consulta porque o filtro por `organizationId` prova que todo
+  documento retornado pertence a organizacao. Sem o filtro, a consulta inteira e
+  recusada.
 - **Atendimento nao e apagado.** Cancelamento e `update` de status, preservando
   historico financeiro.
 - **Notificacao com escrita restrita por campo.** O usuario marca como lida; nao
@@ -299,7 +324,12 @@ Na autenticacao real, o perfil vem de `accounts/{uid}` por assinatura Firestore;
 email nao determina papel. As functions em `functions/` gerenciam o cadastro e
 a troca inicial. Sua implantacao depende de Blaze e ainda esta pendente.
 Consulte [FIREBASE-SETUP.md](FIREBASE-SETUP.md) para o estado remoto confirmado.
-O repositorio operacional ainda e local, mesmo com Auth configurado.
+
+O repositorio operacional escolhe a implementacao em `src/services/index.ts`:
+Firestore quando ha projeto configurado E o usuario pertence a uma organizacao;
+o conjunto demonstrativo em memoria nos demais casos — repositorio clonado sem
+Firebase, modo demonstracao explicito e administrador da plataforma, que nao tem
+tenant operacional.
 
 **Guarda de rota.** Com export estatico nao existe middleware, entao
 `RequireAuth` redireciona no cliente. Isso e suficiente porque a barreira real

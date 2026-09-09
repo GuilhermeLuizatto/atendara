@@ -1,5 +1,8 @@
 import { AI_ASSISTANT_NAME } from "@/config/app";
-import { materializeSystemRules } from "@/config/system-rules";
+import {
+  materializeProfessionRules,
+  materializeSystemRules,
+} from "@/config/system-rules";
 import { atTime, shiftDays } from "@/mocks/dates";
 import type {
   AIDecision,
@@ -98,35 +101,10 @@ export function buildRules(ctx: GeneratorContext): AIRule[] {
 
   const systemRules = materializeSystemRules(organizationId, now);
 
-  const professionRules: AIRule[] = profession.suggestedRules.map(
-    (seed, index) => ({
-      id: `rule-profession-${index + 1}`,
-      organizationId,
-      ...stamp(now),
-      professionalId: null,
-      name: seed.name,
-      description: seed.description,
-      level: "PROFESSION",
-      category: seed.category as RuleCategory,
-      enabled: seed.enabled,
-      priority: 500 - index,
-      conditions: {
-        combinator: "AND",
-        conditions: [
-          {
-            field: "message.classification",
-            operator: seed.action === "ALLOW_TOPIC" ? "EQUALS" : "NOT_EQUALS",
-            value: "ADMINISTRATIVE",
-          },
-        ],
-      },
-      actions: [{ type: seed.action, payload: { topic: seed.category } }],
-      source: "PROFESSION_TEMPLATE",
-      immutable: true,
-      version: 1,
-      naturalLanguageInput: null,
-      lastAppliedAt: null,
-    }),
+  const professionRules = materializeProfessionRules(
+    organizationId,
+    profession,
+    now,
   );
 
   const professionalRules: AIRule[] = PROFESSIONAL_RULE_SEEDS.map((seed) => ({

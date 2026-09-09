@@ -1,12 +1,12 @@
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
-import { paths } from "../functions/generated/paths.js";
+import { messagePath, messagesPath, paths } from "../functions/generated/paths.js";
 
 // As ferramentas do emulador ficam fora do bundle e das dependencias do aplicativo.
 const requireTools = createRequire(new URL("../.local/firebase-tools/package.json", import.meta.url));
 const { initializeTestEnvironment, assertSucceeds, assertFails } = requireTools("@firebase/rules-unit-testing");
-const { doc, setDoc, getDoc, updateDoc, deleteDoc, getDocs, collection } = requireTools("firebase/firestore");
+const { doc, setDoc, getDoc, updateDoc, deleteDoc, getDocs, collection, collectionGroup, query, where, limit } = requireTools("firebase/firestore");
 const environment = await initializeTestEnvironment({ projectId: "demo-atendara", firestore: { host: "127.0.0.1", port: 8085, rules: readFileSync("firestore.rules", "utf8") } });
 const account = (org, patch = {}) => ({ platformRole: "PROFESSIONAL", organizationId: org, professionId: "PSYCHOLOGIST", modules: ["clientes", "agenda", "financeiro", "agente", "mensagens"], status: "ACTIVE", mustChangePassword: false, subscriptionStatus: "ACTIVE", accessUntilMs: Date.now() + 86400000, ...patch });
 
@@ -33,6 +33,9 @@ try {
       await setDoc(doc(db, paths.organization(org)), { primaryProfession: "PSYCHOLOGIST", ownerId: "a" });
       for (const collection of ["clients", "appointments", "transactions", "aiDecisions", "auditLogs"]) await setDoc(doc(db, paths.document(org, collection, "example")), { organizationId: org });
       await setDoc(doc(db, paths.document(org, "aiRules", "immutable")), { organizationId: org, immutable: true, level: "SYSTEM", enabled: true });
+      await setDoc(doc(db, paths.document(org, "conversations", "conv")), { organizationId: org, clientId: "example", status: "OPEN" });
+      await setDoc(doc(db, messagePath(org, "conv", "m1")), { organizationId: org, conversationId: "conv", body: "Bom dia", sentAt: new Date() });
+      await setDoc(doc(db, paths.document(org, "notifications", "alert")), { organizationId: org, status: "UNREAD", title: "Alerta" });
     }
     await setDoc(doc(db, paths.initialPassword("a")), { hash: "test-only" });
   });
@@ -61,7 +64,67 @@ try {
   await denied(setDoc(doc(db("a"), paths.document("org-a", "clients", "foreign")), { organizationId: "org-b" }));
   await denied(getDoc(doc(db("admin"), paths.initialPassword("a"))));
   await denied(getDoc(doc(environment.unauthenticatedContext().firestore(), paths.account("a"))));
-  assert.equal(checks, 26);
+
+  // ------------------------------------------------------------- Etapa 1
+  // Criterio de conclusao: duas organizacoes nao leem nem alteram os dados uma
+  // da outra, inclusive por chamada direta ao SDK.
+
+  const messagesOf = org => query(collectionGroup(db("a"), "messages"), where("organizationId", "==", org));
+
+  // Leitura operacional dentro do proprio tenant, do jeito que o repositorio le.
+  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications"]) {
+    await allowed(getDocs(query(collection(db("a"), paths.collection("org-a", name)), limit(5))));
+  }
+  await allowed(getDocs(collection(db("a"), messagesPath("org-a", "conv"))));
+  await allowed(getDocs(messagesOf("org-a")));
+
+  // A mesma consulta apontada para outro tenant, e a consulta sem filtro de
+  // tenant, sao recusadas inteiras — regra nao filtra resultado.
+  await denied(getDocs(messagesOf("org-b")));
+  await denied(getDocs(query(collectionGroup(db("a"), "messages"), limit(50))));
+  await denied(getDoc(doc(db("a"), messagePath("org-b", "conv", "m1"))));
+  await denied(getDocs(collection(db("a"), messagesPath("org-b", "conv"))));
+
+  // Sem o modulo de mensagens a caixa de entrada nao abre nem por collectionGroup.
+  await denied(getDocs(query(collectionGroup(db("restricted"), "messages"), where("organizationId", "==", "org-a"))));
+
+  // Listagem cruzada de cada colecao operacional.
+  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "auditLogs"]) {
+    await denied(getDocs(query(collection(db("a"), paths.collection("org-b", name)), limit(5))));
+  }
+
+  // Escrita cruzada, documento a documento.
+  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "auditLogs"]) {
+    await denied(setDoc(doc(db("a"), paths.document("org-b", name, "intruso")), { organizationId: "org-b" }));
+    await denied(updateDoc(doc(db("a"), paths.document("org-b", name, "example")), { alterado: true }));
+  }
+  await denied(setDoc(doc(db("a"), messagePath("org-b", "conv", "intrusa")), { organizationId: "org-b", conversationId: "conv", body: "oi" }));
+
+  // Mensagem nasce imutavel: cria, nunca altera nem apaga.
+  await allowed(setDoc(doc(db("a"), messagePath("org-a", "conv", "m2")), { organizationId: "org-a", conversationId: "conv", body: "resposta", sentAt: new Date() }));
+  await denied(updateDoc(doc(db("a"), messagePath("org-a", "conv", "m1")), { body: "reescrita" }));
+  await denied(deleteDoc(doc(db("a"), messagePath("org-a", "conv", "m1"))));
+
+  // Atendimento e conversa nao sao apagados: cancelamento e update.
+  await allowed(updateDoc(doc(db("a"), own("appointments")), { status: "CANCELLED" }));
+  await denied(deleteDoc(doc(db("a"), own("appointments"))));
+  await denied(deleteDoc(doc(db("a"), paths.document("org-a", "conversations", "conv"))));
+
+  // Notificacao: o usuario marca como lida, nao reescreve o alerta.
+  await allowed(updateDoc(doc(db("a"), paths.document("org-a", "notifications", "alert")), { status: "READ", updatedAt: new Date().toISOString() }));
+  await denied(updateDoc(doc(db("a"), paths.document("org-a", "notifications", "alert")), { title: "Outro texto" }));
+
+  // Trilha de auditoria: o profissional escreve, so a administracao le.
+  await allowed(setDoc(doc(db("a"), paths.document("org-a", "auditLogs", "novo")), { organizationId: "org-a", action: "CREATE" }));
+  await denied(getDoc(doc(db("a"), own("auditLogs"))));
+  await allowed(getDoc(doc(db("admin"), own("auditLogs"))));
+
+  // Perfil profissional exige papel administrativo: por isso o cadastro de
+  // profissional e criado pelo backend, e nao pelo aplicativo.
+  await denied(setDoc(doc(db("a"), paths.document("org-a", "professionals", "auto")), { organizationId: "org-a", displayName: "Eu mesmo" }));
+  await allowed(getDoc(doc(db("a"), paths.organization("org-a"))));
+  await denied(getDoc(doc(db("a"), paths.organization("org-b"))));
+  assert.equal(checks, 75);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }
 

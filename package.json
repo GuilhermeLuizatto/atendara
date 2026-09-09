@@ -17,7 +17,10 @@
     "test:watch": "vitest",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verify": "npm run lint && npm run type-check && npm run test && npm run build"
+    "verify": "npm run lint && npm run type-check && npm run test && npm run build",
+    "test:rules": "node .local/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js emulators:exec --config firebase.emulator-tests.json --project demo-atendara --only firestore \"node scripts/test-firestore-rules.mjs\"",
+    "test:repository": "node .local/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js emulators:exec --config firebase.repository-tests.json --project demo-atendara --only firestore \"vitest run --config vitest.emulator.mts\"",
+    "test:emulator": "npm run test:rules && npm run test:repository"
   },
   "dependencies": {
     "clsx": "^2.1.1",

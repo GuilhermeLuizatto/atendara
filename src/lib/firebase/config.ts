@@ -51,6 +51,15 @@ export function getFirebaseConfig(): FirebaseClientConfig {
   return rawConfig;
 }
 
+/**
+ * Modo demonstracao: sessao ficticia e dados em memoria. Vale quando nao ha
+ * projeto configurado ou quando o titular pede explicitamente a demonstracao.
+ * Autenticacao e repositorio operacional precisam concordar sobre isso, entao a
+ * decisao mora aqui e nao em cada modulo.
+ */
+export const isDemoMode =
+  !isFirebaseConfigured || process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
 /** Emuladores locais, ligados por NEXT_PUBLIC_FIREBASE_USE_EMULATORS=true. */
 export const useEmulators =
   process.env.NEXT_PUBLIC_FIREBASE_USE_EMULATORS === "true";

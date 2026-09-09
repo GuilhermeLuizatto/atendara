@@ -7,6 +7,8 @@ com informações e encaminha ao profissional os assuntos que exigem atenção h
 
 **Plataforma multiprofissional de gestao e automacao para quem atende pessoas.**
 
+Uma plataforma **Three Devs**.
+
 Agenda, CRM, financeiro e central de mensagens com um agente de IA que responde o
 administrativo dentro de regras que o profissional define — e encaminha todo o
 resto para o humano.
@@ -174,6 +176,17 @@ apontam para os emuladores.
 | `npm run format`     | Prettier                                      |
 | `npm run verify`     | lint + type-check + testes + build            |
 
+Suites que exigem o emulador (Java e `.local/firebase-tools`):
+
+| Comando                  | O que prova                                                  |
+| ------------------------ | ------------------------------------------------------------ |
+| `npm run test:rules`     | Security Rules: isolamento entre organizacoes, modulos, append-only |
+| `npm run test:repository`| Fiacao do repositorio: `Timestamp` <-> ISO, lote atomico, transacao |
+| `npm run test:access`    | Matriz de acesso: Auth + callable functions + regras juntas   |
+| `npm run test:emulator`  | As tres em sequencia                                          |
+
+Resultados da matriz em [docs/MATRIZ-DE-ACESSO.md](docs/MATRIZ-DE-ACESSO.md).
+
 ---
 
 ## Deploy
@@ -242,6 +255,10 @@ posteriormente e suas limitacoes, consulte [CONTINUATION.md](docs/CONTINUATION.m
 - **Separacao entre dado administrativo e dado sensivel** desde a modelagem. Nao
   ha prontuario clinico no MVP, e o agente nao copia conversa para o cadastro.
 - **Nenhum dado real** e usado em nenhum ambiente.
+- **Matriz de acesso verificada de ponta a ponta** no emulador: cadastro,
+  senha inicial obrigatoria, isolamento por organizacao e profissao, modulos,
+  suspensao, validade e tentativas de autopromocao. Ver
+  [docs/MATRIZ-DE-ACESSO.md](docs/MATRIZ-DE-ACESSO.md).
 
 Este projeto e descrito como **arquitetado considerando principios de privacidade
 e protecao de dados**. Nao ha afirmacao de conformidade com a LGPD: adequacao de

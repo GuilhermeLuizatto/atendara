@@ -6,7 +6,7 @@ import { Sparkles } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { APP_NAME, APP_TAGLINE } from "@/config/app";
+import { APP_NAME, APP_TAGLINE, OPERATOR_NAME } from "@/config/app";
 import { AuthError } from "@/lib/auth";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/providers/auth-provider";
@@ -139,6 +139,10 @@ export default function LoginPage() {
           <Link href="/" className="underline underline-offset-2">
             Voltar para a apresentacao
           </Link>
+        </p>
+
+        <p className="text-muted-foreground mt-2 text-center text-xs">
+          {APP_NAME} e uma plataforma {OPERATOR_NAME}.
         </p>
       </div>
     </div>

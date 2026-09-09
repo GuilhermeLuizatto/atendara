@@ -2,6 +2,16 @@
 
 export const APP_NAME = "Atendara";
 
+/**
+ * Empresa que opera a plataforma.
+ *
+ * Nao e um tenant: a Three Devs nao tem agenda, clientes nem financeiro no
+ * produto. E a identidade de quem publica e responde pelo Atendara, e aparece
+ * na apresentacao, no login e nos metadados. Organizacoes de clientes vivem em
+ * `organizations/{orgId}`; esta nao.
+ */
+export const OPERATOR_NAME = "Three Devs";
+
 export const AI_ASSISTANT_NAME = "Dara";
 
 export const APP_TAGLINE = "Mais tempo para atender.";

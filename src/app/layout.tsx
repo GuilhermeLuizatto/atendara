@@ -1,7 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
-import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE } from "@/config/app";
+import {
+  APP_DESCRIPTION,
+  APP_NAME,
+  APP_TAGLINE,
+  OPERATOR_NAME,
+} from "@/config/app";
 import { AppProviders } from "@/providers";
 import { themeInitScript } from "@/providers/theme-provider";
 
@@ -24,6 +29,9 @@ export const metadata: Metadata = {
   },
   description: APP_DESCRIPTION,
   applicationName: APP_NAME,
+  authors: [{ name: OPERATOR_NAME }],
+  creator: OPERATOR_NAME,
+  publisher: OPERATOR_NAME,
 };
 
 export const viewport: Viewport = {

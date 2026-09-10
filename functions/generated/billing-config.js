@@ -13,8 +13,8 @@
  * plano quer assinar.
  */
 /**
- * Catalogo PROVISORIO. A pergunta 5 do ADR 0001 — nomes, precos e modulos
- * definitivos — continua com o titular; estes valores existem para exercitar o
+ * Catalogo PROVISORIO. Nomes, precos e modulos definitivos continuam com o
+ * titular; estes valores existem para exercitar o
  * fluxo inteiro no ambiente de testes e devem ser revistos antes de qualquer
  * cobranca real. Precos em centavos inteiros.
  */
@@ -78,7 +78,7 @@ export function activePlans() {
 /**
  * Tolerancia depois do fim do ciclo antes de o painel fechar.
  *
- * Pergunta 6 do ADR, respondida aqui em carater provisorio: cinco dias. A razao
+ * Valor provisorio, ainda a confirmar pelo titular: cinco dias. A razao
  * de existir tolerancia e que a recusa de cartao quase sempre e transitoria
  * (limite, cartao vencido) e a Stripe retenta por alguns dias; fechar o painel
  * na primeira falha derrubaria o atendimento de quem so precisa trocar o

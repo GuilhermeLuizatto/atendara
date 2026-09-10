@@ -126,7 +126,7 @@ Colecoes sob `organizations/{organizationId}`:
 esconde isso: a primeira e o alerta que aparece para a equipe dentro do produto;
 a segunda e a mensagem que SAI para quem e atendido, com estado de entrega e
 tentativas. So a segunda exige consentimento, contato valido e configuracao
-explicita — ver [NOTIFICACOES.md](NOTIFICACOES.md).
+explicita — as condicoes vivem em `src/lib/notifications/eligibility.ts`.
 
 Na raiz, alem dessas, vivem as colecoes da **cobranca da plataforma** —
 `platformPlans`, `platformSubscriptions/{organizationId}`, `platformInvoices`,
@@ -343,8 +343,8 @@ demonstracao, e `npm run check:bundle` (parte do `verify`) confere o artefato.
 
 Na autenticacao real, o perfil vem de `accounts/{uid}` por assinatura Firestore;
 email nao determina papel. As functions em `functions/` gerenciam o cadastro e
-a troca inicial. Sua implantacao depende de Blaze e ainda esta pendente.
-Consulte [FIREBASE-SETUP.md](FIREBASE-SETUP.md) para o estado remoto confirmado.
+a troca inicial; as de cobranca dependem dos segredos do gateway no Secret
+Manager.
 
 O repositorio operacional escolhe a implementacao em `src/services/index.ts`:
 Firestore quando ha projeto configurado E o usuario pertence a uma organizacao;
@@ -426,9 +426,6 @@ deploy.
 ---
 
 ## 13. Cobranca da plataforma
-
-Documento completo: [COBRANCA-DA-PLATAFORMA.md](COBRANCA-DA-PLATAFORMA.md).
-Decisao: [ADR 0001](decisions/0001-cobranca-da-plataforma-e-gateway-de-assinatura.md).
 
 O Atendara e operado pela Three Devs e vendido por mensalidade. Existem dois
 dinheiros no produto e a arquitetura os mantem separados por construcao, nao por

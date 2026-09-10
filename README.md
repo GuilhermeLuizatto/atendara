@@ -20,14 +20,11 @@ profissao: terminologia, taxonomia de mensagens, regras e comportamento da
 interface vem de configuracao. A mesma base atende psicologo, psiquiatra, medico,
 dentista, nutricionista, fisioterapeuta, terapeuta e personal trainer.
 
-**Status:** em desenvolvimento, com dashboard, agenda, clientes, mensagens e
-simulador da Dara navegaveis. A gestao de acesso separa o administrador da
-plataforma dos profissionais. Os dados administrativos continuam locais e
-ficticios; a Dara usa um motor de simulacao, sem envio para canais externos.
-
-A publicacao deste repositorio no GitHub nao significa que o aplicativo esteja
-implantado em producao. Firebase Authentication, Firestore, funcoes de gestao
-de contas e Hosting exigem configuracao e validacao no ambiente de destino.
+**Status:** em desenvolvimento. Agenda, clientes, mensagens e financeiro
+persistem no Firestore com isolamento por organizacao. A assinatura da
+plataforma funciona apenas no modo de testes do gateway, os avisos ao cliente
+usam um provedor simulado e a Dara usa um motor de simulacao, sem envio para
+canais externos. O produto ainda nao recebe dados reais nem faz cobranca real.
 
 ---
 
@@ -40,8 +37,9 @@ de contas e Hosting exigem configuracao e validacao no ambiente de destino.
 | Linguagem | TypeScript 5 (strict)              |
 | Auth      | Firebase Authentication            |
 | Banco     | Cloud Firestore                    |
+| Backend   | Cloud Functions (southamerica-east1) |
 | Hosting   | Firebase Hosting (export estatico) |
-| Testes    | Vitest                             |
+| Testes    | Vitest e emuladores do Firebase    |
 | Qualidade | ESLint 9, Prettier                 |
 | CI/CD     | GitHub Actions                     |
 
@@ -49,21 +47,20 @@ de contas e Hosting exigem configuracao e validacao no ambiente de destino.
 
 ## Areas do sistema
 
-| Area          | Rota             | O que faz                                               |
-| ------------- | ---------------- | ------------------------------------------------------- |
-| Dashboard     | `/dashboard`     | Visao do dia: atendimentos, mensagens, receita, alertas |
-| Agenda        | `/agenda`        | Atendimentos nas visoes diaria, semanal e mensal        |
-| Clientes      | `/clientes`      | CRM administrativo, com nome adaptado a profissao       |
-| Mensagens     | `/mensagens`     | Caixa de entrada com classificacao e acao da IA         |
-| Financeiro    | `/financeiro`    | Receitas, pendencias e atrasos do negocio do assinante  |
-| Dara          | `/agente`        | Regras, decisoes auditaveis e simulador                 |
-| Configuracoes | `/configuracoes` | Profissao, equipe, agenda e privacidade                 |
-| Minha assinatura | `/assinatura` | Plano, situacao e cobrancas da mensalidade do Atendara |
-| Administracao | `/admin`         | Cadastros, acesso e a cobranca da plataforma            |
+| Area             | Rota             | O que faz                                               |
+| ---------------- | ---------------- | ------------------------------------------------------- |
+| Dashboard        | `/dashboard`     | Visao do dia: atendimentos, mensagens, receita, alertas |
+| Agenda           | `/agenda`        | Atendimentos nas visoes diaria, semanal e mensal        |
+| Clientes         | `/clientes`      | CRM administrativo, com nome adaptado a profissao       |
+| Mensagens        | `/mensagens`     | Caixa de entrada com classificacao e acao da IA         |
+| Financeiro       | `/financeiro`    | Receitas, pendencias e atrasos do negocio do assinante  |
+| Dara             | `/agente`        | Regras, decisoes auditaveis e simulador                 |
+| Configuracoes    | `/configuracoes` | Profissao, equipe, agenda, privacidade e avisos         |
+| Minha assinatura | `/assinatura`    | Plano, situacao e cobrancas da mensalidade do Atendara  |
+| Administracao    | `/admin`         | Cadastros, acesso e a cobranca da plataforma            |
 
 `/financeiro` e `/assinatura` nao se misturam: um e o dinheiro que o assinante
-recebe do proprio cliente, o outro e a mensalidade que ele paga a operadora. Ver
-[docs/COBRANCA-DA-PLATAFORMA.md](docs/COBRANCA-DA-PLATAFORMA.md).
+recebe do proprio cliente, o outro e a mensalidade que ele paga a operadora.
 
 A nomenclatura acompanha a profissao ativa: o mesmo menu mostra **Pacientes**
 para o dentista, **Alunos** para o personal trainer e **Clientes** para o
@@ -91,7 +88,9 @@ Quatro decisoes que sustentam o resto:
 4. **Toda decisao do agente e registro imutavel** — classificacao, confianca,
    regras aplicadas, motivo e versao do motor.
 
-Detalhes, custos e limitacoes conhecidas em **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+Detalhes em **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**; forma dos
+documentos, consultas e indices em
+**[docs/FIRESTORE-DATA-MODEL.md](docs/FIRESTORE-DATA-MODEL.md)**.
 
 ---
 
@@ -136,27 +135,23 @@ Sem configuracao de Firebase a aplicacao roda em **modo demonstracao**, com
 contas no navegador e dados ficticios. O comando de preparacao gera um acesso
 administrativo exclusivo para esta copia em `.local/admin-initial-access.txt`.
 Use esse acesso na tela de login e defina uma nova senha quando solicitado.
-O administrador cadastra os profissionais e libera os acessos pertinentes.
 
-`.local/` e `.env.local` ficam fora do Git. Nao publique a senha inicial nem
-o verificador local. Esse acesso de demonstracao nao cria uma conta no Firebase.
+`.local/` e `.env.local` ficam fora do Git. O verificador desse acesso so entra
+em build de demonstracao; `npm run check:bundle` confere que ele nao vai para um
+build com Firebase configurado.
 
 ### Conectar a um projeto Firebase (opcional)
 
-Adicione os campos de `.env.example` ao arquivo `.env.local`, preservando
-a configuracao administrativa local gerada no passo anterior. Preencha com os dados de
-**Firebase Console → Configuracoes do projeto → Seus
-apps → Configuracao do SDK**. Nenhum desses valores e segredo: sao
-identificadores publicos que vao no bundle de qualquer aplicacao Firebase. A
-protecao dos dados esta nas Security Rules.
+Adicione os campos de `.env.example` ao arquivo `.env.local`, preservando a
+configuracao administrativa local gerada no passo anterior. Preencha com os
+dados de **Firebase Console → Configuracoes do projeto → Seus apps →
+Configuracao do SDK**. Nenhum desses valores e segredo: sao identificadores
+publicos que vao no bundle de qualquer aplicacao Firebase. A protecao dos dados
+esta nas Security Rules.
 
 Depois habilite **Authentication → Sign-in method → E-mail/senha** e crie o
-Firestore.
-
-Para provisionar o administrador e implantar as funcoes de gestao de contas,
-consulte [FIREBASE-SETUP.md](docs/FIREBASE-SETUP.md). A criacao do projeto
-Firebase, por si so, nao ativa esses fluxos. Enquanto a implantacao nao estiver
-concluida, mantenha `NEXT_PUBLIC_DEMO_MODE=true` para explorar o modo local.
+Firestore. As Cloud Functions exigem o plano Blaze; as de cobranca exigem ainda
+`STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET` no Secret Manager.
 
 ### Emuladores locais
 
@@ -172,29 +167,25 @@ apontam para os emuladores.
 
 ## Comandos
 
-| Comando              | O que faz                                     |
-| -------------------- | --------------------------------------------- |
-| `npm run dev`        | Servidor de desenvolvimento                   |
-| `npm run build`      | Build de producao (export estatico em `out/`) |
-| `npm run lint`       | ESLint                                        |
-| `npm run type-check` | Gera tipos de rota e roda `tsc --noEmit`      |
-| `npm run test`       | Suite de testes                               |
-| `npm run format`     | Prettier                                      |
-| `npm run verify`     | lint + type-check + testes + build            |
+| Comando                | O que faz                                                  |
+| ---------------------- | ---------------------------------------------------------- |
+| `npm run dev`          | Servidor de desenvolvimento                                |
+| `npm run build`        | Build de producao (export estatico em `out/`)              |
+| `npm run lint`         | ESLint                                                     |
+| `npm run type-check`   | Gera tipos de rota e roda `tsc --noEmit`                   |
+| `npm run test`         | Suite de testes                                            |
+| `npm run check:bundle` | Confere que nenhum segredo foi parar em `out/`             |
+| `npm run format`       | Prettier                                                   |
+| `npm run verify`       | lint + type-check + testes + build + conferencia do bundle |
 
-Relatorios em PDF: `node scripts/render-report.mjs docs/ARQUIVO.md` (usa o Edge, sem dependencias).
+Suites que exigem o emulador (Java e a CLI do Firebase):
 
-Suites que exigem o emulador (Java e `.local/firebase-tools`):
-
-| Comando                  | O que prova                                                  |
-| ------------------------ | ------------------------------------------------------------ |
-| `npm run test:rules`     | Security Rules: isolamento entre organizacoes, modulos, append-only |
-| `npm run test:repository`| Fiacao do repositorio: `Timestamp` <-> ISO, lote atomico, transacao |
-| `npm run test:access`    | Matriz de acesso e cobranca: Auth, callables, webhook e regras juntos |
-| `npm run test:emulator`  | As tres em sequencia                                          |
-
-Resultados da matriz em [docs/MATRIZ-DE-ACESSO.md](docs/MATRIZ-DE-ACESSO.md);
-da cobranca, em [docs/COBRANCA-DA-PLATAFORMA.md](docs/COBRANCA-DA-PLATAFORMA.md).
+| Comando                   | O que prova                                                          |
+| ------------------------- | -------------------------------------------------------------------- |
+| `npm run test:rules`      | Security Rules: isolamento entre organizacoes, modulos, append-only  |
+| `npm run test:repository` | Fiacao do repositorio: `Timestamp` <-> ISO, lote atomico, transacao  |
+| `npm run test:access`     | Matriz de acesso e cobranca: Auth, callables, webhook e regras juntos |
+| `npm run test:emulator`   | As tres em sequencia                                                 |
 
 ---
 
@@ -203,13 +194,16 @@ da cobranca, em [docs/COBRANCA-DA-PLATAFORMA.md](docs/COBRANCA-DA-PLATAFORMA.md)
 O build gera um site estatico em `out/`, servido pelo Firebase Hosting.
 
 ```bash
+firebase deploy --only functions
 npm run build
-firebase deploy --only hosting,firestore:rules,firestore:indexes
+firebase deploy --only firestore:rules,firestore:indexes
+firebase deploy --only hosting
 ```
 
-Publique as **Security Rules antes do Hosting**: uma versao nova do frontend nao
-deve entrar no ar com o banco ainda desprotegido. O workflow de deploy ja faz
-nessa ordem.
+As **functions vao primeiro**, porque o workflow de `main` nao as publica e o
+aplicativo novo nao pode entrar no ar chamando uma function antiga. Depois, as
+**Security Rules antes do Hosting**: uma versao nova do frontend nao deve entrar
+no ar com o banco ainda desprotegido.
 
 ---
 
@@ -220,9 +214,9 @@ install → lint → type-check → testes → build → deploy
 ```
 
 - **`.github/workflows/ci.yml`** — todo push e PR. Funciona em fork sem segredos.
-- **`.github/workflows/deploy.yml`** — `main`. Publica Security Rules e depois o
-  Hosting; sem credenciais configuradas, registra que pulou e termina com
-  sucesso.
+- **`.github/workflows/deploy.yml`** — `main`. Publica Security Rules e indices e
+  depois o Hosting; sem credenciais configuradas, registra que pulou e termina
+  com sucesso.
 
 Segredos necessarios para o deploy:
 
@@ -236,19 +230,21 @@ Nenhum segredo fica no codigo.
 
 ---
 
-## Roadmap original
-
-Esta tabela registra o planejamento inicial. Para o trabalho implementado
-posteriormente e suas limitacoes, consulte [CONTINUATION.md](docs/CONTINUATION.md).
+## Roadmap
 
 | Fase  | Escopo                                                                    | Status |
 | ----- | ------------------------------------------------------------------------- | ------ |
 | **0** | Fundacao: tipos, multi-tenancy, Security Rules, design system, shell, CI  | ✅     |
-| **1** | Modulos: dashboard, agenda, CRM, financeiro, mensagens, regras, simulador | ⬜     |
-| **2** | Firestore real: repositorios, RBAC aplicado, auditoria, notificacoes      | ⬜     |
+| **1** | Modulos: dashboard, agenda, CRM, financeiro, mensagens, regras, simulador | ✅     |
+| **2** | Firestore real: repositorios, RBAC aplicado, auditoria, notificacoes      | ✅     |
 | **3** | Automacao: n8n, WhatsApp, Google Calendar, confirmacao e remarcacao       | ⬜     |
 | **4** | IA: classificacao avancada, regras contextuais, extracao, analytics       | ⬜     |
-| **5** | Escala: clinicas, equipes, planos, billing, marketplace de integracoes    | ⬜     |
+| **5** | Escala: clinicas, equipes, planos, billing, marketplace de integracoes    | 🟨     |
+
+Na fase 5, planos e billing estao implementados apenas no modo de testes do
+gateway; clinicas com equipe e marketplace ainda nao existem. Antes de dados
+reais, o produto ainda precisa de endurecimento de seguranca, backup testado e
+revisao de privacidade.
 
 ---
 
@@ -261,13 +257,14 @@ posteriormente e suas limitacoes, consulte [CONTINUATION.md](docs/CONTINUATION.m
   editar ou desativar.
 - **Auditoria append-only**: `aiDecisions` e `auditLogs` recusam `update` e
   `delete`.
+- **Assinatura so muda pelo webhook**, depois de conferir a assinatura
+  criptografica do evento. O navegador nao escreve em nenhuma colecao de
+  cobranca.
+- **Avisos ao cliente sao opt-in explicito**: exigem regra habilitada, contato
+  valido e consentimento que nomeie o canal.
 - **Separacao entre dado administrativo e dado sensivel** desde a modelagem. Nao
   ha prontuario clinico no MVP, e o agente nao copia conversa para o cadastro.
 - **Nenhum dado real** e usado em nenhum ambiente.
-- **Matriz de acesso verificada de ponta a ponta** no emulador: cadastro,
-  senha inicial obrigatoria, isolamento por organizacao e profissao, modulos,
-  suspensao, validade e tentativas de autopromocao. Ver
-  [docs/MATRIZ-DE-ACESSO.md](docs/MATRIZ-DE-ACESSO.md).
 
 Este projeto e descrito como **arquitetado considerando principios de privacidade
 e protecao de dados**. Nao ha afirmacao de conformidade com a LGPD: adequacao de

@@ -455,7 +455,7 @@ describe("Revisao de seguranca — ordem entre fatura, assinatura e reembolso", 
     );
 
     // `charge.invoice` e o formato anterior a 2025-03-31.basil; a versao fixada
-    // nao o envia mais (pendencia S-01 em docs/REVISAO-DE-SEGURANCA-2026-09-10.md).
+    // nao o envia mais, e o reembolso ainda precisa ser resolvido nessa versao.
     await applyGatewayEvent({
       id: "evt_5",
       type: "charge.refunded",

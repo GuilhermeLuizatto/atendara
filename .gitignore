@@ -68,3 +68,11 @@ gha-creds-*.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# documentos privados de planejamento e execucao
+# Relatorios, continuacao, roadmap, revisoes e ADRs ficam so no disco. Vao ao
+# repositorio apenas os documentos tecnicos de referencia.
+/docs/*
+!/docs/ARCHITECTURE.md
+!/docs/FIRESTORE-DATA-MODEL.md
+/scripts/render-report.mjs

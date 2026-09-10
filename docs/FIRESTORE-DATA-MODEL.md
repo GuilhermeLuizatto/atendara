@@ -45,9 +45,9 @@ por conversa. As demais sao colecoes diretas da organizacao.
 As colecoes `platform*` sao a excecao deliberada a "tudo vive sob
 `organizations/`": elas nao pertencem a tenant nenhum, e sim a operadora. Sao a
 mensalidade que a Three Devs cobra dos assinantes, e **nunca** viram
-`transactions` de uma organizacao. Detalhes em
-[COBRANCA-DA-PLATAFORMA.md](COBRANCA-DA-PLATAFORMA.md); a decisao esta no
-[ADR 0001](decisions/0001-cobranca-da-plataforma-e-gateway-de-assinatura.md).
+`transactions` de uma organizacao. O mecanismo esta em
+[`functions/billing.js`](../functions/billing.js) e a politica de acesso em
+[`src/lib/billing/policy.ts`](../src/lib/billing/policy.ts).
 
 Diferenca de forma que vale registrar: os documentos `platform*` guardam datas
 como **string ISO**, e nao `Timestamp`. Eles seguem a convencao de
@@ -302,5 +302,4 @@ assunto dela.
   tocar em dado de cliente nenhum. **Isso descreve a interface, nao as regras:**
   `isMember()` e `hasRole()` devolvem verdadeiro para `PLATFORM_ADMIN` em
   qualquer organizacao, entao as Security Rules concedem a ele leitura e escrita
-  em todos os tenants. Pendencia S-02 da
-  [revisao de seguranca](REVISAO-DE-SEGURANCA-2026-09-10.md).
+  em todos os tenants.

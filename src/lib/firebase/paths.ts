@@ -15,8 +15,8 @@ import type { ID } from "@/types";
  * As colecoes `platform*` sao a excecao deliberada a primeira frase: elas NAO
  * pertencem a tenant nenhum. Sao a cobranca que a operadora faz das clinicas e
  * profissionais assinantes, e por isso vivem na raiz, fora de `organizations/`.
- * Mensalidade da plataforma nunca vira `transactions` de um assinante (ADR
- * 0001, secao 2). Somente o backend escreve nelas.
+ * Mensalidade da plataforma nunca vira `transactions` de um assinante.
+ * Somente o backend escreve nelas.
  */
 
 export const ROOT_COLLECTIONS = {

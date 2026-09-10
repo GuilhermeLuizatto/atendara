@@ -35,7 +35,7 @@ import { GatewayError, stripeRequest, verifyWebhookSignature } from "./gateway.j
  *    e registrado e descartado.
  *
  * Nada aqui toca `organizations/{orgId}/transactions`. O financeiro do
- * assinante e outra contabilidade, com outro dono (ADR 0001, secao 2).
+ * assinante e outra contabilidade, com outro dono.
  */
 
 const REGION = "southamerica-east1";

@@ -9,7 +9,7 @@ import type { AppModule } from "./access";
  * assinante (receita de atendimento, despesas, saldo de paciente). Sao duas
  * contabilidades com donos diferentes e elas nunca se encontram: uma
  * mensalidade da Three Devs jamais vira `Transaction` de um tenant, e nenhum
- * indicador soma os dois. Ver ADR 0001, secao 2.
+ * indicador soma os dois.
  *
  * Valores em centavos inteiros, como no resto do produto (regra 7 do AGENTS).
  */

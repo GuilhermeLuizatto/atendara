@@ -28,12 +28,32 @@ organizations/{orgId}
 ├── transactions/{transactionId}         financeiro
 ├── aiRules/{ruleId}                     apenas os niveis editaveis
 ├── aiDecisions/{decisionId}             append-only
-├── notifications/{notificationId}       alertas
+├── notifications/{notificationId}       alertas DENTRO do painel
+├── notificationDeliveries/{deliveryId}  fila de saida dos avisos ao cliente
 └── auditLogs/{logId}                    append-only
+
+platformPlans/{planId}                    cobranca DA PLATAFORMA (Etapa 3)
+platformSubscriptions/{organizationId}    uma por organizacao — o id E o tenant
+platformInvoices/{invoiceId}              cada cobranca emitida
+platformGatewayEvents/{eventId}           trilha dos eventos; garante idempotencia
+platformCustomers/{customerId}            indice cliente-do-gateway -> organizacao
 ```
 
 `messages` e subcolecao porque e a colecao que mais cresce e quase sempre e lida
 por conversa. As demais sao colecoes diretas da organizacao.
+
+As colecoes `platform*` sao a excecao deliberada a "tudo vive sob
+`organizations/`": elas nao pertencem a tenant nenhum, e sim a operadora. Sao a
+mensalidade que a Three Devs cobra dos assinantes, e **nunca** viram
+`transactions` de uma organizacao. Detalhes em
+[COBRANCA-DA-PLATAFORMA.md](COBRANCA-DA-PLATAFORMA.md); a decisao esta no
+[ADR 0001](decisions/0001-cobranca-da-plataforma-e-gateway-de-assinatura.md).
+
+Diferenca de forma que vale registrar: os documentos `platform*` guardam datas
+como **string ISO**, e nao `Timestamp`. Eles seguem a convencao de
+`accounts/{userId}` — colecoes de raiz, escritas apenas pelo backend, que ja
+carregam `accessUntilMs` numerico para o que as Security Rules precisam
+comparar. A tabela de conversao da secao 2 cobre so as colecoes de tenant.
 
 ---
 
@@ -55,6 +75,7 @@ mantem a tabela de quais campos sao data:
 | `aiRules`       | + `lastAppliedAt`                                          |
 | `aiDecisions`   | + `decidedAt`, `evaluatedAt`                               |
 | `notifications` | + `acknowledgedAt`                                         |
+| `notificationDeliveries` | + `scheduledFor`, `lastAttemptAt`, `nextAttemptAt`, `sentAt`, `cancelledAt` |
 | `auditLogs`     | + `occurredAt`                                             |
 
 **Por que `Timestamp` e nao string.** E o tipo que o Firestore ordena, indexa e
@@ -119,6 +140,7 @@ Definidas em [`src/services/firestore/queries.ts`](../src/services/firestore/que
 | `aiRules`       | `priority` desc        | 200  |
 | `aiDecisions`   | `decidedAt` desc       | 200  |
 | `notifications` | `createdAt` desc       | 100  |
+| `notificationDeliveries` | `scheduledFor` desc | 200 |
 | `auditLogs`     | `occurredAt` desc      | 200  |
 
 O contrato entrega o tenant inteiro; os tetos existem para que uma organizacao
@@ -225,8 +247,25 @@ verificacoes anteriores:
 - trilha de auditoria: o profissional escreve, so a administracao le;
 - criacao de perfil profissional pelo aplicativo — negada.
 
-Total: **75 verificacoes**. O numero e conferido por `assert` no proprio script,
-para que uma verificacao removida por engano quebre o teste.
+A Etapa 3 acrescentou as colecoes de cobranca da plataforma:
+
+- o assinante le a propria assinatura; a do vizinho — negada;
+- membro que nao responde pela organizacao — negado;
+- faturas com filtro do proprio tenant — permitidas; de outro tenant e **sem**
+  filtro — negadas, pelo mesmo mecanismo do `collectionGroup` de mensagens;
+- dono com a mensalidade **vencida**: le a propria cobranca e o catalogo, e
+  continua sem alcancar o operacional — e o caminho para regularizar;
+- trilha de eventos: so a operadora le;
+- indice `platformCustomers`: ninguem le, em papel nenhum;
+- escrita em qualquer das cinco colecoes — negada para todos, **inclusive** o
+  administrador da plataforma.
+
+A Etapa 4 acrescentou 12 verificacoes da fila de avisos. A revisao de seguranca
+de 10/09/2026 acrescentou 3: membro com papel `OWNER` alcanca a cobranca so com
+o vinculo **ativo** — suspenso nao le a assinatura nem as faturas.
+
+Total: **118 verificacoes**. O numero e conferido por `assert` no proprio
+script, para que uma verificacao removida por engano quebre o teste.
 
 Do lado do dominio, `src/services/firestore/plans.test.ts` verifica que nenhum
 plano de escrita produz caminho fora de `organizations/{orgId}/` — a barreira
@@ -239,8 +278,9 @@ comeca antes da rede.
 | `npm test`              | nao                 | a regra de negocio esta certa?                    |
 | `npm run test:rules`    | sim                 | quem pode o que? (isolamento, modulos, append-only) |
 | `npm run test:repository` | sim               | a fiacao grava e le o que promete?                |
+| `npm run test:access`   | sim                 | Auth, callables, webhook e regras concordam entre si? |
 
-`npm run test:emulator` roda as duas ultimas em sequencia.
+`npm run test:emulator` roda as tres ultimas em sequencia.
 
 A suite de repositorio existe porque planos corretos e regras corretas ainda
 deixam um vao: conversao `Timestamp` <-> ISO, lote atomico, transacao e
@@ -259,4 +299,8 @@ assunto dela.
   e nao e copiado para o Firestore — de proposito.
 - **Administrador da plataforma nao tem tenant operacional.** Sua conta nao tem
   organizacao; ele continua vendo o conjunto demonstrativo, por profissao, sem
-  tocar em dado de cliente nenhum.
+  tocar em dado de cliente nenhum. **Isso descreve a interface, nao as regras:**
+  `isMember()` e `hasRole()` devolvem verdadeiro para `PLATFORM_ADMIN` em
+  qualquer organizacao, entao as Security Rules concedem a ele leitura e escrita
+  em todos os tenants. Pendencia S-02 da
+  [revisao de seguranca](REVISAO-DE-SEGURANCA-2026-09-10.md).

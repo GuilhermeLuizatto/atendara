@@ -7,7 +7,7 @@ import { useMemo } from "react";
 
 import { APP_NAME } from "@/config/app";
 import { NAV_ITEMS, navLabel, type AppRoute } from "@/config/navigation";
-import { canAccessModule, isPlatformAdmin } from "@/config/access";
+import { canAccessModule, canManageSubscription, isPlatformAdmin } from "@/config/access";
 import type { AppModule } from "@/types/access";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils/cn";
@@ -120,6 +120,28 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               );
             },
           )}
+          {/* Fora de NAV_ITEMS de proposito: "Minha assinatura" nao e um modulo
+              do produto e nao depende da matriz RBAC do tenant — quem entra e
+              quem responde pela organizacao. E precisa aparecer mesmo com a
+              mensalidade vencida, que e quando ela mais faz falta. */}
+          {canManageSubscription(user?.access) ? (
+            <li>
+              <Link
+                href="/assinatura"
+                onClick={onNavigate}
+                aria-current={pathname.startsWith("/assinatura") ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                  pathname.startsWith("/assinatura")
+                    ? "bg-primary-soft text-primary-soft-foreground font-medium"
+                    : "text-muted-foreground hover:bg-surface-muted hover:text-foreground",
+                )}
+              >
+                <NavIcon name="finance" className="size-4.5 shrink-0 text-subtle-foreground" />
+                <span className="flex-1 truncate">Minha assinatura</span>
+              </Link>
+            </li>
+          ) : null}
         </ul>
       </nav>
 

@@ -1,4 +1,5 @@
 import type { ID, ISODateString, TenantScopedEntity } from "./common";
+import type { NotificationConsent } from "./notifications";
 import type { ServiceModality } from "./profession";
 
 /**
@@ -16,7 +17,16 @@ export type AcquisitionChannel =
   "REFERRAL" | "INSTAGRAM" | "GOOGLE" | "WHATSAPP" | "WEBSITE" | "OTHER";
 
 export interface Client extends TenantScopedEntity {
+  /**
+   * Aceite geral de receber avisos sobre atendimentos. Sozinho nao autoriza
+   * envio nenhum: e preciso tambem um `notificationConsent` que nomeie o canal.
+   */
   appointmentNotificationsEnabled?: boolean;
+  /**
+   * Consentimento por canal. Ausente em cadastro antigo — e ausencia significa
+   * "nao enviar", nunca "enviar pelo canal que a organizacao preferir".
+   */
+  notificationConsent?: NotificationConsent | null;
   fullName: string;
   preferredName: string | null;
   email: string | null;

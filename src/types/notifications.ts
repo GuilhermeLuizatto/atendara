@@ -1,0 +1,211 @@
+import type { ID, ISODateString, TenantScopedEntity } from "./common";
+
+/**
+ * Avisos que SAEM do produto — distintos de `notification.ts`, que e o alerta
+ * exibido dentro do painel.
+ *
+ * O modelo separa duas coisas que nao podem se misturar:
+ *
+ * 1. **`PLATFORM_TO_SUBSCRIBER`** — a operadora avisando o assinante sobre a
+ *    propria assinatura (teste acabando, pagamento recusado, acesso vencendo).
+ *    Deriva de `platformSubscriptions` e hoje aparece so dentro do painel.
+ * 2. **`ORGANIZATION_TO_CLIENT`** — a clinica avisando quem ela atende sobre um
+ *    atendimento. Sai da organizacao, exige canal configurado, consentimento e
+ *    contato valido, e e o unico dos dois que produz `NotificationDelivery`.
+ *
+ * Um aviso de mensalidade nunca vira mensagem de clinica, e um lembrete de
+ * atendimento nunca sai em nome da operadora — sao audiencias, remetentes e
+ * bases legais diferentes.
+ */
+export type NotificationAudience =
+  | "PLATFORM_TO_SUBSCRIBER"
+  | "ORGANIZATION_TO_CLIENT";
+
+/**
+ * Canais de saida da organizacao. `IN_APP` nao entra: aviso dentro do painel e
+ * `Notification`, nao envio — e nao precisa de consentimento nem de contato.
+ */
+export const OUTBOUND_CHANNELS = ["EMAIL", "SMS", "WHATSAPP"] as const;
+
+export type OutboundChannel = (typeof OUTBOUND_CHANNELS)[number];
+
+/** Eventos da agenda que podem gerar aviso ao cliente. */
+export const APPOINTMENT_NOTIFICATION_EVENTS = [
+  "APPOINTMENT_SCHEDULED",
+  "APPOINTMENT_REMINDER",
+  "APPOINTMENT_CONFIRMED",
+  "APPOINTMENT_CANCELLED",
+] as const;
+
+export type AppointmentNotificationEvent =
+  (typeof APPOINTMENT_NOTIFICATION_EVENTS)[number];
+
+/**
+ * Uma regra e a unica coisa que autoriza um envio. Sem regra habilitada para o
+ * par evento+canal, nenhuma acao da agenda produz mensagem — inclusive
+ * confirmar um atendimento.
+ */
+export interface NotificationRule {
+  id: ID;
+  event: AppointmentNotificationEvent;
+  channel: OutboundChannel;
+  /** Desligada por padrao. Ver `DEFAULT_NOTIFICATION_SETTINGS`. */
+  enabled: boolean;
+  /** Antecedencia em minutos. `0` = no proprio instante do evento. */
+  leadMinutes: number;
+  /** `null` = usa o modelo da profissao (`definitions.ts`). */
+  customTemplate: string | null;
+}
+
+export interface OrganizationNotificationSettings {
+  /**
+   * Trava mestra da organizacao. Desligada, nenhuma regra vale — e o unico
+   * campo que precisa ser conferido antes de qualquer coisa.
+   */
+  enabled: boolean;
+  /**
+   * A organizacao comprovou habilitacao como remetente naquele canal (numero
+   * aprovado no provedor, dominio verificado). Ter um contato NAO e comprovar
+   * isso: e por essa distincao que existem dois campos.
+   */
+  verifiedSenderChannels: OutboundChannel[];
+  rules: NotificationRule[];
+}
+
+/**
+ * Consentimento do titular, por canal.
+ *
+ * `Client.appointmentNotificationsEnabled` continua sendo o "aceito receber
+ * avisos" geral; este objeto diz PARA QUAL CANAL. Os dois sao exigidos: um
+ * cadastro antigo, que so tem o booleano, nao passa a receber nada quando a
+ * organizacao liga um canal novo.
+ */
+export interface NotificationConsent {
+  channels: OutboundChannel[];
+  grantedAt: ISODateString;
+  /** Preenchido revoga tudo, independentemente de `channels`. */
+  revokedAt: ISODateString | null;
+  source: "CLIENT_FORM" | "WRITTEN" | "IMPORTED";
+}
+
+/**
+ * Estados de entrega.
+ *
+ * `PLANNED` -> `SENDING` -> `SENT` | `FAILED`; `CANCELLED` fecha o registro
+ * quando o atendimento deixa de existir antes da hora do envio. `FAILED` so e
+ * terminal depois de esgotadas as tentativas; ate la volta para `PLANNED` com
+ * `nextAttemptAt` no futuro.
+ */
+export type DeliveryStatus =
+  | "PLANNED"
+  | "SENDING"
+  | "SENT"
+  | "FAILED"
+  | "CANCELLED";
+
+/** O que o provedor respondeu. Nao inclui conteudo da mensagem. */
+export type DeliveryOutcome = "ACCEPTED" | "TEMPORARY_FAILURE" | "REJECTED";
+
+export const DELIVERY_FAILURE_CODES = [
+  "PROVIDER_UNAVAILABLE",
+  "INVALID_DESTINATION",
+  "RATE_LIMITED",
+  "SENDER_NOT_ALLOWED",
+  "ATTEMPTS_EXHAUSTED",
+] as const;
+
+export type DeliveryFailureCode = (typeof DELIVERY_FAILURE_CODES)[number];
+
+/**
+ * Registro de resultado.
+ *
+ * O que NAO existe aqui e deliberado: nem o texto enviado, nem o nome de quem
+ * recebeu, nem o contato completo, nem qualquer dado do atendimento alem do
+ * identificador. Auditar entrega exige saber "o que foi tentado, quando, por
+ * qual canal e com que resultado" — nao exige guardar a mensagem. `bodyHash`
+ * permite provar que duas tentativas mandaram o mesmo texto sem guardar texto
+ * nenhum.
+ */
+export interface NotificationDelivery extends TenantScopedEntity {
+  audience: "ORGANIZATION_TO_CLIENT";
+  event: AppointmentNotificationEvent;
+  channel: OutboundChannel;
+  ruleId: ID;
+  appointmentId: ID;
+  clientId: ID;
+  professionalId: ID | null;
+  /** Instante em que o envio deve ocorrer (evento menos antecedencia). */
+  scheduledFor: ISODateString;
+  status: DeliveryStatus;
+  attempts: number;
+  lastAttemptAt: ISODateString | null;
+  /** `null` quando nao ha nova tentativa prevista. */
+  nextAttemptAt: ISODateString | null;
+  /** Identificador do provedor. `SIMULATED` enquanto nao houver canal real. */
+  providerId: string;
+  providerMessageId: string | null;
+  failureCode: DeliveryFailureCode | null;
+  templateId: string;
+  bodyHash: string;
+  bodyLength: number;
+  /** Ultimos digitos/caracteres do destino, para conferencia sem expor contato. */
+  contactHint: string;
+  sentAt: ISODateString | null;
+  cancelledAt: ISODateString | null;
+}
+
+/** Por que um evento da agenda nao produziu envio. */
+export const NOTIFICATION_SKIP_REASONS = [
+  "ORGANIZATION_DISABLED",
+  "SENDER_NOT_VERIFIED",
+  "NO_RULE_FOR_EVENT",
+  "RULE_DISABLED",
+  "EVENT_NOT_ALLOWED_FOR_PROFESSION",
+  "CHANNEL_NOT_ALLOWED_FOR_PROFESSION",
+  "MISSING_CONTACT",
+  "INVALID_CONTACT",
+  "MISSING_CONSENT",
+  "CONSENT_REVOKED",
+  "CHANNEL_NOT_CONSENTED",
+  "SCHEDULE_IN_THE_PAST",
+  "ALREADY_PLANNED",
+  "TEMPLATE_REJECTED",
+] as const;
+
+export type NotificationSkipReason =
+  (typeof NOTIFICATION_SKIP_REASONS)[number];
+
+/** Resultado da avaliacao de uma regra contra um evento concreto. */
+export type NotificationEligibility =
+  | { eligible: true; scheduledFor: ISODateString; body: string }
+  | { eligible: false; reason: NotificationSkipReason };
+
+// ------------------------------------------------ avisos da plataforma
+
+export const PLATFORM_NOTICE_EVENTS = [
+  "TRIAL_ENDING",
+  "PAYMENT_PENDING",
+  "ACCESS_ENDING",
+  "SUBSCRIPTION_CANCELED",
+  "NO_SUBSCRIPTION",
+] as const;
+
+export type PlatformNoticeEvent = (typeof PLATFORM_NOTICE_EVENTS)[number];
+
+/**
+ * Aviso da operadora ao assinante.
+ *
+ * E derivado da assinatura a cada leitura, nao gravado: o estado ja e escrito
+ * exclusivamente pelo webhook (AGENTS.md, regra 10), e um aviso persistido
+ * seria uma segunda copia da mesma verdade, livre para divergir. Hoje o canal e
+ * sempre `IN_APP`; e-mail depende de ativacao futura.
+ */
+export interface PlatformNotice {
+  event: PlatformNoticeEvent;
+  severity: "INFO" | "ATTENTION" | "CRITICAL";
+  channel: "IN_APP";
+  title: string;
+  body: string;
+  actionLabel: string | null;
+  actionHref: string | null;
+}

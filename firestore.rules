@@ -34,10 +34,18 @@ service cloud.firestore {
       return /databases/$(database)/documents/accounts/$(uid());
     }
 
-    function activeAccount() {
+    // Conta existente, liberada e com a senha inicial ja trocada — mas SEM
+    // exigir assinatura vigente. E o minimo para alcancar a propria cobranca:
+    // quem esta com a mensalidade vencida precisa conseguir ver o plano e a
+    // fatura para pagar. Nenhum dado operacional passa por este predicado.
+    function signedInAccount() {
       return isSignedIn() && exists(accountRef())
         && get(accountRef()).data.status == 'ACTIVE'
-        && get(accountRef()).data.mustChangePassword == false
+        && get(accountRef()).data.mustChangePassword == false;
+    }
+
+    function activeAccount() {
+      return signedInAccount()
         && (get(accountRef()).data.platformRole == 'PLATFORM_ADMIN'
           || (get(accountRef()).data.subscriptionStatus == 'ACTIVE'
             && get(accountRef()).data.accessUntilMs > request.time.toMillis()));
@@ -83,6 +91,29 @@ service cloud.firestore {
 
     function isAdmin(orgId) {
       return hasRole(orgId, ['OWNER', 'ADMIN']);
+    }
+
+    // Quem responde pela ASSINATURA DA PLATAFORMA daquela organizacao.
+    //
+    // Nao basta o papel 'OWNER': o profissional autonomo cadastrado por
+    // `registerProfessional` nasce como membro 'PROFESSIONAL' e ao mesmo tempo
+    // como `ownerId` da propria organizacao. Quem paga a mensalidade e o dono
+    // da organizacao, entao e o `ownerId` que manda — o papel entra para o caso
+    // da clinica que promove alguem a OWNER.
+    //
+    // Usa `signedInAccount()` e nao `isMember()` de proposito: com a
+    // mensalidade vencida o acesso operacional fecha, e e exatamente nesse
+    // momento que a pessoa precisa abrir a propria cobranca para regularizar.
+    //
+    // O papel so vale com o vinculo ATIVO: sem isso, um OWNER suspenso da
+    // organizacao continuaria lendo faturas dela. A callable confere o mesmo.
+    function subscriptionOwner(orgId) {
+      return platformAdmin() || (signedInAccount()
+        && get(accountRef()).data.organizationId == orgId
+        && (get(/databases/$(database)/documents/organizations/$(orgId)).data.ownerId == uid()
+          || (exists(memberRef(orgId))
+            && get(memberRef(orgId)).data.role == 'OWNER'
+            && get(memberRef(orgId)).data.status == 'ACTIVE')));
     }
 
     // Defesa em profundidade: o documento carrega o proprio organizationId e
@@ -239,6 +270,46 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // ------------------------------------------- avisos ao cliente
+
+      // Fila de saida dos avisos que a organizacao envia a quem ela atende.
+      //
+      // Nao confundir com `notifications` acima: aquela e o alerta dentro do
+      // painel, esta e a mensagem que sai. Por isso o modulo exigido e a
+      // `agenda` — todo evento que a alimenta vem de la — e a criacao exige
+      // papel com autonomia sobre a operacao.
+      //
+      // Um documento so nasce `PLANNED` e com zero tentativas. Sem isso, um
+      // cliente poderia gravar uma entrega ja `SENT` e a trilha passaria a
+      // afirmar que uma mensagem foi enviada sem que nada tenha sido tentado.
+      //
+      // ATENCAO: enquanto o unico provedor for o simulado, quem executa a
+      // entrega e o proprio aplicativo, e por isso `update` existe aqui. Com um
+      // provedor real, o disparo passa para o backend e estas regras devem
+      // fechar para `write: if false`, como as colecoes `platform*`.
+      match /notificationDeliveries/{deliveryId} {
+        allow read: if moduleAccess(orgId, 'agenda');
+
+        allow create: if moduleAccess(orgId, 'agenda') && canManage(orgId)
+          && belongsToOrg(orgId)
+          && request.resource.data.status == 'PLANNED'
+          && request.resource.data.attempts == 0
+          && request.resource.data.sentAt == null;
+
+        // O que muda depois do planejamento e so o resultado da tentativa.
+        // Destinatario, evento, canal, horario e hash do texto sao fixos: se
+        // pudessem mudar, o registro deixaria de provar o que foi enviado.
+        allow update: if moduleAccess(orgId, 'agenda') && canManage(orgId)
+          && onlyChanges([
+            'status', 'attempts', 'lastAttemptAt', 'nextAttemptAt',
+            'providerMessageId', 'failureCode', 'sentAt', 'cancelledAt',
+            'updatedAt', 'updatedBy'
+          ]);
+
+        // Registro de envio nao se apaga, como a trilha de auditoria.
+        allow delete: if false;
+      }
+
       // ------------------------------------------------ trilha de auditoria
 
       match /auditLogs/{logId} {
@@ -267,6 +338,56 @@ service cloud.firestore {
     // aceita somente `create`.
     match /{path=**}/messages/{messageId} {
       allow read: if moduleAccess(resource.data.organizationId, 'mensagens');
+    }
+
+    // ------------------------------------------- cobranca DA PLATAFORMA
+    //
+    // Estas colecoes sao da operadora (Three Devs), nao de tenant nenhum — por
+    // isso vivem na raiz. Elas nao se misturam com
+    // `organizations/{orgId}/transactions`, que continua sendo o financeiro do
+    // negocio do assinante, com as regras de sempre.
+    //
+    // NENHUMA delas aceita escrita do cliente, em nenhum papel. Ativar uma
+    // assinatura, estender validade ou lancar uma fatura sao consequencias de
+    // um evento assinado pelo gateway, aplicado pelo backend. Voltar da tela de
+    // pagamento nao prova pagamento; por isso nao existe caminho do navegador
+    // ate estes documentos que nao seja leitura.
+
+    // Catalogo de planos: legivel por qualquer conta liberada, inclusive a que
+    // esta com a mensalidade vencida — e ela quem mais precisa ver o catalogo.
+    match /platformPlans/{planId} {
+      allow read: if signedInAccount();
+      allow write: if false;
+    }
+
+    // Uma assinatura por organizacao, com o id do documento igual ao
+    // organizationId. O assinante le a propria; a operadora le todas.
+    match /platformSubscriptions/{orgId} {
+      allow read: if subscriptionOwner(orgId);
+      allow write: if false;
+    }
+
+    // Faturas: o assinante so alcanca as da propria organizacao. Como no
+    // collectionGroup de mensagens, a consulta do cliente precisa filtrar por
+    // `organizationId` — sem o filtro o Firestore nao consegue provar que todo
+    // documento retornado passa na regra e recusa a consulta inteira.
+    match /platformInvoices/{invoiceId} {
+      allow read: if subscriptionOwner(resource.data.organizationId);
+      allow write: if false;
+    }
+
+    // Trilha dos eventos do gateway. E o que garante idempotencia, entao e
+    // auditoria: so a operadora le, e ninguem escreve pelo cliente.
+    match /platformGatewayEvents/{eventId} {
+      allow read: if platformAdmin();
+      allow write: if false;
+    }
+
+    // Indice `customerId do gateway -> organizacao`. E o que amarra assinante,
+    // organizacao e assinatura; se o cliente pudesse le-lo ou escreve-lo,
+    // poderia apontar a cobranca de um para o beneficio de outro.
+    match /platformCustomers/{customerId} {
+      allow read, write: if false;
     }
 
     // ----------------------------------------------------------------- padrao

@@ -23,9 +23,25 @@ import type {
   Conversation,
   ID,
   ISODateString,
+  OrganizationNotificationSettings,
   ProfessionId,
 } from "@/types";
 
+import {
+  dispatchDelivery,
+  emptySummary,
+  tally,
+  type DispatchSummary,
+} from "@/lib/notifications";
+import {
+  dispatchTargetFor,
+  dueDeliveries,
+} from "../notifications";
+import {
+  deliveryCancelWrite,
+  deliveryTransitionWrite,
+  planUpdateNotificationSettings,
+} from "./plans/outbound";
 import {
   RepositoryError,
   type AppointmentInput,
@@ -111,6 +127,7 @@ const COLLECTION_PARTS: Array<[PartName, ConvertedCollection]> = [
   ["aiRules", "aiRules"],
   ["aiDecisions", "aiDecisions"],
   ["notifications", "notifications"],
+  ["notificationDeliveries", "notificationDeliveries"],
   ["auditLogs", "auditLogs"],
 ];
 
@@ -508,6 +525,48 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
     >,
   ): Promise<void> {
     await this.commit(planUpdateConversation(this.context(), id, patch).writes);
+  }
+
+  // ------------------------------------------------ avisos ao cliente
+
+  async updateNotificationSettings(
+    settings: OrganizationNotificationSettings,
+  ): Promise<void> {
+    await this.commit(
+      planUpdateNotificationSettings(this.context(), settings).writes,
+    );
+  }
+
+  /**
+   * Disparo das entregas vencidas.
+   *
+   * Sequencial, e nao em paralelo, de proposito: cada envio consulta o estado
+   * que o anterior deixou, e o provedor simulado responde na hora. Uma fila real
+   * pertence ao servidor — este metodo existe para exercitar o ciclo completo
+   * sem que nada saia para uma pessoa de verdade.
+   */
+  async dispatchDueNotifications(now?: ISODateString): Promise<DispatchSummary> {
+    const ctx = this.context();
+    const at = now ?? ctx.now;
+    let summary = emptySummary();
+    const writes: WriteOperation[] = [];
+
+    for (const delivery of dueDeliveries(ctx.snapshot, at)) {
+      const decision = await dispatchDelivery(
+        dispatchTargetFor(ctx.snapshot, delivery, at),
+        at,
+      );
+      summary = tally(summary, delivery.id, decision);
+
+      if (decision.action === "CANCELLED") {
+        writes.push(deliveryCancelWrite(ctx, delivery));
+      } else if (decision.action !== "SKIPPED") {
+        writes.push(deliveryTransitionWrite(ctx, delivery, decision.transition));
+      }
+    }
+
+    await this.commit(writes);
+    return summary;
   }
 
   // -------------------------------------------------------- notificacoes

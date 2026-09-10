@@ -1,0 +1,336 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, PageHeader } from "@/components/ui";
+import { APP_NAME, OPERATOR_NAME } from "@/config/app";
+import {
+  BILLING_INTERVAL_LABELS,
+  INVOICE_STATUS_LABELS,
+  SUBSCRIPTION_STATUS_LABELS,
+  activePlans,
+  findPlan,
+} from "@/config/billing";
+import { canManageSubscription } from "@/config/access";
+import { formatCurrency, formatDate } from "@/lib/utils/format";
+import { useAuth } from "@/providers/auth-provider";
+import { platformBillingClient } from "@/services/billing";
+
+import { PlatformNotices } from "./platform-notices";
+import type { BadgeTone } from "@/components/ui";
+import type {
+  PlatformInvoice,
+  PlatformSubscription,
+  PlatformSubscriptionStatus,
+} from "@/types";
+
+const STATUS_TONE: Record<PlatformSubscriptionStatus, BadgeTone> = {
+  TRIALING: "info",
+  ACTIVE: "success",
+  PAST_DUE: "warning",
+  CANCELED: "neutral",
+  INCOMPLETE: "warning",
+  UNPAID: "danger",
+};
+
+/**
+ * "Minha assinatura" — o assinante e a propria organizacao dele, nada alem.
+ *
+ * Separada de `/financeiro` de proposito e sem nenhum ponto de contato: la
+ * estao as receitas e despesas do negocio do assinante; aqui esta o que ele
+ * paga a {OPERATOR_NAME}. Nenhum valor desta tela entra naquele fluxo de caixa,
+ * e nenhum numero de la aparece aqui.
+ *
+ * Tudo nesta tela e leitura, com uma excecao que tambem nao decide nada: os
+ * botoes levam ao checkout e ao portal hospedados, e o pedido de cancelamento
+ * vai para o gateway. A situacao so muda quando o evento assinado chega ao
+ * backend — por isso o aviso de que voltar do pagamento nao confirma nada.
+ */
+export function SubscriptionView() {
+  const { user } = useAuth();
+  const billing = platformBillingClient();
+  const organizationId = user?.access?.organizationId ?? null;
+  const allowed = canManageSubscription(user?.access);
+
+  const [subscription, setSubscription] = useState<PlatformSubscription | null>(null);
+  const [invoices, setInvoices] = useState<PlatformInvoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  /**
+   * O `setState` acontece sempre dentro de um callback assincrono, nunca no
+   * corpo do efeito: e o que a regra `react-hooks/set-state-in-effect` do React
+   * Compiler exige, e e o mesmo padrao da tela de administracao.
+   */
+  const load = useCallback(() => {
+    if (!organizationId || !billing.available) {
+      return Promise.resolve().then(() => setLoading(false));
+    }
+    return Promise.all([
+      billing.subscription(organizationId),
+      billing.invoices(organizationId),
+    ])
+      .then(([current, history]) => {
+        setSubscription(current);
+        setInvoices(history);
+      })
+      .catch(() => setError("Nao foi possivel carregar sua assinatura agora."))
+      .finally(() => setLoading(false));
+  }, [billing, organizationId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function go(action: () => Promise<string>) {
+    setBusy(true);
+    setError("");
+    try {
+      window.location.href = await action();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Nao foi possivel continuar.");
+      setBusy(false);
+    }
+  }
+
+  async function cancel() {
+    setBusy(true);
+    setError("");
+    try {
+      await billing.requestCancellation();
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Nao foi possivel solicitar o cancelamento.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!allowed) return null;
+
+  const plan = subscription?.planId ? findPlan(subscription.planId) : null;
+  const vigente = subscription?.status === "ACTIVE" || subscription?.status === "TRIALING";
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Minha assinatura"
+        description={`O que voce paga a ${OPERATOR_NAME} pelo uso do ${APP_NAME}. Esta area nao se mistura com o financeiro do seu negocio.`}
+        actions={
+          subscription ? (
+            <Badge tone={STATUS_TONE[subscription.status]} dot>
+              {SUBSCRIPTION_STATUS_LABELS[subscription.status]}
+            </Badge>
+          ) : null
+        }
+      />
+
+      {/* Avisos da operadora sobre a assinatura. Derivados do estado, nunca
+          gravados: quem escreve situacao e validade e o webhook. */}
+      {billing.available && !loading ? (
+        <PlatformNotices subscription={subscription} />
+      ) : null}
+
+      {!billing.available ? (
+        <Card>
+          <CardBody>
+            <p className="text-muted-foreground text-sm">
+              A cobranca depende de um projeto real configurado. No modo
+              demonstracao nao existe assinatura — e nao inventamos uma.
+            </p>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {error ? (
+        <p role="alert" className="text-danger text-sm">
+          {error}
+        </p>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Plano atual</CardTitle>
+        </CardHeader>
+        <CardBody className="space-y-4">
+          {loading ? (
+            <p className="text-muted-foreground text-sm">Carregando...</p>
+          ) : subscription ? (
+            <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Detail label="Plano" value={plan?.name ?? subscription.planId ?? "—"} />
+              <Detail
+                label="Valor"
+                value={`${formatCurrency(subscription.amountInCents)} / ${BILLING_INTERVAL_LABELS[subscription.interval]}`}
+              />
+              <Detail
+                label={subscription.cancelAtPeriodEnd ? "Encerra em" : "Proxima cobranca"}
+                value={subscription.currentPeriodEnd ? formatDate(subscription.currentPeriodEnd) : "—"}
+              />
+              <Detail
+                label="Acesso liberado ate"
+                value={subscription.accessUntil ? formatDate(subscription.accessUntil) : "—"}
+                hint="Inclui a tolerancia apos o fim do ciclo."
+              />
+            </dl>
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              Voce ainda nao tem uma assinatura. Escolha um plano abaixo.
+            </p>
+          )}
+
+          {subscription?.cancelAtPeriodEnd ? (
+            <p className="bg-warning-soft text-warning-soft-foreground rounded-lg p-3 text-sm">
+              O cancelamento esta agendado. O acesso continua ate o fim do ciclo
+              ja pago e nao havera nova cobranca.
+            </p>
+          ) : null}
+
+          <p className="bg-surface-muted text-muted-foreground rounded-lg p-3 text-sm">
+            A liberacao acontece quando o gateway confirma o pagamento, e nao
+            quando voce volta da tela de pagamento. Se acabou de pagar, atualize
+            esta pagina em instantes.
+          </p>
+
+          {subscription ? (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" disabled={busy || !billing.available} onClick={() => void go(() => billing.openPortal())}>
+                Gerenciar pagamento
+              </Button>
+              {vigente && !subscription.cancelAtPeriodEnd ? (
+                <Button variant="outline" disabled={busy} onClick={() => void cancel()}>
+                  Cancelar ao fim do ciclo
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+        </CardBody>
+      </Card>
+
+      {!vigente ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Planos</CardTitle>
+          </CardHeader>
+          <CardBody>
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {activePlans().map((option) => (
+                <li key={option.id} className="border-border flex flex-col gap-2 rounded-lg border p-4">
+                  <p className="text-foreground font-medium">{option.name}</p>
+                  <p className="text-muted-foreground text-sm">{option.description}</p>
+                  <p className="text-foreground text-lg font-semibold tabular-nums">
+                    {formatCurrency(option.priceInCents)}
+                    <span className="text-muted-foreground text-sm font-normal">
+                      {" "}
+                      / {BILLING_INTERVAL_LABELS[option.interval]}
+                    </span>
+                  </p>
+                  {option.trialDays > 0 ? (
+                    <p className="text-subtle-foreground text-xs">
+                      {option.trialDays} dias de teste antes da primeira cobranca.
+                    </p>
+                  ) : null}
+                  <Button
+                    className="mt-auto"
+                    disabled={busy || !billing.available}
+                    onClick={() => void go(() => billing.startCheckout(option.id))}
+                  >
+                    Assinar
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Cobrancas</CardTitle>
+        </CardHeader>
+        <CardBody>
+          {invoices.length === 0 ? (
+            <p className="text-muted-foreground text-sm">Nenhuma cobranca emitida ainda.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-muted-foreground text-left text-xs">
+                  <tr>
+                    <th className="py-2 pr-4 font-medium">Emissao</th>
+                    <th className="py-2 pr-4 font-medium">Periodo</th>
+                    <th className="py-2 pr-4 font-medium">Valor</th>
+                    <th className="py-2 pr-4 font-medium">Situacao</th>
+                    <th className="py-2 font-medium">Comprovante</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map((invoice) => (
+                    <tr key={invoice.id} className="border-border border-t">
+                      <td className="py-2 pr-4 whitespace-nowrap">{formatDate(invoice.issuedAt)}</td>
+                      <td className="text-muted-foreground py-2 pr-4 whitespace-nowrap">
+                        {invoice.periodEnd ? `ate ${formatDate(invoice.periodEnd)}` : "—"}
+                      </td>
+                      <td className="py-2 pr-4 tabular-nums whitespace-nowrap">
+                        {formatCurrency(invoice.amountDueInCents)}
+                        {invoice.amountRefundedInCents > 0 ? (
+                          <span className="text-muted-foreground">
+                            {" "}
+                            (-{formatCurrency(invoice.amountRefundedInCents)})
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="py-2 pr-4">
+                        <Badge tone={invoiceTone(invoice)}>{INVOICE_STATUS_LABELS[invoice.status]}</Badge>
+                      </td>
+                      <td className="py-2">
+                        {invoice.hostedInvoiceUrl ? (
+                          <a
+                            className="text-primary underline"
+                            href={invoice.hostedInvoiceUrl}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                          >
+                            Abrir
+                          </a>
+                        ) : (
+                          <span className="text-subtle-foreground">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+function invoiceTone(invoice: PlatformInvoice): BadgeTone {
+  switch (invoice.status) {
+    case "PAID":
+      return "success";
+    case "PAST_DUE":
+    case "UNCOLLECTIBLE":
+      return "danger";
+    case "REFUNDED":
+    case "PARTIALLY_REFUNDED":
+      return "info";
+    case "OPEN":
+      return "warning";
+    default:
+      return "neutral";
+  }
+}
+
+function Detail({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div>
+      <dt className="text-muted-foreground text-xs font-medium">{label}</dt>
+      <dd className="text-foreground mt-1 text-sm font-medium">{value}</dd>
+      {hint ? <p className="text-subtle-foreground mt-1 text-xs">{hint}</p> : null}
+    </div>
+  );
+}

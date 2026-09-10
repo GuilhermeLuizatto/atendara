@@ -23,6 +23,20 @@ export function hasActiveAccess(account: AccountAccess | null | undefined, now =
     !!account.accessUntil && Date.parse(account.accessUntil) > now.getTime();
 }
 
+/**
+ * Quem alcanca "Minha assinatura".
+ *
+ * Nao usa `hasActiveAccess` de proposito: com a mensalidade vencida o painel
+ * fecha, e e justamente ai que a pessoa precisa abrir a propria cobranca para
+ * regularizar. Esconder a tela seria conveniencia de interface; quem decide de
+ * verdade sao as Security Rules (`subscriptionOwner`) e a callable, que confere
+ * o `ownerId` da organizacao no servidor.
+ */
+export function canManageSubscription(account: AccountAccess | null | undefined): boolean {
+  return !!account && account.status === "ACTIVE" && !account.mustChangePassword &&
+    account.platformRole === "PROFESSIONAL" && !!account.organizationId;
+}
+
 export function canAccessProfession(account: AccountAccess | null | undefined, profession: ProfessionId): boolean {
   return hasActiveAccess(account) && (isPlatformAdmin(account) || account?.professionId === profession);
 }

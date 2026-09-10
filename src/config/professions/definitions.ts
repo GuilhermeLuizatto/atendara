@@ -64,6 +64,31 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
         enabled: true,
       },
     ],
+    notifications: {
+      // Sem `APPOINTMENT_SCHEDULED`: o primeiro contato ainda esta sendo
+      // combinado por conversa, e um aviso automatico nessa hora cria registro
+      // do vinculo antes de a pessoa ter escolhido o canal.
+      allowedEvents: [
+        "APPOINTMENT_REMINDER",
+        "APPOINTMENT_CONFIRMED",
+        "APPOINTMENT_CANCELLED",
+      ],
+      // SMS fica de fora: chega sem remetente identificavel e sem como revogar
+      // o consentimento pela propria mensagem.
+      allowedChannels: ["EMAIL", "WHATSAPP"],
+      disclosure: "TIME_ONLY",
+      defaultLeadMinutes: 1440,
+      templates: {
+        APPOINTMENT_SCHEDULED:
+          "Ola, {{clientName}}. Seu horario em {{organizationName}} ficou marcado para {{date}} as {{time}}.",
+        APPOINTMENT_REMINDER:
+          "Ola, {{clientName}}. Lembrete do seu horario em {{date}} as {{time}}. Responda esta mensagem se precisar remarcar.",
+        APPOINTMENT_CONFIRMED:
+          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} esta confirmado.",
+        APPOINTMENT_CANCELLED:
+          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+      },
+    },
     features: {
       clinicalRecords: true,
       insurancePlans: false,
@@ -113,6 +138,31 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
         enabled: true,
       },
     ],
+    notifications: {
+      // Sem `APPOINTMENT_SCHEDULED`: o primeiro contato ainda esta sendo
+      // combinado por conversa, e um aviso automatico nessa hora cria registro
+      // do vinculo antes de a pessoa ter escolhido o canal.
+      allowedEvents: [
+        "APPOINTMENT_REMINDER",
+        "APPOINTMENT_CONFIRMED",
+        "APPOINTMENT_CANCELLED",
+      ],
+      // SMS fica de fora: chega sem remetente identificavel e sem como revogar
+      // o consentimento pela propria mensagem.
+      allowedChannels: ["EMAIL", "WHATSAPP"],
+      disclosure: "TIME_ONLY",
+      defaultLeadMinutes: 1440,
+      templates: {
+        APPOINTMENT_SCHEDULED:
+          "Ola, {{clientName}}. Seu horario em {{organizationName}} ficou marcado para {{date}} as {{time}}.",
+        APPOINTMENT_REMINDER:
+          "Ola, {{clientName}}. Lembrete do seu horario em {{date}} as {{time}}. Responda esta mensagem se precisar remarcar.",
+        APPOINTMENT_CONFIRMED:
+          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} esta confirmado.",
+        APPOINTMENT_CANCELLED:
+          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+      },
+    },
     features: {
       clinicalRecords: true,
       insurancePlans: true,
@@ -161,6 +211,31 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
         enabled: true,
       },
     ],
+    notifications: {
+      // Sem `APPOINTMENT_SCHEDULED`: o primeiro contato ainda esta sendo
+      // combinado por conversa, e um aviso automatico nessa hora cria registro
+      // do vinculo antes de a pessoa ter escolhido o canal.
+      allowedEvents: [
+        "APPOINTMENT_REMINDER",
+        "APPOINTMENT_CONFIRMED",
+        "APPOINTMENT_CANCELLED",
+      ],
+      // SMS fica de fora: chega sem remetente identificavel e sem como revogar
+      // o consentimento pela propria mensagem.
+      allowedChannels: ["EMAIL", "WHATSAPP"],
+      disclosure: "TIME_ONLY",
+      defaultLeadMinutes: 1440,
+      templates: {
+        APPOINTMENT_SCHEDULED:
+          "Ola, {{clientName}}. Seu horario em {{organizationName}} ficou marcado para {{date}} as {{time}}.",
+        APPOINTMENT_REMINDER:
+          "Ola, {{clientName}}. Lembrete do seu horario em {{date}} as {{time}}. Responda esta mensagem se precisar remarcar.",
+        APPOINTMENT_CONFIRMED:
+          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} esta confirmado.",
+        APPOINTMENT_CANCELLED:
+          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+      },
+    },
     features: {
       clinicalRecords: true,
       insurancePlans: true,
@@ -210,6 +285,27 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
         enabled: true,
       },
     ],
+    notifications: {
+      allowedEvents: [
+        "APPOINTMENT_SCHEDULED",
+        "APPOINTMENT_REMINDER",
+        "APPOINTMENT_CONFIRMED",
+        "APPOINTMENT_CANCELLED",
+      ],
+      allowedChannels: ["EMAIL", "SMS", "WHATSAPP"],
+      disclosure: "TIME_AND_PROFESSIONAL",
+      defaultLeadMinutes: 1440,
+      templates: {
+        APPOINTMENT_SCHEDULED:
+          "Ola, {{clientName}}. Seu horario com {{professionalName}} ficou marcado para {{date}} as {{time}}.",
+        APPOINTMENT_REMINDER:
+          "Ola, {{clientName}}. Lembrete do seu horario com {{professionalName}} em {{date}} as {{time}}.",
+        APPOINTMENT_CONFIRMED:
+          "Ola, {{clientName}}. Seu horario com {{professionalName}} em {{date}} as {{time}} esta confirmado.",
+        APPOINTMENT_CANCELLED:
+          "Ola, {{clientName}}. Seu horario com {{professionalName}} em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+      },
+    },
     features: {
       clinicalRecords: true,
       insurancePlans: true,
@@ -259,6 +355,27 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
         enabled: true,
       },
     ],
+    notifications: {
+      allowedEvents: [
+        "APPOINTMENT_SCHEDULED",
+        "APPOINTMENT_REMINDER",
+        "APPOINTMENT_CONFIRMED",
+        "APPOINTMENT_CANCELLED",
+      ],
+      allowedChannels: ["EMAIL", "SMS", "WHATSAPP"],
+      disclosure: "TIME_AND_PROFESSIONAL",
+      defaultLeadMinutes: 1440,
+      templates: {
+        APPOINTMENT_SCHEDULED:
+          "Ola, {{clientName}}. Seu horario com {{professionalName}} ficou marcado para {{date}} as {{time}}.",
+        APPOINTMENT_REMINDER:
+          "Ola, {{clientName}}. Lembrete do seu horario com {{professionalName}} em {{date}} as {{time}}.",
+        APPOINTMENT_CONFIRMED:
+          "Ola, {{clientName}}. Seu horario com {{professionalName}} em {{date}} as {{time}} esta confirmado.",
+        APPOINTMENT_CANCELLED:
+          "Ola, {{clientName}}. Seu horario com {{professionalName}} em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+      },
+    },
     features: {
       clinicalRecords: true,
       insurancePlans: false,
@@ -307,6 +424,27 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
         enabled: true,
       },
     ],
+    notifications: {
+      allowedEvents: [
+        "APPOINTMENT_SCHEDULED",
+        "APPOINTMENT_REMINDER",
+        "APPOINTMENT_CONFIRMED",
+        "APPOINTMENT_CANCELLED",
+      ],
+      allowedChannels: ["EMAIL", "SMS", "WHATSAPP"],
+      disclosure: "TIME_AND_PROFESSIONAL",
+      defaultLeadMinutes: 720,
+      templates: {
+        APPOINTMENT_SCHEDULED:
+          "Ola, {{clientName}}. Seu horario com {{professionalName}} ficou marcado para {{date}} as {{time}}.",
+        APPOINTMENT_REMINDER:
+          "Ola, {{clientName}}. Lembrete do seu horario com {{professionalName}} em {{date}} as {{time}}.",
+        APPOINTMENT_CONFIRMED:
+          "Ola, {{clientName}}. Seu horario com {{professionalName}} em {{date}} as {{time}} esta confirmado.",
+        APPOINTMENT_CANCELLED:
+          "Ola, {{clientName}}. Seu horario com {{professionalName}} em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+      },
+    },
     features: {
       clinicalRecords: true,
       insurancePlans: true,
@@ -354,6 +492,31 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
         enabled: true,
       },
     ],
+    notifications: {
+      // Sem `APPOINTMENT_SCHEDULED`: o primeiro contato ainda esta sendo
+      // combinado por conversa, e um aviso automatico nessa hora cria registro
+      // do vinculo antes de a pessoa ter escolhido o canal.
+      allowedEvents: [
+        "APPOINTMENT_REMINDER",
+        "APPOINTMENT_CONFIRMED",
+        "APPOINTMENT_CANCELLED",
+      ],
+      // SMS fica de fora: chega sem remetente identificavel e sem como revogar
+      // o consentimento pela propria mensagem.
+      allowedChannels: ["EMAIL", "WHATSAPP"],
+      disclosure: "TIME_ONLY",
+      defaultLeadMinutes: 1440,
+      templates: {
+        APPOINTMENT_SCHEDULED:
+          "Ola, {{clientName}}. Seu horario em {{organizationName}} ficou marcado para {{date}} as {{time}}.",
+        APPOINTMENT_REMINDER:
+          "Ola, {{clientName}}. Lembrete do seu horario em {{date}} as {{time}}. Responda esta mensagem se precisar remarcar.",
+        APPOINTMENT_CONFIRMED:
+          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} esta confirmado.",
+        APPOINTMENT_CANCELLED:
+          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+      },
+    },
     features: {
       clinicalRecords: false,
       insurancePlans: false,
@@ -402,6 +565,29 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
         enabled: true,
       },
     ],
+    notifications: {
+      allowedEvents: [
+        "APPOINTMENT_SCHEDULED",
+        "APPOINTMENT_REMINDER",
+        "APPOINTMENT_CONFIRMED",
+        "APPOINTMENT_CANCELLED",
+      ],
+      allowedChannels: ["EMAIL", "SMS", "WHATSAPP"],
+      // Nada aqui revela condicao de saude, entao o texto pode nomear o
+      // atendimento — e um lembrete que diz "treino" e mais util.
+      disclosure: "TIME_PROFESSIONAL_AND_SERVICE",
+      defaultLeadMinutes: 180,
+      templates: {
+        APPOINTMENT_SCHEDULED:
+          "Ola, {{clientName}}. Seu {{serviceTerm}} com {{professionalName}} ficou marcado para {{date}} as {{time}}.",
+        APPOINTMENT_REMINDER:
+          "Ola, {{clientName}}. Lembrete do seu {{serviceTerm}} com {{professionalName}} em {{date}} as {{time}}.",
+        APPOINTMENT_CONFIRMED:
+          "Ola, {{clientName}}. Seu {{serviceTerm}} com {{professionalName}} em {{date}} as {{time}} esta confirmado.",
+        APPOINTMENT_CANCELLED:
+          "Ola, {{clientName}}. Seu {{serviceTerm}} com {{professionalName}} em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+      },
+    },
     features: {
       clinicalRecords: false,
       insurancePlans: false,

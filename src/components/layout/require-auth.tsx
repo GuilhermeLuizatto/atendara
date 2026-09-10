@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { hasActiveAccess, canAccessModule, isPlatformAdmin } from "@/config/access";
+import { hasActiveAccess, canAccessModule, canManageSubscription, isPlatformAdmin } from "@/config/access";
 import { APP_MODULES, type AppModule } from "@/types/access";
 import { PasswordSetup } from "@/features/auth/password-setup";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,13 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
   if (user?.access?.mustChangePassword) return <PasswordSetup />;
   const area = pathname.split("/")[1];
-  const allowed = hasActiveAccess(user?.access) && (area === "admin" ? isPlatformAdmin(user?.access) : APP_MODULES.includes(area as AppModule) && canAccessModule(user?.access, area as AppModule));
+  // "Minha assinatura" e a unica area que NAO exige acesso vigente: quem esta
+  // com a mensalidade vencida precisa chegar ate ela para regularizar. As
+  // Security Rules e a callable continuam decidindo o que ela consegue ler e
+  // pedir; esconder a rota seria conveniencia, liberar o dado seria erro.
+  const allowed = area === "assinatura"
+    ? canManageSubscription(user?.access)
+    : hasActiveAccess(user?.access) && (area === "admin" ? isPlatformAdmin(user?.access) : APP_MODULES.includes(area as AppModule) && canAccessModule(user?.access, area as AppModule));
   if (!allowed) return <main className="bg-background flex min-h-dvh items-center justify-center p-6"><div className="max-w-md space-y-4">
     <h1 className="text-foreground text-xl font-semibold">Acesso nao liberado</h1>
     <p className="text-muted-foreground text-sm">Seu cadastro precisa estar ativo, com mensalidade vigente e permissao para esta area. Consulte o administrador.</p>

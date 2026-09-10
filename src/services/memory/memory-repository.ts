@@ -4,9 +4,23 @@ import { getProfession } from "@/config/professions";
 import { ruleInputSchema, validateRuleInput } from "@/lib/rules/validation";
 import { decide } from "@/lib/ai/decision-engine";
 import { buildMockDataset } from "@/mocks";
+import {
+  dispatchDelivery,
+  emptySummary,
+  tally,
+  toDeliveryDocument,
+  type DispatchSummary,
+} from "@/lib/notifications";
+import {
+  dispatchTargetFor,
+  dueDeliveries,
+  pendingDeliveriesFor,
+  planForAppointmentEvent,
+} from "../notifications";
 import type {
   AIRule,
   Appointment,
+  AppointmentNotificationEvent,
   AppointmentStatus,
   AuditLog,
   Client,
@@ -15,6 +29,8 @@ import type {
   ISODateString,
   Message,
   Notification,
+  NotificationDelivery,
+  OrganizationNotificationSettings,
   ProfessionId,
   Transaction,
 } from "@/types";
@@ -397,11 +413,31 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       });
     }
 
+    // Avisos ao cliente. Vazio enquanto a organizacao nao tiver ligado canal,
+    // evento, antecedencia e modelo — que e o padrao.
+    const withAppointment: WorkspaceSnapshot = {
+      ...this.snapshot,
+      appointments: [...this.snapshot.appointments, appointment],
+    };
+    const scheduled = this.withPlannedNotifications(
+      withAppointment,
+      appointment,
+      "APPOINTMENT_SCHEDULED",
+      now,
+    );
+    const notificationDeliveries = this.withPlannedNotifications(
+      { ...withAppointment, notificationDeliveries: scheduled },
+      appointment,
+      "APPOINTMENT_REMINDER",
+      now,
+    );
+
     this.commit({
       ...this.snapshot,
       appointments: [...this.snapshot.appointments, appointment].sort((a, b) =>
         a.startsAt.localeCompare(b.startsAt),
       ),
+      notificationDeliveries,
       transactions,
       auditLogs: [
         this.audit(
@@ -468,8 +504,34 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       updatedBy: this.actor.userId,
     };
 
+    // Remarcar muda o instante do lembrete, e a chave do envio deriva dele: o
+    // que estava planejado para o horario antigo e cancelado, e o novo entra.
+    const withUpdated: WorkspaceSnapshot = {
+      ...this.snapshot,
+      appointments: this.snapshot.appointments.map((appointment) =>
+        appointment.id === id ? updated : appointment,
+      ),
+    };
+    const notificationDeliveries =
+      startsAt === existing.startsAt
+        ? this.snapshot.notificationDeliveries
+        : this.withPlannedNotifications(
+            {
+              ...withUpdated,
+              notificationDeliveries: this.withCancelledNotifications(
+                withUpdated,
+                id,
+                now,
+              ),
+            },
+            updated,
+            "APPOINTMENT_REMINDER",
+            now,
+          );
+
     this.commit({
       ...this.snapshot,
+      notificationDeliveries,
       appointments: this.snapshot.appointments
         .map((appointment) => (appointment.id === id ? updated : appointment))
         .sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
@@ -541,6 +603,43 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       );
     }
 
+    // Confirmar e cancelar passam pelo mesmo portao que qualquer outro evento.
+    // Sem regra habilitada, o plano volta vazio e a mudanca de estado continua
+    // sendo so uma mudanca de estado.
+    const withUpdated: WorkspaceSnapshot = {
+      ...this.snapshot,
+      appointments: this.snapshot.appointments.map((appointment) =>
+        appointment.id === id ? updated : appointment,
+      ),
+    };
+    let notificationDeliveries = this.snapshot.notificationDeliveries;
+
+    if (status === "CONFIRMED") {
+      notificationDeliveries = this.withPlannedNotifications(
+        withUpdated,
+        existing,
+        "APPOINTMENT_CONFIRMED",
+        now,
+      );
+    }
+
+    if (status === "CANCELLED" || status === "NO_SHOW") {
+      // O atendimento deixou de valer: o que ainda nao saiu nao deve sair.
+      notificationDeliveries = this.withCancelledNotifications(
+        { ...withUpdated, notificationDeliveries },
+        id,
+        now,
+      );
+      if (status === "CANCELLED") {
+        notificationDeliveries = this.withPlannedNotifications(
+          { ...withUpdated, notificationDeliveries },
+          existing,
+          "APPOINTMENT_CANCELLED",
+          now,
+        );
+      }
+    }
+
     // Cancelamento nao cobra: a receita pendente e cancelada junto.
     const transactions = this.snapshot.transactions.map((transaction) =>
       transaction.appointmentId === id &&
@@ -557,6 +656,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       ),
       transactions,
       notifications,
+      notificationDeliveries,
       auditLogs: [
         this.audit(
           {
@@ -1111,6 +1211,134 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
           : conversation,
       ),
     });
+  }
+
+  // ------------------------------------------------ avisos ao cliente
+
+  async updateNotificationSettings(
+    settings: OrganizationNotificationSettings,
+  ): Promise<void> {
+    this.assertPermission("organization:update");
+    const now = this.now();
+    const enabledRules = settings.rules.filter((rule) => rule.enabled).length;
+
+    this.commit({
+      ...this.snapshot,
+      organization: {
+        ...this.snapshot.organization,
+        settings: { ...this.snapshot.organization.settings, notifications: settings },
+        updatedAt: now,
+        updatedBy: this.actor.userId,
+      },
+      auditLogs: [
+        this.audit(
+          {
+            action: "UPDATE",
+            actorType: "USER",
+            resource: { type: "organization", id: this.organizationId },
+            summary: settings.enabled
+              ? `Avisos de atendimento ativados com ${enabledRules} regra(s).`
+              : "Avisos de atendimento desativados.",
+            metadata: {
+              enabled: settings.enabled,
+              channels: settings.verifiedSenderChannels.join(",") || "nenhum",
+              enabledRules,
+            },
+          },
+          now,
+        ),
+        ...this.snapshot.auditLogs,
+      ],
+    });
+  }
+
+  /**
+   * Disparo das entregas vencidas com o provedor simulado.
+   *
+   * Igual ao do Firestore de proposito: a demonstracao precisa mostrar o mesmo
+   * comportamento do produto, inclusive o de nao enviar nada quando falta
+   * configuracao. Nenhuma mensagem real sai daqui.
+   */
+  async dispatchDueNotifications(now?: ISODateString): Promise<DispatchSummary> {
+    const at = now ?? this.now();
+    let summary = emptySummary();
+    let deliveries = this.snapshot.notificationDeliveries;
+
+    for (const delivery of dueDeliveries(this.snapshot, at)) {
+      const decision = await dispatchDelivery(
+        dispatchTargetFor({ ...this.snapshot, notificationDeliveries: deliveries }, delivery, at),
+        at,
+      );
+      summary = tally(summary, delivery.id, decision);
+
+      const patch =
+        decision.action === "CANCELLED"
+          ? { status: "CANCELLED" as const, cancelledAt: at, nextAttemptAt: null }
+          : decision.action === "SKIPPED"
+            ? null
+            : decision.transition;
+      if (!patch) continue;
+
+      deliveries = deliveries.map((item) =>
+        item.id === delivery.id
+          ? { ...item, ...patch, updatedAt: at, updatedBy: this.actor.userId }
+          : item,
+      );
+    }
+
+    if (deliveries !== this.snapshot.notificationDeliveries) {
+      this.commit({ ...this.snapshot, notificationDeliveries: deliveries });
+    }
+    return summary;
+  }
+
+  /**
+   * Aplica o plano de avisos de um evento da agenda.
+   *
+   * Devolve a fila inalterada no caso normal — organizacao sem configuracao
+   * produz plano vazio, e e por isso que confirmar um atendimento nao envia
+   * nada sozinho.
+   */
+  private withPlannedNotifications(
+    next: WorkspaceSnapshot,
+    appointment: Appointment,
+    event: AppointmentNotificationEvent,
+    now: ISODateString,
+  ): NotificationDelivery[] {
+    const plan = planForAppointmentEvent(next, appointment, event, now);
+    if (plan.planned.length === 0) return next.notificationDeliveries;
+
+    return [
+      ...plan.planned.map((planned) =>
+        toDeliveryDocument(planned, this.organizationId, now, this.actor.userId),
+      ),
+      ...next.notificationDeliveries,
+    ];
+  }
+
+  /** Cancela o que ainda nao saiu para um atendimento que deixou de valer. */
+  private withCancelledNotifications(
+    next: WorkspaceSnapshot,
+    appointmentId: ID,
+    now: ISODateString,
+  ): NotificationDelivery[] {
+    const pending = new Set(
+      pendingDeliveriesFor(next, appointmentId).map((delivery) => delivery.id),
+    );
+    if (pending.size === 0) return next.notificationDeliveries;
+
+    return next.notificationDeliveries.map((delivery) =>
+      pending.has(delivery.id)
+        ? {
+            ...delivery,
+            status: "CANCELLED" as const,
+            cancelledAt: now,
+            nextAttemptAt: null,
+            updatedAt: now,
+            updatedBy: this.actor.userId,
+          }
+        : delivery,
+    );
   }
 
   // -------------------------------------------------------- notificacoes

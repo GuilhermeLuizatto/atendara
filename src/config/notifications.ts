@@ -1,0 +1,257 @@
+import type {
+  AppointmentNotificationEvent,
+  DeliveryFailureCode,
+  NotificationSkipReason,
+  OrganizationNotificationSettings,
+  OutboundChannel,
+  PlatformNoticeEvent,
+} from "@/types";
+
+/**
+ * Politica de avisos, como DADO.
+ *
+ * Duas coisas moram aqui e em nenhum outro lugar: o que cada canal exige antes
+ * de existir envio, e o que um modelo de mensagem pode dizer. `lib/` executa;
+ * este arquivo decide.
+ *
+ * Nada neste arquivo liga nada. Todo padrao e "desligado", e ligar exige quatro
+ * escolhas explicitas da organizacao — canal, evento, antecedencia e modelo —
+ * mais consentimento e contato validos do lado de quem recebe.
+ */
+
+// ------------------------------------------------------------------ canais
+
+export interface ChannelMeta {
+  label: string;
+  /** Campo do cadastro que guarda o destino. */
+  contactField: "email" | "phone";
+  /**
+   * Provedor que atende o canal hoje. `SIMULATED` significa que nenhuma
+   * mensagem sai do processo: o provedor devolve um resultado deterministico e
+   * nao abre conexao nenhuma.
+   */
+  providerId: "SIMULATED";
+  /** Limite de caracteres do corpo. Deriva do canal, nao do gosto do texto. */
+  maxBodyLength: number;
+  /**
+   * O que ainda falta para o canal existir de verdade. Exibido na interface —
+   * um canal que parece pronto e nao esta e pior do que um canal ausente.
+   */
+  activationRequirement: string;
+}
+
+export const CHANNEL_META: Record<OutboundChannel, ChannelMeta> = {
+  EMAIL: {
+    label: "E-mail",
+    contactField: "email",
+    providerId: "SIMULATED",
+    maxBodyLength: 600,
+    activationRequirement:
+      "Dominio remetente verificado no provedor de e-mail e registro de retorno configurado.",
+  },
+  SMS: {
+    label: "SMS",
+    contactField: "phone",
+    providerId: "SIMULATED",
+    maxBodyLength: 160,
+    activationRequirement:
+      "Numero remetente habilitado na operadora e telefone do destinatario em formato internacional.",
+  },
+  WHATSAPP: {
+    label: "WhatsApp",
+    contactField: "phone",
+    providerId: "SIMULATED",
+    maxBodyLength: 400,
+    activationRequirement:
+      "Numero aprovado na API oficial do WhatsApp Business e modelo de mensagem homologado pela Meta.",
+  },
+};
+
+// ------------------------------------------------------------------ eventos
+
+export interface AppointmentEventMeta {
+  label: string;
+  description: string;
+  /**
+   * Sempre `false`. O campo existe para que a resposta a "qual evento vem
+   * ligado?" seja uma linha de dado conferivel por teste, e nao a ausencia de
+   * codigo em algum lugar.
+   */
+  defaultEnabled: false;
+  /** Antecedencias oferecidas na interface, em minutos. */
+  allowedLeadMinutes: number[];
+  /**
+   * O evento acontece na hora do atendimento (`START`) ou no instante em que a
+   * mudanca e registrada (`CHANGE`). Antecedencia so faz sentido no primeiro.
+   */
+  anchor: "START" | "CHANGE";
+}
+
+export const APPOINTMENT_EVENT_META: Record<
+  AppointmentNotificationEvent,
+  AppointmentEventMeta
+> = {
+  APPOINTMENT_SCHEDULED: {
+    label: "Agendamento registrado",
+    description: "Avisa quando um novo horario e marcado.",
+    defaultEnabled: false,
+    allowedLeadMinutes: [0],
+    anchor: "CHANGE",
+  },
+  APPOINTMENT_REMINDER: {
+    label: "Lembrete",
+    description: "Avisa antes do horario marcado.",
+    defaultEnabled: false,
+    allowedLeadMinutes: [60, 180, 720, 1_440, 2_880],
+    anchor: "START",
+  },
+  APPOINTMENT_CONFIRMED: {
+    label: "Confirmacao registrada",
+    description:
+      "Avisa que o horario foi confirmado. Confirmar na agenda NAO envia nada por si so: sem esta regra habilitada, a confirmacao apenas muda o atendimento.",
+    defaultEnabled: false,
+    allowedLeadMinutes: [0],
+    anchor: "CHANGE",
+  },
+  APPOINTMENT_CANCELLED: {
+    label: "Cancelamento",
+    description: "Avisa que o horario foi cancelado.",
+    defaultEnabled: false,
+    allowedLeadMinutes: [0],
+    anchor: "CHANGE",
+  },
+};
+
+// ------------------------------------------------------------- modelos
+
+/**
+ * Variaveis aceitas em um modelo.
+ *
+ * A lista e fechada: o renderizador recusa qualquer outra. Nao e conveniencia —
+ * e o que impede alguem de escrever uma observacao interna do cadastro dentro
+ * de um lembrete e manda-la para o celular de quem e atendido.
+ */
+export const TEMPLATE_VARIABLES = [
+  "clientName",
+  "organizationName",
+  "professionalName",
+  "serviceTerm",
+  "date",
+  "time",
+] as const;
+
+export type TemplateVariable = (typeof TEMPLATE_VARIABLES)[number];
+
+/**
+ * Vocabulario que nao pode aparecer no texto que sai.
+ *
+ * Um lembrete precisa de horario, nao de motivo. Qualquer uma destas palavras
+ * transforma a mensagem em informacao de saude circulando por canal aberto e
+ * visivel na tela bloqueada do celular. A verificacao e por radical e sem
+ * acento, porque o texto do modelo e escrito por pessoas.
+ */
+export const FORBIDDEN_TEMPLATE_TERMS = [
+  "diagnostic",
+  "sintoma",
+  "medicament",
+  "remedi",
+  "receita",
+  "exame",
+  "laudo",
+  "prontuario",
+  "tratamento",
+  "terapia",
+  "medicacao",
+  "dose",
+  "doenc",
+  "transtorno",
+  "lesao",
+] as const;
+
+// ------------------------------------------------------------ tentativas
+
+/**
+ * Tentativas controladas.
+ *
+ * Tres tentativas com espera crescente. Falha temporaria (provedor fora do ar,
+ * limite de taxa) merece nova tentativa; destino invalido e recusa do remetente
+ * nao merecem nenhuma — repetir nao muda o resultado e so multiplica registro.
+ */
+export const RETRY_POLICY = {
+  maxAttempts: 3,
+  /** Espera, em minutos, antes da tentativa seguinte. */
+  backoffMinutes: [5, 30],
+  retriableFailures: ["PROVIDER_UNAVAILABLE", "RATE_LIMITED"],
+} as const;
+
+export function isRetriable(code: DeliveryFailureCode): boolean {
+  return (RETRY_POLICY.retriableFailures as readonly string[]).includes(code);
+}
+
+/**
+ * Janela em que um envio atrasado ainda faz sentido.
+ *
+ * Lembrete que chega depois do horario nao e lembrete: e confusao. Passada a
+ * janela, a entrega e cancelada em vez de tentada.
+ */
+export const MAX_DELIVERY_DELAY_MINUTES = 120;
+
+// -------------------------------------------------------------- padroes
+
+/**
+ * O estado inicial de toda organizacao: nada ligado, nenhum remetente
+ * comprovado, nenhuma regra. E a resposta a "o que acontece se ninguem
+ * configurar?" — nada sai.
+ */
+export const DEFAULT_NOTIFICATION_SETTINGS: OrganizationNotificationSettings = {
+  enabled: false,
+  verifiedSenderChannels: [],
+  rules: [],
+};
+
+// --------------------------------------------------------------- rotulos
+
+export const SKIP_REASON_LABELS: Record<NotificationSkipReason, string> = {
+  ORGANIZATION_DISABLED: "A organizacao nao ativou o envio de avisos.",
+  SENDER_NOT_VERIFIED: "O canal nao tem remetente comprovado.",
+  NO_RULE_FOR_EVENT: "Nenhuma regra cobre este evento.",
+  RULE_DISABLED: "A regra existe, mas esta desativada.",
+  EVENT_NOT_ALLOWED_FOR_PROFESSION:
+    "A profissao nao permite aviso para este evento.",
+  CHANNEL_NOT_ALLOWED_FOR_PROFESSION:
+    "A profissao nao permite este canal pelo grau de sensibilidade dos dados.",
+  MISSING_CONTACT: "O cadastro nao tem contato para este canal.",
+  INVALID_CONTACT: "O contato do cadastro nao passa na validacao do canal.",
+  MISSING_CONSENT: "O cadastro nao registrou consentimento.",
+  CONSENT_REVOKED: "O consentimento foi revogado.",
+  CHANNEL_NOT_CONSENTED: "O consentimento nao inclui este canal.",
+  SCHEDULE_IN_THE_PAST: "O horario de envio ja passou.",
+  ALREADY_PLANNED: "Ja existe um envio planejado igual a este.",
+  TEMPLATE_REJECTED: "O modelo foi recusado pela politica de conteudo.",
+};
+
+export const DELIVERY_FAILURE_LABELS: Record<DeliveryFailureCode, string> = {
+  PROVIDER_UNAVAILABLE: "Provedor indisponivel",
+  INVALID_DESTINATION: "Destino invalido",
+  RATE_LIMITED: "Limite de envio atingido",
+  SENDER_NOT_ALLOWED: "Remetente nao autorizado",
+  ATTEMPTS_EXHAUSTED: "Tentativas esgotadas",
+};
+
+export const PLATFORM_NOTICE_LABELS: Record<PlatformNoticeEvent, string> = {
+  TRIAL_ENDING: "Periodo de teste terminando",
+  PAYMENT_PENDING: "Pagamento pendente",
+  ACCESS_ENDING: "Acesso vencendo",
+  SUBSCRIPTION_CANCELED: "Assinatura cancelada",
+  NO_SUBSCRIPTION: "Sem assinatura ativa",
+};
+
+/**
+ * Antecedencia, em dias, em que a plataforma passa a avisar o assinante.
+ * Sao avisos DA OPERADORA: nao usam canal de clinica e nao viram
+ * `NotificationDelivery`.
+ */
+export const PLATFORM_NOTICE_WINDOW_DAYS = {
+  trialEnding: 3,
+  accessEnding: 5,
+} as const;

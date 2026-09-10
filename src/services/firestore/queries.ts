@@ -40,6 +40,7 @@ export const SNAPSHOT_LIMITS = {
   aiRules: 200,
   aiDecisions: 200,
   notifications: 100,
+  notificationDeliveries: 200,
   auditLogs: 200,
 } as const;
 
@@ -127,6 +128,13 @@ export const snapshotQueries = {
       tenantQuery(db, organizationId, "notifications"),
       orderBy("createdAt", "desc"),
       limit(SNAPSHOT_LIMITS.notifications),
+    ),
+
+  notificationDeliveries: (db: Firestore, organizationId: ID) =>
+    query(
+      tenantQuery(db, organizationId, "notificationDeliveries"),
+      orderBy("scheduledFor", "desc"),
+      limit(SNAPSHOT_LIMITS.notificationDeliveries),
     ),
 
   auditLogs: (db: Firestore, organizationId: ID) =>

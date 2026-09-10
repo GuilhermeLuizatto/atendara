@@ -1,3 +1,4 @@
+import type { DispatchSummary } from "@/lib/notifications";
 import type {
   AIDecision,
   AIRule,
@@ -8,9 +9,13 @@ import type {
   Client,
   Conversation,
   ID,
+  ISODateString,
   Message,
   Notification,
+  NotificationConsent,
+  NotificationDelivery,
   Organization,
+  OrganizationNotificationSettings,
   Professional,
   Transaction,
 } from "@/types";
@@ -35,6 +40,8 @@ export interface WorkspaceSnapshot {
   rules: AIRule[];
   decisions: AIDecision[];
   notifications: Notification[];
+  /** Fila de saida dos avisos ao cliente. Vazia enquanto nada for configurado. */
+  notificationDeliveries: NotificationDelivery[];
   auditLogs: AuditLog[];
 }
 
@@ -51,7 +58,10 @@ export interface RepositoryActor {
 // --------------------------------------------------------------- entradas
 
 export interface ClientInput {
+  /** Aceite geral. Sozinho nao autoriza envio: falta nomear o canal. */
   appointmentNotificationsEnabled?: boolean;
+  /** Consentimento por canal, com data e origem. */
+  notificationConsent?: NotificationConsent | null;
   fullName: string;
   preferredName: string | null;
   email: string | null;
@@ -215,6 +225,20 @@ export interface WorkspaceRepository {
       >
     >,
   ): Promise<void>;
+
+  /**
+   * Configuracao dos avisos que a organizacao envia. E a unica porta para ligar
+   * canal, evento, antecedencia e modelo — nao ha caminho implicito.
+   */
+  updateNotificationSettings(
+    settings: OrganizationNotificationSettings,
+  ): Promise<void>;
+  /**
+   * Executa as entregas vencidas com o provedor simulado e grava o resultado.
+   * Nao existe gatilho automatico: e chamada por acao explicita, e nenhuma
+   * mensagem real sai daqui.
+   */
+  dispatchDueNotifications(now?: ISODateString): Promise<DispatchSummary>;
 
   createNotification(input: NotificationInput): Promise<ID>;
   acknowledgeNotification(id: ID): Promise<void>;

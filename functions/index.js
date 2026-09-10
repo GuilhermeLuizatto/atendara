@@ -78,3 +78,12 @@ export const completeInitialPassword = onCall(options, async request => {
   await batch.commit();
   return { ok: true };
 });
+
+// Cobranca da plataforma. Vive em billing.js porque e outro assunto: aqui
+// estao contas e acesso; la esta a mensalidade que a operadora cobra.
+export {
+  createSubscriptionCheckout,
+  openBillingPortal,
+  cancelPlatformSubscription,
+  stripeWebhook,
+} from "./billing.js";

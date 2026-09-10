@@ -55,9 +55,15 @@ de contas e Hosting exigem configuracao e validacao no ambiente de destino.
 | Agenda        | `/agenda`        | Atendimentos nas visoes diaria, semanal e mensal        |
 | Clientes      | `/clientes`      | CRM administrativo, com nome adaptado a profissao       |
 | Mensagens     | `/mensagens`     | Caixa de entrada com classificacao e acao da IA         |
-| Financeiro    | `/financeiro`    | Receitas, pendencias e atrasos derivados da agenda      |
+| Financeiro    | `/financeiro`    | Receitas, pendencias e atrasos do negocio do assinante  |
 | Dara          | `/agente`        | Regras, decisoes auditaveis e simulador                 |
 | Configuracoes | `/configuracoes` | Profissao, equipe, agenda e privacidade                 |
+| Minha assinatura | `/assinatura` | Plano, situacao e cobrancas da mensalidade do Atendara |
+| Administracao | `/admin`         | Cadastros, acesso e a cobranca da plataforma            |
+
+`/financeiro` e `/assinatura` nao se misturam: um e o dinheiro que o assinante
+recebe do proprio cliente, o outro e a mensalidade que ele paga a operadora. Ver
+[docs/COBRANCA-DA-PLATAFORMA.md](docs/COBRANCA-DA-PLATAFORMA.md).
 
 A nomenclatura acompanha a profissao ativa: o mesmo menu mostra **Pacientes**
 para o dentista, **Alunos** para o personal trainer e **Clientes** para o
@@ -184,10 +190,11 @@ Suites que exigem o emulador (Java e `.local/firebase-tools`):
 | ------------------------ | ------------------------------------------------------------ |
 | `npm run test:rules`     | Security Rules: isolamento entre organizacoes, modulos, append-only |
 | `npm run test:repository`| Fiacao do repositorio: `Timestamp` <-> ISO, lote atomico, transacao |
-| `npm run test:access`    | Matriz de acesso: Auth + callable functions + regras juntas   |
+| `npm run test:access`    | Matriz de acesso e cobranca: Auth, callables, webhook e regras juntos |
 | `npm run test:emulator`  | As tres em sequencia                                          |
 
-Resultados da matriz em [docs/MATRIZ-DE-ACESSO.md](docs/MATRIZ-DE-ACESSO.md).
+Resultados da matriz em [docs/MATRIZ-DE-ACESSO.md](docs/MATRIZ-DE-ACESSO.md);
+da cobranca, em [docs/COBRANCA-DA-PLATAFORMA.md](docs/COBRANCA-DA-PLATAFORMA.md).
 
 ---
 

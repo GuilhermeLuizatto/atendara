@@ -12,7 +12,11 @@ import {
   type TransactionInput,
   type WorkspaceRepository,
 } from "@/services";
-import type { AppointmentStatus, ID } from "@/types";
+import type {
+  AppointmentStatus,
+  ID,
+  OrganizationNotificationSettings,
+} from "@/types";
 
 import { useToast } from "./toast-provider";
 import { useWorkspace } from "./workspace-provider";
@@ -109,6 +113,21 @@ export function useWorkspaceActions() {
         run((repo) => repo.appendMessage(input)),
       recordDecision: (input: DecisionInput) =>
         run((repo) => repo.recordDecision(input)),
+
+      updateNotificationSettings: (settings: OrganizationNotificationSettings) =>
+        run(
+          (repo) => repo.updateNotificationSettings(settings),
+          settings.enabled
+            ? "Avisos de atendimento atualizados."
+            : "Avisos de atendimento desligados.",
+        ),
+      // Provedor simulado: nenhuma mensagem sai do processo. O rotulo diz isso
+      // na propria mensagem de sucesso, para nao dar a impressao contraria.
+      dispatchDueNotifications: () =>
+        run(
+          (repo) => repo.dispatchDueNotifications(),
+          "Simulacao executada. Nenhuma mensagem real foi enviada.",
+        ),
 
       acknowledgeNotification: (id: ID) =>
         run((repo) => repo.acknowledgeNotification(id)),

@@ -8,6 +8,7 @@ import type {
   ProfessionId,
 } from "@/types";
 
+import { DEFAULT_NOTIFICATION_SETTINGS } from "./notifications";
 import {
   AI_ASSISTANT_NAME,
   DEFAULT_CONFIDENCE_THRESHOLD,
@@ -73,6 +74,17 @@ export function defaultOrganizationSettings(
       auditRetentionDays: 730,
       blockConversationToCrmCopy: true,
     },
+    // Avisos ao cliente nascem desligados, sem canal e sem regra. O padrao nao
+    // e cautela de interface: e a unica coisa que impede uma organizacao recem
+    // criada de mandar mensagem para quem nunca consentiu.
+    //
+    // Copiado, e nao referenciado: o padrao carrega arrays, e devolver a mesma
+    // instancia faria a configuracao de uma organizacao aparecer em outra.
+    notifications: {
+      ...DEFAULT_NOTIFICATION_SETTINGS,
+      verifiedSenderChannels: [],
+      rules: [],
+    },
   };
 }
 
@@ -136,6 +148,10 @@ export function withOrganizationDefaults(
       agenda: { ...defaults.agenda, ...raw.settings?.agenda },
       ai: { ...defaults.ai, ...raw.settings?.ai },
       privacy: { ...defaults.privacy, ...raw.settings?.privacy },
+      notifications: {
+        ...defaults.notifications,
+        ...raw.settings?.notifications,
+      },
     },
   };
 }

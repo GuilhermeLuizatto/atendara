@@ -1,4 +1,5 @@
 import type { BaseEntity, CurrencyCode, ID } from "./common";
+import type { OrganizationNotificationSettings } from "./notifications";
 import type { ProfessionId, ServiceModality } from "./profession";
 
 /**
@@ -54,6 +55,11 @@ export interface OrganizationSettings {
   agenda: AgendaSettings;
   ai: AIAgentSettings;
   privacy: PrivacySettings;
+  /**
+   * Avisos que a organizacao envia a quem ela atende. Nasce inteiramente
+   * desligado; ver `DEFAULT_NOTIFICATION_SETTINGS` em `src/config/notifications`.
+   */
+  notifications: OrganizationNotificationSettings;
 }
 
 export interface Organization extends BaseEntity {

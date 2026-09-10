@@ -1,4 +1,8 @@
 import type { MessageClassificationId } from "./classification";
+import type {
+  AppointmentNotificationEvent,
+  OutboundChannel,
+} from "./notifications";
 
 export const PROFESSION_IDS = [
   "PSYCHOLOGIST",
@@ -63,6 +67,37 @@ export interface SuggestedRuleSeed {
   enabled: boolean;
 }
 
+/**
+ * Quanto de um atendimento pode aparecer no texto que sai da clinica.
+ *
+ * Um lembrete de psiquiatra que diz "sua consulta psiquiatrica" revela
+ * tratamento a quem ler a notificacao na tela bloqueada; o mesmo lembrete de
+ * personal trainer dizendo "seu treino" nao revela nada. E por isso que isto e
+ * um campo por profissao, e nao um texto unico com uma excecao no meio.
+ */
+export type AppointmentDisclosureLevel =
+  /** Apenas horario e nome da organizacao. Nunca o tipo de atendimento. */
+  | "TIME_ONLY"
+  /** Acrescenta o nome de quem atende. */
+  | "TIME_AND_PROFESSIONAL"
+  /** Acrescenta o termo do atendimento ("treino", "sessao"). */
+  | "TIME_PROFESSIONAL_AND_SERVICE";
+
+export interface ProfessionNotificationConfig {
+  /** Eventos que esta profissao pode avisar. O que nao esta aqui nao sai. */
+  allowedEvents: AppointmentNotificationEvent[];
+  /** Canais aceitaveis para o grau de sensibilidade da profissao. */
+  allowedChannels: OutboundChannel[];
+  disclosure: AppointmentDisclosureLevel;
+  /** Antecedencia sugerida ao ligar um lembrete, em minutos. */
+  defaultLeadMinutes: number;
+  /**
+   * Modelo por evento. Usa apenas as variaveis de `TEMPLATE_VARIABLES`; o
+   * renderizador recusa qualquer outra e recusa vocabulario clinico.
+   */
+  templates: Record<AppointmentNotificationEvent, string>;
+}
+
 export interface ProfessionConfig {
   id: ProfessionId;
   label: string;
@@ -88,5 +123,7 @@ export interface ProfessionConfig {
   /** Aviso exibido na interface. Texto informativo, nao parecer juridico. */
   complianceNotice: string;
   suggestedRules: SuggestedRuleSeed[];
+  /** Avisos de atendimento permitidos e como eles falam. */
+  notifications: ProfessionNotificationConfig;
   features: ProfessionFeatureFlags;
 }

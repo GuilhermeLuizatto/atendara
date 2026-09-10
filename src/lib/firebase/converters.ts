@@ -69,6 +69,14 @@ export const COLLECTION_DATE_FIELDS = {
   aiRules: [...STAMP_FIELDS, "lastAppliedAt"],
   aiDecisions: [...STAMP_FIELDS, "decidedAt", "evaluatedAt"],
   notifications: [...STAMP_FIELDS, "acknowledgedAt"],
+  notificationDeliveries: [
+    ...STAMP_FIELDS,
+    "scheduledFor",
+    "lastAttemptAt",
+    "nextAttemptAt",
+    "sentAt",
+    "cancelledAt",
+  ],
   auditLogs: [...STAMP_FIELDS, "occurredAt"],
 } as const;
 

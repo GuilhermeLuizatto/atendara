@@ -87,6 +87,9 @@ export function buildMockDataset(
     rules,
     decisions,
     notifications,
+    // Vazia por construcao: a demonstracao nao simula mensagem enviada a
+    // ninguem, e mock nao e historico que possa virar envio.
+    notificationDeliveries: [],
     auditLogs,
   };
 }

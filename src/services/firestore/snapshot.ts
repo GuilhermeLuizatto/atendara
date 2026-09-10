@@ -15,6 +15,7 @@ import type {
   ISODateString,
   Message,
   Notification,
+  NotificationDelivery,
   Professional,
   ProfessionId,
   Transaction,
@@ -35,6 +36,7 @@ export interface SnapshotParts {
   aiRules: AIRule[];
   aiDecisions: AIDecision[];
   notifications: Notification[];
+  notificationDeliveries: NotificationDelivery[];
   auditLogs: AuditLog[];
 }
 
@@ -50,6 +52,7 @@ export function emptyParts(): SnapshotParts {
     aiRules: [],
     aiDecisions: [],
     notifications: [],
+    notificationDeliveries: [],
     auditLogs: [],
   };
 }
@@ -120,6 +123,7 @@ export function assembleSnapshot(
     ],
     decisions: parts.aiDecisions,
     notifications: parts.notifications,
+    notificationDeliveries: parts.notificationDeliveries,
     auditLogs: parts.auditLogs,
   };
 }

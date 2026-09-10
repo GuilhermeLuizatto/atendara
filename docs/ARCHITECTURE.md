@@ -45,8 +45,10 @@ src/
 │   │   ├── agenda/
 │   │   ├── clientes/
 │   │   ├── mensagens/
-│   │   ├── financeiro/
+│   │   ├── financeiro/       Financeiro do NEGOCIO do assinante
+│   │   ├── assinatura/       Mensalidade que o assinante paga a operadora
 │   │   ├── agente/
+│   │   ├── admin/            Cadastros e cobranca da plataforma
 │   │   └── configuracoes/
 │   ├── login/
 │   ├── layout.tsx            Raiz: fontes, metadata, providers
@@ -59,6 +61,7 @@ src/
 │
 ├── config/                   Politica do produto, como DADO
 │   ├── app.ts                Constantes globais
+│   ├── billing.ts            Catalogo de planos, tolerancia e indicadores
 │   ├── classifications.ts    Taxonomia de mensagens + metadata
 │   ├── labels.ts             Traducao de enums para pt-BR
 │   ├── navigation.ts         Itens de menu e permissao exigida
@@ -68,6 +71,7 @@ src/
 │
 ├── lib/
 │   ├── auth/                 Adaptadores de autenticacao
+│   ├── billing/              Politica de acesso e indicadores (puros, sem SDK)
 │   ├── firebase/             Cliente, caminhos, conversores
 │   ├── storage/              Store sobre localStorage
 │   └── utils/                cn, formatadores
@@ -80,6 +84,7 @@ src/
 ├── providers/                Contextos globais (tema, auth, workspace)
 │
 ├── services/                 Persistencia
+│   ├── billing/              Cobranca da plataforma — porta separada, de leitura
 │   ├── types.ts              Contrato `WorkspaceRepository`
 │   ├── aggregates.ts         Derivados puros (saldo, atraso, conflito)
 │   ├── guards.ts             Permissao e validacao comuns as duas versoes
@@ -113,8 +118,21 @@ Colecoes sob `organizations/{organizationId}`:
 | `transactions`  | Financeiro                               |
 | `aiRules`       | Regras do agente, dos quatro niveis      |
 | `aiDecisions`   | Registro imutavel de cada decisao        |
-| `notifications` | Alertas                                  |
+| `notifications` | Alertas DENTRO do painel                 |
+| `notificationDeliveries` | Fila de saida dos avisos ao cliente |
 | `auditLogs`     | Trilha append-only                       |
+
+`notifications` e `notificationDeliveries` sao coisas diferentes e o nome quase
+esconde isso: a primeira e o alerta que aparece para a equipe dentro do produto;
+a segunda e a mensagem que SAI para quem e atendido, com estado de entrega e
+tentativas. So a segunda exige consentimento, contato valido e configuracao
+explicita — ver [NOTIFICACOES.md](NOTIFICACOES.md).
+
+Na raiz, alem dessas, vivem as colecoes da **cobranca da plataforma** —
+`platformPlans`, `platformSubscriptions/{organizationId}`, `platformInvoices`,
+`platformGatewayEvents` e `platformCustomers`. Elas nao pertencem a tenant
+nenhum: sao a mensalidade que a operadora cobra dos assinantes, e por isso ficam
+fora de `organizations/`. Ver a secao 13.
 
 Na raiz, `accounts/{userId}` define papel de plataforma, profissao, modulos,
 validade e troca obrigatoria de senha. Apenas o backend escreve nessa colecao.
@@ -319,6 +337,9 @@ O modo e escolhido uma vez, em `src/lib/auth/index.ts`. Isso e o que permite
 clonar o repositorio e navegar no prototipo sem criar projeto no Firebase.
 O administrador local deve ser gerado com `node scripts/create-demo-admin.mjs`.
 O verificador fica em `.env.local` e a senha inicial em `.local/`, fora do Git.
+Fora do Git nao e fora do bundle: `NEXT_PUBLIC_*` vai literal para o JavaScript
+publicado. Por isso `src/config/demo-admin.ts` so le o verificador em build de
+demonstracao, e `npm run check:bundle` (parte do `verify`) confere o artefato.
 
 Na autenticacao real, o perfil vem de `accounts/{uid}` por assinatura Firestore;
 email nao determina papel. As functions em `functions/` gerenciam o cadastro e
@@ -401,3 +422,47 @@ de rota no cliente e `next/image` sem otimizacao no servidor.
 server-side e o deploy passa a usar a integracao de frameworks do Firebase ou
 Cloud Run. Nenhum codigo de dominio muda — apenas `next.config.ts` e o alvo de
 deploy.
+
+---
+
+## 13. Cobranca da plataforma
+
+Documento completo: [COBRANCA-DA-PLATAFORMA.md](COBRANCA-DA-PLATAFORMA.md).
+Decisao: [ADR 0001](decisions/0001-cobranca-da-plataforma-e-gateway-de-assinatura.md).
+
+O Atendara e operado pela Three Devs e vendido por mensalidade. Existem dois
+dinheiros no produto e a arquitetura os mantem separados por construcao, nao por
+disciplina:
+
+| | Cobranca da plataforma | Financeiro operacional |
+| --- | --- | --- |
+| Colecoes | `platform*` na raiz | `organizations/{orgId}/transactions` |
+| Porta no codigo | `PlatformBillingClient` | `WorkspaceRepository` |
+| Derivados | `src/lib/billing/metrics.ts` | `src/services/aggregates.ts` |
+| Tela | `/assinatura`, `/admin` | `/financeiro` |
+
+Nenhuma funcao de um lado recebe dado do outro. `WorkspaceRepository` nao foi
+alterado nesta etapa — a cobranca entrou por uma porta propria, e nao alargando
+a existente.
+
+**A autoridade e o webhook.** `accounts/{uid}.subscriptionStatus` e `accessUntil`
+continuam sendo o portao que `firestore.rules` verifica; a cobranca apenas passou
+a ser a **origem** dessas escritas, no lugar do administrador ajustando a mao. O
+navegador nao tem caminho de escrita para nenhuma colecao `platform*`, e nenhuma
+callable de cobranca aceita `organizationId` vindo do cliente — a organizacao e
+lida de `accounts/{uid}` no servidor.
+
+**A politica e compartilhada, nao duplicada.** `src/lib/billing/policy.ts` e
+transpilado para `functions/generated/billing-policy.js` por
+`scripts/build-functions.mjs`, do mesmo jeito que os caminhos e os enums de
+acesso. O navegador usa para exibir; o backend usa para decidir. Duas copias
+divergiriam.
+
+**Idempotencia e correcao, nao otimizacao.** O gateway retenta e nao promete
+ordem. `platformGatewayEvents/{eventId}` e criado na mesma transacao do efeito —
+a reentrega aborta —, e cada documento afetado guarda o instante do ultimo evento
+aplicado, para que um evento atrasado nao reescreva estado mais novo.
+
+**Custo assumido:** o webhook obriga uma function HTTP (`onRequest`) porque
+`output: "export"` nao tem rota de servidor, e a verificacao da assinatura exige
+o corpo bruto. E a primeira dependencia de backend HTTP do produto.

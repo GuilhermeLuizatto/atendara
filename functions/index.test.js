@@ -8,7 +8,10 @@ vi.mock("firebase-admin/firestore", () => ({ getFirestore: () => ({
   batch: () => ({ create: (ref, data) => mock.creates.push([ref.path, data]), update: (ref, data) => mock.updates.push([ref.path, data]), delete: vi.fn(), commit: mock.commit }),
   runTransaction: async callback => callback({ get: ref => ref.get(), update: (ref, data) => mock.updates.push([ref.path, data]) }),
 }) }));
-vi.mock("firebase-functions/v2/https", () => ({ onCall: (_options, handler) => handler, HttpsError: class extends Error { constructor(code, message) { super(message); this.code = code; } } }));
+// `onRequest` entra porque index.js reexporta o webhook de cobranca; sem ele o
+// modulo nem carrega. O comportamento do webhook e testado em billing.test.js.
+vi.mock("firebase-functions/logger", () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
+vi.mock("firebase-functions/v2/https", () => ({ onCall: (_options, handler) => handler, onRequest: (_options, handler) => handler, HttpsError: class extends Error { constructor(code, message) { super(message); this.code = code; } } }));
 import { registerProfessional, updateAccount, completeInitialPassword } from "./index.js";
 import { paths } from "./generated/paths.js";
 const request = data => ({ auth: { uid: "admin", token: { auth_time: Date.now() / 1000 } }, data });

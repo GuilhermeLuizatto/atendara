@@ -35,6 +35,24 @@ SaaS multiprofissional de gestao e automacao. Leia
 7. **Dinheiro em centavos inteiros.** Nenhum float na camada financeira.
 8. **Alterou `src/config/permissions.ts`? Altere `firestore.rules` junto.** Nao
    ha como compartilhar codigo entre TypeScript e CEL.
+9. **Cobranca da plataforma nao e financeiro de tenant.** Mensalidade do
+   Atendara vive em `platform*` na raiz; receita e despesa do assinante vivem em
+   `organizations/{orgId}/transactions`. Nenhuma consulta, agregado ou tela
+   mistura as duas.
+10. **Assinatura e validade so mudam pelo webhook.** `subscriptionStatus` e
+    `accessUntil` sao escritos exclusivamente pelo backend, depois de conferir a
+    assinatura criptografica do evento. Retornar do checkout nao prova pagamento,
+    e nenhuma callable de cobranca aceita `organizationId` do cliente.
+11. **Aviso ao cliente e sempre opt-in explicito.** Nenhuma acao da agenda envia
+    mensagem sozinha — confirmar um atendimento, inclusive. Sao necessarias, em
+    conjunto: a chave da organizacao ligada, uma regra habilitada para aquele
+    evento e canal, remetente comprovado, o canal permitido pela profissao,
+    contato valido e consentimento que nomeie o canal. Todas as condicoes vivem
+    em `src/lib/notifications/eligibility.ts` e sao cobertas por testes.
+12. **Aviso da plataforma nao usa canal de clinica.** Situacao da assinatura e
+    derivada de `platformSubscriptions` e fica dentro do painel; aviso de
+    atendimento sai da organizacao. Sao remetentes, audiencias e bases legais
+    diferentes, e nao existe caminho de um para o outro.
 
 ## Estilo
 

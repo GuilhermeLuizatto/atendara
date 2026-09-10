@@ -2,6 +2,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";
+import { Tabs } from "@/components/ui/tabs";
+import { PlatformBillingPanel } from "./platform-billing";
 import { MODULE_LABELS, isPlatformAdmin } from "@/config/access";
 import { listProfessions } from "@/config/professions";
 import { authAdapter } from "@/lib/auth";
@@ -17,6 +19,7 @@ export function AdminView() {
   const [busy, setBusy] = useState(false);
   const [credential, setCredential] = useState<{ email: string; password: string } | null>(null);
   const [modules, setModules] = useState<AppModule[]>([...APP_MODULES]);
+  const [tab, setTab] = useState<"cadastros" | "cobranca">("cadastros");
   const admin = isPlatformAdmin(user?.access);
   useEffect(() => {
     if (!admin) return;
@@ -44,8 +47,12 @@ export function AdminView() {
   }
   const edit = (id: string, changes: Partial<AccountAccess>) => setAccounts(current => current.map(item => item.userId === id ? { ...item, ...changes } : item));
   return <div className="mx-auto max-w-6xl space-y-6 p-6">
-    <div><h1 className="text-foreground text-2xl font-semibold">Administracao</h1><p className="text-muted-foreground mt-1 text-sm">Profissionais, permissoes e acesso mensal da Atendara.</p></div>
-    <p className="bg-surface-muted text-muted-foreground rounded-lg p-3 text-sm">A mensalidade e controlada manualmente por validade. O cadastro nao faz cobranca nem envia mensagens.{mode === "demo" ? " Modo local: estes cadastros existem somente neste navegador." : " As contas sao gerenciadas pelo Firebase."}</p>
+    <div><h1 className="text-foreground text-2xl font-semibold">Administracao</h1><p className="text-muted-foreground mt-1 text-sm">Profissionais, permissoes e a cobranca da plataforma.</p></div>
+    <Tabs options={[{ value: "cadastros", label: "Cadastros e acesso" }, { value: "cobranca", label: "Cobranca da plataforma" }]} value={tab} onChange={setTab} />
+    {/* A aba de cobranca le somente as colecoes `platform*`. Nenhuma consulta
+        daqui alcanca o financeiro operacional de organizacao nenhuma. */}
+    {tab === "cobranca" ? <PlatformBillingPanel /> : <>
+    <p className="bg-surface-muted text-muted-foreground rounded-lg p-3 text-sm">A validade tambem pode ser ajustada a mao aqui; com a assinatura ativa quem escreve essa data e o webhook do gateway. O cadastro nao faz cobranca nem envia mensagens.{mode === "demo" ? " Modo local: estes cadastros existem somente neste navegador." : " As contas sao gerenciadas pelo Firebase."}</p>
     {error ? <p role="alert" className="text-danger text-sm">{error}</p> : null}
     <form onSubmit={submit} className="bg-surface border-border space-y-4 rounded-xl border p-5">
       <h2 className="text-foreground font-semibold">Adicionar profissional</h2>
@@ -72,5 +79,6 @@ export function AdminView() {
       </article>)}
       {!accounts.some(a => a.platformRole === "PROFESSIONAL") ? <p className="text-muted-foreground text-sm">Nenhum profissional cadastrado.</p> : null}
     </section>
+    </>}
   </div>;
 }

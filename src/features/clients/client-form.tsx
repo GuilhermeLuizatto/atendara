@@ -13,10 +13,12 @@ import {
 import type { ClientInput } from "@/services";
 import { useWorkspaceActions } from "@/providers/use-workspace-actions";
 import { useWorkspace } from "@/providers/workspace-provider";
+import { CHANNEL_META } from "@/config/notifications";
 import type {
   AcquisitionChannel,
   Client,
   ClientStatus,
+  OutboundChannel,
   ServiceModality,
 } from "@/types";
 
@@ -38,6 +40,7 @@ function emptyDraft(
     tags: [],
     administrativeNotes: null,
     appointmentNotificationsEnabled: false,
+    notificationConsent: null,
   };
 }
 
@@ -54,7 +57,52 @@ function toDraft(client: Client): ClientInput {
     tags: client.tags,
     administrativeNotes: client.administrativeNotes,
     appointmentNotificationsEnabled: client.appointmentNotificationsEnabled ?? false,
+    notificationConsent: client.notificationConsent ?? null,
   };
+}
+
+/**
+ * Retirar o aceite nao apaga o consentimento: carimba a revogacao. Apagar
+ * perderia a prova de que houve consentimento — e de quando ele acabou.
+ */
+function toggleConsent(draft: ClientInput, enabled: boolean): Partial<ClientInput> {
+  const now = new Date().toISOString();
+  const current = draft.notificationConsent ?? null;
+
+  if (!enabled) {
+    return {
+      appointmentNotificationsEnabled: false,
+      notificationConsent: current
+        ? { ...current, revokedAt: current.revokedAt ?? now }
+        : null,
+    };
+  }
+
+  return {
+    appointmentNotificationsEnabled: true,
+    notificationConsent: current
+      ? { ...current, revokedAt: null }
+      : { channels: [], grantedAt: now, revokedAt: null, source: "CLIENT_FORM" },
+  };
+}
+
+function toggleChannel(
+  draft: ClientInput,
+  channel: OutboundChannel,
+  consented: boolean,
+): Partial<ClientInput> {
+  const now = new Date().toISOString();
+  const current = draft.notificationConsent ?? {
+    channels: [],
+    grantedAt: now,
+    revokedAt: null,
+    source: "CLIENT_FORM" as const,
+  };
+  const channels = consented
+    ? [...current.channels.filter((item) => item !== channel), channel]
+    : current.channels.filter((item) => item !== channel);
+
+  return { notificationConsent: { ...current, channels, revokedAt: null } };
 }
 
 function validate(draft: ClientInput): Errors {
@@ -123,6 +171,11 @@ export function ClientForm({
 
   const term = terminology.client.singularLower;
 
+  // Os canais oferecidos vem da profissao: o grau de sensibilidade dos dados
+  // decide o que pode circular por canal aberto.
+  const allowedChannels = profession.notifications.allowedChannels;
+  const consentedChannels = draft.notificationConsent?.channels ?? [];
+
   return (
     <Modal
       open={open}
@@ -136,9 +189,50 @@ export function ClientForm({
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="bg-surface-muted rounded-lg p-3">
-          <label className="text-foreground flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.appointmentNotificationsEnabled ?? false} onChange={event => patch({ appointmentNotificationsEnabled: event.target.checked })} />Autoriza receber avisos sobre atendimentos</label>
-          <p className="text-muted-foreground mt-1 text-xs">Preferencia opcional. O envio ainda nao esta conectado; confirmar na agenda nao envia mensagem.</p>
+        <div className="bg-surface-muted space-y-2 rounded-lg p-3">
+          <label className="text-foreground flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={draft.appointmentNotificationsEnabled ?? false}
+              onChange={(event) => patch(toggleConsent(draft, event.target.checked))}
+            />
+            Autoriza receber avisos sobre atendimentos
+          </label>
+
+          {draft.appointmentNotificationsEnabled ? (
+            <div className="space-y-1 pl-6">
+              <p className="text-muted-foreground text-xs">
+                Por quais canais. O consentimento vale por canal: marcar aqui nao
+                autoriza os demais.
+              </p>
+              {allowedChannels.map((channel) => (
+                <label
+                  key={channel}
+                  className="text-foreground flex items-center gap-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={consentedChannels.includes(channel)}
+                    onChange={(event) =>
+                      patch(toggleChannel(draft, channel, event.target.checked))
+                    }
+                  />
+                  {CHANNEL_META[channel].label}
+                  <span className="text-muted-foreground text-xs">
+                    {CHANNEL_META[channel].contactField === "email"
+                      ? "exige e-mail no cadastro"
+                      : "exige telefone no cadastro"}
+                  </span>
+                </label>
+              ))}
+            </div>
+          ) : null}
+
+          <p className="text-muted-foreground text-xs">
+            Nenhuma mensagem sai enquanto a organizacao nao configurar canal,
+            evento, antecedencia e modelo em Configuracoes. Confirmar na agenda,
+            por si so, nao envia nada.
+          </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">

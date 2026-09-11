@@ -1,4 +1,5 @@
 import type { ID, ISODateString, TenantScopedEntity } from "./common";
+import type { PrivacyRedactionMark } from "./privacy";
 
 export type TransactionType = "INCOME" | "EXPENSE";
 
@@ -38,6 +39,7 @@ export interface Transaction extends TenantScopedEntity {
   dueDate: ISODateString;
   paidAt: ISODateString | null;
   gateway: PaymentGatewayRef | null;
+  privacyRedaction?: PrivacyRedactionMark | null;
 }
 
 /** Agregados calculados para o dashboard e a tela financeira. */

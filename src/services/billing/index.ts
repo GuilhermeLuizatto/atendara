@@ -1,5 +1,6 @@
 import { isDemoMode } from "@/lib/firebase/config";
 import type {
+  Page,
   PlatformGatewayEvent,
   PlatformInvoice,
   PlatformSubscription,
@@ -37,14 +38,14 @@ class UnavailablePlatformBillingClient implements PlatformBillingClient {
   async requestCancellation(): Promise<void> {
     throw new BillingUnavailableError();
   }
-  async allSubscriptions(): Promise<PlatformSubscription[]> {
-    return [];
+  async allSubscriptions(): Promise<Page<PlatformSubscription>> {
+    return { items: [], next: null };
   }
-  async allInvoices(): Promise<PlatformInvoice[]> {
-    return [];
+  async allInvoices(): Promise<Page<PlatformInvoice>> {
+    return { items: [], next: null };
   }
-  async recentGatewayEvents(): Promise<PlatformGatewayEvent[]> {
-    return [];
+  async recentGatewayEvents(): Promise<Page<PlatformGatewayEvent>> {
+    return { items: [], next: null };
   }
 }
 

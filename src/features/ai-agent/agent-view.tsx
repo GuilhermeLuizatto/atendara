@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { LockKeyhole, Plus } from "lucide-react";
+import { LockKeyhole, Plus, ScrollText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { EmptyState } from "@/components/ui/empty-state";
+import { LoadMore } from "@/components/ui/load-more";
 import { PageHeader } from "@/components/ui/page-header";
-import { Tabs } from "@/components/ui/tabs";
+import { SkeletonCard } from "@/components/ui/skeleton";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { RULE_LEVEL_LABELS } from "@/config/labels";
 import { AI_ASSISTANT_NAME } from "@/config/app";
 import { formatDateTime } from "@/lib/utils/format";
@@ -21,17 +24,30 @@ import { DecisionDetails } from "./decision-details";
 
 export function AgentView() {
   const { data } = useWorkspace();
-  if (!data) return <p>Carregando agente...</p>;
+  if (!data) return <AgentSkeleton />;
   return <AgentWorkspace key={data.organization.id} />;
 }
 
+function AgentSkeleton() {
+  return (
+    <div className="space-y-5" aria-busy="true">
+      <p role="status" className="sr-only">
+        Carregando o agente...
+      </p>
+      <SkeletonCard lines={1} />
+      <SkeletonCard lines={3} />
+      <SkeletonCard lines={3} />
+    </div>
+  );
+}
+
 function AgentWorkspace() {
-  const { data, session } = useWorkspace();
+  const { data, session, repository } = useWorkspace();
   const actions = useWorkspaceActions();
   const [tab, setTab] = useState<"rules" | "simulator" | "audit">("rules");
   const [editing, setEditing] = useState<AIRule | "new" | null>(null);
   const [deleting, setDeleting] = useState<AIRule | null>(null);
-  if (!data) return <p>Carregando agente...</p>;
+  if (!data) return <AgentSkeleton />;
   const groups = [
     {
       title: "1. Regras fundamentais e da profissao",
@@ -59,6 +75,8 @@ function AgentWorkspace() {
       />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs
+          idBase="agente"
+          label={`Secoes de ${AI_ASSISTANT_NAME}`}
           value={tab}
           onChange={setTab}
           options={[
@@ -78,6 +96,7 @@ function AgentWorkspace() {
           </Button>
         )}
       </div>
+      <TabPanel idBase="agente" value={tab} className="space-y-5">
       {tab === "rules" &&
         groups.map((group) => (
           <section key={group.title} className="space-y-3">
@@ -152,7 +171,20 @@ function AgentWorkspace() {
           </section>
         ))}
       {tab === "simulator" && <Simulator />}
-      {tab === "audit" && (
+      {tab === "audit" && data.decisions.length === 0 && (
+        <Card>
+          <EmptyState
+            icon={<ScrollText className="size-5" aria-hidden />}
+            title="Nenhuma decisao registrada"
+            description={
+              repository?.mode === "memory"
+                ? "Use Testar para simular uma mensagem; a decisao aparece aqui."
+                : "Cada mensagem avaliada pelo agente deixa uma decisao aqui. Sem canal de mensagens integrado, a lista fica vazia ate la."
+            }
+          />
+        </Card>
+      )}
+      {tab === "audit" && data.decisions.length > 0 && (
         <div className="space-y-3">
           {data.decisions.map((decision) => (
             <Card key={decision.id} className="p-4">
@@ -176,8 +208,17 @@ function AgentWorkspace() {
               </details>
             </Card>
           ))}
+          <Card>
+            <LoadMore
+              page={data.pagination?.decisions}
+              summary={`Mostrando as ${data.decisions.length} decisoes mais recentes.`}
+              label="Carregar decisoes anteriores"
+              onLoadMore={() => void actions.loadMore("decisions")}
+            />
+          </Card>
         </div>
       )}
+      </TabPanel>
       {editing && (
         <RuleForm
           key={editing === "new" ? "new" : editing.id}

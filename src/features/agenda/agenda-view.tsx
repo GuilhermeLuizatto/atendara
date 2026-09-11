@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Select } from "@/components/ui/form";
+import { LoadMore } from "@/components/ui/load-more";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
@@ -16,10 +17,14 @@ import {
   dayOfMonth,
   monthLabel,
   shortWeekdayLabel,
+  toDateKey,
   weekLabel,
   type DateKey,
 } from "@/lib/utils/datetime";
+import { formatDate } from "@/lib/utils/format";
+import { newTerm } from "@/lib/utils/terms";
 import { useNow } from "@/lib/utils/use-now";
+import { useWorkspaceActions } from "@/providers/use-workspace-actions";
 import { useWorkspace } from "@/providers/workspace-provider";
 import type { Appointment } from "@/types";
 
@@ -37,9 +42,20 @@ const MODE_OPTIONS: { value: AgendaMode; label: string }[] = [
 ];
 
 export function AgendaView() {
-  const { terminology, loading } = useWorkspace();
+  const { terminology, loading, data } = useWorkspace();
+  const { loadMore } = useWorkspaceActions();
   const agenda = useAgenda();
   const now = useNow();
+
+  // A agenda chega das datas mais distantes para as mais proximas do passado.
+  // Olhar um periodo anterior ao mais antigo carregado mostraria dias vazios
+  // que talvez nao estejam vazios.
+  const page = data?.pagination?.appointments;
+  const oldestLoaded = data?.appointments[0]?.startsAt ?? null;
+  const beforeLoaded =
+    Boolean(page?.hasMore || page?.loading) &&
+    oldestLoaded !== null &&
+    agenda.visibleDays[0] <= toDateKey(new Date(oldestLoaded));
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
@@ -98,7 +114,7 @@ export function AgendaView() {
         actions={
           <Button size="md" onClick={() => openCreate()}>
             <Plus className="size-4" aria-hidden strokeWidth={2} />
-            Novo {terminology.appointment.singularLower}
+            {newTerm(terminology.appointment)}
           </Button>
         }
       />
@@ -151,19 +167,30 @@ export function AgendaView() {
             ))}
           </Select>
 
-          <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
+          <label className="text-muted-foreground flex min-h-8 items-center gap-2 text-xs">
             <input
               type="checkbox"
               checked={agenda.showCancelled}
               onChange={(event) =>
                 agenda.setShowCancelled(event.target.checked)
               }
-              className="accent-primary size-3.5"
+              className="accent-primary size-4"
             />
             Mostrar cancelados
           </label>
         </div>
       </Card>
+
+      {beforeLoaded && oldestLoaded ? (
+        <Card>
+          <LoadMore
+            page={page}
+            summary={`${terminology.appointment.plural} anteriores a ${formatDate(oldestLoaded)} ainda nao foram carregados.`}
+            label="Carregar periodo anterior"
+            onLoadMore={() => void loadMore("appointments")}
+          />
+        </Card>
+      ) : null}
 
       <Card className="overflow-hidden">
         {agenda.mode === "month" ? (
@@ -276,7 +303,7 @@ function DayHeading({
       <p
         className={cn(
           "mx-auto mt-0.5 flex size-6 items-center justify-center rounded-full text-sm tabular-nums",
-          isToday ? "bg-accent font-semibold text-white" : "text-foreground",
+          isToday ? "bg-accent text-accent-foreground font-semibold" : "text-foreground",
         )}
       >
         {dayOfMonth(dateKey)}

@@ -1,4 +1,5 @@
 import type { ID, ISODateString, TenantScopedEntity } from "./common";
+import type { PrivacyRedactionMark } from "./privacy";
 
 export type AuditActorType = "USER" | "AI_AGENT" | "SYSTEM";
 
@@ -26,7 +27,9 @@ export interface AuditResourceRef {
 
 /**
  * Log de auditoria. Apenas escrita: as Security Rules permitem `create` e
- * negam `update`/`delete` para qualquer papel, inclusive OWNER.
+ * negam `update`/`delete` para qualquer papel, inclusive OWNER. A unica
+ * alteracao possivel e a pseudonimizacao pelo backend, marcada em
+ * `privacyRedaction` — a entrada continua existindo.
  */
 export interface AuditLog extends TenantScopedEntity {
   actorType: AuditActorType;
@@ -38,4 +41,5 @@ export interface AuditLog extends TenantScopedEntity {
   summary: string;
   metadata: Record<string, string | number | boolean | null>;
   occurredAt: ISODateString;
+  privacyRedaction?: PrivacyRedactionMark | null;
 }

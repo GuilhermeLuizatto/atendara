@@ -3,6 +3,8 @@ import type {
   AIActionTaken,
   AppointmentStatus,
   AttentionLevel,
+  AuditAction,
+  AuditActorType,
   ClientStatus,
   ConversationStatus,
   MessageChannel,
@@ -70,6 +72,53 @@ export const ATTENTION_LABELS: Record<AttentionLevel, string> = {
   HIGH: "Alta",
   CRITICAL: "Critica",
 };
+
+export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
+  CREATE: "Criacao",
+  UPDATE: "Alteracao",
+  DELETE: "Exclusao",
+  READ_SENSITIVE: "Leitura de dado sensivel",
+  LOGIN: "Entrada",
+  LOGOUT: "Saida",
+  RULE_ENABLED: "Regra ativada",
+  RULE_DISABLED: "Regra desativada",
+  AI_AUTO_RESPONSE: "Resposta automatica",
+  AI_ESCALATION: "Encaminhamento ao profissional",
+  PERMISSION_CHANGED: "Permissao alterada",
+  EXPORT: "Exportacao",
+};
+
+export const AUDIT_ACTOR_LABELS: Record<AuditActorType, string> = {
+  USER: "Pessoa da equipe",
+  AI_AGENT: "Agente",
+  SYSTEM: "Sistema",
+};
+
+/** Tipo de registro afetado. Tipo desconhecido aparece como foi gravado. */
+export const AUDIT_RESOURCE_LABELS: Record<string, string> = {
+  organization: "Organizacao",
+  client: "Cadastro",
+  appointment: "Atendimento",
+  transaction: "Lancamento",
+  rule: "Regra do agente",
+  conversation: "Conversa",
+  message: "Mensagem",
+  aiDecision: "Decisao do agente",
+  notification: "Alerta",
+  notificationDelivery: "Aviso ao cliente",
+  privacyRequest: "Pedido de titular",
+};
+
+/** 0 = domingo, como `AgendaSettings.workingDays`. */
+export const WEEKDAY_LABELS = [
+  "Domingo",
+  "Segunda",
+  "Terca",
+  "Quarta",
+  "Quinta",
+  "Sexta",
+  "Sabado",
+] as const;
 
 export const TRANSACTION_STATUS_LABELS: Record<TransactionStatus, string> = {
   PENDING: "Pendente",

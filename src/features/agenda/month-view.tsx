@@ -76,12 +76,12 @@ export function MonthView({
                 className={cn(
                   "mb-1 flex size-6 items-center justify-center rounded-full text-xs tabular-nums transition-colors",
                   isToday
-                    ? "bg-accent font-semibold text-white"
+                    ? "bg-accent text-accent-foreground font-semibold"
                     : outside
                       ? "text-subtle-foreground hover:bg-surface-muted"
                       : "text-foreground hover:bg-surface-muted",
                 )}
-                aria-label={`Ver dia ${dayOfMonth(key)}`}
+                aria-label={`Ver dia ${dayOfMonth(key)}, ${appointments.length} atendimento(s)`}
               >
                 {dayOfMonth(key)}
               </button>
@@ -92,7 +92,7 @@ export function MonthView({
                     <button
                       type="button"
                       onClick={() => onSelectAppointment(appointment)}
-                      className="hover:bg-surface-muted flex w-full items-center gap-1 rounded px-1 py-0.5 text-left transition-colors"
+                      className="hover:bg-surface-muted flex min-h-6 w-full items-center gap-1 rounded px-1 text-left transition-colors"
                     >
                       <span
                         aria-hidden
@@ -116,7 +116,7 @@ export function MonthView({
                     <button
                       type="button"
                       onClick={() => onSelectDay(key)}
-                      className="text-muted-foreground hover:text-foreground px-1 text-[10px] transition-colors"
+                      className="text-muted-foreground hover:text-foreground min-h-6 px-1 text-[11px] transition-colors"
                     >
                       + {appointments.length - CHIPS_PER_CELL} outros
                     </button>

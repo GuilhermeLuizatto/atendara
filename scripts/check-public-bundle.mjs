@@ -1,6 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+
+import { contentSecurityPolicyProblems } from "./csp.mjs";
+import { buildEnvironment } from "./public-env.mjs";
 
 /**
  * Confere o que o `next build` deixou em `out/` — o que vai ao ar.
@@ -15,18 +18,7 @@ import { join } from "node:path";
 
 const OUT = "out";
 
-function parseEnvFile(path) {
-  if (!existsSync(path)) return {};
-  const values = {};
-  for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (match) values[match[1]] = match[2].replace(/^["']|["']$/g, "");
-  }
-  return values;
-}
-
-// Mesma precedencia do Next: o ambiente do processo vence o arquivo.
-const env = { ...parseEnvFile(".env.local"), ...process.env };
+const env = buildEnvironment();
 
 const firebaseConfigured = [
   "NEXT_PUBLIC_FIREBASE_API_KEY",
@@ -68,6 +60,7 @@ if (!existsSync(OUT)) {
 
 const findings = [];
 let scanned = 0;
+let htmlPages = 0;
 for await (const path of files(OUT)) {
   scanned += 1;
   const content = await readFile(path, "utf8");
@@ -76,6 +69,11 @@ for await (const path of files(OUT)) {
   }
   for (const { label, pattern } of forbiddenPatterns) {
     if (pattern.test(content)) findings.push(`${path}: ${label}`);
+  }
+  // Toda pagina publicada carrega a CSP com o hash dos proprios scripts.
+  if (path.endsWith(".html")) {
+    htmlPages += 1;
+    for (const problem of contentSecurityPolicyProblems(content)) findings.push(`${path}: ${problem}`);
   }
 }
 
@@ -86,5 +84,5 @@ if (findings.length > 0) {
 }
 
 console.log(
-  `Bundle publico conferido: ${scanned} arquivos, ${demoBuild ? "build de demonstracao" : "sem verificador demo"}, nenhum segredo.`,
+  `Bundle publico conferido: ${scanned} arquivos, ${demoBuild ? "build de demonstracao" : "sem verificador demo"}, nenhum segredo, CSP com hash em ${htmlPages} paginas.`,
 );

@@ -1,4 +1,5 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
+import { ReCaptchaEnterpriseProvider, initializeAppCheck } from "firebase/app-check";
 import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth";
 import {
   connectFirestoreEmulator,
@@ -6,7 +7,7 @@ import {
   type Firestore,
 } from "firebase/firestore";
 
-import { getFirebaseConfig, useEmulators } from "./config";
+import { appCheckSiteKey, getFirebaseConfig, useEmulators } from "./config";
 
 /**
  * Inicializacao preguicosa e idempotente do SDK cliente.
@@ -21,11 +22,35 @@ let cachedAuth: Auth | null = null;
 let cachedDb: Firestore | null = null;
 let authEmulatorConnected = false;
 let dbEmulatorConnected = false;
+let appCheckActivated = false;
 
 export function getFirebaseApp(): FirebaseApp {
   if (cachedApp) return cachedApp;
   cachedApp = getApps().length ? getApp() : initializeApp(getFirebaseConfig());
+  activateAppCheck(cachedApp);
   return cachedApp;
+}
+
+/**
+ * App Check antes de qualquer chamada: Functions e Firestore anexam o token
+ * sozinhos quando ele esta ativo no app. As callables exigem o token, entao um
+ * build sem a chave de site falha fechado.
+ */
+function activateAppCheck(app: FirebaseApp): void {
+  if (appCheckActivated || typeof window === "undefined") return;
+  appCheckActivated = true;
+  if (useEmulators) {
+    // Emulador local: token de depuracao, que o emulador das functions aceita.
+    (self as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+  if (!appCheckSiteKey) {
+    console.warn("App Check sem chave de site: as callables vao recusar este aplicativo.");
+    return;
+  }
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
 }
 
 export function getFirebaseAuth(): Auth {

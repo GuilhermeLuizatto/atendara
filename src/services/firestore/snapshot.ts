@@ -13,6 +13,7 @@ import type {
   Conversation,
   ID,
   ISODateString,
+  Membership,
   Message,
   Notification,
   NotificationDelivery,
@@ -22,11 +23,12 @@ import type {
 } from "@/types";
 
 import { markOverdue, recomputeClientAggregates } from "../aggregates";
-import type { WorkspaceSnapshot } from "../types";
+import type { WorkspacePagination, WorkspaceSnapshot } from "../types";
 
 /** Partes cruas vindas do Firestore, uma por listener. */
 export interface SnapshotParts {
   organization: PartialOrganization | null;
+  membership: Membership | null;
   professionals: Professional[];
   clients: Client[];
   appointments: Appointment[];
@@ -43,6 +45,7 @@ export interface SnapshotParts {
 export function emptyParts(): SnapshotParts {
   return {
     organization: null,
+    membership: null,
     professionals: [],
     clients: [],
     appointments: [],
@@ -75,6 +78,7 @@ export function assembleSnapshot(
   organizationId: ID,
   professionId: ProfessionId,
   now: ISODateString,
+  pagination: WorkspacePagination = {},
 ): WorkspaceSnapshot | null {
   if (!parts.organization) return null;
 
@@ -125,5 +129,7 @@ export function assembleSnapshot(
     notifications: parts.notifications,
     notificationDeliveries: parts.notificationDeliveries,
     auditLogs: parts.auditLogs,
+    membership: parts.membership,
+    pagination,
   };
 }

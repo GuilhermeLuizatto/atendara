@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { permissionsForRole } from "@/config/permissions";
+import { permissionsForMembership, permissionsForRole } from "@/config/permissions";
 import { buildMockDataset } from "@/mocks";
-import type { Appointment, Client, Transaction } from "@/types";
+import type { Appointment, Client, ServiceModality, Transaction } from "@/types";
 
 import type { WorkspaceSnapshot } from "../types";
 import type { PlanContext, WriteOperation } from "./plan";
@@ -18,6 +18,8 @@ import {
 } from "./plans/clients";
 import { planCreateTransaction } from "./plans/finance";
 import { planReceiveMessage, planReplyToConversation } from "./plans/messaging";
+import { planUpdateAgendaSettings } from "./plans/organization";
+import { planUpdateNotificationSettings } from "./plans/outbound";
 import {
   planCreateRule,
   planDeleteRule,
@@ -154,6 +156,71 @@ describe("isolamento do tenant nos planos de escrita", () => {
     expect(() =>
       planDeleteClient(ctx, ctx.snapshot.clients[0].id),
     ).toThrow("Sem permissao para esta acao.");
+  });
+});
+
+function dataOf(write: WriteOperation): Record<string, unknown> {
+  if (write.op === "delete") throw new Error("Escrita sem dados.");
+  return write.data;
+}
+
+describe("configuracao da organizacao", () => {
+  const notifications = { enabled: true, verifiedSenderChannels: ["SMS" as const], rules: [] };
+
+  it("deixa o titular sem papel administrativo configurar os avisos, e so eles", () => {
+    const holder = makeContext(undefined, {
+      role: "PROFESSIONAL",
+      permissions: permissionsForMembership("PROFESSIONAL", true),
+    });
+
+    const plan = planUpdateNotificationSettings(holder, notifications);
+    expect(collections(plan.writes)).toEqual(["organizations", "auditLogs"]);
+    // As rules aceitam do titular so estes campos; o plano nao pode pedir mais.
+    expect(Object.keys(dataOf(plan.writes[0])).sort()).toEqual(
+      ["settings.notifications", "updatedAt", "updatedBy"].sort(),
+    );
+
+    expect(() =>
+      planUpdateAgendaSettings(holder, holder.snapshot.organization.settings.agenda),
+    ).toThrow("Sem permissao para esta acao.");
+  });
+
+  it("recusa os avisos a profissional que nao e o titular", () => {
+    const member = makeContext(undefined, {
+      role: "PROFESSIONAL",
+      permissions: permissionsForMembership("PROFESSIONAL", false),
+    });
+    expect(() => planUpdateNotificationSettings(member, notifications)).toThrow(
+      "Sem permissao para esta acao.",
+    );
+  });
+
+  it("valida e normaliza o horario de atendimento antes de gravar", () => {
+    const ctx = makeContext();
+    const agenda = ctx.snapshot.organization.settings.agenda;
+
+    expect(() => planUpdateAgendaSettings(ctx, { ...agenda, workingDays: [] })).toThrow("dia");
+    expect(() =>
+      planUpdateAgendaSettings(ctx, { ...agenda, workdayStart: "19:00", workdayEnd: "08:00" }),
+    ).toThrow("antes do fim");
+    expect(() => planUpdateAgendaSettings(ctx, { ...agenda, slotIntervalMinutes: 7 })).toThrow(
+      "intervalo",
+    );
+    expect(() =>
+      planUpdateAgendaSettings(ctx, { ...agenda, defaultModality: "INEXISTENTE" as ServiceModality }),
+    ).toThrow("Modalidade");
+
+    const plan = planUpdateAgendaSettings(ctx, {
+      ...agenda,
+      workingDays: [5, 1, 1],
+      workdayStart: "07:30",
+    });
+    expect(collections(plan.writes)).toEqual(["organizations", "auditLogs"]);
+    expect(dataOf(plan.writes[0])["settings.agenda"]).toEqual({
+      ...agenda,
+      workingDays: [1, 5],
+      workdayStart: "07:30",
+    });
   });
 });
 

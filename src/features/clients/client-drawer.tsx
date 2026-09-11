@@ -24,6 +24,7 @@ import {
   formatDateTime,
   formatPhone,
 } from "@/lib/utils/format";
+import { byGender, newTerm, noTerm } from "@/lib/utils/terms";
 import { useWorkspaceActions } from "@/providers/use-workspace-actions";
 import { useWorkspace } from "@/providers/workspace-provider";
 import type { Client } from "@/types";
@@ -70,7 +71,7 @@ export function ClientDrawer({
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={() => onNewAppointment(client)}>
               <CalendarPlus className="size-3.5" aria-hidden strokeWidth={1.75} />
-              Novo {terminology.appointment.singularLower}
+              {newTerm(terminology.appointment)}
             </Button>
             <Button variant="outline" size="sm" onClick={() => onEdit(client)}>
               <Pencil className="size-3.5" aria-hidden strokeWidth={1.75} />
@@ -165,7 +166,8 @@ export function ClientDrawer({
           <Section title={`Historico de ${terminology.appointment.pluralLower}`}>
             {history.length === 0 ? (
               <p className="text-muted-foreground text-sm">
-                Nenhum {terminology.appointment.singularLower} registrado.
+                {noTerm(terminology.appointment)}{" "}
+                {byGender(terminology.appointment, "registrado", "registrada")}.
               </p>
             ) : (
               <ul className="divide-border border-border divide-y rounded-lg border">

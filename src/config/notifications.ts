@@ -1,4 +1,5 @@
 import type {
+  AppointmentDisclosureLevel,
   AppointmentNotificationEvent,
   DeliveryFailureCode,
   NotificationSkipReason,
@@ -38,6 +39,12 @@ export interface ChannelMeta {
    * um canal que parece pronto e nao esta e pior do que um canal ausente.
    */
   activationRequirement: string;
+  /**
+   * Por quem o aviso passa ate chegar, dito a pessoa no texto de
+   * consentimento. Quem autoriza precisa saber que ha um terceiro no caminho.
+   * Ja com a contracao ("pelo", "pela"): a frase e montada por concatenacao.
+   */
+  consentIntermediary: string;
 }
 
 export const CHANNEL_META: Record<OutboundChannel, ChannelMeta> = {
@@ -48,6 +55,7 @@ export const CHANNEL_META: Record<OutboundChannel, ChannelMeta> = {
     maxBodyLength: 600,
     activationRequirement:
       "Dominio remetente verificado no provedor de e-mail e registro de retorno configurado.",
+    consentIntermediary: "pelo provedor de e-mail usado pela organizacao",
   },
   SMS: {
     label: "SMS",
@@ -56,6 +64,7 @@ export const CHANNEL_META: Record<OutboundChannel, ChannelMeta> = {
     maxBodyLength: 160,
     activationRequirement:
       "Numero remetente habilitado na operadora e telefone do destinatario em formato internacional.",
+    consentIntermediary: "pela operadora de telefonia",
   },
   WHATSAPP: {
     label: "WhatsApp",
@@ -64,6 +73,7 @@ export const CHANNEL_META: Record<OutboundChannel, ChannelMeta> = {
     maxBodyLength: 400,
     activationRequirement:
       "Numero aprovado na API oficial do WhatsApp Business e modelo de mensagem homologado pela Meta.",
+    consentIntermediary: "pelo WhatsApp, servico da Meta",
   },
 };
 
@@ -85,6 +95,8 @@ export interface AppointmentEventMeta {
    * mudanca e registrada (`CHANGE`). Antecedencia so faz sentido no primeiro.
    */
   anchor: "START" | "CHANGE";
+  /** Como o evento aparece no texto de consentimento, em minusculas. */
+  consentLabel: string;
 }
 
 export const APPOINTMENT_EVENT_META: Record<
@@ -97,6 +109,7 @@ export const APPOINTMENT_EVENT_META: Record<
     defaultEnabled: false,
     allowedLeadMinutes: [0],
     anchor: "CHANGE",
+    consentLabel: "horario marcado",
   },
   APPOINTMENT_REMINDER: {
     label: "Lembrete",
@@ -104,6 +117,7 @@ export const APPOINTMENT_EVENT_META: Record<
     defaultEnabled: false,
     allowedLeadMinutes: [60, 180, 720, 1_440, 2_880],
     anchor: "START",
+    consentLabel: "lembrete antes do horario",
   },
   APPOINTMENT_CONFIRMED: {
     label: "Confirmacao registrada",
@@ -112,6 +126,7 @@ export const APPOINTMENT_EVENT_META: Record<
     defaultEnabled: false,
     allowedLeadMinutes: [0],
     anchor: "CHANGE",
+    consentLabel: "confirmacao do horario",
   },
   APPOINTMENT_CANCELLED: {
     label: "Cancelamento",
@@ -119,8 +134,40 @@ export const APPOINTMENT_EVENT_META: Record<
     defaultEnabled: false,
     allowedLeadMinutes: [0],
     anchor: "CHANGE",
+    consentLabel: "cancelamento do horario",
   },
 };
+
+// ------------------------------------------------------- consentimento
+
+/**
+ * Versao do texto de consentimento. Vai gravada em
+ * `NotificationConsent.textVersion`: trocar o texto exige trocar a versao, ou
+ * deixa de ser possivel saber o que cada pessoa aceitou.
+ *
+ * RASCUNHO: redacao, base legal e necessidade do consentimento para cada
+ * evento dependem de revisao por profissional qualificado.
+ */
+export const NOTIFICATION_CONSENT_TEXT_VERSION = "2026-09-10-rascunho";
+
+export const NOTIFICATION_CONSENT_REVIEW_STATUS = "DRAFT_PENDING_LEGAL_REVIEW" as const;
+
+/**
+ * O que o aviso mostra, dito a pessoa. Precisa acompanhar
+ * `ALLOWED_BY_DISCLOSURE` em `lib/notifications/templates.ts`: prometer menos
+ * do que o renderizador interpola seria consentimento para outra coisa.
+ */
+export const CONSENT_DISCLOSURE_PHRASES: Record<AppointmentDisclosureLevel, string> = {
+  TIME_ONLY: "trazem apenas o seu nome, o nome da organizacao, a data e o horario",
+  TIME_AND_PROFESSIONAL:
+    "trazem o seu nome, o nome da organizacao, o nome de quem atende, a data e o horario",
+  TIME_PROFESSIONAL_AND_SERVICE:
+    "trazem o seu nome, o nome da organizacao, o nome de quem atende, o tipo de atendimento, a data e o horario",
+};
+
+/** Orientacao para a equipe, fora do texto que a pessoa le. */
+export const CONSENT_STAFF_INSTRUCTION =
+  "Leia ou mostre o texto acima a pessoa. Marque somente se ela autorizou, e so os canais que ela escolheu.";
 
 // ------------------------------------------------------------- modelos
 

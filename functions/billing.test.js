@@ -22,8 +22,8 @@ vi.mock("firebase-functions/logger", () => ({
   error: vi.fn(),
 }));
 vi.mock("firebase-functions/v2/https", () => ({
-  onCall: (_options, handler) => handler,
-  onRequest: (_options, handler) => handler,
+  onCall: (options, handler) => Object.assign(handler, { options }),
+  onRequest: (options, handler) => Object.assign(handler, { options }),
   HttpsError: class extends Error {
     constructor(code, message) {
       super(message);
@@ -530,6 +530,7 @@ describe("Revisao de seguranca — quem pode pedir pelas callables", () => {
     // autorizacao termina em `failed-precondition` antes de qualquer rede.
     delete process.env.STRIPE_SECRET_KEY;
     process.env.STRIPE_PRICE_MAP = JSON.stringify({ [PLAN]: "price_teste" });
+    process.env.APP_BASE_URL = "https://app.atendara.test";
     store.set(paths.account(MEMBRO), {
       userId: MEMBRO,
       platformRole: "PROFESSIONAL",
@@ -547,6 +548,7 @@ describe("Revisao de seguranca — quem pode pedir pelas callables", () => {
 
   afterEach(() => {
     delete process.env.STRIPE_PRICE_MAP;
+    delete process.env.APP_BASE_URL;
   });
 
   it("OWNER suspenso da organizacao nao abre o portal nem cancela", async () => {
@@ -617,5 +619,184 @@ describe("Codificacao do formulario enviado ao gateway", () => {
     expect(decodeURIComponent(encoded)).toContain("line_items[0][price]=price_1");
     expect(decodeURIComponent(encoded)).toContain("metadata[organizationId]=org-a");
     expect(encoded).not.toContain("vazio");
+  });
+});
+
+// Datas relativas ao relogio: o portao compara a validade com o agora, e datas
+// fixas fariam estes testes mudarem de sentido com o passar dos meses.
+const DAY = 86_400_000;
+const relative = (days) => new Date(Date.now() + days * DAY).toISOString();
+/** Como o webhook grava: segundos do gateway, sem milissegundos. */
+const asGateway = (iso, extraDays = 0) =>
+  new Date(Math.floor(Date.parse(iso) / 1000) * 1000 + extraDays * DAY).toISOString();
+const chamadaDe = (uid, data = {}) => ({ auth: { uid, token: {} }, data });
+
+describe("Revisao 5B — concessao registrada diante dos eventos do gateway", () => {
+  const grantUntil = relative(20);
+
+  beforeEach(() => {
+    store.set(paths.platformAccessGrant(ORG), {
+      organizationId: ORG,
+      subscriberUserId: USER,
+      kind: "COURTESY",
+      reason: "Cortesia do piloto combinado.",
+      until: grantUntil,
+      revokedAt: null,
+    });
+  });
+
+  it("assinatura incompleta nao fecha uma cortesia vigente", async () => {
+    await applyGatewayEvent(checkoutEvent("evt_1"));
+    await applyGatewayEvent(
+      subscriptionEvent("evt_2", "customer.subscription.created", "incomplete", relative(30), "2026-09-09T12:00:05.000Z"),
+    );
+
+    expect(subscription()).toMatchObject({ status: "INCOMPLETE", accessUntil: null });
+    expect(account()).toMatchObject({
+      subscriptionStatus: "ACTIVE",
+      accessUntil: grantUntil,
+      accessUntilMs: Date.parse(grantUntil),
+    });
+  });
+
+  it("ciclo pago mais longo prevalece, e o reembolso integral nao fecha a concessao", async () => {
+    const periodEnd = relative(30);
+    await applyGatewayEvent(checkoutEvent("evt_1"));
+    await applyGatewayEvent(
+      subscriptionEvent("evt_2", "customer.subscription.created", "active", periodEnd, "2026-09-09T12:00:05.000Z"),
+    );
+    await applyGatewayEvent(invoiceEvent("evt_3", "invoice.paid", "in_1", periodEnd, "2026-09-09T12:00:08.000Z"));
+    // Concessao de 20 dias nao encurta um ciclo pago de 30 mais tolerancia.
+    expect(account()).toMatchObject({ subscriptionStatus: "ACTIVE", accessUntil: asGateway(periodEnd, 5) });
+
+    await applyGatewayEvent({
+      id: "evt_4",
+      type: "charge.refunded",
+      created: seconds("2026-09-10T10:00:00.000Z"),
+      data: { object: { invoice: "in_1", amount_refunded: 19_900 } },
+    });
+
+    expect(invoice("in_1")).toMatchObject({ status: "REFUNDED" });
+    expect(subscription()).toMatchObject({ accessUntil: "2026-09-10T10:00:00.000Z" });
+    expect(account()).toMatchObject({ subscriptionStatus: "ACTIVE", accessUntil: grantUntil });
+  });
+
+  it("concessao revogada nao segura o acesso depois do cancelamento", async () => {
+    store.set(paths.platformAccessGrant(ORG), { ...store.get(paths.platformAccessGrant(ORG)), revokedAt: relative(-1) });
+    const periodEnd = relative(3);
+    await applyGatewayEvent(checkoutEvent("evt_1"));
+    await applyGatewayEvent(
+      subscriptionEvent("evt_2", "customer.subscription.deleted", "canceled", periodEnd, "2026-09-09T12:00:05.000Z"),
+    );
+
+    expect(account()).toMatchObject({ subscriptionStatus: "CANCELLED", accessUntil: asGateway(periodEnd) });
+  });
+});
+
+describe("Revisao 5B — limite por usuario nas callables do gateway", () => {
+  beforeEach(() => {
+    delete process.env.STRIPE_SECRET_KEY;
+    process.env.APP_BASE_URL = "https://app.atendara.test";
+    process.env.STRIPE_PRICE_MAP = JSON.stringify({ [PLAN]: "price_teste" });
+    store.set(paths.platformSubscription(ORG), {
+      organizationId: ORG,
+      subscriberUserId: USER,
+      status: "ACTIVE",
+      gateway: { provider: "STRIPE", customerId: CUSTOMER, subscriptionId: SUBSCRIPTION },
+    });
+  });
+
+  afterEach(() => {
+    delete process.env.APP_BASE_URL;
+    delete process.env.STRIPE_PRICE_MAP;
+  });
+
+  it("recusa a sexta tentativa de checkout na janela, contando cada callable a parte", async () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await expect(createSubscriptionCheckout(chamadaDe(USER, { planId: PLAN }))).rejects.toMatchObject({
+        code: "failed-precondition",
+      });
+    }
+    await expect(createSubscriptionCheckout(chamadaDe(USER, { planId: PLAN }))).rejects.toMatchObject({
+      code: "resource-exhausted",
+    });
+
+    expect(store.get(paths.platformRateLimit(`createSubscriptionCheckout_${USER}`))).toMatchObject({ count: 5 });
+    // O portal tem o proprio contador.
+    await expect(openBillingPortal(chamadaDe(USER))).rejects.toMatchObject({ code: "failed-precondition" });
+  });
+
+  it("limita pedidos de cancelamento e volta a aceitar depois da janela", async () => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await expect(cancelPlatformSubscription(chamadaDe(USER))).rejects.toMatchObject({ code: "failed-precondition" });
+    }
+    await expect(cancelPlatformSubscription(chamadaDe(USER))).rejects.toMatchObject({ code: "resource-exhausted" });
+
+    store.set(paths.platformRateLimit(`cancelPlatformSubscription_${USER}`), {
+      count: 3,
+      windowStartMs: Date.now() - 601_000,
+    });
+    await expect(cancelPlatformSubscription(chamadaDe(USER))).rejects.toMatchObject({ code: "failed-precondition" });
+  });
+
+  it("toda callable de cobranca exige App Check; o webhook nao", async () => {
+    const billing = await import("./billing.js");
+    for (const name of ["createSubscriptionCheckout", "openBillingPortal", "cancelPlatformSubscription"]) {
+      expect(billing[name].options, name).toMatchObject({ enforceAppCheck: true });
+    }
+    expect(billing.stripeWebhook.options.enforceAppCheck).toBeUndefined();
+  });
+});
+
+describe("Revisao 5B — retorno do checkout fora do emulador", () => {
+  let fetchSpy;
+
+  beforeEach(() => {
+    process.env.STRIPE_SECRET_KEY = "sk_test_apenas_para_teste_sem_rede";
+    process.env.STRIPE_PRICE_MAP = JSON.stringify({ [PLAN]: "price_teste" });
+    delete process.env.APP_BASE_URL;
+    delete process.env.FUNCTIONS_EMULATOR;
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("rede desligada no teste"));
+    store.set(paths.platformSubscription(ORG), {
+      organizationId: ORG,
+      subscriberUserId: USER,
+      status: "CANCELED",
+      gateway: { provider: "STRIPE", customerId: CUSTOMER, subscriptionId: SUBSCRIPTION },
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    delete process.env.STRIPE_SECRET_KEY;
+    delete process.env.STRIPE_PRICE_MAP;
+    delete process.env.APP_BASE_URL;
+    delete process.env.FUNCTIONS_EMULATOR;
+  });
+
+  it("sem APP_BASE_URL a callable falha fechada antes de falar com o gateway", async () => {
+    const erro = await createSubscriptionCheckout(chamadaDe(USER, { planId: PLAN })).catch((caught) => caught);
+
+    expect(erro).toMatchObject({ code: "failed-precondition" });
+    expect(erro.message).toContain("APP_BASE_URL");
+    await expect(openBillingPortal(chamadaDe(USER))).rejects.toMatchObject({ code: "failed-precondition" });
+    // Antes, a sessao era aberta no gateway com retorno para 127.0.0.1.
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("recusa endereco de retorno sem https fora do emulador", async () => {
+    process.env.APP_BASE_URL = "http://app.atendara.test";
+
+    const erro = await createSubscriptionCheckout(chamadaDe(USER, { planId: PLAN })).catch((caught) => caught);
+
+    expect(erro).toMatchObject({ code: "failed-precondition" });
+    expect(erro.message).toContain("https");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("no emulador, sem a variavel, segue para o endereco local", async () => {
+    process.env.FUNCTIONS_EMULATOR = "true";
+
+    await expect(createSubscriptionCheckout(chamadaDe(USER, { planId: PLAN }))).rejects.toMatchObject({ code: "internal" });
+    expect(String(fetchSpy.mock.calls[0][1].body)).toContain(encodeURIComponent("http://127.0.0.1:3000"));
   });
 });

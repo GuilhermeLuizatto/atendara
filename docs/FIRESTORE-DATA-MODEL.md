@@ -30,13 +30,17 @@ organizations/{orgId}
 ├── aiDecisions/{decisionId}             append-only
 ├── notifications/{notificationId}       alertas DENTRO do painel
 ├── notificationDeliveries/{deliveryId}  fila de saida dos avisos ao cliente
-└── auditLogs/{logId}                    append-only
+├── auditLogs/{logId}                    append-only (so o backend pseudonimiza)
+└── privacyRequests/{requestId}          pedidos de titulares atendidos (so backend)
 
 platformPlans/{planId}                    cobranca DA PLATAFORMA (Etapa 3)
 platformSubscriptions/{organizationId}    uma por organizacao — o id E o tenant
 platformInvoices/{invoiceId}              cada cobranca emitida
 platformGatewayEvents/{eventId}           trilha dos eventos; garante idempotencia
 platformCustomers/{customerId}            indice cliente-do-gateway -> organizacao
+platformAccessGrants/{organizationId}     concessao manual vigente, uma por organizacao
+platformAuditLogs/{logId}                 trilha append-only dos atos da operadora
+platformRateLimits/{callable_uid}         contador de abuso por usuario (so backend)
 ```
 
 `messages` e subcolecao porque e a colecao que mais cresce e quase sempre e lida
@@ -54,6 +58,10 @@ como **string ISO**, e nao `Timestamp`. Eles seguem a convencao de
 `accounts/{userId}` — colecoes de raiz, escritas apenas pelo backend, que ja
 carregam `accessUntilMs` numerico para o que as Security Rules precisam
 comparar. A tabela de conversao da secao 2 cobre so as colecoes de tenant.
+A excecao e `expiresAt`, gravado como `Timestamp` em `platformGatewayEvents` e
+`platformRateLimits` porque politica de TTL so le esse tipo. So
+`platformRateLimits` tem TTL ligado (`firestore.indexes.json`); o prazo dos
+eventos e provisorio e nao tem politica ligada.
 
 ---
 
@@ -77,6 +85,7 @@ mantem a tabela de quais campos sao data:
 | `notifications` | + `acknowledgedAt`                                         |
 | `notificationDeliveries` | + `scheduledFor`, `lastAttemptAt`, `nextAttemptAt`, `sentAt`, `cancelledAt` |
 | `auditLogs`     | + `occurredAt`                                             |
+| `privacyRequests` | + `executedAt`, `expiresAt`                              |
 
 **Por que `Timestamp` e nao string.** E o tipo que o Firestore ordena, indexa e
 exporta nativamente; politicas de TTL, comparacao com `request.time` nas
@@ -85,8 +94,9 @@ Security Rules e leitura no console dependem dele.
 **Por que uma tabela e nao inferencia.** Adivinhar por sufixo ("tudo que termina
 em `At`") transformaria qualquer campo de texto futuro em data silenciosamente.
 
-Duas excecoes propositais: `externalCalendar.syncedAt` e `gateway` sao payloads
-espelhados de sistemas externos e ficam como vieram.
+Tres excecoes propositais: `externalCalendar.syncedAt` e `gateway` sao payloads
+espelhados de sistemas externos e ficam como vieram; `privacyRedaction.redactedAt`
+e gravado pelo backend ja em ISO.
 
 **`id` vem do caminho, nunca do corpo.** Um documento com `id` divergente e lido
 pelo id real.
@@ -125,12 +135,12 @@ Quando isso virar Cloud Function disparada por escrita, o snapshot nao muda.
 
 ---
 
-## 4. Consultas e limites
+## 4. Consultas e paginas
 
 Definidas em [`src/services/firestore/queries.ts`](../src/services/firestore/queries.ts).
 
-| Colecao         | Ordenacao              | Teto |
-| --------------- | ---------------------- | ---- |
+| Colecao         | Ordenacao              | Pagina |
+| --------------- | ---------------------- | ------ |
 | `professionals` | `displayName`          | 50   |
 | `clients`       | `fullName`             | 500  |
 | `appointments`  | `startsAt` desc        | 500  |
@@ -143,10 +153,47 @@ Definidas em [`src/services/firestore/queries.ts`](../src/services/firestore/que
 | `notificationDeliveries` | `scheduledFor` desc | 200 |
 | `auditLogs`     | `occurredAt` desc      | 200  |
 
-O contrato entrega o tenant inteiro; os tetos existem para que uma organizacao
-antiga nao transforme a primeira carga em uma conta inesperada. As colecoes que
-crescem sem parar vem das mais recentes para as mais antigas. Paginar por
-colecao e a evolucao natural e **nao muda a interface do repositorio**.
+A primeira carga traz uma pagina de cada colecao, para que uma organizacao
+antiga nao transforme a abertura do painel numa conta inesperada. As colecoes
+que crescem sem parar vem das mais recentes para as mais antigas. Cada consulta
+pede um documento a mais do que mostra: e o que preenche
+`snapshot.pagination[colecao].hasMore` sem uma ida extra ao servidor.
+
+`repository.loadMore(colecao)` soma uma pagina ao limite do listener daquela
+colecao. A tela diz o que esta carregado antes de oferecer o botao — clientes
+em ordem alfabetica, agenda anterior ao atendimento mais antigo, financeiro,
+decisoes, conversas e trilha de auditoria.
+
+**Custo assumido:** um listener com limite maior e outra consulta, entao os
+documentos que ja estavam na tela sao cobrados de novo. A alternativa, cursor
+com paginas estaticas, perderia o tempo real: editar um registro da segunda
+pagina nao apareceria ate recarregar.
+
+As listagens da operadora (cadastros, concessoes, trilha, assinaturas, faturas
+e eventos) usam cursor (`src/lib/firebase/paging.ts`): sao leituras pontuais, e
+a ordem vem de campo presente em todo documento (`email`, `grantedAt`,
+`createdAt`, id do documento, `issuedAt`, `receivedAt`). Nenhum indice composto
+novo.
+
+### Vinculo de quem usa o painel
+
+O repositorio tambem escuta `members/{uid}` do proprio usuario. O papel dali e
+o que a sessao usa para montar as permissoes — o mesmo documento que
+`hasRole()` confere nas rules. Sem isso, OWNER e ADMIN de uma clinica apareciam
+no aplicativo como `PROFESSIONAL`. Ser titular vem do `ownerId` da
+organizacao.
+
+### Estado da carga
+
+`repository.getLoadState()` separa carregando, pronto e indisponivel, para a
+tela nunca mostrar "nada cadastrado" quando o que houve foi falha:
+
+- organizacao sem documento vinda do cache: `offline`;
+- organizacao sem documento vinda do servidor: `organization-missing`;
+- leitura da organizacao negada: `access-denied` (validade vencida, suspensao);
+- colecao que falhou por outro motivo que nao permissao: fica em `failed`, e o
+  painel avisa quais areas podem estar incompletas;
+- carga que passa de 12 s: `slow`, com opcao de tentar de novo.
 
 ### Mensagens por `collectionGroup`
 
@@ -255,16 +302,42 @@ A Etapa 3 acrescentou as colecoes de cobranca da plataforma:
   filtro — negadas, pelo mesmo mecanismo do `collectionGroup` de mensagens;
 - dono com a mensalidade **vencida**: le a propria cobranca e o catalogo, e
   continua sem alcancar o operacional — e o caminho para regularizar;
-- trilha de eventos: so a operadora le;
-- indice `platformCustomers`: ninguem le, em papel nenhum;
-- escrita em qualquer das cinco colecoes — negada para todos, **inclusive** o
-  administrador da plataforma.
+- trilha de eventos: so a operadora le, e so com segundo fator (TOTP) na sessao;
+- indice `platformCustomers` e contadores `platformRateLimits`: ninguem le, em
+  papel nenhum;
+- concessao manual: o titular le a da propria organizacao, a operadora le todas;
+- trilha `platformAuditLogs`: so a operadora le;
+- escrita em qualquer colecao `platform*` — negada para todos, **inclusive** a
+  operadora. Concessao e trilha sao gravadas pelas callables, na mesma transacao.
 
 A Etapa 4 acrescentou 12 verificacoes da fila de avisos. A revisao de seguranca
 de 10/09/2026 acrescentou 3: membro com papel `OWNER` alcanca a cobranca so com
-o vinculo **ativo** — suspenso nao le a assinatura nem as faturas.
+o vinculo **ativo** — suspenso nao le a assinatura nem as faturas. A Etapa 5B
+acrescentou 59 (operadora fora dos tenants, segundo fator, concessao, trilha da
+operadora, contador de abuso).
 
-Total: **118 verificacoes**. O numero e conferido por `assert` no proprio
+A Etapa 5C acrescentou 12, sobre `privacyRequests`:
+
+- o titular (`ownerId`, nascido `PROFESSIONAL`), `OWNER` e `ADMIN` ativos leem;
+- membro sem responsabilidade, `OWNER` suspenso, outro tenant e a operadora com
+  TOTP — negados;
+- criacao, alteracao e exclusao pelo cliente — negadas para todos;
+- "retirar" conteudo de uma decisao pelo cliente — negado: pseudonimizar e ato
+  do backend.
+
+A etapa de uso real acrescentou 13, sobre o titular configurar os proprios
+avisos:
+
+- o titular (`ownerId`, nascido `PROFESSIONAL`) troca `settings.notifications`
+  com `updatedAt`/`updatedBy`;
+- o mesmo titular trocando nome, agenda, agente, dono, ou avisos junto de outro
+  campo, ou gravando avisos que nao sao mapa — negado;
+- `ownerId` de uma organizacao da qual a conta nao e membro — negado;
+- membro `PROFESSIONAL` que nao e titular, membro com modulo restrito,
+  operadora com TOTP e titular com validade vencida — negados;
+- `ADMIN` continua alterando a agenda: o caminho administrativo nao mudou.
+
+Total: **202 verificacoes**. O numero e conferido por `assert` no proprio
 script, para que uma verificacao removida por engano quebre o teste.
 
 Do lado do dominio, `src/services/firestore/plans.test.ts` verifica que nenhum
@@ -290,16 +363,54 @@ assunto dela.
 
 ---
 
-## 8. O que ainda nao existe
+## 8. Eliminacao, pseudonimizacao e lapide
+
+O destino de cada colecao esta em `PERSONAL_DATA_MAP`
+([`src/config/privacy.ts`](../src/config/privacy.ts)); a visao geral fica em
+[ARCHITECTURE.md](ARCHITECTURE.md), secao 14. O que muda na forma dos documentos:
+
+- **Pedido de eliminacao de um cliente.** `clients`, `conversations` e
+  `messages` do cliente sao apagados. `appointments`, `transactions`,
+  `notifications`, `notificationDeliveries`, `aiDecisions`, `auditLogs` e
+  `privacyRequests` ligados a ele continuam, com os campos pessoais trocados e
+  a marca `privacyRedaction: { scope, requestId, redactedAt }`. Onde havia o
+  `clientId`, fica o mesmo pseudonimo `titular-removido-{aleatorio}` em todos os
+  documentos. A busca parte do `clientId` e segue os ids derivados
+  (`resource.id`, `target.id`, `aiDecisionId`), porque o resumo da trilha e o
+  titulo do alerta sao montados com o nome.
+- **Exclusao da organizacao.** Colecoes operacionais, membros e perfis sao
+  apagados, inclusive subcolecoes. `aiDecisions`, `auditLogs` e
+  `privacyRequests` sao pseudonimizados e ganham `expiresAt` provisorio.
+  `organizations/{orgId}` vira lapide: `{ id, deletion, expiresAt }`, sem nome,
+  dono, profissao nem configuracao — as regras deixam de reconhecer qualquer
+  membro. `accounts`, `initialPasswords` e `userMemberships` dos membros sao
+  apagados, com o usuario do Auth. Em `platformSubscriptions`, so
+  `subscriberEmail` sai; faturas, eventos, concessoes e trilha da plataforma
+  ficam, com o motivo escrito no mapa.
+
+**Indices.** Nenhum novo. As buscas por `clientId`, `subjectId`, `resource.id`,
+`target.id` e `aiDecisionId` sao igualdade ou `in` em campo unico; a pagina de
+mensagens da exportacao usa o indice `organizationId ASC, sentAt DESC` que a
+caixa de entrada ja exige.
+
+---
+
+## 9. O que ainda nao existe
 
 - **Conversas nao tem origem externa.** Nao ha WhatsApp, SMS nem e-mail
-  conectados, entao uma organizacao real comeca com a caixa de entrada vazia. O
-  simulador do agente continua funcionando para quem tem o modulo `agente`.
+  conectados, entao uma organizacao real comeca com a caixa de entrada vazia, e
+  a tela diz isso. O simulador do agente precisa de uma conversa existente: numa
+  organizacao real ele explica por que nao ha o que testar, e as regras seguem
+  editaveis.
+- **Progresso do guia de primeiros passos fica no navegador.** Confirmar a
+  profissao e o horario nao e dado da organizacao; os passos de cadastro e
+  atendimento sao lidos dos proprios dados.
 - **Sem migracao de dados demonstrativos.** O conjunto ficticio vive em memoria
   e nao e copiado para o Firestore — de proposito.
 - **Administrador da plataforma nao tem tenant operacional.** Sua conta nao tem
   organizacao; ele continua vendo o conjunto demonstrativo, por profissao, sem
-  tocar em dado de cliente nenhum. **Isso descreve a interface, nao as regras:**
-  `isMember()` e `hasRole()` devolvem verdadeiro para `PLATFORM_ADMIN` em
-  qualquer organizacao, entao as Security Rules concedem a ele leitura e escrita
-  em todos os tenants.
+  tocar em dado de cliente nenhum. As Security Rules dizem o mesmo: a operadora
+  nao passa por `isMember()`, `hasRole()` nem `moduleAccess()`, e so alcanca
+  `accounts` e as colecoes `platform*`, sempre com segundo fator na sessao.
+  Organizacao e vinculo sao criados pelo backend. Admin SDK e console do
+  Firebase continuam passando por cima das regras.

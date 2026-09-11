@@ -38,9 +38,12 @@ export function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
       {/* Enquanto os dados nao vierem do Firestore, o aviso precisa estar
           visivel: e o que impede alguem de confundir a demonstracao com
           prontuario e cadastrar gente de verdade. */}
-      {demonstrative ? (
-        <Badge tone="warning" className="hidden sm:inline-flex">
-          {mode === "demo" ? "Modo demonstracao" : "Dados demonstrativos locais"}
+      {demonstrative && repository ? (
+        <Badge tone="warning">
+          <span className="sm:hidden">Demonstracao</span>
+          <span className="hidden sm:inline">
+            {mode === "demo" ? "Modo demonstracao" : "Dados demonstrativos locais"}
+          </span>
         </Badge>
       ) : null}
 

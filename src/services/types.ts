@@ -1,5 +1,6 @@
 import type { DispatchSummary } from "@/lib/notifications";
 import type {
+  AgendaSettings,
   AIDecision,
   AIRule,
   Appointment,
@@ -10,6 +11,7 @@ import type {
   Conversation,
   ID,
   ISODateString,
+  Membership,
   Message,
   Notification,
   NotificationConsent,
@@ -20,14 +22,53 @@ import type {
   Transaction,
 } from "@/types";
 
+/** Colecoes do snapshot que podem chegar por partes. */
+export type WorkspaceCollection =
+  | "professionals"
+  | "clients"
+  | "appointments"
+  | "conversations"
+  | "messages"
+  | "transactions"
+  | "rules"
+  | "decisions"
+  | "notifications"
+  | "notificationDeliveries"
+  | "auditLogs";
+
+export interface CollectionPage {
+  /** Existem documentos alem dos carregados, na ordem da consulta. */
+  hasMore: boolean;
+  /** A proxima pagina foi pedida e ainda nao chegou. */
+  loading: boolean;
+}
+
+/** Colecao ausente aqui chegou inteira. */
+export type WorkspacePagination = Partial<Record<WorkspaceCollection, CollectionPage>>;
+
 /**
- * Fotografia completa do espaco de trabalho de UMA organizacao.
+ * Onde a carga do workspace esta.
  *
- * O repositorio entrega sempre o conjunto inteiro. Para o volume de um
- * consultorio isso e barato e simplifica muito a interface: as telas derivam o
- * que precisam com `useMemo`, sem query por tela. Quando uma organizacao
- * crescer a ponto de isso doer, a troca e paginar por colecao — o contrato de
- * assinatura nao muda.
+ * Existe para a tela nunca confundir "ainda nao chegou" ou "nao deu para
+ * buscar" com "esta vazio" — numa organizacao nova, vazio e o estado normal, e
+ * uma lista vazia por falha de rede diria ao profissional que ele perdeu dados.
+ */
+export type WorkspaceLoadState =
+  | { status: "loading"; slow: boolean }
+  /** `failed`: colecoes que nao carregaram por falha tecnica. O resto funciona. */
+  | { status: "ready"; failed: WorkspaceCollection[] }
+  | {
+      status: "unavailable";
+      reason: "offline" | "organization-missing" | "access-denied" | "failed";
+    };
+
+/**
+ * Fotografia do espaco de trabalho de UMA organizacao.
+ *
+ * O repositorio entrega o conjunto carregado de uma vez, e as telas derivam o
+ * que precisam com `useMemo`, sem query por tela. As colecoes que crescem vem
+ * por paginas (`pagination`), das mais recentes para as mais antigas; pedir a
+ * proxima e `loadMore`.
  */
 export interface WorkspaceSnapshot {
   organization: Organization;
@@ -43,6 +84,12 @@ export interface WorkspaceSnapshot {
   /** Fila de saida dos avisos ao cliente. Vazia enquanto nada for configurado. */
   notificationDeliveries: NotificationDelivery[];
   auditLogs: AuditLog[];
+  /**
+   * Vinculo de quem usa o painel, lido de `members/{uid}` — o mesmo documento
+   * que as rules conferem. Ausente na demonstracao, que nao tem vinculo real.
+   */
+  membership?: Membership | null;
+  pagination?: WorkspacePagination;
 }
 
 export type RepositoryMode = "memory" | "firestore";
@@ -181,6 +228,16 @@ export interface WorkspaceRepository {
    * `null` enquanto a primeira carga nao chegou (caso do Firestore).
    */
   getSnapshot(): WorkspaceSnapshot | null;
+  /** Mesma referencia enquanto nada mudar, para `useSyncExternalStore`. */
+  getLoadState(): WorkspaceLoadState;
+  subscribeLoadState(listener: () => void): () => void;
+  /** Descarta as leituras abertas e comeca a carga de novo. */
+  retry(): void;
+  /**
+   * Pede a proxima pagina de uma colecao. Resolve quando ela chega; sem efeito
+   * quando nao ha mais nada.
+   */
+  loadMore(collection: WorkspaceCollection): Promise<void>;
   setActor(actor: RepositoryActor): void;
 
   createClient(input: ClientInput): Promise<ID>;
@@ -233,6 +290,8 @@ export interface WorkspaceRepository {
   updateNotificationSettings(
     settings: OrganizationNotificationSettings,
   ): Promise<void>;
+  /** Horario de atendimento e padroes da agenda. Exige `organization:update`. */
+  updateAgendaSettings(settings: AgendaSettings): Promise<void>;
   /**
    * Executa as entregas vencidas com o provedor simulado e grava o resultado.
    * Nao existe gatilho automatico: e chamada por acao explicita, e nenhuma

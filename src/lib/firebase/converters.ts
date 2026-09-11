@@ -49,7 +49,8 @@ const STAMP_FIELDS = ["createdAt", "updatedAt"] as const;
  * transformaria qualquer campo de texto futuro em data silenciosamente.
  *
  * `externalCalendar.syncedAt` e `gateway` ficam de fora de proposito — sao
- * payloads espelhados de sistemas externos, gravados como vieram.
+ * payloads espelhados de sistemas externos, gravados como vieram. O mesmo vale
+ * para `privacyRedaction.redactedAt`, que o backend grava ja em ISO.
  */
 export const COLLECTION_DATE_FIELDS = {
   organizations: STAMP_FIELDS,
@@ -78,6 +79,7 @@ export const COLLECTION_DATE_FIELDS = {
     "cancelledAt",
   ],
   auditLogs: [...STAMP_FIELDS, "occurredAt"],
+  privacyRequests: [...STAMP_FIELDS, "executedAt"],
 } as const;
 
 export type ConvertedCollection = keyof typeof COLLECTION_DATE_FIELDS;

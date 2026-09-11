@@ -1,9 +1,10 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils/cn";
+import { useDialogFocus } from "@/lib/utils/use-dialog-focus";
 
 import { Button } from "./button";
 
@@ -29,46 +30,34 @@ export function Drawer({
   footer?: ReactNode;
   children: ReactNode;
 }) {
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKeyDown);
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open, onClose]);
+  const panelRef = useRef<HTMLElement>(null);
+  const titleId = useId();
+  useDialogFocus(open, panelRef, onClose);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[90]">
-      <button
-        type="button"
-        aria-label="Fechar"
+      <div
+        aria-hidden
         onClick={onClose}
         className="bg-foreground/40 absolute inset-0 backdrop-blur-[2px]"
       />
 
       <aside
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className={cn(
-          "border-border bg-surface shadow-overlay absolute inset-y-0 right-0 flex w-full flex-col border-l",
+          "border-border bg-surface shadow-overlay absolute inset-y-0 right-0 flex w-full flex-col border-l outline-none",
           "sm:max-w-md",
         )}
       >
         <div className="border-border flex items-start justify-between gap-4 border-b px-5 py-4">
           <div className="min-w-0">
-            <h2 className="text-foreground truncate text-sm font-semibold">
+            <h2 id={titleId} className="text-foreground truncate text-sm font-semibold">
               {title}
             </h2>
             {subtitle ? (

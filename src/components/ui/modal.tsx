@@ -1,9 +1,10 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils/cn";
+import { useDialogFocus } from "@/lib/utils/use-dialog-focus";
 
 import { Button } from "./button";
 
@@ -18,9 +19,9 @@ const SIZES: Record<ModalSize, string> = {
 /**
  * Dialogo modal.
  *
- * Tres comportamentos que costumam faltar em modais improvisados e que sao
- * requisito de acessibilidade: Escape fecha, o foco vai para dentro ao abrir, e
- * a pagina de tras nao rola enquanto o dialogo estiver aberto.
+ * O teclado fica dentro do dialogo enquanto ele existir e volta para quem o
+ * abriu quando fecha (`useDialogFocus`). Titulo e descricao sao ligados por id,
+ * para o leitor de tela anunciar os dois ao entrar.
  */
 export function Modal({
   open,
@@ -38,38 +39,17 @@ export function Modal({
   children: ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKeyDown);
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    // Leva o foco para o primeiro controle; sem isso o teclado continuaria
-    // navegando a pagina atras do dialogo.
-    const focusable = panelRef.current?.querySelector<HTMLElement>(
-      "input, select, textarea, button, [tabindex]:not([tabindex='-1'])",
-    );
-    focusable?.focus();
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open, onClose]);
+  const titleId = useId();
+  const descriptionId = useId();
+  useDialogFocus(open, panelRef, onClose);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center p-0 sm:items-center sm:p-6">
-      <button
-        type="button"
-        aria-label="Fechar"
+      {/* So o mouse fecha por aqui; o teclado usa Escape ou o botao Fechar. */}
+      <div
+        aria-hidden
         onClick={onClose}
         className="bg-foreground/40 absolute inset-0 backdrop-blur-[2px]"
       />
@@ -78,18 +58,22 @@ export function Modal({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
+        tabIndex={-1}
         className={cn(
-          "border-border bg-surface shadow-overlay relative flex max-h-[90dvh] w-full flex-col border",
+          "border-border bg-surface shadow-overlay relative flex max-h-[90dvh] w-full flex-col border outline-none",
           "rounded-t-2xl sm:rounded-card",
           SIZES[size],
         )}
       >
         <div className="border-border flex items-start justify-between gap-4 border-b px-5 py-4">
           <div className="min-w-0">
-            <h2 className="text-foreground text-sm font-semibold">{title}</h2>
+            <h2 id={titleId} className="text-foreground text-sm font-semibold">
+              {title}
+            </h2>
             {description ? (
-              <p className="text-muted-foreground mt-0.5 text-xs">
+              <p id={descriptionId} className="text-muted-foreground mt-0.5 text-xs">
                 {description}
               </p>
             ) : null}

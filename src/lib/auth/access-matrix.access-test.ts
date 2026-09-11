@@ -9,32 +9,29 @@ import {
   type Auth,
 } from "firebase/auth";
 import {
+  collection,
   connectFirestoreEmulator,
   doc,
   getDoc,
+  getDocs,
   getFirestore,
   setDoc,
   terminate,
   updateDoc,
   type Firestore,
 } from "firebase/firestore";
-import {
-  connectFunctionsEmulator,
-  getFunctions,
-  httpsCallable,
-  type Functions,
-} from "firebase/functions";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { paths } from "@/lib/firebase/paths";
+import { callFunction, tokenSession, type TokenSession } from "@/lib/testing/emulator-session";
 
 /**
- * Etapa 2 do roadmap: a matriz de acesso, provada de ponta a ponta.
+ * Etapa 2 do roadmap: a matriz de acesso, provada de ponta a ponta — estendida
+ * na 5B com segundo fator da operadora, App Check e o fim do acesso dela aos
+ * tenants.
  *
  * As suites anteriores testam as pecas isoladas. Esta encadeia as tres que
  * decidem quem entra: Firebase Auth, as callable functions e as Security Rules.
- * E o unico lugar onde "o profissional so ve a propria profissao" deixa de ser
- * afirmacao e vira ida e volta pela rede.
  *
  * Roda inteira no emulador. Nenhuma conta de producao e tocada, nenhuma senha
  * real aparece aqui: as credenciais abaixo sao literais de teste, validas
@@ -45,7 +42,6 @@ import { paths } from "@/lib/firebase/paths";
 
 const require = createRequire(import.meta.url);
 const PROJECT = "demo-atendara";
-const REGION = "southamerica-east1";
 
 const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9098";
 const [FIRESTORE_HOST, FIRESTORE_PORT] = (
@@ -56,6 +52,7 @@ const ADMIN = { email: "administrador@atendara.test", password: "SenhaDeTeste-Ad
 const PROFESSIONAL = { email: "profissional@atendara.test" };
 const NEW_PASSWORD = "SenhaDeTeste-Profissional-2";
 const OTHER_TENANT = "org-de-outro-profissional";
+const MODULES = ["dashboard", "agenda", "clientes"];
 
 /** SDK administrativo: semeia e inspeciona sem passar pelas regras. */
 const admin = require("../../../functions/node_modules/firebase-admin/lib/index.js");
@@ -63,7 +60,8 @@ const admin = require("../../../functions/node_modules/firebase-admin/lib/index.
 let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
-let functions: Functions;
+/** A operadora com TOTP — o token que o emulador de Auth nao sabe emitir. */
+let operator: TokenSession;
 
 let adminUid: string;
 let professionalUid: string;
@@ -82,6 +80,11 @@ async function signInAsProfessional(password: string): Promise<void> {
   await signInWithEmailAndPassword(auth, PROFESSIONAL.email, password);
 }
 
+/** Callable com a sessao do Auth do emulador (senha, sem segundo fator). */
+async function callAsSignedIn<Result = unknown>(name: string, data: unknown): Promise<Result> {
+  return callFunction<Result>(name, data, { idToken: await auth.currentUser!.getIdToken() });
+}
+
 /** Le a conta pelo SDK administrativo, sem depender das regras. */
 async function accountOf(uid: string): Promise<Record<string, unknown>> {
   const snapshot = await admin.firestore().doc(paths.account(uid)).get();
@@ -97,8 +100,8 @@ beforeAll(async () => {
   process.env.FIRESTORE_EMULATOR_HOST = `${FIRESTORE_HOST}:${FIRESTORE_PORT}`;
   admin.initializeApp({ projectId: PROJECT });
 
-  // Administrador da plataforma, do mesmo jeito que `bootstrap-admin.js` cria
-  // em producao: conta no Auth e documento de autoridade no Firestore.
+  // Operadora, do mesmo jeito que `bootstrap-admin.js` cria em producao: conta
+  // no Auth e documento de autoridade no Firestore, sem validade.
   const adminUser = await admin.auth().createUser({
     email: ADMIN.email,
     password: ADMIN.password,
@@ -114,9 +117,6 @@ beforeAll(async () => {
     organizationId: null,
     modules: ["dashboard", "agenda", "clientes", "mensagens", "financeiro", "agente", "configuracoes"],
     status: "ACTIVE",
-    subscriptionStatus: "ACTIVE",
-    accessUntil: null,
-    accessUntilMs: 0,
     mustChangePassword: false,
     createdAt: new Date().toISOString(),
   });
@@ -133,45 +133,55 @@ beforeAll(async () => {
     .doc(paths.document(OTHER_TENANT, "clients", "cadastro-alheio"))
     .set({ organizationId: OTHER_TENANT, fullName: "Cadastro Alheio" });
 
-  app = initializeApp(
-    { projectId: PROJECT, apiKey: "chave-de-emulador" },
-    "access-tests",
-  );
+  app = initializeApp({ projectId: PROJECT, apiKey: "chave-de-emulador" }, "access-tests");
   auth = getAuth(app);
   connectAuthEmulator(auth, `http://${AUTH_HOST}`, { disableWarnings: true });
   db = getFirestore(app);
   connectFirestoreEmulator(db, FIRESTORE_HOST, Number(FIRESTORE_PORT));
-  functions = getFunctions(app, REGION);
-  connectFunctionsEmulator(functions, "127.0.0.1", 5002);
+  operator = tokenSession(adminUid, "totp");
 });
 
 afterAll(async () => {
   await signOut(auth).catch(() => {});
+  await operator.dispose();
   await terminate(db);
   await deleteApp(app);
   await Promise.all(admin.apps.map((instance: { delete(): Promise<void> }) => instance.delete()));
 });
 
 describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () => {
-  it("so o administrador da plataforma cadastra profissionais", async () => {
+  const registration = () => ({
+    displayName: "Profissional de Teste",
+    email: PROFESSIONAL.email,
+    professionId: "PSYCHOLOGIST",
+    modules: MODULES,
+    initialGrant: { kind: "PILOT", until: futureISO(), reason: "Piloto da matriz de acesso." },
+  });
+
+  it("senha da operadora sem segundo fator nao cadastra ninguem", async () => {
     await signInAsAdmin();
 
-    const result = await httpsCallable<
-      Record<string, unknown>,
-      { userId: string; temporaryPassword: string }
-    >(
-      functions,
-      "registerProfessional",
-    )({
-      displayName: "Profissional de Teste",
-      email: PROFESSIONAL.email,
-      professionId: "PSYCHOLOGIST",
-      modules: ["dashboard", "agenda", "clientes"],
-      accessUntil: futureISO(),
+    await expect(callAsSignedIn("registerProfessional", registration())).rejects.toMatchObject({
+      code: "permission-denied",
     });
+    // E a sessao sem fator nao le cadastro nenhum.
+    await expectDenied(getDocs(collection(db, paths.accounts())));
+  });
 
-    professionalUid = result.data.userId;
-    temporaryPassword = result.data.temporaryPassword;
+  it("sem atestado do App Check a callable recusa antes de olhar quem chama", async () => {
+    await expect(
+      callFunction("registerProfessional", registration(), { idToken: operator.idToken, appCheck: false }),
+    ).rejects.toMatchObject({ code: "unauthenticated" });
+  });
+
+  it("so a operadora com segundo fator cadastra profissionais", async () => {
+    const result = await operator.call<{ userId: string; temporaryPassword: string }>(
+      "registerProfessional",
+      registration(),
+    );
+
+    professionalUid = result.userId;
+    temporaryPassword = result.temporaryPassword;
 
     expect(professionalUid).toBeTruthy();
     expect(temporaryPassword.length).toBeGreaterThan(12);
@@ -182,6 +192,8 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
       platformRole: "PROFESSIONAL",
       professionId: "PSYCHOLOGIST",
       status: "ACTIVE",
+      // Aberto pela concessao inicial registrada, e nao por campo solto.
+      subscriptionStatus: "ACTIVE",
       mustChangePassword: true,
     });
   });
@@ -226,10 +238,8 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
 
   it("a nova senha nao pode ser a senha inicial", async () => {
     await expect(
-      httpsCallable(functions, "completeInitialPassword")({
-        password: temporaryPassword,
-      }),
-    ).rejects.toMatchObject({ code: "functions/invalid-argument" });
+      callAsSignedIn("completeInitialPassword", { password: temporaryPassword }),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
 
     expect(await accountOf(professionalUid)).toMatchObject({
       mustChangePassword: true,
@@ -237,9 +247,7 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
   });
 
   it("a troca libera o painel e remove o verificador temporario", async () => {
-    await httpsCallable(functions, "completeInitialPassword")({
-      password: NEW_PASSWORD,
-    });
+    await callAsSignedIn("completeInitialPassword", { password: NEW_PASSWORD });
 
     expect(await accountOf(professionalUid)).toMatchObject({
       mustChangePassword: false,
@@ -303,63 +311,46 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
   });
 
   it("suspensao e vencimento fecham o acesso pelo servidor", async () => {
-    await signInAsAdmin();
-    const update = httpsCallable(functions, "updateAccount");
+    const database = admin.firestore();
+    const original = await accountOf(professionalUid);
 
-    await update({
-      userId: professionalUid,
-      status: "SUSPENDED",
-      subscriptionStatus: "ACTIVE",
-      accessUntil: futureISO(),
-      modules: ["dashboard", "agenda", "clientes"],
-    });
+    // Suspender continua sendo ato da operadora, pela callable e com registro.
+    await operator.call("updateAccount", { userId: professionalUid, status: "SUSPENDED", modules: MODULES });
     await signInAsProfessional(NEW_PASSWORD);
     await expectDenied(
       getDoc(doc(db, paths.document(organizationId, "clients", "qualquer"))),
     );
+    await operator.call("updateAccount", { userId: professionalUid, status: "ACTIVE", modules: MODULES });
 
-    await signInAsAdmin();
-    await update({
-      userId: professionalUid,
-      status: "ACTIVE",
-      subscriptionStatus: "ACTIVE",
+    // Validade vencida e assinatura cancelada nao tem mais callable que as
+    // escreva: sao preparadas pelo SDK administrativo, como o webhook faria.
+    await database.doc(paths.account(professionalUid)).update({
       accessUntil: new Date(Date.now() - 86_400_000).toISOString(),
-      modules: ["dashboard", "agenda", "clientes"],
+      accessUntilMs: Date.now() - 86_400_000,
     });
-    await signInAsProfessional(NEW_PASSWORD);
     await expectDenied(
       getDoc(doc(db, paths.document(organizationId, "clients", "qualquer"))),
     );
 
-    await signInAsAdmin();
-    await update({
-      userId: professionalUid,
-      status: "ACTIVE",
+    await database.doc(paths.account(professionalUid)).update({
       subscriptionStatus: "CANCELLED",
-      accessUntil: futureISO(),
-      modules: ["dashboard", "agenda", "clientes"],
+      accessUntil: original.accessUntil,
+      accessUntilMs: original.accessUntilMs,
     });
-    await signInAsProfessional(NEW_PASSWORD);
     await expectDenied(
       getDoc(doc(db, paths.document(organizationId, "clients", "qualquer"))),
     );
 
-    // Restaurado, o acesso volta — a trava e a assinatura, nao um efeito colateral.
-    await signInAsAdmin();
-    await update({
-      userId: professionalUid,
-      status: "ACTIVE",
-      subscriptionStatus: "ACTIVE",
-      accessUntil: futureISO(),
-      modules: ["dashboard", "agenda", "clientes"],
+    // Restaurado, o acesso volta — a trava e a validade, nao um efeito colateral.
+    await database.doc(paths.account(professionalUid)).update({
+      subscriptionStatus: original.subscriptionStatus,
     });
-    await signInAsProfessional(NEW_PASSWORD);
     await expect(
       getDoc(doc(db, paths.document(organizationId, "clients", "qualquer"))),
     ).resolves.toBeDefined();
   });
 
-  it("o profissional nao promove a propria conta", async () => {
+  it("o profissional nao promove a propria conta nem abre o proprio acesso", async () => {
     await signInAsProfessional(NEW_PASSWORD);
 
     // Nem escrevendo direto no documento de autoridade...
@@ -377,45 +368,68 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
     );
     // ...nem chamando as funcoes administrativas.
     await expect(
-      httpsCallable(functions, "registerProfessional")({
+      callAsSignedIn("registerProfessional", {
         displayName: "Conta Forjada",
         email: "forjada@atendara.test",
         professionId: "PSYCHOLOGIST",
         modules: ["dashboard"],
-        accessUntil: futureISO(),
       }),
-    ).rejects.toMatchObject({ code: "functions/permission-denied" });
+    ).rejects.toMatchObject({ code: "permission-denied" });
 
+    // Payload valido, sem situacao nem validade: a recusa e por quem chama, e
+    // nao por formato.
     await expect(
-      httpsCallable(functions, "updateAccount")({
+      callAsSignedIn("updateAccount", {
         userId: professionalUid,
         status: "ACTIVE",
-        subscriptionStatus: "ACTIVE",
-        accessUntil: futureISO(),
         modules: ["dashboard", "agenda", "clientes", "financeiro", "agente", "mensagens"],
       }),
-    ).rejects.toMatchObject({ code: "functions/permission-denied" });
-  });
-
-  it("nem o administrador altera a propria conta por updateAccount", async () => {
-    await signInAsAdmin();
+    ).rejects.toMatchObject({ code: "permission-denied" });
 
     await expect(
-      httpsCallable(functions, "updateAccount")({
+      callAsSignedIn("grantAccess", {
+        organizationId,
+        kind: "COURTESY",
+        until: futureISO(60),
+        reason: "Tentativa do proprio profissional.",
+      }),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+  });
+
+  it("nem a operadora altera a propria conta por updateAccount", async () => {
+    await expect(
+      operator.call("updateAccount", {
         userId: adminUid,
         status: "SUSPENDED",
-        subscriptionStatus: "ACTIVE",
-        accessUntil: futureISO(),
         modules: ["dashboard"],
       }),
-    ).rejects.toMatchObject({ code: "functions/permission-denied" });
+    ).rejects.toMatchObject({ code: "permission-denied" });
   });
 
   it("o verificador de senha inicial nunca e legivel pelo cliente", async () => {
-    await signInAsAdmin();
-    await expectDenied(getDoc(doc(db, paths.initialPassword(professionalUid))));
+    await expectDenied(getDoc(doc(operator.firestore, paths.initialPassword(professionalUid))));
 
     await signInAsProfessional(NEW_PASSWORD);
     await expectDenied(getDoc(doc(db, paths.initialPassword(professionalUid))));
+  });
+});
+
+describe("A operadora nao tem acesso operacional", () => {
+  it("nem com segundo fator a operadora le ou escreve dado de tenant", async () => {
+    const tenantClient = paths.document(organizationId, "clients", "qualquer");
+
+    await expectDenied(getDoc(doc(operator.firestore, tenantClient)));
+    await expectDenied(getDoc(doc(operator.firestore, paths.document(OTHER_TENANT, "clients", "cadastro-alheio"))));
+    await expectDenied(
+      setDoc(doc(operator.firestore, paths.document(organizationId, "clients", "da-operadora")), {
+        organizationId,
+        fullName: "Escrito pela operadora",
+      }),
+    );
+    await expectDenied(getDoc(doc(operator.firestore, paths.organization(organizationId))));
+    await expectDenied(getDoc(doc(operator.firestore, paths.document(organizationId, "auditLogs", "qualquer"))));
+
+    // O que continua com ela: contas, para administrar os cadastros.
+    await expect(getDocs(collection(operator.firestore, paths.accounts()))).resolves.toBeDefined();
   });
 });

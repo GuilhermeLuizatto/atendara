@@ -14,7 +14,7 @@ const CONTROL_BASE = cn(
   "disabled:cursor-not-allowed disabled:opacity-60",
 );
 
-const CONTROL_OK = "border-border focus:border-primary";
+const CONTROL_OK = "border-input focus:border-primary";
 const CONTROL_ERROR = "border-danger focus:border-danger";
 
 /**

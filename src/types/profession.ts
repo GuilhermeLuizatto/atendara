@@ -27,6 +27,11 @@ export interface TermPair {
   plural: string;
   singularLower: string;
   pluralLower: string;
+  /**
+   * Genero gramatical. Sem ele a interface escreve "Novo sessao": artigo e
+   * adjetivo em pt-BR concordam com o termo, e o termo muda por profissao.
+   */
+  feminine: boolean;
 }
 
 export interface ProfessionTerminology {

@@ -10,9 +10,11 @@ import {
   type MessageInput,
   type RuleInput,
   type TransactionInput,
+  type WorkspaceCollection,
   type WorkspaceRepository,
 } from "@/services";
 import type {
+  AgendaSettings,
   AppointmentStatus,
   ID,
   OrganizationNotificationSettings,
@@ -121,6 +123,13 @@ export function useWorkspaceActions() {
             ? "Avisos de atendimento atualizados."
             : "Avisos de atendimento desligados.",
         ),
+      updateAgendaSettings: (settings: AgendaSettings) =>
+        run(
+          (repo) => repo.updateAgendaSettings(settings),
+          "Horario de atendimento salvo.",
+        ),
+      loadMore: (collection: WorkspaceCollection) =>
+        run((repo) => repo.loadMore(collection)),
       // Provedor simulado: nenhuma mensagem sai do processo. O rotulo diz isso
       // na propria mensagem de sucesso, para nao dar a impressao contraria.
       dispatchDueNotifications: () =>

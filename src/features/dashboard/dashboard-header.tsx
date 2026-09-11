@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { CalendarPlus } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { buttonStyles } from "@/components/ui/button";
 import { DEFAULT_LOCALE, DEFAULT_TIMEZONE } from "@/config/app";
 import { productHour } from "@/lib/utils/format";
+import { newTerm } from "@/lib/utils/terms";
+import type { TermPair } from "@/types";
 
 function greetingFor(now: Date): string {
   const hour = productHour(now);
@@ -24,11 +26,11 @@ const fullDateFormatter = new Intl.DateTimeFormat(DEFAULT_LOCALE, {
 export function DashboardHeader({
   now,
   professionalName,
-  appointmentLabel,
+  appointmentTerm,
 }: {
   now: Date;
   professionalName: string;
-  appointmentLabel: string;
+  appointmentTerm: TermPair;
 }) {
   const firstName = professionalName.split(" ")[0];
   const formattedDate = fullDateFormatter.format(now);
@@ -44,11 +46,9 @@ export function DashboardHeader({
         </p>
       </div>
 
-      <Link href="/agenda" className="shrink-0">
-        <Button size="md">
-          <CalendarPlus className="size-4" aria-hidden strokeWidth={1.75} />
-          Novo {appointmentLabel.toLocaleLowerCase("pt-BR")}
-        </Button>
+      <Link href="/agenda" className={buttonStyles({ className: "shrink-0 self-start sm:self-auto" })}>
+        <CalendarPlus className="size-4" aria-hidden strokeWidth={1.75} />
+        {newTerm(appointmentTerm)}
       </Link>
     </header>
   );

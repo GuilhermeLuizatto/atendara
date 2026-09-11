@@ -13,7 +13,13 @@ import {
 import type { ClientInput } from "@/services";
 import { useWorkspaceActions } from "@/providers/use-workspace-actions";
 import { useWorkspace } from "@/providers/workspace-provider";
-import { CHANNEL_META } from "@/config/notifications";
+import {
+  CHANNEL_META,
+  CONSENT_STAFF_INSTRUCTION,
+  NOTIFICATION_CONSENT_TEXT_VERSION,
+} from "@/config/notifications";
+import { consentStatement } from "@/lib/notifications/consent-text";
+import { newTerm } from "@/lib/utils/terms";
 import type {
   AcquisitionChannel,
   Client,
@@ -64,6 +70,9 @@ function toDraft(client: Client): ClientInput {
 /**
  * Retirar o aceite nao apaga o consentimento: carimba a revogacao. Apagar
  * perderia a prova de que houve consentimento — e de quando ele acabou.
+ *
+ * Autorizar de novo depois de retirar e um aceite novo: ganha data nova e a
+ * versao do texto mostrado agora, e nao herda as do aceite anterior.
  */
 function toggleConsent(draft: ClientInput, enabled: boolean): Partial<ClientInput> {
   const now = new Date().toISOString();
@@ -81,8 +90,19 @@ function toggleConsent(draft: ClientInput, enabled: boolean): Partial<ClientInpu
   return {
     appointmentNotificationsEnabled: true,
     notificationConsent: current
-      ? { ...current, revokedAt: null }
-      : { channels: [], grantedAt: now, revokedAt: null, source: "CLIENT_FORM" },
+      ? {
+          ...current,
+          grantedAt: current.revokedAt ? now : current.grantedAt,
+          revokedAt: null,
+          textVersion: NOTIFICATION_CONSENT_TEXT_VERSION,
+        }
+      : {
+          channels: [],
+          grantedAt: now,
+          revokedAt: null,
+          source: "CLIENT_FORM",
+          textVersion: NOTIFICATION_CONSENT_TEXT_VERSION,
+        },
   };
 }
 
@@ -97,12 +117,21 @@ function toggleChannel(
     grantedAt: now,
     revokedAt: null,
     source: "CLIENT_FORM" as const,
+    textVersion: NOTIFICATION_CONSENT_TEXT_VERSION,
   };
   const channels = consented
     ? [...current.channels.filter((item) => item !== channel), channel]
     : current.channels.filter((item) => item !== channel);
 
-  return { notificationConsent: { ...current, channels, revokedAt: null } };
+  return {
+    notificationConsent: {
+      ...current,
+      channels,
+      revokedAt: null,
+      // Incluir um canal e aceitar o texto de agora; retirar um nao muda o aceite.
+      textVersion: consented ? NOTIFICATION_CONSENT_TEXT_VERSION : current.textVersion,
+    },
+  };
 }
 
 function validate(draft: ClientInput): Errors {
@@ -175,12 +204,18 @@ export function ClientForm({
   // decide o que pode circular por canal aberto.
   const allowedChannels = profession.notifications.allowedChannels;
   const consentedChannels = draft.notificationConsent?.channels ?? [];
+  const statement = consentStatement({
+    organizationName: data?.organization.name ?? "",
+    channels: allowedChannels,
+    events: profession.notifications.allowedEvents,
+    disclosure: profession.notifications.disclosure,
+  });
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={client ? `Editar ${term}` : `Novo ${term}`}
+      title={client ? `Editar ${term}` : newTerm(terminology.client)}
       description={
         client
           ? "Dados administrativos. Informacoes sensiveis nao pertencem a este cadastro."
@@ -190,13 +225,24 @@ export function ClientForm({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="bg-surface-muted space-y-2 rounded-lg p-3">
+          <div className="border-border space-y-1 rounded-md border p-2">
+            {statement.paragraphs.map((paragraph) => (
+              <p key={paragraph} className="text-foreground text-xs">
+                {paragraph}
+              </p>
+            ))}
+            <p className="text-muted-foreground text-xs">
+              Texto versao {statement.version}
+            </p>
+          </div>
+          <p className="text-muted-foreground text-xs">{CONSENT_STAFF_INSTRUCTION}</p>
           <label className="text-foreground flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={draft.appointmentNotificationsEnabled ?? false}
               onChange={(event) => patch(toggleConsent(draft, event.target.checked))}
             />
-            Autoriza receber avisos sobre atendimentos
+            A pessoa autorizou receber avisos sobre atendimentos
           </label>
 
           {draft.appointmentNotificationsEnabled ? (

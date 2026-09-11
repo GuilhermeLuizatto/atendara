@@ -20,6 +20,33 @@ function parts(patch: Partial<SnapshotParts> = {}): SnapshotParts {
   };
 }
 
+describe("vinculo e paginacao", () => {
+  it("repassa o vinculo lido e o ponto de cada pagina, sem inventar nenhum dos dois", () => {
+    const membership = {
+      id: "user-1",
+      organizationId: ORG,
+      createdAt: NOW,
+      updatedAt: NOW,
+      createdBy: null,
+      updatedBy: null,
+      userId: "user-1",
+      role: "ADMIN" as const,
+      status: "ACTIVE" as const,
+      invitedBy: null,
+    };
+
+    const snapshot = assembleSnapshot(parts({ membership }), ORG, "PSYCHOLOGIST", NOW, {
+      clients: { hasMore: true, loading: false },
+    })!;
+    expect(snapshot.membership?.role).toBe("ADMIN");
+    expect(snapshot.pagination).toEqual({ clients: { hasMore: true, loading: false } });
+
+    const bare = assembleSnapshot(parts(), ORG, "PSYCHOLOGIST", NOW)!;
+    expect(bare.membership).toBeNull();
+    expect(bare.pagination).toEqual({});
+  });
+});
+
 function client(patch: Partial<Client> = {}): Client {
   return {
     id: "client-1",

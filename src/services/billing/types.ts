@@ -1,5 +1,7 @@
 import type {
   ID,
+  Page,
+  PageRequest,
   PlatformGatewayEvent,
   PlatformInvoice,
   PlatformSubscription,
@@ -35,9 +37,9 @@ export interface PlatformBillingClient {
   requestCancellation(): Promise<void>;
 
   // ------------------------------------------------- somente PLATFORM_ADMIN
-  allSubscriptions(): Promise<PlatformSubscription[]>;
-  allInvoices(): Promise<PlatformInvoice[]>;
-  recentGatewayEvents(): Promise<PlatformGatewayEvent[]>;
+  allSubscriptions(request?: PageRequest): Promise<Page<PlatformSubscription>>;
+  allInvoices(request?: PageRequest): Promise<Page<PlatformInvoice>>;
+  recentGatewayEvents(request?: PageRequest): Promise<Page<PlatformGatewayEvent>>;
 }
 
 export class BillingUnavailableError extends Error {

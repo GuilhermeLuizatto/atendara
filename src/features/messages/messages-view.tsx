@@ -1,11 +1,15 @@
 "use client";
 
+import { MessagesSquare } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
+import { LoadMore } from "@/components/ui/load-more";
 import { PageHeader } from "@/components/ui/page-header";
+import { SkeletonCard } from "@/components/ui/skeleton";
 import { classificationMeta } from "@/config/classifications";
 import {
   AI_ACTION_LABELS,
@@ -22,16 +26,58 @@ import type { Conversation, Message } from "@/types";
 
 export function MessagesView() {
   const { data } = useWorkspace();
-  if (!data) return <p>Carregando mensagens...</p>;
+  if (!data) return <MessagesSkeleton />;
   return <MessagesWorkspace key={data.organization.id} />;
 }
 
+function MessagesSkeleton() {
+  return (
+    <div className="space-y-5" aria-busy="true">
+      <p role="status" className="sr-only">
+        Carregando mensagens...
+      </p>
+      <SkeletonCard lines={1} />
+      <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
+        <SkeletonCard lines={6} />
+        <SkeletonCard lines={4} />
+      </div>
+    </div>
+  );
+}
+
 function MessagesWorkspace() {
-  const { data } = useWorkspace();
+  const { data, repository } = useWorkspace();
+  const { loadMore } = useWorkspaceActions();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("ALL");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  if (!data) return <p>Carregando mensagens...</p>;
+  if (!data) return <MessagesSkeleton />;
+  const demonstrative = repository?.mode === "memory";
+
+  // Conversas sao simulacao por decisao do titular: sem canal integrado, uma
+  // organizacao real nao recebe nenhuma. A tela diz isso em vez de parecer
+  // quebrada — e nao inventa conversa para preencher.
+  if (data.conversations.length === 0) {
+    return (
+      <div className="space-y-5">
+        <PageHeader
+          title="Mensagens"
+          description="Acompanhe as conversas e assuma os casos que precisam de atencao."
+        />
+        <Card>
+          <EmptyState
+            icon={<MessagesSquare className="size-5" aria-hidden />}
+            title="Nenhuma conversa ainda"
+            description={
+              demonstrative
+                ? "Os dados de demonstracao foram esvaziados. Restaure-os pelo menu da sua conta."
+                : "A central recebe conversas quando um canal de mensagens estiver integrado. Hoje nenhum canal esta ativo: nenhuma mensagem chega nem sai por aqui."
+            }
+          />
+        </Card>
+      </div>
+    );
+  }
   const rank = { CRITICAL: 0, HIGH: 1, ATTENTION: 2, NORMAL: 3 };
   const conversations = data.conversations
     .filter(
@@ -55,7 +101,7 @@ function MessagesWorkspace() {
       <PageHeader
         title="Mensagens"
         description="Acompanhe as conversas e assuma os casos que precisam de atencao."
-        actions={<Badge tone="info">Conversas de demonstracao</Badge>}
+        actions={demonstrative ? <Badge tone="info">Conversas de demonstracao</Badge> : null}
       />
       <div className="grid items-start gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
         <Card className={cn(selected && "hidden lg:block")}>
@@ -130,11 +176,18 @@ function MessagesWorkspace() {
               </button>
             ))}
             {!conversations.length && (
-              <p className="text-muted-foreground p-5 text-sm">
-                Nenhuma conversa encontrada.
+              <p role="status" className="text-muted-foreground p-5 text-sm">
+                Nenhuma conversa com essa busca ou filtro.
               </p>
             )}
           </div>
+          <LoadMore
+            className="border-border border-t"
+            page={data.pagination?.conversations}
+            summary={`Mostrando as ${data.conversations.length} conversas mais recentes.`}
+            label="Carregar conversas anteriores"
+            onLoadMore={() => void loadMore("conversations")}
+          />
         </Card>
         {selected ? (
           <ConversationPanel

@@ -16,6 +16,8 @@ export interface WorkspaceRepositoryOptions {
    * que nao atende ninguem e portanto nao possui tenant operacional.
    */
   organizationId?: ID | null;
+  /** Quem usa o painel. No Firestore, e dele o vinculo lido para o papel. */
+  userId?: ID | null;
   /** Ancora temporal do conjunto demonstrativo. Ignorada no Firestore. */
   anchor?: Date;
   /** Escopo do armazenamento local da demonstracao. Ignorado no Firestore. */
@@ -35,13 +37,14 @@ export interface WorkspaceRepositoryOptions {
 export function createWorkspaceRepository(
   options: WorkspaceRepositoryOptions,
 ): WorkspaceRepository {
-  const { professionId, organizationId, anchor = new Date(), scope } = options;
+  const { professionId, organizationId, userId, anchor = new Date(), scope } = options;
 
   if (!isDemoMode && organizationId) {
     return new FirestoreWorkspaceRepository(
       getDb(),
       organizationId,
       professionId,
+      { userId },
     );
   }
 

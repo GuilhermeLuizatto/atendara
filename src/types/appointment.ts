@@ -1,4 +1,5 @@
 import type { ID, ISODateString, TenantScopedEntity } from "./common";
+import type { PrivacyRedactionMark } from "./privacy";
 import type { ServiceModality } from "./profession";
 
 export type AppointmentStatus =
@@ -43,4 +44,6 @@ export interface Appointment extends TenantScopedEntity {
   /** Preenchido quando este atendimento substitui outro remarcado. */
   rescheduledFromId: ID | null;
   externalCalendar: ExternalCalendarRef | null;
+  /** Titular eliminado: horario e valor ficam, quem foi atendido nao. */
+  privacyRedaction?: PrivacyRedactionMark | null;
 }

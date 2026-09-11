@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  documentId,
   getDoc,
   getDocs,
   limit,
@@ -11,9 +12,12 @@ import {
 import { getFunctions, httpsCallable } from "firebase/functions";
 
 import { getDb, getFirebaseApp } from "@/lib/firebase/client";
+import { readPage } from "@/lib/firebase/paging";
 import { paths } from "@/lib/firebase/paths";
 import type {
   ID,
+  Page,
+  PageRequest,
   PlatformGatewayEvent,
   PlatformInvoice,
   PlatformSubscription,
@@ -23,10 +27,10 @@ import type { PlatformBillingClient } from "./types";
 
 const REGION = "southamerica-east1";
 
-/** Teto das listagens administrativas. Paginacao entra quando a base pedir. */
-const ADMIN_PAGE_SIZE = 200;
+/** Pagina das listagens da operadora. */
+const ADMIN_PAGE_SIZE = 50;
+/** O assinante ve os ultimos tres anos de faturas mensais. */
 const INVOICE_PAGE_SIZE = 36;
-const EVENT_PAGE_SIZE = 50;
 
 function callable<Input, Output>(name: string) {
   return httpsCallable<Input, Output>(
@@ -87,38 +91,30 @@ export class FirestorePlatformBillingClient implements PlatformBillingClient {
     )({});
   }
 
-  async allSubscriptions(): Promise<PlatformSubscription[]> {
-    const result = await getDocs(
-      query(
-        collection(getDb(), paths.platformSubscriptions()),
-        limit(ADMIN_PAGE_SIZE),
-      ),
-    );
-    return result.docs.map(
+  allSubscriptions(request: PageRequest = {}): Promise<Page<PlatformSubscription>> {
+    // O id do documento e o `organizationId`: ordem estavel, e presente em todos.
+    return readPage(
+      query(collection(getDb(), paths.platformSubscriptions()), orderBy(documentId())),
+      request,
+      ADMIN_PAGE_SIZE,
       (document) => document.data() as PlatformSubscription,
     );
   }
 
-  async allInvoices(): Promise<PlatformInvoice[]> {
-    const result = await getDocs(
-      query(
-        collection(getDb(), paths.platformInvoices()),
-        orderBy("issuedAt", "desc"),
-        limit(ADMIN_PAGE_SIZE),
-      ),
+  allInvoices(request: PageRequest = {}): Promise<Page<PlatformInvoice>> {
+    return readPage(
+      query(collection(getDb(), paths.platformInvoices()), orderBy("issuedAt", "desc")),
+      request,
+      ADMIN_PAGE_SIZE,
+      (document) => document.data() as PlatformInvoice,
     );
-    return result.docs.map((document) => document.data() as PlatformInvoice);
   }
 
-  async recentGatewayEvents(): Promise<PlatformGatewayEvent[]> {
-    const result = await getDocs(
-      query(
-        collection(getDb(), paths.platformGatewayEvents()),
-        orderBy("receivedAt", "desc"),
-        limit(EVENT_PAGE_SIZE),
-      ),
-    );
-    return result.docs.map(
+  recentGatewayEvents(request: PageRequest = {}): Promise<Page<PlatformGatewayEvent>> {
+    return readPage(
+      query(collection(getDb(), paths.platformGatewayEvents()), orderBy("receivedAt", "desc")),
+      request,
+      ADMIN_PAGE_SIZE,
       (document) => document.data() as PlatformGatewayEvent,
     );
   }

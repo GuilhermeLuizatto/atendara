@@ -12,13 +12,19 @@ import {
   findPlan,
 } from "@/config/billing";
 import { canManageSubscription } from "@/config/access";
+import { ACCESS_GRANT_KIND_LABELS } from "@/config/platform";
+import { isGrantInForce } from "@/lib/platform/access-gate";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
+import { safeExternalUrl } from "@/lib/utils/url";
+import { useNow } from "@/lib/utils/use-now";
 import { useAuth } from "@/providers/auth-provider";
 import { platformBillingClient } from "@/services/billing";
+import { platformAccessReader } from "@/services/platform-access";
 
 import { PlatformNotices } from "./platform-notices";
 import type { BadgeTone } from "@/components/ui";
 import type {
+  PlatformAccessGrant,
   PlatformInvoice,
   PlatformSubscription,
   PlatformSubscriptionStatus,
@@ -49,11 +55,14 @@ const STATUS_TONE: Record<PlatformSubscriptionStatus, BadgeTone> = {
 export function SubscriptionView() {
   const { user } = useAuth();
   const billing = platformBillingClient();
+  const access = platformAccessReader();
+  const now = useNow();
   const organizationId = user?.access?.organizationId ?? null;
   const allowed = canManageSubscription(user?.access);
 
   const [subscription, setSubscription] = useState<PlatformSubscription | null>(null);
   const [invoices, setInvoices] = useState<PlatformInvoice[]>([]);
+  const [grant, setGrant] = useState<PlatformAccessGrant | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -70,14 +79,16 @@ export function SubscriptionView() {
     return Promise.all([
       billing.subscription(organizationId),
       billing.invoices(organizationId),
+      access.accessGrant(organizationId),
     ])
-      .then(([current, history]) => {
+      .then(([current, history, currentGrant]) => {
         setSubscription(current);
         setInvoices(history);
+        setGrant(currentGrant);
       })
       .catch(() => setError("Nao foi possivel carregar sua assinatura agora."))
       .finally(() => setLoading(false));
-  }, [billing, organizationId]);
+  }, [access, billing, organizationId]);
 
   useEffect(() => {
     void load();
@@ -147,6 +158,25 @@ export function SubscriptionView() {
         <p role="alert" className="text-danger text-sm">
           {error}
         </p>
+      ) : null}
+
+      {/* Concessao da operadora, separada da assinatura: nao gera fatura e nao
+          e cobranca. O acesso vale ate a maior data entre as duas. */}
+      {grant && isGrantInForce(grant, now.getTime()) ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Acesso concedido pela operadora</CardTitle>
+          </CardHeader>
+          <CardBody className="space-y-2">
+            <p className="text-foreground text-sm">
+              {`A ${OPERATOR_NAME} liberou seu acesso ate ${formatDate(grant.until)} (${ACCESS_GRANT_KIND_LABELS[grant.kind].toLowerCase()}).`}
+            </p>
+            <p className="text-muted-foreground text-sm">
+              Nao e cobranca: nenhuma fatura corresponde a este periodo. Se voce assinar, o acesso segue ate a data
+              mais distante entre a assinatura e esta concessao.
+            </p>
+          </CardBody>
+        </Card>
       ) : null}
 
       <Card>
@@ -283,10 +313,10 @@ export function SubscriptionView() {
                         <Badge tone={invoiceTone(invoice)}>{INVOICE_STATUS_LABELS[invoice.status]}</Badge>
                       </td>
                       <td className="py-2">
-                        {invoice.hostedInvoiceUrl ? (
+                        {safeExternalUrl(invoice.hostedInvoiceUrl) ? (
                           <a
                             className="text-primary underline"
-                            href={invoice.hostedInvoiceUrl}
+                            href={safeExternalUrl(invoice.hostedInvoiceUrl)!}
                             target="_blank"
                             rel="noreferrer noopener"
                           >

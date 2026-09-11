@@ -60,6 +60,12 @@ export function getFirebaseConfig(): FirebaseClientConfig {
 export const isDemoMode =
   !isFirebaseConfigured || process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
+/**
+ * Chave de site do reCAPTCHA Enterprise usada pelo App Check. Publica por
+ * natureza; sem ela as callables recusam o aplicativo, porque exigem App Check.
+ */
+export const appCheckSiteKey = process.env.NEXT_PUBLIC_APP_CHECK_SITE_KEY ?? "";
+
 /** Emuladores locais, ligados por NEXT_PUBLIC_FIREBASE_USE_EMULATORS=true. */
 export const useEmulators =
   process.env.NEXT_PUBLIC_FIREBASE_USE_EMULATORS === "true";

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { APPOINTMENT_STATUS_LABELS, MODALITY_LABELS } from "@/config/labels";
 import { fromDateAndTime, toDateKey, toTimeValue } from "@/lib/utils/datetime";
+import { byGender, indefiniteTerm, newTerm } from "@/lib/utils/terms";
 import { useWorkspaceActions } from "@/providers/use-workspace-actions";
 import { useWorkspace } from "@/providers/workspace-provider";
 import type { AppointmentInput } from "@/services";
@@ -158,15 +160,24 @@ export function AppointmentForm({
     <Modal
       open={open}
       onClose={onClose}
-      title={appointment ? `Editar ${term}` : `Novo ${term}`}
+      title={appointment ? `Editar ${term}` : newTerm(terminology.appointment)}
       description={
         clients.length === 0
-          ? `Cadastre um ${terminology.client.singularLower} antes de agendar.`
+          ? `Cadastre ${indefiniteTerm(terminology.client)} antes de agendar.`
           : undefined
       }
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        {clients.length === 0 ? (
+          <p className="bg-warning-soft text-warning-soft-foreground rounded-lg px-3 py-2 text-sm">
+            O agendamento e feito para {indefiniteTerm(terminology.client)} ja{" "}
+            {byGender(terminology.client, "cadastrado", "cadastrada")}.{" "}
+            <Link href="/clientes" onClick={onClose} className="font-medium underline underline-offset-2">
+              Cadastrar {terminology.client.singularLower}
+            </Link>
+          </p>
+        ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <Field

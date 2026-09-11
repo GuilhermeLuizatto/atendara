@@ -47,6 +47,9 @@ export function defaultOrganizationKind(id: ProfessionId): OrganizationKind {
   return DEFAULT_KIND[id] ?? "SOLO_PRACTITIONER";
 }
 
+/** Intervalos oferecidos na grade da agenda, em minutos. */
+export const AGENDA_SLOT_INTERVALS = [10, 15, 20, 30, 45, 60] as const;
+
 export function defaultOrganizationSettings(
   profession: ProfessionConfig,
 ): OrganizationSettings {

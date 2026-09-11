@@ -11,10 +11,12 @@ import {
   fromUnixSeconds,
   isFullRefund,
   isOutOfOrder,
-  toAccountSubscriptionStatus,
   toPlatformStatus,
 } from "./generated/billing-policy.js";
+import { resolveAccountGate } from "./generated/access-gate.js";
+import { PROVISIONAL_RETENTION_DAYS } from "./generated/platform-config.js";
 import { GatewayError, stripeRequest, verifyWebhookSignature } from "./gateway.js";
+import { consumeRateLimit } from "./rate-limit.js";
 
 /**
  * Cobranca DA PLATAFORMA: a mensalidade que a Three Devs cobra dos assinantes.
@@ -40,7 +42,10 @@ import { GatewayError, stripeRequest, verifyWebhookSignature } from "./gateway.j
 
 const REGION = "southamerica-east1";
 const SECRETS = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"];
-const callOptions = { region: REGION, maxInstances: 3, cors: true, secrets: SECRETS };
+// App Check obrigatorio: sem atestado do aplicativo nao se abre sessao no
+// gateway. O webhook fica fora — quem o chama e o gateway, e ele prova a origem
+// pela assinatura do evento.
+const callOptions = { region: REGION, maxInstances: 3, cors: true, secrets: SECRETS, enforceAppCheck: true };
 const webhookOptions = { region: REGION, maxInstances: 5, secrets: SECRETS };
 
 // `getFirestore()` preguicoso: os modulos sao avaliados antes de
@@ -51,8 +56,23 @@ function now() {
   return new Date().toISOString();
 }
 
+/**
+ * Para onde o gateway devolve o assinante. Fora do emulador, falha fechada:
+ * sem a variavel, ou sem `https:`, o assinante pagaria e voltaria para um
+ * endereco que nao e o aplicativo. Conferida antes de qualquer chamada ao
+ * gateway, para nao abrir sessao que ja nasce com retorno errado.
+ */
 function appBaseUrl() {
-  return (process.env.APP_BASE_URL ?? "http://127.0.0.1:3000").replace(/\/$/, "");
+  const emulator = process.env.FUNCTIONS_EMULATOR === "true";
+  const configured = process.env.APP_BASE_URL?.trim();
+  if (!configured) {
+    if (emulator) return "http://127.0.0.1:3000";
+    throw new HttpsError("failed-precondition", "O endereco de retorno da cobranca (APP_BASE_URL) nao esta configurado neste ambiente.");
+  }
+  if (!emulator && !configured.startsWith("https://")) {
+    throw new HttpsError("failed-precondition", "O endereco de retorno da cobranca (APP_BASE_URL) precisa usar https.");
+  }
+  return configured.replace(/\/$/, "");
 }
 
 /** `planId -> price` do gateway. So o servidor conhece: o cliente pede plano. */
@@ -141,6 +161,8 @@ export const createSubscriptionCheckout = onCall(callOptions, async (request) =>
   if (organization.ownerId !== request.auth.uid) {
     throw new HttpsError("permission-denied", "Somente o titular da organizacao contrata a assinatura.");
   }
+  const baseUrl = appBaseUrl();
+  await consumeRateLimit(request.auth.uid, "createSubscriptionCheckout");
   const parsed = checkoutInput.safeParse(request.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", "Escolha um plano valido.");
 
@@ -190,8 +212,8 @@ export const createSubscriptionCheckout = onCall(callOptions, async (request) =>
         client_reference_id: organizationId,
         line_items: [{ price, quantity: 1 }],
         locale: "pt-BR",
-        success_url: `${appBaseUrl()}/assinatura/?retorno=concluido`,
-        cancel_url: `${appBaseUrl()}/assinatura/?retorno=cancelado`,
+        success_url: `${baseUrl}/assinatura/?retorno=concluido`,
+        cancel_url: `${baseUrl}/assinatura/?retorno=cancelado`,
         metadata: { organizationId, subscriberUserId: account.userId, planId: plan.id },
         subscription_data: {
           metadata: { organizationId, subscriberUserId: account.userId, planId: plan.id },
@@ -215,6 +237,8 @@ export const createSubscriptionCheckout = onCall(callOptions, async (request) =>
  */
 export const openBillingPortal = onCall(callOptions, async (request) => {
   const { organizationId } = await subscriptionOwner(request);
+  const baseUrl = appBaseUrl();
+  await consumeRateLimit(request.auth.uid, "openBillingPortal");
   const subscription = (await db().doc(paths.platformSubscription(organizationId)).get()).data();
   const customerId = subscription?.gateway?.customerId;
   if (!customerId) throw new HttpsError("failed-precondition", "Esta organizacao ainda nao tem assinatura.");
@@ -222,7 +246,7 @@ export const openBillingPortal = onCall(callOptions, async (request) => {
   try {
     const session = await stripeRequest("billing_portal/sessions", {
       customer: customerId,
-      return_url: `${appBaseUrl()}/assinatura/`,
+      return_url: `${baseUrl}/assinatura/`,
     });
     return { url: session.url };
   } catch (error) {
@@ -238,6 +262,7 @@ export const openBillingPortal = onCall(callOptions, async (request) => {
  */
 export const cancelPlatformSubscription = onCall(callOptions, async (request) => {
   const { organizationId } = await subscriptionOwner(request);
+  await consumeRateLimit(request.auth.uid, "cancelPlatformSubscription");
   const subscription = (await db().doc(paths.platformSubscription(organizationId)).get()).data();
   const subscriptionId = subscription?.gateway?.subscriptionId;
   if (!subscriptionId) throw new HttpsError("failed-precondition", "Nao ha assinatura para cancelar.");
@@ -335,12 +360,16 @@ function invoicePeriodEnd(invoice) {
 }
 
 /**
- * Localiza a conta que recebe o portao de acesso.
+ * Localiza a conta que recebe o portao de acesso e a concessao vigente da
+ * organizacao.
  *
  * Separado de `applyAccountGate` porque uma transacao do Firestore recusa
  * leitura depois de escrita: todo `get` precisa acontecer antes do primeiro
  * `set`. Devolve `null` — e nao lanca — quando a conta nao pode ser tocada:
  * conta inexistente, conta administrativa, ou conta de outra organizacao.
+ *
+ * A concessao e lida NA MESMA transacao: sem isso, uma concessao gravada entre
+ * a leitura e a escrita seria sobrescrita por um portao calculado sem ela.
  */
 async function readAccountGate(transaction, subscriberUserId, organizationId) {
   if (!subscriberUserId) return null;
@@ -350,21 +379,29 @@ async function readAccountGate(transaction, subscriberUserId, organizationId) {
   if (!account) return null;
   if (account.platformRole !== "PROFESSIONAL") return null;
   if (account.organizationId !== organizationId) return null;
-  return accountRef;
+  const grant = (await transaction.get(db().doc(paths.platformAccessGrant(organizationId)))).data() ?? null;
+  return { accountRef, grant };
 }
 
 /**
  * Reflete a assinatura em `accounts/{uid}` — o portao que as Security Rules
- * leem. E a UNICA escrita de `subscriptionStatus` e `accessUntil` que a
- * cobranca produz, e ela so acontece dentro do webhook.
+ * leem. Um dos dois caminhos que escrevem `subscriptionStatus` e `accessUntil`;
+ * o outro e a concessao registrada da operadora (`platform.js`). O portao usa a
+ * maior validade entre os dois, entao um evento nunca fecha uma concessao
+ * vigente, e uma concessao nunca encurta ciclo pago.
  */
-function applyAccountGate(transaction, accountRef, subscription, planId) {
-  if (!accountRef) return;
+function applyAccountGate(transaction, target, subscription, planId) {
+  if (!target) return;
 
+  const gate = resolveAccountGate({
+    subscription: { status: subscription.status, accessUntil: subscription.accessUntil ?? null },
+    grant: target.grant,
+    nowMs: Date.now(),
+  });
   const changes = {
-    subscriptionStatus: toAccountSubscriptionStatus(subscription.status),
-    accessUntil: subscription.accessUntil,
-    accessUntilMs: subscription.accessUntil ? Date.parse(subscription.accessUntil) : 0,
+    subscriptionStatus: gate.subscriptionStatus,
+    accessUntil: gate.accessUntil,
+    accessUntilMs: gate.accessUntil ? Date.parse(gate.accessUntil) : 0,
   };
 
   // Os modulos do plano so entram enquanto a assinatura da direito a eles.
@@ -373,7 +410,7 @@ function applyAccountGate(transaction, accountRef, subscription, planId) {
     changes.modules = plan.modules;
   }
 
-  transaction.update(accountRef, changes);
+  transaction.update(target.accountRef, changes);
 }
 
 const SKIP = (reason, organizationId = null) => ({ outcome: "IGNORED", reason, organizationId });
@@ -762,6 +799,9 @@ export async function applyGatewayEvent(event) {
       reason: result.reason ?? null,
       gatewayCreatedAt: fromUnixSeconds(event.created) ?? now(),
       receivedAt: now(),
+      // Para a politica de TTL, que so sera ligada com prazo aprovado. Muito
+      // alem da janela de reenvio: apagar cedo reabriria a idempotencia.
+      expiresAt: new Date(Date.now() + PROVISIONAL_RETENTION_DAYS.platformGatewayEvents * 86_400_000),
     });
 
     return result;

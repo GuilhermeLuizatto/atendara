@@ -1,5 +1,6 @@
 import type { ID, ISODateString, TenantScopedEntity } from "./common";
 import type { AttentionLevel } from "./conversation";
+import type { PrivacyRedactionMark } from "./privacy";
 
 export const NOTIFICATION_TYPES = [
   "POSSIBLE_RISK_DETECTED",
@@ -44,4 +45,5 @@ export interface Notification extends TenantScopedEntity {
   aiDecisionId: ID | null;
   acknowledgedBy: ID | null;
   acknowledgedAt: ISODateString | null;
+  privacyRedaction?: PrivacyRedactionMark | null;
 }

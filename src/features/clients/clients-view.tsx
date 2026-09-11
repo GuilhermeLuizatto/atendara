@@ -9,12 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input, Select } from "@/components/ui/form";
+import { LoadMore } from "@/components/ui/load-more";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CLIENT_STATUS_TONE } from "@/components/ui/tones";
 import { CLIENT_STATUS_LABELS, MODALITY_LABELS } from "@/config/labels";
 import { AppointmentForm } from "@/features/agenda/appointment-form";
 import { formatCurrency, formatDate, formatPhone } from "@/lib/utils/format";
+import { byGender, firstTerm, newTerm, noTerm } from "@/lib/utils/terms";
+import { useWorkspaceActions } from "@/providers/use-workspace-actions";
 import { useWorkspace } from "@/providers/workspace-provider";
 import type { Client, ClientStatus } from "@/types";
 
@@ -30,9 +33,11 @@ const SORT_LABELS: Record<ClientSort, string> = {
 };
 
 export function ClientsView() {
-  const { terminology, loading } = useWorkspace();
+  const { terminology, loading, data } = useWorkspace();
+  const { loadMore } = useWorkspaceActions();
   const { filters, setFilters, clients, total, countsByStatus, professionals } =
     useClients();
+  const page = data?.pagination?.clients;
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
@@ -62,11 +67,11 @@ export function ClientsView() {
     <div className="space-y-5">
       <PageHeader
         title={terminology.client.plural}
-        description={`CRM administrativo. ${total} ${total === 1 ? terminology.client.singularLower : terminology.client.pluralLower} cadastrados.`}
+        description={`CRM administrativo. ${total} ${total === 1 ? terminology.client.singularLower : terminology.client.pluralLower} ${page?.hasMore ? "carregados" : "cadastrados"}.`}
         actions={
           <Button size="md" onClick={openCreate}>
             <Plus className="size-4" aria-hidden strokeWidth={2} />
-            Novo {terminology.client.singularLower}
+            {newTerm(terminology.client)}
           </Button>
         }
       />
@@ -145,10 +150,14 @@ export function ClientsView() {
         <Card>
           <EmptyState
             icon={<UsersRound className="size-5" aria-hidden />}
-            title={`Nenhum ${terminology.client.singularLower} encontrado`}
+            title={
+              total === 0
+                ? `${noTerm(terminology.client)} cadastrad${byGender(terminology.client, "o", "a")} ainda`
+                : "Nada encontrado com essa busca ou filtro"
+            }
             description={
               total === 0
-                ? "Comece cadastrando o primeiro."
+                ? `Comece por ${firstTerm(terminology.client)}: nome e contato bastam.`
                 : "Ajuste a busca ou os filtros."
             }
             action={
@@ -179,19 +188,24 @@ export function ClientsView() {
                 <tr
                   key={client.id}
                   onClick={() => setSelected(client)}
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") setSelected(client);
-                  }}
                   className="hover:bg-surface-muted/60 cursor-pointer transition-colors"
                 >
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2.5">
                       <Avatar name={client.fullName} size="sm" />
                       <div className="min-w-0">
-                        <p className="text-foreground truncate text-sm font-medium">
+                        {/* O clique na linha e atalho de mouse; teclado e leitor
+                            de tela chegam pelo botao, que diz o que abre. */}
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelected(client);
+                          }}
+                          className="text-foreground block max-w-full truncate rounded text-left text-sm font-medium hover:underline"
+                        >
                           {client.fullName}
-                        </p>
+                        </button>
                         <p className="text-subtle-foreground truncate text-xs">
                           {MODALITY_LABELS[client.preferredModality]}
                         </p>
@@ -252,6 +266,13 @@ export function ClientsView() {
               </li>
             ))}
           </ul>
+          <LoadMore
+            className="border-border border-t"
+            page={page}
+            summary={`Mostrando ${total} ${terminology.client.pluralLower} em ordem alfabetica. Busca e filtros consideram so os carregados.`}
+            label={`Carregar mais ${terminology.client.pluralLower}`}
+            onLoadMore={() => void loadMore("clients")}
+          />
         </Card>
       )}
 

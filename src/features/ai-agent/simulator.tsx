@@ -18,6 +18,18 @@ export function Simulator() {
   const [busy, setBusy] = useState(false);
   const [time, setTime] = useState("10:00");
   if (!data) return null;
+  if (data.conversations.length === 0) {
+    return (
+      <Card className="p-5">
+        <h2 className="font-semibold">Testar agente</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          O teste usa uma conversa existente, e esta organizacao ainda nao tem
+          nenhuma: sem canal de mensagens integrado, nenhuma conversa chega. As
+          regras continuam valendo e podem ser revisadas na aba Regras.
+        </p>
+      </Card>
+    );
+  }
   const conversationId =
     selectedId ||
     data.conversations.find((item) => !item.escalated)?.id ||

@@ -22,6 +22,7 @@ import {
 } from "@/lib/storage/preference-store";
 import {
   createWorkspaceRepository,
+  type WorkspaceLoadState,
   type WorkspaceRepository,
   type WorkspaceSnapshot,
 } from "@/services";
@@ -31,6 +32,7 @@ import type {
   ProfessionConfig,
   ProfessionId,
   ProfessionTerminology,
+  Role,
 } from "@/types";
 
 import { useAuth } from "./auth-provider";
@@ -43,6 +45,10 @@ const professionStore = createPreferenceStore<ProfessionId>(
 
 interface WorkspaceContextValue {
   loading: boolean;
+  /** Carregando, pronto ou indisponivel — ver `WorkspaceLoadState`. */
+  loadState: WorkspaceLoadState;
+  /** Descarta as leituras abertas e tenta carregar de novo. */
+  retry: () => void;
   profession: ProfessionConfig;
   terminology: ProfessionTerminology;
   setProfession: (id: ProfessionId) => void;
@@ -57,6 +63,8 @@ const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
 const NOOP_SUBSCRIBE = () => () => {};
 const NULL_SNAPSHOT = () => null;
+const INITIAL_LOAD: WorkspaceLoadState = { status: "loading", slow: false };
+const INITIAL_LOAD_SNAPSHOT = () => INITIAL_LOAD;
 
 /**
  * Estado do espaco de trabalho.
@@ -85,10 +93,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     professionStore.getServerSnapshot,
   );
 
-  const professionId = isPlatformAdmin(user?.access) ? preferredProfessionId : user?.access?.professionId ?? DEFAULT_PROFESSION;
+  const platformAdmin = isPlatformAdmin(user?.access);
+  const professionId = platformAdmin ? preferredProfessionId : user?.access?.professionId ?? DEFAULT_PROFESSION;
   const scope = user?.access?.organizationId ?? user?.userId;
+  const userId = user?.userId ?? null;
 
-  const organizationId = isPlatformAdmin(user?.access)
+  const organizationId = platformAdmin
     ? null
     : (user?.access?.organizationId ?? null);
 
@@ -98,10 +108,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         ? createWorkspaceRepository({
             professionId,
             organizationId,
+            userId,
             scope,
           })
         : null,
-    [hydrated, professionId, organizationId, scope, user?.access],
+    [hydrated, professionId, organizationId, userId, scope, user?.access],
   );
 
   // Trocar de conta, de organizacao ou de profissao cria um repositorio novo;
@@ -126,16 +137,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const data = useSyncExternalStore(subscribe, getSnapshot, NULL_SNAPSHOT);
 
-  // Sincroniza o autor das escritas com a sessao. E um efeito de sistema
-  // externo (nao ha `setState`), que e o uso legitimo de `useEffect`.
-  useEffect(() => {
-    repository?.setActor({
-      userId: user?.userId ?? null,
-      name: user?.displayName ?? "Sistema",
-      role: isPlatformAdmin(user?.access) ? "OWNER" : "PROFESSIONAL",
-      permissions: accountPermissions(user?.access),
-    });
-  }, [repository, user]);
+  const subscribeLoad = useMemo(
+    () =>
+      repository
+        ? (listener: () => void) => repository.subscribeLoadState(listener)
+        : NOOP_SUBSCRIBE,
+    [repository],
+  );
+
+  const getLoadState = useMemo(
+    () => (repository ? () => repository.getLoadState() : INITIAL_LOAD_SNAPSHOT),
+    [repository],
+  );
+
+  const loadState = useSyncExternalStore(
+    subscribeLoad,
+    getLoadState,
+    INITIAL_LOAD_SNAPSHOT,
+  );
+
+  const retry = useCallback(() => repository?.retry(), [repository]);
 
   const setProfession = useCallback((id: ProfessionId) => {
     if (isPlatformAdmin(user?.access)) professionStore.set(id);
@@ -145,14 +166,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const session = useMemo<ActiveSession | null>(() => {
     if (!user || !data) return null;
-    // O papel do cliente espelha a matriz de `config/permissions.ts`; no
-    // Firestore o papel autoritativo vem do documento de membership, e os dois
-    // precisam concordar — ver a nota em firestore.rules.
+    const admin = isPlatformAdmin(user.access);
+    // O papel autoritativo e o do vinculo em `members/{uid}`, o mesmo que as
+    // rules conferem. A operadora abre so o conjunto demonstrativo, como OWNER.
+    const role: Role = admin ? "OWNER" : (data.membership?.role ?? "PROFESSIONAL");
+    const isOrganizationHolder = !admin && data.organization.ownerId === user.userId;
     return {
       user,
       organizationId: data.organization.id,
-      role: isPlatformAdmin(user.access) ? "OWNER" : "PROFESSIONAL",
-      permissions: accountPermissions(user.access),
+      role,
+      isOrganizationHolder,
+      permissions: accountPermissions(user.access, { role, isOrganizationHolder }),
       // Em uma clinica ha varios perfis na organizacao; o do usuario e o que
       // carrega o proprio uid. O primeiro da lista so serve de retomada para a
       // demonstracao, onde o titular e o unico profissional.
@@ -165,9 +189,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
   }, [user, data]);
 
+  // Sincroniza o autor das escritas com a sessao. E um efeito de sistema
+  // externo (nao ha `setState`), que e o uso legitimo de `useEffect`.
+  useEffect(() => {
+    repository?.setActor({
+      userId: user?.userId ?? null,
+      name: user?.displayName ?? "Sistema",
+      role: session?.role ?? (isPlatformAdmin(user?.access) ? "OWNER" : "PROFESSIONAL"),
+      permissions: session?.permissions ?? accountPermissions(user?.access),
+    });
+  }, [repository, user, session]);
+
   const value = useMemo(
     () => ({
       loading: data === null,
+      loadState,
+      retry,
       profession,
       terminology: profession.terminology,
       setProfession,
@@ -176,7 +213,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       data,
       repository,
     }),
-    [data, profession, setProfession, session, repository],
+    [data, loadState, retry, profession, setProfession, session, repository],
   );
 
   return (

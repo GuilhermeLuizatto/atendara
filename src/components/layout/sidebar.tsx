@@ -55,7 +55,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2.5 px-4 py-4">
-        <span className="bg-accent flex size-8 shrink-0 items-center justify-center rounded-lg text-white">
+        <span className="bg-accent text-accent-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
           <Sparkles className="size-4" aria-hidden strokeWidth={2} />
         </span>
         <span className="min-w-0">
@@ -68,7 +68,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </span>
       </div>
 
-      <nav className="scrollbar-slim flex-1 overflow-y-auto px-2 pb-4">
+      <nav aria-label="Principal" className="scrollbar-slim flex-1 overflow-y-auto px-2 pb-4">
         <ul className="space-y-0.5">
           {isPlatformAdmin(user?.access) ? <li><Link href="/admin" onClick={onNavigate} className="text-primary block rounded-lg px-3 py-2 text-sm font-medium">Administracao</Link></li> : null}
           {NAV_ITEMS.filter((item) => canAccessModule(user?.access, item.href.slice(1) as AppModule)).map(
@@ -102,18 +102,25 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                     </span>
 
                     {count && count.value > 0 ? (
-                      <span
-                        aria-label={`${count.value} pendente(s)`}
-                        className={cn(
-                          "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5",
-                          "text-[11px] font-semibold tabular-nums",
-                          count.urgent
-                            ? "bg-danger text-white"
-                            : "bg-surface-muted text-muted-foreground",
-                        )}
-                      >
-                        {count.value}
-                      </span>
+                      <>
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5",
+                            "text-[11px] font-semibold tabular-nums",
+                            count.urgent
+                              ? "bg-danger text-danger-foreground"
+                              : "bg-surface-muted text-muted-foreground",
+                          )}
+                        >
+                          {count.value}
+                        </span>
+                        {/* `aria-label` em span e ignorado por varios leitores:
+                            o numero vai como texto do proprio link. */}
+                        <span className="sr-only">
+                          , {count.value} pendente{count.value > 1 ? "s" : ""}
+                        </span>
+                      </>
                     ) : null}
                   </Link>
                 </li>

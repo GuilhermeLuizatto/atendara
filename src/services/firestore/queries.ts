@@ -22,15 +22,14 @@ import type { ID } from "@/types";
  */
 
 /**
- * Teto de documentos por colecao.
+ * Tamanho da pagina por colecao.
  *
- * O contrato do repositorio entrega o tenant inteiro, e para um consultorio
- * isso e barato. Os limites existem para que uma organizacao antiga nao
- * transforme a primeira carga em uma conta inesperada: as colecoes que crescem
- * sem parar (mensagens, decisoes, auditoria) vem das mais recentes para as mais
- * antigas. Paginar por colecao e a evolucao natural — e nao muda a interface.
+ * A primeira carga traz uma pagina de cada; `loadMore` soma mais uma. As
+ * colecoes que crescem sem parar (agenda, financeiro, mensagens, decisoes,
+ * auditoria) vem das mais recentes para as mais antigas, entao o que fica de
+ * fora da primeira pagina e sempre o historico mais distante.
  */
-export const SNAPSHOT_LIMITS = {
+export const SNAPSHOT_PAGE_SIZES = {
   professionals: 50,
   clients: 500,
   appointments: 500,
@@ -44,11 +43,22 @@ export const SNAPSHOT_LIMITS = {
   auditLogs: 200,
 } as const;
 
+export type PagedPart = keyof typeof SNAPSHOT_PAGE_SIZES;
+
 export function organizationRef(
   db: Firestore,
   organizationId: ID,
 ): DocumentReference {
   return doc(db, paths.organization(organizationId));
+}
+
+/** O vinculo de um usuario. As rules deixam cada membro ler os da propria organizacao. */
+export function membershipRef(
+  db: Firestore,
+  organizationId: ID,
+  userId: ID,
+): DocumentReference {
+  return doc(db, paths.document(organizationId, "members", userId));
 }
 
 function tenantQuery(
@@ -59,33 +69,40 @@ function tenantQuery(
   return collection(db, paths.collection(organizationId, name));
 }
 
-export const snapshotQueries = {
-  professionals: (db: Firestore, organizationId: ID) =>
+/**
+ * `count` e o total pedido naquele momento. Quem chama pede um documento a
+ * mais do que mostra, para saber se existe proxima pagina.
+ */
+export const snapshotQueries: Record<
+  PagedPart,
+  (db: Firestore, organizationId: ID, count: number) => Query
+> = {
+  professionals: (db, organizationId, count) =>
     query(
       tenantQuery(db, organizationId, "professionals"),
       orderBy("displayName"),
-      limit(SNAPSHOT_LIMITS.professionals),
+      limit(count),
     ),
 
-  clients: (db: Firestore, organizationId: ID) =>
+  clients: (db, organizationId, count) =>
     query(
       tenantQuery(db, organizationId, "clients"),
       orderBy("fullName"),
-      limit(SNAPSHOT_LIMITS.clients),
+      limit(count),
     ),
 
-  appointments: (db: Firestore, organizationId: ID) =>
+  appointments: (db, organizationId, count) =>
     query(
       tenantQuery(db, organizationId, "appointments"),
       orderBy("startsAt", "desc"),
-      limit(SNAPSHOT_LIMITS.appointments),
+      limit(count),
     ),
 
-  conversations: (db: Firestore, organizationId: ID) =>
+  conversations: (db, organizationId, count) =>
     query(
       tenantQuery(db, organizationId, "conversations"),
       orderBy("lastMessageAt", "desc"),
-      limit(SNAPSHOT_LIMITS.conversations),
+      limit(count),
     ),
 
   /**
@@ -94,56 +111,56 @@ export const snapshotQueries = {
    * e o filtro nao e conveniencia: as Security Rules so aprovam a consulta
    * porque ele garante que todo documento retornado pertence a organizacao.
    */
-  messages: (db: Firestore, organizationId: ID) =>
+  messages: (db, organizationId, count) =>
     query(
       collectionGroup(db, "messages"),
       where("organizationId", "==", organizationId),
       orderBy("sentAt", "desc"),
-      limit(SNAPSHOT_LIMITS.messages),
+      limit(count),
     ),
 
-  transactions: (db: Firestore, organizationId: ID) =>
+  transactions: (db, organizationId, count) =>
     query(
       tenantQuery(db, organizationId, "transactions"),
       orderBy("dueDate", "desc"),
-      limit(SNAPSHOT_LIMITS.transactions),
+      limit(count),
     ),
 
-  aiRules: (db: Firestore, organizationId: ID) =>
+  aiRules: (db, organizationId, count) =>
     query(
       tenantQuery(db, organizationId, "aiRules"),
       orderBy("priority", "desc"),
-      limit(SNAPSHOT_LIMITS.aiRules),
+      limit(count),
     ),
 
-  aiDecisions: (db: Firestore, organizationId: ID) =>
+  aiDecisions: (db, organizationId, count) =>
     query(
       tenantQuery(db, organizationId, "aiDecisions"),
       orderBy("decidedAt", "desc"),
-      limit(SNAPSHOT_LIMITS.aiDecisions),
+      limit(count),
     ),
 
-  notifications: (db: Firestore, organizationId: ID) =>
+  notifications: (db, organizationId, count) =>
     query(
       tenantQuery(db, organizationId, "notifications"),
       orderBy("createdAt", "desc"),
-      limit(SNAPSHOT_LIMITS.notifications),
+      limit(count),
     ),
 
-  notificationDeliveries: (db: Firestore, organizationId: ID) =>
+  notificationDeliveries: (db, organizationId, count) =>
     query(
       tenantQuery(db, organizationId, "notificationDeliveries"),
       orderBy("scheduledFor", "desc"),
-      limit(SNAPSHOT_LIMITS.notificationDeliveries),
+      limit(count),
     ),
 
-  auditLogs: (db: Firestore, organizationId: ID) =>
+  auditLogs: (db, organizationId, count) =>
     query(
       tenantQuery(db, organizationId, "auditLogs"),
       orderBy("occurredAt", "desc"),
-      limit(SNAPSHOT_LIMITS.auditLogs),
+      limit(count),
     ),
-} as const;
+};
 
 /** Id gerado pelo Firestore, sem ida ao servidor. */
 export function generateId(

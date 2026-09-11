@@ -5,14 +5,15 @@ import { CalendarCheck, CalendarX2, Check, Clock } from "lucide-react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonStyles } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { APPOINTMENT_STATUS_TONE } from "@/components/ui/tones";
 import { APPOINTMENT_STATUS_LABELS, MODALITY_LABELS } from "@/config/labels";
 import { cn } from "@/lib/utils/cn";
 import { formatTime, formatTimeUntil } from "@/lib/utils/format";
+import { nextTerm, noTerm } from "@/lib/utils/terms";
 import { useWorkspaceActions } from "@/providers/use-workspace-actions";
-import type { Appointment } from "@/types";
+import type { Appointment, TermPair } from "@/types";
 
 /**
  * Cartao de destaque do proximo atendimento.
@@ -25,13 +26,13 @@ export function NextAppointment({
   appointment,
   inProgress,
   now,
-  appointmentLabel,
+  appointmentTerm,
   clientLabel,
 }: {
   appointment: Appointment | null;
   inProgress: boolean;
   now: Date;
-  appointmentLabel: string;
+  appointmentTerm: TermPair;
   clientLabel: string;
 }) {
   const { setAppointmentStatus } = useWorkspaceActions();
@@ -41,13 +42,11 @@ export function NextAppointment({
       <div className="rounded-card border-border bg-surface shadow-card border">
         <EmptyState
           icon={<CalendarCheck className="size-5" aria-hidden />}
-          title={`Nenhum ${appointmentLabel.toLocaleLowerCase("pt-BR")} pela frente`}
+          title={`${noTerm(appointmentTerm)} pela frente`}
           description="Sua agenda esta livre pelo resto do dia. Aproveite para revisar pendencias."
           action={
-            <Link href="/agenda">
-              <Button variant="secondary" size="sm">
-                Abrir agenda
-              </Button>
+            <Link href="/agenda" className={buttonStyles({ variant: "secondary", size: "sm" })}>
+              Abrir agenda
             </Link>
           }
         />
@@ -57,7 +56,7 @@ export function NextAppointment({
 
   return (
     <section
-      aria-label={`Proximo ${appointmentLabel.toLocaleLowerCase("pt-BR")}`}
+      aria-label={nextTerm(appointmentTerm)}
       className={cn(
         "rounded-card border-border bg-surface shadow-card relative overflow-hidden border",
       )}
@@ -74,7 +73,7 @@ export function NextAppointment({
               <p className="text-muted-foreground text-xs font-medium">
                 {inProgress
                   ? "Em andamento"
-                  : `Proximo ${appointmentLabel.toLocaleLowerCase("pt-BR")}`}
+                  : nextTerm(appointmentTerm)}
               </p>
               <Badge
                 tone={inProgress ? "accent" : "neutral"}

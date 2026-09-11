@@ -31,7 +31,13 @@ SaaS multiprofissional de gestao e automacao. Leia
    contorne.
 5. **Regra `immutable` nao muda.** Nem pela interface, nem pelas Security Rules,
    nem para OWNER.
-6. **`aiDecisions` e `auditLogs` sao append-only.**
+6. **`aiDecisions` e `auditLogs` sao append-only.** Nenhum papel altera ou
+   apaga pelo cliente, e nenhum pedido de titular apaga a trilha. A unica
+   alteracao admitida e a pseudonimizacao pelo backend (`functions/privacy.js`),
+   a pedido do titular dos dados ou na exclusao da organizacao: troca so os
+   campos listados em `src/config/privacy.ts`, nunca os de
+   `APPEND_ONLY_PROTECTED_FIELDS`, e marca `privacyRedaction` com o id do
+   pedido registrado em `privacyRequests` ou `platformAuditLogs`.
 7. **Dinheiro em centavos inteiros.** Nenhum float na camada financeira.
 8. **Alterou `src/config/permissions.ts`? Altere `firestore.rules` junto.** Nao
    ha como compartilhar codigo entre TypeScript e CEL.
@@ -39,10 +45,13 @@ SaaS multiprofissional de gestao e automacao. Leia
    Atendara vive em `platform*` na raiz; receita e despesa do assinante vivem em
    `organizations/{orgId}/transactions`. Nenhuma consulta, agregado ou tela
    mistura as duas.
-10. **Assinatura e validade so mudam pelo webhook.** `subscriptionStatus` e
-    `accessUntil` sao escritos exclusivamente pelo backend, depois de conferir a
-    assinatura criptografica do evento. Retornar do checkout nao prova pagamento,
-    e nenhuma callable de cobranca aceita `organizationId` do cliente.
+10. **Assinatura e validade so mudam pelo webhook ou por concessao registrada.**
+    `subscriptionStatus` e `accessUntil` sao escritos exclusivamente pelo
+    backend: pelo webhook, depois de conferir a assinatura criptografica do
+    evento, ou pela concessao manual da operadora — com segundo fator, motivo,
+    prazo maximo e registro append-only na mesma transacao. Nenhuma outra
+    callable escreve esses campos. Retornar do checkout nao prova pagamento, e
+    nenhuma callable de cobranca aceita `organizationId` do cliente.
 11. **Aviso ao cliente e sempre opt-in explicito.** Nenhuma acao da agenda envia
     mensagem sozinha — confirmar um atendimento, inclusive. Sao necessarias, em
     conjunto: a chave da organizacao ligada, uma regra habilitada para aquele
@@ -58,6 +67,11 @@ SaaS multiprofissional de gestao e automacao. Leia
 
 - Cores apenas por token semantico (`bg-surface`, `text-muted-foreground`,
   `bg-danger-soft`). Nunca `bg-zinc-100` ou `text-red-600`.
+- Texto sobre `bg-accent` ou `bg-danger` usa `text-accent-foreground` ou
+  `text-danger-foreground`; borda de campo e `border-input`. O contraste AA dos
+  tokens e conferido por `src/lib/utils/contrast.test.ts`.
+- Link com cara de botao usa `buttonStyles()`, nunca `<Button>` dentro de
+  `<Link>`. Dialogo usa `Modal`/`Drawer`, que prendem e devolvem o foco.
 - Codigo e enums em ingles; interface e comentarios em pt-BR.
 - Comentario explica **por que**, nunca **o que**.
 - Arquivos pequenos e coesos. `config/` guarda politica, `lib/` guarda mecanismo.

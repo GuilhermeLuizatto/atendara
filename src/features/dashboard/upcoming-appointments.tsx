@@ -11,18 +11,19 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { APPOINTMENT_STATUS_TONE } from "@/components/ui/tones";
 import { APPOINTMENT_STATUS_LABELS, MODALITY_LABELS } from "@/config/labels";
 import { formatTime, formatTimeUntil } from "@/lib/utils/format";
+import { allTerm, nextPluralTerm } from "@/lib/utils/terms";
 import { toDateKey } from "@/mocks";
 import { useWorkspaceActions } from "@/providers/use-workspace-actions";
-import type { Appointment } from "@/types";
+import type { Appointment, TermPair } from "@/types";
 
 export function UpcomingAppointments({
   appointments,
   now,
-  appointmentPlural,
+  appointmentTerm,
 }: {
   appointments: Appointment[];
   now: Date;
-  appointmentPlural: string;
+  appointmentTerm: TermPair;
 }) {
   const { setAppointmentStatus } = useWorkspaceActions();
   const todayKey = toDateKey(now);
@@ -40,7 +41,7 @@ export function UpcomingAppointments({
             </Link>
           }
         >
-          Proximos {appointmentPlural.toLocaleLowerCase("pt-BR")}
+          {nextPluralTerm(appointmentTerm)}
         </CardTitle>
       </CardHeader>
 
@@ -119,7 +120,7 @@ export function UpcomingAppointments({
             href="/agenda"
             className="text-muted-foreground hover:text-foreground text-xs transition-colors"
           >
-            Ver todos os {appointmentPlural.toLocaleLowerCase("pt-BR")}
+            Ver {allTerm(appointmentTerm)}
           </Link>
         </CardBody>
       ) : null}

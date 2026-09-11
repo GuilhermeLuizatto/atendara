@@ -91,7 +91,7 @@ export function AlertsPanel({
                   className={cn(
                     "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg",
                     critical
-                      ? "bg-danger text-white"
+                      ? "bg-danger text-danger-foreground"
                       : "bg-warning-soft text-warning-soft-foreground",
                   )}
                 >

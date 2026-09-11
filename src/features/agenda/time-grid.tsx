@@ -3,6 +3,7 @@
 import { APPOINTMENT_STATUS_LABELS, MODALITY_LABELS } from "@/config/labels";
 import { cn } from "@/lib/utils/cn";
 import {
+  dayLabel,
   minutesIntoDay,
   toDateKey,
   type DateKey,
@@ -97,7 +98,7 @@ export function DayColumn({
             onClick={() =>
               onCreateAt(dateKey, `${String(hour).padStart(2, "0")}:00`)
             }
-            aria-label={`Agendar as ${hour}:00`}
+            aria-label={`Agendar em ${dayLabel(dateKey)}, as ${String(hour).padStart(2, "0")}:00`}
             style={{ height: PIXELS_PER_HOUR }}
             className="border-border hover:bg-surface-muted/50 block w-full border-b transition-colors"
           />
@@ -120,6 +121,7 @@ export function DayColumn({
           key={appointment.id}
           type="button"
           onClick={() => onSelect(appointment)}
+          aria-label={`${formatTime(appointment.startsAt)}, ${appointment.clientName}, ${APPOINTMENT_STATUS_LABELS[appointment.status]}, ${MODALITY_LABELS[appointment.modality]}`}
           style={{
             top,
             height,

@@ -6,7 +6,6 @@ import {
   type DocumentData,
   type DocumentReference,
   type Firestore,
-  type Query,
   type UpdateData,
   type WithFieldValue,
 } from "firebase/firestore";
@@ -18,11 +17,13 @@ import {
 } from "@/lib/firebase/converters";
 import type { TenantCollection } from "@/lib/firebase/paths";
 import type {
+  AgendaSettings,
   Appointment,
   AppointmentStatus,
   Conversation,
   ID,
   ISODateString,
+  Membership,
   OrganizationNotificationSettings,
   ProfessionId,
 } from "@/types";
@@ -53,6 +54,9 @@ import {
   type RepositoryActor,
   type RuleInput,
   type TransactionInput,
+  type WorkspaceCollection,
+  type WorkspaceLoadState,
+  type WorkspacePagination,
   type WorkspaceRepository,
   type WorkspaceSnapshot,
 } from "../types";
@@ -85,6 +89,7 @@ import {
   planReplyToConversation,
   planUpdateConversation,
 } from "./plans/messaging";
+import { planUpdateAgendaSettings } from "./plans/organization";
 import {
   planCreateRule,
   planDeleteRule,
@@ -92,10 +97,13 @@ import {
   planUpdateRule,
 } from "./plans/rules";
 import {
+  SNAPSHOT_PAGE_SIZES,
   generateId,
   generateMessageId,
+  membershipRef,
   organizationRef,
   snapshotQueries,
+  type PagedPart,
 } from "./queries";
 import {
   assembleSnapshot,
@@ -117,22 +125,37 @@ import {
 
 type PartName = keyof SnapshotParts;
 
-const COLLECTION_PARTS: Array<[PartName, ConvertedCollection]> = [
-  ["professionals", "professionals"],
-  ["clients", "clients"],
-  ["appointments", "appointments"],
-  ["conversations", "conversations"],
-  ["messages", "messages"],
-  ["transactions", "transactions"],
-  ["aiRules", "aiRules"],
-  ["aiDecisions", "aiDecisions"],
-  ["notifications", "notifications"],
-  ["notificationDeliveries", "notificationDeliveries"],
-  ["auditLogs", "auditLogs"],
+/** Parte do snapshot, colecao do conversor e nome publico da colecao. */
+const COLLECTION_PARTS: Array<[PagedPart, ConvertedCollection, WorkspaceCollection]> = [
+  ["professionals", "professionals", "professionals"],
+  ["clients", "clients", "clients"],
+  ["appointments", "appointments", "appointments"],
+  ["conversations", "conversations", "conversations"],
+  ["messages", "messages", "messages"],
+  ["transactions", "transactions", "transactions"],
+  ["aiRules", "aiRules", "rules"],
+  ["aiDecisions", "aiDecisions", "decisions"],
+  ["notifications", "notifications", "notifications"],
+  ["notificationDeliveries", "notificationDeliveries", "notificationDeliveries"],
+  ["auditLogs", "auditLogs", "auditLogs"],
 ];
 
 /** Limite do Firestore por lote; a folga cobre a escrita de auditoria. */
 const BATCH_LIMIT = 450;
+
+/**
+ * Depois disto a tela passa a dizer que esta demorando, em vez de mostrar um
+ * esqueleto para sempre. Nao cancela nada: o SDK continua tentando.
+ */
+const SLOW_LOAD_MS = 12_000;
+
+export interface FirestoreRepositoryOptions {
+  /** Quem usa o painel. Sem ele, o vinculo nao e lido e o papel fica o padrao. */
+  userId?: ID | null;
+  /** Tamanho de pagina por colecao. Os testes usam paginas pequenas. */
+  pageSizes?: Partial<Record<PagedPart, number>>;
+  slowLoadMs?: number;
+}
 
 /**
  * O que `WriteBatch` e `Transaction` tem em comum. Tipar o minimo necessario
@@ -157,33 +180,86 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
   private parts: SnapshotParts = emptyParts();
   private readonly pending = new Set<PartName>();
   private readonly listeners = new Set<(snapshot: WorkspaceSnapshot) => void>();
-  private readonly unsubscribes: Array<() => void> = [];
+  private readonly loadListeners = new Set<() => void>();
+  private readonly unsubscribes = new Map<PartName, () => void>();
   private actor: RepositoryActor = { userId: null, name: "Sistema" };
+
+  private readonly userId: ID | null;
+  private readonly pageSizes: Record<PagedPart, number>;
+  private readonly slowLoadMs: number;
+  /** Quantos documentos cada colecao pediu ate agora. */
+  private readonly limits: Record<PagedPart, number>;
+  private readonly hasMore = new Set<PagedPart>();
+  private readonly loadingMore = new Set<PagedPart>();
+  private readonly failed = new Set<PagedPart>();
+  /**
+   * Resposta de um listener ja substituido e ignorada: sem isto, a pagina menor
+   * que ainda estava a caminho sobrescreveria a maior que acabou de chegar.
+   */
+  private readonly generations = new Map<PartName, number>();
+  private readonly pageWaiters = new Map<PagedPart, Array<() => void>>();
+  private loadState: WorkspaceLoadState = { status: "loading", slow: false };
+  private slowTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly db: Firestore,
     private readonly organizationId: ID,
     private readonly professionId: ProfessionId,
+    options: FirestoreRepositoryOptions = {},
   ) {
-    this.pending.add("organization");
-    for (const [part] of COLLECTION_PARTS) this.pending.add(part);
+    this.userId = options.userId ?? null;
+    this.pageSizes = { ...SNAPSHOT_PAGE_SIZES, ...options.pageSizes };
+    this.limits = { ...this.pageSizes };
+    this.slowLoadMs = options.slowLoadMs ?? SLOW_LOAD_MS;
     this.listen();
   }
 
   // ------------------------------------------------------------- leitura
 
   private listen(): void {
-    this.unsubscribes.push(
+    this.pending.clear();
+    this.pending.add("organization");
+    if (this.userId) this.pending.add("membership");
+    for (const [part] of COLLECTION_PARTS) this.pending.add(part);
+
+    this.startSlowTimer();
+    this.watchOrganization();
+    if (this.userId) this.watchMembership(this.userId);
+    for (const [part, collection] of COLLECTION_PARTS) {
+      this.watchCollection(part, collection);
+    }
+  }
+
+  private nextGeneration(part: PartName): number {
+    const generation = (this.generations.get(part) ?? 0) + 1;
+    this.generations.set(part, generation);
+    return generation;
+  }
+
+  private replaceListener(part: PartName, unsubscribe: () => void): void {
+    const previous = this.unsubscribes.get(part);
+    this.unsubscribes.set(part, unsubscribe);
+    previous?.();
+  }
+
+  private watchOrganization(): void {
+    const generation = this.nextGeneration("organization");
+    this.replaceListener(
+      "organization",
       onSnapshot(
         organizationRef(this.db, this.organizationId),
         (document) => {
+          if (generation !== this.generations.get("organization")) return;
           if (!document.exists()) {
-            // Sem o documento da organizacao nao ha workspace: a conta existe
-            // mas nao foi provisionada. Melhor continuar carregando do que
-            // publicar uma fotografia inventada.
-            console.error(
-              `Organizacao ${this.organizationId} nao encontrada no Firestore.`,
-            );
+            // Sem o documento nao ha workspace. Vindo do cache, e falta de
+            // conexao; vindo do servidor, a conta existe mas a organizacao nao
+            // foi provisionada. Nenhum dos dois vira fotografia inventada.
+            this.parts = { ...this.parts, organization: null };
+            this.snapshot = null;
+            this.setLoadState({
+              status: "unavailable",
+              reason: document.metadata.fromCache ? "offline" : "organization-missing",
+            });
             return;
           }
           this.parts = {
@@ -196,36 +272,88 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
           };
           this.settle("organization");
         },
-        (error) => this.onPartError("organization", error),
+        (error) => this.onOrganizationError(error),
       ),
     );
+  }
 
-    for (const [part, collection] of COLLECTION_PARTS) {
-      const build = snapshotQueries[part as keyof typeof snapshotQueries] as (
-        db: Firestore,
-        organizationId: ID,
-      ) => Query;
+  private watchMembership(userId: ID): void {
+    const generation = this.nextGeneration("membership");
+    this.replaceListener(
+      "membership",
+      onSnapshot(
+        membershipRef(this.db, this.organizationId, userId),
+        (document) => {
+          if (generation !== this.generations.get("membership")) return;
+          this.parts = {
+            ...this.parts,
+            membership: document.exists()
+              ? fromFirestoreData<Membership>("members", document.id, document.data())
+              : null,
+          };
+          this.settle("membership");
+        },
+        // Vinculo ilegivel nao derruba o painel: o papel fica o padrao e as
+        // rules continuam decidindo cada leitura e escrita.
+        () => {
+          if (generation !== this.generations.get("membership")) return;
+          this.settle("membership");
+        },
+      ),
+    );
+  }
 
-      this.unsubscribes.push(
-        onSnapshot(
-          build(this.db, this.organizationId),
-          (result) => {
-            this.parts = {
-              ...this.parts,
-              [part]: result.docs.map((document) =>
-                fromFirestoreData(
-                  collection,
-                  document.id,
-                  document.data() as DocumentData,
-                ),
-              ),
-            };
-            this.settle(part);
-          },
-          (error) => this.onPartError(part, error),
-        ),
-      );
+  private watchCollection(part: PagedPart, collection: ConvertedCollection): void {
+    const generation = this.nextGeneration(part);
+    const count = this.limits[part];
+
+    this.replaceListener(
+      part,
+      onSnapshot(
+        snapshotQueries[part](this.db, this.organizationId, count + 1),
+        (result) => {
+          if (generation !== this.generations.get(part)) return;
+          const documents = result.docs.slice(0, count);
+          if (result.docs.length > count) this.hasMore.add(part);
+          else this.hasMore.delete(part);
+          this.loadingMore.delete(part);
+          this.failed.delete(part);
+
+          this.parts = {
+            ...this.parts,
+            [part]: documents.map((document) =>
+              fromFirestoreData(collection, document.id, document.data() as DocumentData),
+            ),
+          };
+          this.releasePageWaiters(part);
+          this.settle(part);
+        },
+        (error) => {
+          if (generation !== this.generations.get(part)) return;
+          this.onCollectionError(part, error);
+        },
+      ),
+    );
+  }
+
+  private onOrganizationError(error: unknown): void {
+    const code = (error as { code?: string })?.code;
+    if (code !== "permission-denied") {
+      console.error("Falha ao carregar a organizacao do Firestore.", error);
     }
+    // Sem limpar a parte, a proxima colecao que chegasse remontaria o painel
+    // com a organizacao antiga — justamente depois de o acesso ter sido negado.
+    this.parts = { ...this.parts, organization: null };
+    this.snapshot = null;
+    this.setLoadState({
+      status: "unavailable",
+      reason:
+        code === "permission-denied"
+          ? "access-denied"
+          : code === "unavailable"
+            ? "offline"
+            : "failed",
+    });
   }
 
   /**
@@ -235,12 +363,18 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
    * (financeiro, mensagens, agente) ou o papel exigido — a trilha de auditoria,
    * por exemplo, so e legivel por administracao. A tela ja esconde o que a
    * matriz de permissoes nao autoriza; aqui a colecao apenas chega vazia.
+   * Qualquer outra falha fica registrada em `failed`, para a tela nao dizer
+   * "nada cadastrado" quando o que houve foi erro.
    */
-  private onPartError(part: PartName, error: unknown): void {
+  private onCollectionError(part: PagedPart, error: unknown): void {
     const code = (error as { code?: string })?.code;
     if (code !== "permission-denied") {
       console.error(`Falha ao carregar "${part}" do Firestore.`, error);
+      this.failed.add(part);
     }
+    this.hasMore.delete(part);
+    this.loadingMore.delete(part);
+    this.releasePageWaiters(part);
     this.settle(part);
   }
 
@@ -250,17 +384,64 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
     this.publish();
   }
 
+  private pagination(): WorkspacePagination {
+    const pagination: WorkspacePagination = {};
+    for (const [part, , collection] of COLLECTION_PARTS) {
+      if (this.hasMore.has(part) || this.loadingMore.has(part)) {
+        pagination[collection] = {
+          hasMore: this.hasMore.has(part),
+          loading: this.loadingMore.has(part),
+        };
+      }
+    }
+    return pagination;
+  }
+
   private publish(): void {
     const next = assembleSnapshot(
       this.parts,
       this.organizationId,
       this.professionId,
       this.now(),
+      this.pagination(),
     );
     if (!next) return;
 
     this.snapshot = next;
+    this.setLoadState({
+      status: "ready",
+      failed: COLLECTION_PARTS.filter(([part]) => this.failed.has(part)).map(
+        ([, , collection]) => collection,
+      ),
+    });
     for (const listener of this.listeners) listener(next);
+  }
+
+  private setLoadState(next: WorkspaceLoadState): void {
+    if (JSON.stringify(next) === JSON.stringify(this.loadState)) return;
+    this.loadState = next;
+    if (next.status !== "loading") this.clearSlowTimer();
+    for (const listener of this.loadListeners) listener();
+  }
+
+  private startSlowTimer(): void {
+    this.clearSlowTimer();
+    this.slowTimer = setTimeout(() => {
+      if (this.loadState.status === "loading") {
+        this.setLoadState({ status: "loading", slow: true });
+      }
+    }, this.slowLoadMs);
+  }
+
+  private clearSlowTimer(): void {
+    if (this.slowTimer !== null) clearTimeout(this.slowTimer);
+    this.slowTimer = null;
+  }
+
+  private releasePageWaiters(part: PagedPart): void {
+    const waiters = this.pageWaiters.get(part);
+    this.pageWaiters.delete(part);
+    for (const resolve of waiters ?? []) resolve();
   }
 
   subscribe(listener: (snapshot: WorkspaceSnapshot) => void): () => void {
@@ -275,15 +456,65 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
     return this.snapshot;
   }
 
+  getLoadState(): WorkspaceLoadState {
+    return this.loadState;
+  }
+
+  subscribeLoadState(listener: () => void): () => void {
+    this.loadListeners.add(listener);
+    return () => {
+      this.loadListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Pede a proxima pagina aumentando o limite do listener daquela colecao.
+   *
+   * Custo assumido: o Firestore cobra de novo os documentos que ja estavam na
+   * tela, porque um listener com limite maior e outra consulta. Em troca a
+   * colecao continua em tempo real inteira — com cursor e paginas estaticas,
+   * editar um registro da segunda pagina nao apareceria ate recarregar.
+   */
+  loadMore(collection: WorkspaceCollection): Promise<void> {
+    const entry = COLLECTION_PARTS.find(([, , name]) => name === collection);
+    if (!entry) return Promise.resolve();
+    const [part, converted] = entry;
+    if (!this.hasMore.has(part)) return Promise.resolve();
+
+    const arrived = new Promise<void>((resolve) => {
+      this.pageWaiters.set(part, [...(this.pageWaiters.get(part) ?? []), resolve]);
+    });
+    if (this.loadingMore.has(part)) return arrived;
+
+    this.limits[part] += this.pageSizes[part];
+    this.loadingMore.add(part);
+    this.publish();
+    this.watchCollection(part, converted);
+    return arrived;
+  }
+
+  retry(): void {
+    for (const unsubscribe of this.unsubscribes.values()) unsubscribe();
+    this.unsubscribes.clear();
+    this.generations.clear();
+    this.failed.clear();
+    this.loadingMore.clear();
+    this.setLoadState({ status: "loading", slow: false });
+    this.listen();
+  }
+
   setActor(actor: RepositoryActor): void {
     this.actor = actor;
   }
 
   /** Encerra os listeners. Chamado quando a sessao ou a organizacao muda. */
   dispose(): void {
-    for (const unsubscribe of this.unsubscribes) unsubscribe();
-    this.unsubscribes.length = 0;
+    for (const unsubscribe of this.unsubscribes.values()) unsubscribe();
+    this.unsubscribes.clear();
     this.listeners.clear();
+    this.loadListeners.clear();
+    this.clearSlowTimer();
+    for (const part of [...this.pageWaiters.keys()]) this.releasePageWaiters(part);
   }
 
   // ------------------------------------------------------------- escrita
@@ -535,6 +766,10 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
     await this.commit(
       planUpdateNotificationSettings(this.context(), settings).writes,
     );
+  }
+
+  async updateAgendaSettings(settings: AgendaSettings): Promise<void> {
+    await this.commit(planUpdateAgendaSettings(this.context(), settings).writes);
   }
 
   /**

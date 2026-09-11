@@ -26,13 +26,16 @@ export const ROOT_COLLECTIONS = {
   initialPasswords: "initialPasswords",
 } as const;
 
-/** Cobranca da plataforma. Fora de `organizations/` por natureza. */
+/** Cobranca e atos da operadora. Fora de `organizations/` por natureza. */
 export const PLATFORM_COLLECTIONS = {
   platformPlans: "platformPlans",
   platformSubscriptions: "platformSubscriptions",
   platformInvoices: "platformInvoices",
   platformGatewayEvents: "platformGatewayEvents",
   platformCustomers: "platformCustomers",
+  platformAccessGrants: "platformAccessGrants",
+  platformAuditLogs: "platformAuditLogs",
+  platformRateLimits: "platformRateLimits",
 } as const;
 
 export const TENANT_COLLECTIONS = {
@@ -51,6 +54,9 @@ export const TENANT_COLLECTIONS = {
   // fila de saida, com estado de entrega e tentativas.
   notificationDeliveries: "notificationDeliveries",
   auditLogs: "auditLogs",
+  // Registro de cada pedido de titular de dados atendido pela organizacao.
+  // Escrito so pelo backend, junto da exportacao ou da eliminacao.
+  privacyRequests: "privacyRequests",
 } as const;
 
 export type TenantCollection = keyof typeof TENANT_COLLECTIONS;
@@ -106,6 +112,24 @@ export const paths = {
    */
   platformCustomer: (customerId: string) =>
     `${PLATFORM_COLLECTIONS.platformCustomers}/${customerId}`,
+
+  // ------------------------------------------------ atos da operadora
+
+  platformAccessGrants: () => PLATFORM_COLLECTIONS.platformAccessGrants,
+  /**
+   * Concessao vigente, chaveada pelo `organizationId` pelo mesmo motivo da
+   * assinatura: uma organizacao nao acumula duas concessoes.
+   */
+  platformAccessGrant: (organizationId: ID) =>
+    `${PLATFORM_COLLECTIONS.platformAccessGrants}/${organizationId}`,
+
+  platformAuditLogs: () => PLATFORM_COLLECTIONS.platformAuditLogs,
+  platformAuditLog: (logId: ID) =>
+    `${PLATFORM_COLLECTIONS.platformAuditLogs}/${logId}`,
+
+  /** Contador por usuario e callable. So o backend le e escreve. */
+  platformRateLimit: (key: string) =>
+    `${PLATFORM_COLLECTIONS.platformRateLimits}/${key}`,
 } as const;
 
 /**

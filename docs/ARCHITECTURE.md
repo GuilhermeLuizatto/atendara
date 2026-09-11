@@ -48,9 +48,10 @@ src/
 │   │   ├── financeiro/       Financeiro do NEGOCIO do assinante
 │   │   ├── assinatura/       Mensalidade que o assinante paga a operadora
 │   │   ├── agente/
-│   │   ├── admin/            Cadastros e cobranca da plataforma
+│   │   ├── admin/            Cadastros, concessoes, cobranca e trilha da operadora
 │   │   └── configuracoes/
-│   ├── login/
+│   ├── login/                Entrar e pedir nova senha
+│   ├── redefinir-senha/      Destino do link de nova senha
 │   ├── layout.tsx            Raiz: fontes, metadata, providers
 │   ├── globals.css           Design tokens
 │   └── page.tsx              Apresentacao publica
@@ -91,7 +92,7 @@ src/
 │   ├── memory/               Prototipo e demonstracao
 │   └── firestore/            Producao
 │       ├── plans/            O QUE muda: funcoes puras -> lista de escritas
-│       ├── queries.ts        Consultas e limites do snapshot
+│       ├── queries.ts        Consultas e paginas do snapshot
 │       └── snapshot.ts       Montagem, regras semeadas e derivados
 │
 └── types/                    Dominio
@@ -121,6 +122,7 @@ Colecoes sob `organizations/{organizationId}`:
 | `notifications` | Alertas DENTRO do painel                 |
 | `notificationDeliveries` | Fila de saida dos avisos ao cliente |
 | `auditLogs`     | Trilha append-only                       |
+| `privacyRequests` | Registro dos pedidos de titulares atendidos |
 
 `notifications` e `notificationDeliveries` sao coisas diferentes e o nome quase
 esconde isso: a primeira e o alerta que aparece para a equipe dentro do produto;
@@ -130,9 +132,11 @@ explicita — as condicoes vivem em `src/lib/notifications/eligibility.ts`.
 
 Na raiz, alem dessas, vivem as colecoes da **cobranca da plataforma** —
 `platformPlans`, `platformSubscriptions/{organizationId}`, `platformInvoices`,
-`platformGatewayEvents` e `platformCustomers`. Elas nao pertencem a tenant
-nenhum: sao a mensalidade que a operadora cobra dos assinantes, e por isso ficam
-fora de `organizations/`. Ver a secao 13.
+`platformGatewayEvents` e `platformCustomers` — e as dos atos da operadora,
+`platformAccessGrants`, `platformAuditLogs` e `platformRateLimits`. Elas nao
+pertencem a tenant nenhum: sao a mensalidade que a operadora cobra dos
+assinantes e o registro do que ela faz, e por isso ficam fora de
+`organizations/`. Ver a secao 13.
 
 Na raiz, `accounts/{userId}` define papel de plataforma, profissao, modulos,
 validade e troca obrigatoria de senha. Apenas o backend escreve nessa colecao.
@@ -205,6 +209,8 @@ Garantias implementadas:
   OWNER. E isso que transforma "Nivel 1" de convencao da interface em garantia.
 - **Auditoria append-only.** `aiDecisions` e `auditLogs` aceitam `create` e
   negam `update`/`delete` sem excecao. Um registro alteravel nao seria auditoria.
+  A pseudonimizacao a pedido do titular e do backend e nao passa pelas regras
+  (secao 14).
 - **Mensagens imutaveis.** Preservar o que foi dito e o que permite auditar as
   decisoes do agente depois.
 - **`collectionGroup` de mensagens com filtro de tenant.** A caixa de entrada le
@@ -216,6 +222,11 @@ Garantias implementadas:
   historico financeiro.
 - **Notificacao com escrita restrita por campo.** O usuario marca como lida; nao
   reescreve o alerta.
+- **Titular configura os proprios avisos, e so eles.** O autonomo nasce
+  `PROFESSIONAL` e dono da organizacao. `organizationHolder()` deixa o `ownerId`
+  com vinculo ativo trocar `settings.notifications` — nenhum outro campo do
+  documento — e espelha `ORGANIZATION_HOLDER_PERMISSIONS`. Nenhum outro membro
+  ganha nada; nome, agenda e agente continuam de `OWNER`/`ADMIN`.
 
 **Custo assumido:** `isMember()` e `roleOf()` executam `get()` no documento de
 membro, e cada `get()` conta como leitura. Em troca, o isolamento nao depende de
@@ -342,7 +353,16 @@ publicado. Por isso `src/config/demo-admin.ts` so le o verificador em build de
 demonstracao, e `npm run check:bundle` (parte do `verify`) confere o artefato.
 
 Na autenticacao real, o perfil vem de `accounts/{uid}` por assinatura Firestore;
-email nao determina papel. As functions em `functions/` gerenciam o cadastro e
+email nao determina papel. Dentro da organizacao, o papel da sessao vem de
+`members/{uid}` — o documento que as rules conferem — e ser titular vem do
+`ownerId`; `accountPermissions` cruza os dois com os modulos liberados.
+
+**Recuperacao de senha.** `sendPasswordReset` responde igual exista a conta ou
+nao, em pt-BR, e o link cai em `/redefinir-senha/` quando o modelo de e-mail do
+projeto aponta para la (sem isso, a pagina padrao do Firebase faz o mesmo). A
+tela confere o codigo antes de pedir a senha e exige 12 a 128 caracteres. Senha
+redefinida nao dispensa a troca inicial: `mustChangePassword` so e baixado pela
+callable, no servidor. As functions em `functions/` gerenciam o cadastro e
 a troca inicial; as de cobranca dependem dos segredos do gateway no Secret
 Manager.
 
@@ -402,7 +422,8 @@ Separacao obrigatoria, decidida na arquitetura e nao adiada para depois:
 **Sobre conformidade:** o projeto e descrito como _arquitetado considerando
 principios de privacidade e protecao de dados_. Nao ha afirmacao de adequacao a
 LGPD — isso exige validacao tecnica e juridica que este estagio nao contempla.
-Nenhum dado real e usado em lugar nenhum.
+Nenhum dado real e usado em lugar nenhum. O lado tecnico dos pedidos de titular
+esta na secao 14.
 
 ---
 
@@ -442,9 +463,16 @@ Nenhuma funcao de um lado recebe dado do outro. `WorkspaceRepository` nao foi
 alterado nesta etapa — a cobranca entrou por uma porta propria, e nao alargando
 a existente.
 
-**A autoridade e o webhook.** `accounts/{uid}.subscriptionStatus` e `accessUntil`
-continuam sendo o portao que `firestore.rules` verifica; a cobranca apenas passou
-a ser a **origem** dessas escritas, no lugar do administrador ajustando a mao. O
+**A autoridade e o webhook, ou a concessao registrada.**
+`accounts/{uid}.subscriptionStatus` e `accessUntil` continuam sendo o portao que
+`firestore.rules` verifica. Existem exatamente duas origens dessas escritas: o
+webhook do gateway e a concessao manual da operadora (`functions/platform.js`),
+com segundo fator, tipo, prazo maximo, motivo e entrada em `platformAuditLogs`
+na mesma transacao. O portao usa a maior validade entre as duas
+(`src/lib/platform/access-gate.ts`), lida na mesma transacao pelo webhook e pelas
+callables: um evento nao fecha concessao vigente, e concessao nunca encurta ciclo
+pago. Nenhuma outra callable escreve esses campos — `functions/index.test.js`
+varre o codigo para garantir. O
 navegador nao tem caminho de escrita para nenhuma colecao `platform*`, e nenhuma
 callable de cobranca aceita `organizationId` vindo do cliente — a organizacao e
 lida de `accounts/{uid}` no servidor.
@@ -463,3 +491,55 @@ aplicado, para que um evento atrasado nao reescreva estado mais novo.
 **Custo assumido:** o webhook obriga uma function HTTP (`onRequest`) porque
 `output: "export"` nao tem rota de servidor, e a verificacao da assinatura exige
 o corpo bruto. E a primeira dependencia de backend HTTP do produto.
+
+---
+
+## 14. Pedidos de titulares de dados
+
+O lado tecnico de exportar e eliminar o que o produto guarda sobre uma pessoa.
+Prazos, excecoes a eliminacao e base legal **nao** sao decididos aqui: sao
+pontos juridicos em aberto, e o codigo esta marcado assim.
+
+**O mapa e politica executavel.** `src/config/privacy.ts` diz, para cada colecao
+de `paths.ts`, que campos descrevem pessoas, a retencao atual e o que acontece
+na eliminacao de um cliente e na exclusao da organizacao (`DELETE`,
+`PSEUDONYMIZE`, `TOMBSTONE`, `KEEP` com motivo escrito, `NOT_APPLICABLE`).
+`functions/privacy.js` executa o mapa; `src/lib/privacy/redaction.ts` e a funcao
+pura que transforma documento em patch. Um teste exige entrada para toda
+colecao: nenhuma colecao nova entra sem decisao de privacidade.
+
+**Cinco callables, nenhuma com `organizationId`.** A organizacao sai de
+`accounts/{uid}`, como na cobranca.
+
+| Callable | Quem chama | Efeito |
+| --- | --- | --- |
+| `exportClientData` | responsavel, painel aberto | JSON com cadastro, agenda, conversas, financeiro, envios, decisoes e trilha sem nome da equipe |
+| `eraseClientData` | responsavel, painel aberto | apaga cadastro, conversas e mensagens; pseudonimiza o resto |
+| `startOrganizationExport` | responsavel, painel aberto | registra o inicio e devolve o id exigido por toda pagina |
+| `exportOrganizationPage` | quem iniciou, em ate 60 min | uma pagina de uma colecao; o servidor nao guarda arquivo |
+| `deleteOrganization` | so o titular (`ownerId`), login recente, sem assinatura viva | apaga o tenant, pseudonimiza a trilha, deixa lapide, encerra contas |
+
+"Responsavel" e papel `OWNER`/`ADMIN` ou o titular — o autonomo nasce
+`PROFESSIONAL` e dono. Espelhado em `privacy:*` (`permissions.ts`) e em
+`privacyResponsible()` (`firestore.rules`).
+
+**Append-only reconciliado.** Decisoes do agente e trilha nunca sao apagadas por
+pedido de titular. O backend troca so os campos pessoais listados no mapa —
+nunca os de `APPEND_ONLY_PROTECTED_FIELDS` —, grava `privacyRedaction` com o id
+do pedido e mantem classificacao, regras aplicadas, acao, motivo e datas. Pelo
+cliente, `update` e `delete` continuam negados. O pseudonimo e aleatorio: nao
+deriva do `clientId`, e o registro do pedido guarda o pseudonimo, nao o id.
+
+**Todo pedido deixa registro.** `organizations/{orgId}/privacyRequests` (so
+backend escreve; so o responsavel le) mais uma entrada `EXPORT` ou `DELETE` na
+trilha, sem nome de ninguem. A exclusao da organizacao registra
+`ORGANIZATION_DELETED` em `platformAuditLogs`, porque o tenant deixa de existir.
+
+**Retencao.** Segue o criterio da Etapa 5B: `expiresAt` gravado com prazo
+provisorio, TTL desligado para toda colecao com dado de pessoa. So
+`platformRateLimits` tem TTL.
+
+**Custo e limites assumidos.** Eliminacao e exclusao nao sao uma transacao unica
+(podem passar de 500 escritas): dependentes primeiro, cadastro e registro por
+ultimo, e repetir o pedido retoma. Nao ha tela nesta etapa. Copias fora do
+Firestore — backup, arquivo baixado, gateway, provedores — nao sao alcancadas.

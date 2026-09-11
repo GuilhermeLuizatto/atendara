@@ -10,6 +10,11 @@ const { doc, setDoc, getDoc, updateDoc, deleteDoc, getDocs, collection, collecti
 const environment = await initializeTestEnvironment({ projectId: "demo-atendara", firestore: { host: "127.0.0.1", port: 8085, rules: readFileSync("firestore.rules", "utf8") } });
 const account = (org, patch = {}) => ({ platformRole: "PROFESSIONAL", organizationId: org, professionId: "PSYCHOLOGIST", modules: ["clientes", "agenda", "financeiro", "agente", "mensagens"], status: "ACTIVE", mustChangePassword: false, subscriptionStatus: "ACTIVE", accessUntilMs: Date.now() + 86400000, ...patch });
 
+// Tokens de teste com e sem segundo fator. O emulador aceita token nao
+// assinado; producao nao. O claim e o mesmo que o Identity Platform grava.
+const TOTP = { firebase: { sign_in_provider: "password", sign_in_second_factor: "totp" } };
+const PHONE = { firebase: { sign_in_provider: "password", sign_in_second_factor: "phone" } };
+
 let checks = 0;
 async function allowed(operation) { await assertSucceeds(operation); checks++; }
 async function denied(operation) { await assertFails(operation); checks++; }
@@ -17,6 +22,8 @@ try {
   await environment.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     const profiles = {
+      // A operadora carrega campos de assinatura validos de proposito: prova
+      // que nao e a validade que a mantem fora dos tenants.
       admin: account(null, { platformRole: "PLATFORM_ADMIN" }),
       a: account("org-a"), b: account("org-b"),
       initial: account("org-a", { mustChangePassword: true }),
@@ -32,20 +39,21 @@ try {
       await setDoc(doc(db, paths.account(uid)), profile);
       if (profile.organizationId) await setDoc(doc(db, paths.document(profile.organizationId, "members", uid)), { role: "PROFESSIONAL", status: "ACTIVE" });
     }
-    // Membros promovidos a OWNER sem serem o titular (`ownerId`). O papel so
-    // alcanca a cobranca com o vinculo ativo.
-    for (const [uid, status] of [["ownerRole", "ACTIVE"], ["ownerRoleSuspended", "SUSPENDED"]]) {
+    // Membros promovidos a OWNER ou ADMIN sem serem o titular (`ownerId`). O
+    // papel so alcanca a cobranca com o vinculo ativo.
+    for (const [uid, role, status] of [["ownerRole", "OWNER", "ACTIVE"], ["ownerRoleSuspended", "OWNER", "SUSPENDED"], ["adminRole", "ADMIN", "ACTIVE"]]) {
       await setDoc(doc(db, paths.account(uid)), account("org-a"));
-      await setDoc(doc(db, paths.document("org-a", "members", uid)), { role: "OWNER", status });
+      await setDoc(doc(db, paths.document("org-a", "members", uid)), { role, status });
     }
     for (const org of ["org-a", "org-b"]) {
       await setDoc(doc(db, paths.organization(org)), { primaryProfession: "PSYCHOLOGIST", ownerId: "a" });
-      for (const collection of ["clients", "appointments", "transactions", "aiDecisions", "auditLogs"]) await setDoc(doc(db, paths.document(org, collection, "example")), { organizationId: org });
+      for (const collection of ["professionals", "clients", "appointments", "transactions", "aiDecisions", "auditLogs"]) await setDoc(doc(db, paths.document(org, collection, "example")), { organizationId: org });
       await setDoc(doc(db, paths.document(org, "aiRules", "immutable")), { organizationId: org, immutable: true, level: "SYSTEM", enabled: true });
       await setDoc(doc(db, paths.document(org, "conversations", "conv")), { organizationId: org, clientId: "example", status: "OPEN" });
       await setDoc(doc(db, messagePath(org, "conv", "m1")), { organizationId: org, conversationId: "conv", body: "Bom dia", sentAt: new Date() });
       await setDoc(doc(db, paths.document(org, "notifications", "alert")), { organizationId: org, status: "UNREAD", title: "Alerta" });
       await setDoc(doc(db, paths.document(org, "notificationDeliveries", "envio")), { organizationId: org, status: "PLANNED", attempts: 0, sentAt: null, channel: "SMS", event: "APPOINTMENT_REMINDER", bodyHash: "abcdef12", contactHint: "***0000" });
+      await setDoc(doc(db, paths.document(org, "privacyRequests", "pedido")), { organizationId: org, type: "CLIENT_EXPORT", subjectId: "example", requestedBy: "a" });
     }
     await setDoc(doc(db, paths.initialPassword("a")), { hash: "test-only" });
 
@@ -56,18 +64,25 @@ try {
     for (const [org, owner] of [["org-a", "a"], ["org-b", "b"], ["org-c", "ownerExpired"]]) {
       await setDoc(doc(db, paths.platformSubscription(org)), { organizationId: org, subscriberUserId: owner, status: "ACTIVE", amountInCents: 19900, currency: "BRL", interval: "MONTH" });
       await setDoc(doc(db, paths.platformInvoice(`in-${org}`)), { id: `in-${org}`, organizationId: org, status: "PAID", amountDueInCents: 19900, issuedAt: new Date().toISOString() });
+      await setDoc(doc(db, paths.platformAccessGrant(org)), { organizationId: org, subscriberUserId: owner, kind: "PILOT", reason: "Piloto combinado.", until: "2026-12-01T00:00:00.000Z", revokedAt: null });
     }
     await setDoc(doc(db, paths.platformGatewayEvent("evt-1")), { id: "evt-1", type: "invoice.paid", outcome: "APPLIED", organizationId: "org-a", receivedAt: new Date().toISOString() });
     await setDoc(doc(db, paths.platformCustomer("cus_1")), { customerId: "cus_1", organizationId: "org-a", subscriberUserId: "a" });
+    await setDoc(doc(db, paths.platformAuditLog("log-1")), { id: "log-1", action: "ACCESS_GRANTED", actorId: "admin", organizationId: "org-a", createdAt: new Date().toISOString() });
+    await setDoc(doc(db, paths.platformRateLimit("createSubscriptionCheckout_a")), { count: 1, windowStartMs: Date.now() });
   });
   const db = uid => environment.authenticatedContext(uid).firestore();
+  const withTotp = uid => environment.authenticatedContext(uid, TOTP).firestore();
+  const withPhone = uid => environment.authenticatedContext(uid, PHONE).firestore();
   const own = collection => paths.document("org-a", collection, "example");
   await allowed(getDoc(doc(db("a"), own("clients"))));
-  await allowed(getDoc(doc(db("admin"), paths.document("org-b", "clients", "example"))));
-  await allowed(getDocs(collection(db("admin"), paths.accounts())));
+  // Estas tres afirmavam acesso da operadora aos tenants e foram
+  // invertidas: nem com segundo fator ela le cliente, cria vinculo ou regra.
+  await denied(getDoc(doc(withTotp("admin"), paths.document("org-b", "clients", "example"))));
+  await allowed(getDocs(collection(withTotp("admin"), paths.accounts())));
   await allowed(updateDoc(doc(db("a"), own("clients")), { fullName: "Teste administrativo" }));
-  await allowed(setDoc(doc(db("admin"), paths.document("org-b", "members", "new")), { role: "PROFESSIONAL", status: "ACTIVE" }));
-  await allowed(setDoc(doc(db("admin"), paths.document("org-b", "aiRules", "custom")), { organizationId: "org-b", immutable: false, level: "PROFESSIONAL" }));
+  await denied(setDoc(doc(withTotp("admin"), paths.document("org-b", "members", "new")), { role: "PROFESSIONAL", status: "ACTIVE" }));
+  await denied(setDoc(doc(withTotp("admin"), paths.document("org-b", "aiRules", "custom")), { organizationId: "org-b", immutable: false, level: "PROFESSIONAL" }));
   await denied(getDoc(doc(db("a"), paths.document("org-b", "clients", "example"))));
   await denied(updateDoc(doc(db("a"), paths.account("a")), { platformRole: "PLATFORM_ADMIN" }));
   await denied(setDoc(doc(db("a"), paths.document("org-a", "members", "forged")), { role: "OWNER", status: "ACTIVE" }));
@@ -76,14 +91,15 @@ try {
   await allowed(getDoc(doc(db("restricted"), own("clients"))));
   await denied(getDoc(doc(db("restricted"), own("transactions"))));
   await denied(getDoc(doc(db("restricted"), own("appointments"))));
-  await denied(updateDoc(doc(db("admin"), paths.document("org-a", "aiRules", "immutable")), { enabled: false }));
-  await denied(deleteDoc(doc(db("admin"), paths.document("org-a", "aiRules", "immutable"))));
+  // Regra imutavel e trilhas append-only: nem o OWNER da organizacao muda.
+  await denied(updateDoc(doc(db("ownerRole"), paths.document("org-a", "aiRules", "immutable")), { enabled: false }));
+  await denied(deleteDoc(doc(db("ownerRole"), paths.document("org-a", "aiRules", "immutable"))));
   for (const collection of ["aiDecisions", "auditLogs"]) {
-    await denied(updateDoc(doc(db("admin"), own(collection)), { changed: true }));
-    await denied(deleteDoc(doc(db("admin"), own(collection))));
+    await denied(updateDoc(doc(db("ownerRole"), own(collection)), { changed: true }));
+    await denied(deleteDoc(doc(db("ownerRole"), own(collection))));
   }
   await denied(setDoc(doc(db("a"), paths.document("org-a", "clients", "foreign")), { organizationId: "org-b" }));
-  await denied(getDoc(doc(db("admin"), paths.initialPassword("a"))));
+  await denied(getDoc(doc(withTotp("admin"), paths.initialPassword("a"))));
   await denied(getDoc(doc(environment.unauthenticatedContext().firestore(), paths.account("a"))));
 
   // ------------------------------------------------------------- Etapa 1
@@ -156,19 +172,58 @@ try {
   await denied(getDoc(doc(db("restricted"), paths.document("org-a", "notificationDeliveries", "envio"))));
 
   // A configuracao dos avisos vive na organizacao, e alterar a organizacao
-  // continua sendo ato administrativo.
-  await allowed(updateDoc(doc(db("admin"), paths.organization("org-a")), { "settings.notifications": { enabled: true, verifiedSenderChannels: ["SMS"], rules: [] }, ownerId: "a" }));
+  // continua sendo ato administrativo DA PROPRIA organizacao.
+  await allowed(updateDoc(doc(db("ownerRole"), paths.organization("org-a")), { "settings.notifications": { enabled: true, verifiedSenderChannels: ["SMS"], rules: [] }, ownerId: "a" }));
 
   // Trilha de auditoria: o profissional escreve, so a administracao le.
   await allowed(setDoc(doc(db("a"), paths.document("org-a", "auditLogs", "novo")), { organizationId: "org-a", action: "CREATE" }));
   await denied(getDoc(doc(db("a"), own("auditLogs"))));
-  await allowed(getDoc(doc(db("admin"), own("auditLogs"))));
+  await allowed(getDoc(doc(db("ownerRole"), own("auditLogs"))));
+  await allowed(getDoc(doc(db("adminRole"), own("auditLogs"))));
 
   // Perfil profissional exige papel administrativo: por isso o cadastro de
   // profissional e criado pelo backend, e nao pelo aplicativo.
   await denied(setDoc(doc(db("a"), paths.document("org-a", "professionals", "auto")), { organizationId: "org-a", displayName: "Eu mesmo" }));
   await allowed(getDoc(doc(db("a"), paths.organization("org-a"))));
   await denied(getDoc(doc(db("a"), paths.organization("org-b"))));
+
+  // ------------------------------------------------------------- Etapa 5B
+  // A operadora nao alcanca dado operacional. Uma negacao de leitura e
+  // uma de escrita por colecao, com a sessao mais forte que ela pode ter.
+
+  const operator = withTotp("admin");
+  await denied(getDoc(doc(operator, paths.organization("org-a"))));
+  await denied(updateDoc(doc(operator, paths.organization("org-a")), { name: "Alterada pela operadora" }));
+  await denied(setDoc(doc(operator, paths.organization("org-nova")), { primaryProfession: "PSYCHOLOGIST", ownerId: "admin" }));
+  await denied(getDoc(doc(operator, paths.document("org-a", "members", "a"))));
+  await denied(updateDoc(doc(operator, paths.document("org-a", "members", "a")), { role: "OWNER" }));
+  await denied(deleteDoc(doc(operator, paths.document("org-a", "members", "restricted"))));
+  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "auditLogs"]) {
+    await denied(getDoc(doc(operator, own(name))));
+    await denied(setDoc(doc(operator, paths.document("org-a", name, "da-operadora")), { organizationId: "org-a" }));
+  }
+  await denied(getDoc(doc(operator, messagePath("org-a", "conv", "m1"))));
+  await denied(getDocs(query(collectionGroup(operator, "messages"), where("organizationId", "==", "org-a"))));
+  await denied(setDoc(doc(operator, messagePath("org-a", "conv", "da-operadora")), { organizationId: "org-a", conversationId: "conv", body: "oi" }));
+
+  // Apagar a organizacao pelo navegador trancaria o tenant. Nem o OWNER.
+  await denied(deleteDoc(doc(db("ownerRole"), paths.organization("org-a"))));
+  await denied(deleteDoc(doc(operator, paths.organization("org-b"))));
+
+  // MFA: sem o fator exigido, a conta de operadora nao e a operadora. A propria
+  // conta continua legivel, que e o que a tela usa para pedir o fator.
+  await allowed(getDoc(doc(db("admin"), paths.account("admin"))));
+  await denied(getDocs(collection(db("admin"), paths.accounts())));
+  await denied(getDocs(collection(withPhone("admin"), paths.accounts())));
+  await denied(getDoc(doc(db("admin"), paths.account("a"))));
+  await allowed(getDoc(doc(withTotp("admin"), paths.account("a"))));
+  await denied(getDocs(collection(db("admin"), paths.platformSubscriptions())));
+  await denied(getDoc(doc(db("admin"), paths.platformSubscription("org-b"))));
+  await denied(getDocs(collection(db("admin"), paths.platformInvoices())));
+  await denied(getDocs(collection(db("admin"), paths.platformGatewayEvents())));
+  // E um profissional com TOTP continua sendo profissional.
+  await denied(getDocs(collection(withTotp("a"), paths.accounts())));
+
   // ------------------------------------------------------------- Etapa 3
   // Cobranca da plataforma. Duas coisas para provar: o assinante alcanca a
   // PROPRIA cobranca e nada alem dela, e NINGUEM escreve — nem o administrador
@@ -180,8 +235,8 @@ try {
   // Leitura: cada um enxerga o que lhe cabe.
   await allowed(getDoc(doc(db("a"), paths.platformSubscription("org-a"))));
   await denied(getDoc(doc(db("a"), paths.platformSubscription("org-b"))));
-  await allowed(getDoc(doc(db("admin"), paths.platformSubscription("org-b"))));
-  await allowed(getDocs(collection(db("admin"), paths.platformSubscriptions())));
+  await allowed(getDoc(doc(withTotp("admin"), paths.platformSubscription("org-b"))));
+  await allowed(getDocs(collection(withTotp("admin"), paths.platformSubscriptions())));
   await denied(getDocs(collection(db("a"), paths.platformSubscriptions())));
 
   // Membro que nao responde pela organizacao nao ve a cobranca dela.
@@ -205,26 +260,95 @@ try {
   await allowed(getDocs(invoicesOf("a", "org-a")));
   await denied(getDocs(invoicesOf("a", "org-b")));
   await denied(getDocs(query(collection(db("a"), paths.platformInvoices()), limit(50))));
-  await allowed(getDocs(collection(db("admin"), paths.platformInvoices())));
+  await allowed(getDocs(collection(withTotp("admin"), paths.platformInvoices())));
 
   // Trilha de eventos e indice de clientes: auditoria da operadora.
-  await allowed(getDocs(collection(db("admin"), paths.platformGatewayEvents())));
+  await allowed(getDocs(collection(withTotp("admin"), paths.platformGatewayEvents())));
   await denied(getDocs(collection(db("a"), paths.platformGatewayEvents())));
   await denied(getDoc(doc(db("a"), paths.platformCustomer("cus_1"))));
-  await denied(getDoc(doc(db("admin"), paths.platformCustomer("cus_1"))));
+  await denied(getDoc(doc(withTotp("admin"), paths.platformCustomer("cus_1"))));
 
   // Escrita: negada para todo mundo, em todas as colecoes.
   await denied(setDoc(doc(db("a"), paths.platformSubscription("org-a")), { organizationId: "org-a", status: "ACTIVE" }));
-  await denied(setDoc(doc(db("admin"), paths.platformSubscription("org-a")), { organizationId: "org-a", status: "ACTIVE" }));
+  await denied(setDoc(doc(withTotp("admin"), paths.platformSubscription("org-a")), { organizationId: "org-a", status: "ACTIVE" }));
   await denied(updateDoc(doc(db("a"), paths.platformSubscription("org-a")), { accessUntil: "2099-01-01T00:00:00.000Z" }));
-  await denied(updateDoc(doc(db("admin"), paths.platformInvoice("in-org-a")), { status: "PAID" }));
+  await denied(updateDoc(doc(withTotp("admin"), paths.platformInvoice("in-org-a")), { status: "PAID" }));
   await denied(setDoc(doc(db("a"), paths.platformInvoice("in-forjada")), { organizationId: "org-a", status: "PAID" }));
-  await denied(setDoc(doc(db("admin"), paths.platformGatewayEvent("evt-forjado")), { id: "evt-forjado", outcome: "APPLIED" }));
-  await denied(setDoc(doc(db("admin"), paths.platformPlan("plano-forjado")), { priceInCents: 1 }));
+  await denied(setDoc(doc(withTotp("admin"), paths.platformGatewayEvent("evt-forjado")), { id: "evt-forjado", outcome: "APPLIED" }));
+  await denied(setDoc(doc(withTotp("admin"), paths.platformPlan("plano-forjado")), { priceInCents: 1 }));
   await denied(deleteDoc(doc(db("a"), paths.platformSubscription("org-a"))));
-  await denied(setDoc(doc(db("admin"), paths.platformCustomer("cus_2")), { organizationId: "org-a" }));
+  await denied(setDoc(doc(withTotp("admin"), paths.platformCustomer("cus_2")), { organizationId: "org-a" }));
 
-  assert.equal(checks, 118);
+  // ------------------------------------------------------------- Etapa 5B
+  // Concessao manual e trilha da operadora. O titular ve a propria
+  // concessao, inclusive vencido; a operadora ve todas; ninguem escreve.
+
+  await allowed(getDoc(doc(db("a"), paths.platformAccessGrant("org-a"))));
+  await denied(getDoc(doc(db("a"), paths.platformAccessGrant("org-b"))));
+  await allowed(getDoc(doc(db("ownerExpired"), paths.platformAccessGrant("org-c"))));
+  await denied(getDoc(doc(db("restricted"), paths.platformAccessGrant("org-a"))));
+  await allowed(getDocs(collection(withTotp("admin"), paths.platformAccessGrants())));
+  await denied(getDocs(collection(db("admin"), paths.platformAccessGrants())));
+  await denied(setDoc(doc(db("a"), paths.platformAccessGrant("org-a")), { organizationId: "org-a", until: "2099-01-01T00:00:00.000Z" }));
+  await denied(updateDoc(doc(withTotp("admin"), paths.platformAccessGrant("org-b")), { until: "2099-01-01T00:00:00.000Z" }));
+  await denied(deleteDoc(doc(withTotp("admin"), paths.platformAccessGrant("org-b"))));
+
+  await allowed(getDocs(collection(withTotp("admin"), paths.platformAuditLogs())));
+  await denied(getDocs(collection(db("admin"), paths.platformAuditLogs())));
+  await denied(getDocs(collection(db("a"), paths.platformAuditLogs())));
+  await denied(setDoc(doc(withTotp("admin"), paths.platformAuditLog("forjado")), { action: "ACCESS_GRANTED", actorId: "admin" }));
+  await denied(updateDoc(doc(withTotp("admin"), paths.platformAuditLog("log-1")), { reason: "reescrito" }));
+  await denied(deleteDoc(doc(withTotp("admin"), paths.platformAuditLog("log-1"))));
+
+  // O contador de abuso e mecanismo do backend. Zerar o proprio contador
+  // pelo navegador anularia o limite.
+  await denied(getDoc(doc(withTotp("admin"), paths.platformRateLimit("createSubscriptionCheckout_a"))));
+  await denied(setDoc(doc(db("a"), paths.platformRateLimit("createSubscriptionCheckout_a")), { count: 0, windowStartMs: 0 }));
+
+  // ------------------------------------------------------------- Etapa 5C
+  // Pedidos de titulares de dados. O registro e do backend; le quem responde
+  // pela organizacao — papel OWNER/ADMIN ativo ou o titular (`ownerId`, aqui
+  // "a", nascido PROFESSIONAL) —, e mais ninguem, nem a operadora.
+  const privacyRequest = org => paths.document(org, "privacyRequests", "pedido");
+  await allowed(getDoc(doc(db("a"), privacyRequest("org-a"))));
+  await allowed(getDoc(doc(db("ownerRole"), privacyRequest("org-a"))));
+  await allowed(getDoc(doc(db("adminRole"), privacyRequest("org-a"))));
+  await denied(getDoc(doc(db("restricted"), privacyRequest("org-a"))));
+  await denied(getDoc(doc(db("ownerRoleSuspended"), privacyRequest("org-a"))));
+  await denied(getDoc(doc(db("a"), privacyRequest("org-b"))));
+  await denied(getDocs(query(collection(db("b"), paths.collection("org-a", "privacyRequests")), limit(5))));
+  await denied(getDoc(doc(operator, privacyRequest("org-a"))));
+  await denied(setDoc(doc(db("ownerRole"), paths.document("org-a", "privacyRequests", "forjado")), { organizationId: "org-a", type: "CLIENT_ERASURE" }));
+  await denied(updateDoc(doc(db("a"), privacyRequest("org-a")), { subjectId: "outro" }));
+  await denied(deleteDoc(doc(db("ownerRole"), privacyRequest("org-a"))));
+  // A pseudonimizacao e ato do backend: pelo cliente, a decisao continua
+  // imutavel, inclusive para "retirar" o conteudo.
+  await denied(updateDoc(doc(db("ownerRole"), own("aiDecisions")), { inputPreview: "[conteudo removido a pedido do titular dos dados]" }));
+
+  // ------------------------------------------------------------- Etapa 6
+  // O titular da organizacao (`ownerId`) configura os proprios avisos sem papel
+  // administrativo — e nada mais do documento. "a" e PROFESSIONAL e titular de
+  // org-a; "b" e PROFESSIONAL de org-b, cujo titular tambem e "a".
+  const notificationSettings = { enabled: false, verifiedSenderChannels: [], rules: [] };
+  const orgA = () => paths.organization("org-a");
+  await allowed(updateDoc(doc(db("a"), orgA()), { "settings.notifications": notificationSettings, updatedAt: new Date().toISOString(), updatedBy: "a" }));
+  await denied(updateDoc(doc(db("a"), orgA()), { name: "Renomeada pelo titular" }));
+  await denied(updateDoc(doc(db("a"), orgA()), { "settings.notifications": notificationSettings, name: "Junto com os avisos" }));
+  await denied(updateDoc(doc(db("a"), orgA()), { "settings.agenda": { workdayStart: "06:00" } }));
+  await denied(updateDoc(doc(db("a"), orgA()), { "settings.ai": { allowAutonomousReplies: true } }));
+  await denied(updateDoc(doc(db("a"), orgA()), { "settings.notifications": notificationSettings, ownerId: "b" }));
+  await denied(updateDoc(doc(db("a"), orgA()), { "settings.notifications": "ligado" }));
+  // Ser `ownerId` sem vinculo ativo naquela organizacao nao abre nada.
+  await denied(updateDoc(doc(db("a"), paths.organization("org-b")), { "settings.notifications": notificationSettings }));
+  // Nenhum outro membro ganha o caminho, nem com modulo liberado.
+  await denied(updateDoc(doc(db("b"), paths.organization("org-b")), { "settings.notifications": notificationSettings }));
+  await denied(updateDoc(doc(db("restricted"), orgA()), { "settings.notifications": notificationSettings }));
+  await denied(updateDoc(doc(operator, orgA()), { "settings.notifications": notificationSettings }));
+  // Titular com a validade vencida perde o caminho junto com o painel.
+  await denied(updateDoc(doc(db("ownerExpired"), paths.organization("org-c")), { "settings.notifications": notificationSettings }));
+  // O caminho administrativo nao mudou: ADMIN continua alterando a agenda.
+  await allowed(updateDoc(doc(db("adminRole"), orgA()), { "settings.agenda": { workdayStart: "07:00" } }));
+
+  assert.equal(checks, 202);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }
-

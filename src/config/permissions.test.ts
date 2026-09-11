@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { PERMISSIONS, ROLES, type Role } from "@/types";
+import { PERMISSIONS, PLATFORM_PERMISSIONS, ROLES, type Role } from "@/types";
 
 import {
+  ORGANIZATION_HOLDER_PERMISSIONS,
+  PLATFORM_ROLE_PERMISSIONS,
   ROLE_PERMISSIONS,
   hasPermission,
+  hasPlatformPermission,
+  permissionsForMembership,
   permissionsForRole,
 } from "./permissions";
+import { PRIVACY_RESPONSIBLE_ROLES } from "./privacy";
 
 /**
  * Invariantes do RBAC.
@@ -53,6 +58,41 @@ describe("matriz de permissoes", () => {
     expect(hasPermission("ASSISTANT", "conversation:reply")).toBe(true);
   });
 
+  it("reserva pedidos de titulares aos papeis que o backend e as rules aceitam", () => {
+    for (const permission of ["privacy:export", "privacy:erase"] as const) {
+      const roles = ROLES.filter((role) => hasPermission(role, permission));
+      expect(new Set(roles)).toEqual(new Set(PRIVACY_RESPONSIBLE_ROLES));
+    }
+  });
+
+  it("reserva a configuracao de avisos a OWNER, ADMIN e ao titular", () => {
+    const allowed: Role[] = ["OWNER", "ADMIN"];
+    for (const role of ROLES) {
+      expect(hasPermission(role, "notificationSettings:update")).toBe(allowed.includes(role));
+      expect(permissionsForMembership(role, true)).toContain("notificationSettings:update");
+    }
+  });
+
+  it("da ao titular so a lista fechada, alem do proprio papel", () => {
+    // Espelha `organizationHolder()` nas rules: avisos e pedidos de titular.
+    expect(new Set(ORGANIZATION_HOLDER_PERMISSIONS)).toEqual(
+      new Set(["notificationSettings:update", "privacy:export", "privacy:erase"]),
+    );
+    const professional = new Set(permissionsForRole("PROFESSIONAL"));
+    const gained = permissionsForMembership("PROFESSIONAL", true).filter(
+      (permission) => !professional.has(permission),
+    );
+    expect(new Set(gained)).toEqual(new Set(ORGANIZATION_HOLDER_PERMISSIONS));
+    expect(gained).not.toContain("organization:update");
+    expect(gained).not.toContain("auditLog:read");
+  });
+
+  it("nao amplia o papel de quem nao e titular", () => {
+    for (const role of ROLES) {
+      expect(permissionsForMembership(role, false)).toEqual(permissionsForRole(role));
+    }
+  });
+
   it("restringe a leitura da trilha de auditoria a OWNER e ADMIN", () => {
     const allowed: Role[] = ["OWNER", "ADMIN"];
     for (const role of ROLES) {
@@ -78,6 +118,39 @@ describe("matriz de permissoes", () => {
         expect(higher.has(permission)).toBe(true);
       }
       expect(higher.size).toBeGreaterThan(lower.size);
+    }
+  });
+
+  it("nao da a operadora nenhuma permissao de tenant", () => {
+    const tenant = new Set<string>(PERMISSIONS);
+    for (const permission of PLATFORM_ROLE_PERMISSIONS.PLATFORM_ADMIN) {
+      expect(tenant.has(permission)).toBe(false);
+    }
+    expect(new Set(PLATFORM_ROLE_PERMISSIONS.PLATFORM_ADMIN)).toEqual(new Set(PLATFORM_PERMISSIONS));
+  });
+
+  it("reserva os atos de plataforma a operadora ativa", () => {
+    const base = {
+      userId: "u",
+      email: "u@atendara.test",
+      displayName: "U",
+      organizationId: null,
+      professionId: null,
+      modules: [],
+      status: "ACTIVE" as const,
+      subscriptionStatus: "PENDING" as const,
+      accessUntil: null,
+      mustChangePassword: false,
+      createdAt: "2026-09-10T00:00:00.000Z",
+    };
+    const operator = { ...base, platformRole: "PLATFORM_ADMIN" as const };
+    const professional = { ...base, platformRole: "PROFESSIONAL" as const, organizationId: "org" };
+
+    expect(hasPlatformPermission(operator, "accessGrant:create")).toBe(true);
+    expect(hasPlatformPermission({ ...operator, status: "SUSPENDED" }, "accessGrant:create")).toBe(false);
+    expect(hasPlatformPermission({ ...operator, mustChangePassword: true }, "account:list")).toBe(false);
+    for (const permission of PLATFORM_PERMISSIONS) {
+      expect(hasPlatformPermission(professional, permission)).toBe(false);
     }
   });
 

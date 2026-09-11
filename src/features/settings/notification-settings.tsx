@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
 import {
@@ -18,6 +18,8 @@ import type {
   OutboundChannel,
 } from "@/types";
 
+const CHECKBOX = "accent-primary size-4 shrink-0";
+
 /**
  * Configuracao dos avisos ao cliente.
  *
@@ -27,12 +29,17 @@ import type {
  * que aparece aqui e o que aconteceria, e nao uma explicacao paralela do que
  * deveria acontecer.
  *
+ * Quem altera e quem tem `notificationSettings:update`: OWNER, ADMIN e o
+ * titular da organizacao. Os demais veem a configuracao sem os controles
+ * ligados — as rules recusariam a gravacao de qualquer jeito.
+ *
  * Nada e enviado por esta tela. O unico provedor implementado e o simulado.
  */
 export function NotificationSettings() {
-  const { data, profession } = useWorkspace();
+  const { data, profession, session } = useWorkspace();
   const { updateNotificationSettings, dispatchDueNotifications } =
     useWorkspaceActions();
+  const readOnlyNoteId = useId();
 
   const settings = data?.organization.settings.notifications;
   const [saving, setSaving] = useState(false);
@@ -75,6 +82,9 @@ export function NotificationSettings() {
 
   if (!settings || !data) return null;
 
+  const canEdit = session?.permissions.includes("notificationSettings:update") ?? false;
+  const disabled = saving || !canEdit;
+  const describedBy = canEdit ? undefined : readOnlyNoteId;
   const deliveries = data.notificationDeliveries;
 
   async function persist(next: Parameters<typeof updateNotificationSettings>[0]) {
@@ -125,7 +135,17 @@ export function NotificationSettings() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" aria-busy={saving || undefined}>
+      {!canEdit ? (
+        <p
+          id={readOnlyNoteId}
+          className="bg-surface-muted text-muted-foreground rounded-lg p-3 text-sm"
+        >
+          Somente o titular da organizacao, o proprietario ou um administrador
+          altera os avisos. Voce pode consultar como estao configurados.
+        </p>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle
@@ -144,16 +164,18 @@ export function NotificationSettings() {
             ainda e preciso um canal com remetente comprovado, uma regra para o
             evento e, do outro lado, contato valido e consentimento por canal.
           </p>
-          <p className="text-warning text-sm">
+          <p className="text-warning-soft-foreground text-sm">
             Todos os canais usam um provedor simulado. Nada e enviado para
             ninguem, em nenhuma circunstancia, ate que um provedor real seja
             integrado.
           </p>
-          <label className="text-foreground flex items-center gap-2 text-sm">
+          <label className="text-foreground flex min-h-6 items-center gap-2 text-sm">
             <input
               type="checkbox"
+              className={CHECKBOX}
               checked={settings.enabled}
-              disabled={saving}
+              disabled={disabled}
+              aria-describedby={describedBy}
               onChange={(event) => toggleMaster(event.target.checked)}
             />
             Permitir que esta organizacao envie avisos sobre atendimentos
@@ -165,31 +187,35 @@ export function NotificationSettings() {
         <CardHeader>
           <CardTitle>Canais</CardTitle>
         </CardHeader>
-        <CardBody className="space-y-3">
-          <p className="text-muted-foreground text-sm">
-            Marcar um canal declara que a organizacao esta habilitada como
-            remetente nele. Ter um numero ou um e-mail nao e a mesma coisa que
-            estar habilitado a enviar por ele.
-          </p>
-          {profession.notifications.allowedChannels.map((channel) => (
-            <div key={channel} className="border-border rounded-lg border p-3">
-              <label className="text-foreground flex items-center gap-2 text-sm font-medium">
-                <input
-                  type="checkbox"
-                  checked={settings.verifiedSenderChannels.includes(channel)}
-                  disabled={saving}
-                  onChange={(event) => toggleSender(channel, event.target.checked)}
-                />
-                {CHANNEL_META[channel].label}
-              </label>
-              <p className="text-muted-foreground mt-1 text-xs">
-                Pendente para uso real: {CHANNEL_META[channel].activationRequirement}
-              </p>
-            </div>
-          ))}
+        <CardBody>
+          <fieldset className="space-y-3">
+            <legend className="text-muted-foreground mb-3 text-sm">
+              Marcar um canal declara que a organizacao esta habilitada como
+              remetente nele. Ter um numero ou um e-mail nao e a mesma coisa que
+              estar habilitado a enviar por ele.
+            </legend>
+            {profession.notifications.allowedChannels.map((channel) => (
+              <div key={channel} className="border-border rounded-lg border p-3">
+                <label className="text-foreground flex min-h-6 items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    className={CHECKBOX}
+                    checked={settings.verifiedSenderChannels.includes(channel)}
+                    disabled={disabled}
+                    aria-describedby={describedBy}
+                    onChange={(event) => toggleSender(channel, event.target.checked)}
+                  />
+                  {CHANNEL_META[channel].label}
+                </label>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  Pendente para uso real: {CHANNEL_META[channel].activationRequirement}
+                </p>
+              </div>
+            ))}
+          </fieldset>
           {profession.notifications.allowedChannels.length <
           Object.keys(CHANNEL_META).length ? (
-            <p className="text-muted-foreground text-xs">
+            <p className="text-muted-foreground mt-3 text-xs">
               Alguns canais nao aparecem porque a profissao {profession.label} nao
               os permite, pelo grau de sensibilidade dos dados que trafega.
             </p>
@@ -205,8 +231,8 @@ export function NotificationSettings() {
           {profession.notifications.allowedEvents.map((event) => {
             const meta = APPOINTMENT_EVENT_META[event];
             return (
-              <div key={event} className="border-border space-y-2 rounded-lg border p-3">
-                <p className="text-foreground text-sm font-medium">{meta.label}</p>
+              <fieldset key={event} className="border-border space-y-2 rounded-lg border p-3">
+                <legend className="text-foreground px-1 text-sm font-medium">{meta.label}</legend>
                 <p className="text-muted-foreground text-xs">{meta.description}</p>
 
                 {profession.notifications.allowedChannels.map((channel) => {
@@ -215,11 +241,13 @@ export function NotificationSettings() {
                   );
                   return (
                     <div key={channel} className="flex flex-wrap items-center gap-3">
-                      <label className="text-foreground flex items-center gap-2 text-sm">
+                      <label className="text-foreground flex min-h-6 items-center gap-2 text-sm">
                         <input
                           type="checkbox"
+                          className={CHECKBOX}
                           checked={rule?.enabled ?? false}
-                          disabled={saving}
+                          disabled={disabled}
+                          aria-describedby={describedBy}
                           onChange={(input) =>
                             upsertRule(event, channel, {
                               enabled: input.target.checked,
@@ -231,14 +259,14 @@ export function NotificationSettings() {
 
                       {meta.anchor === "START" ? (
                         <label className="text-muted-foreground flex items-center gap-2 text-xs">
-                          Antecedencia
+                          Antecedencia por {CHANNEL_META[channel].label}
                           <select
-                            className="border-border bg-surface text-foreground rounded border px-2 py-1"
+                            className="border-input bg-surface text-foreground h-8 rounded border px-2"
                             value={
                               rule?.leadMinutes ??
                               profession.notifications.defaultLeadMinutes
                             }
-                            disabled={saving}
+                            disabled={disabled}
                             onChange={(input) =>
                               upsertRule(event, channel, {
                                 leadMinutes: Number(input.target.value),
@@ -258,7 +286,7 @@ export function NotificationSettings() {
                     </div>
                   );
                 })}
-              </div>
+              </fieldset>
             );
           })}
         </CardBody>
@@ -314,7 +342,8 @@ export function NotificationSettings() {
           ) : (
             <p className="text-muted-foreground text-sm">
               Sem atendimento futuro no periodo carregado, nao ha caso concreto
-              para simular.
+              para simular. Marque um atendimento na agenda para ver o que seria
+              enviado.
             </p>
           )}
         </CardBody>
@@ -342,22 +371,29 @@ export function NotificationSettings() {
               ? "Nenhum envio planejado."
               : "Executar processa os envios ja vencidos com o provedor simulado. Nada sai do produto."}
           </p>
-          {deliveries.slice(0, 10).map((delivery) => (
-            <div
-              key={delivery.id}
-              className="border-border flex flex-wrap items-center gap-2 rounded-lg border p-2 text-xs"
-            >
-              <Badge tone={DELIVERY_TONES[delivery.status]}>{delivery.status}</Badge>
-              <span className="text-foreground">
-                {CHANNEL_META[delivery.channel].label} · {delivery.contactHint}
-              </span>
-              <span className="text-muted-foreground">
-                {formatDateTime(delivery.scheduledFor)} · tentativas:{" "}
-                {delivery.attempts}
-                {delivery.failureCode ? ` · ${delivery.failureCode}` : ""}
-              </span>
-            </div>
-          ))}
+          <ul className="space-y-2">
+            {deliveries.slice(0, 10).map((delivery) => (
+              <li
+                key={delivery.id}
+                className="border-border flex flex-wrap items-center gap-2 rounded-lg border p-2 text-xs"
+              >
+                <Badge tone={DELIVERY_TONES[delivery.status]}>{delivery.status}</Badge>
+                <span className="text-foreground">
+                  {CHANNEL_META[delivery.channel].label} · {delivery.contactHint}
+                </span>
+                <span className="text-muted-foreground">
+                  {formatDateTime(delivery.scheduledFor)} · tentativas:{" "}
+                  {delivery.attempts}
+                  {delivery.failureCode ? ` · ${delivery.failureCode}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {deliveries.length > 10 ? (
+            <p className="text-muted-foreground text-xs">
+              Mostrando os 10 envios mais recentes de {deliveries.length} carregados.
+            </p>
+          ) : null}
         </CardBody>
       </Card>
     </div>

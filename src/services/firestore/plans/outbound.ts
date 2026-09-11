@@ -113,15 +113,16 @@ export function deliveryCancelWrite(
 }
 
 /**
- * Alterar a configuracao de avisos e ato administrativo, e por isso exige
- * `organization:update` e deixa rastro na trilha. O resumo registra o que mudou
- * sem copiar modelo nenhum: o texto vive na configuracao, nao na auditoria.
+ * Alterar a configuracao de avisos exige `notificationSettings:update` — de
+ * OWNER, ADMIN ou do titular da organizacao — e deixa rastro na trilha. O
+ * resumo registra o que mudou sem copiar modelo nenhum: o texto vive na
+ * configuracao, nao na auditoria.
  */
 export function planUpdateNotificationSettings(
   ctx: PlanContext,
   settings: OrganizationNotificationSettings,
 ): Plan {
-  assertPermission(ctx.actor, "organization:update");
+  assertPermission(ctx.actor, "notificationSettings:update");
 
   const enabledRules = settings.rules.filter((rule) => rule.enabled).length;
 

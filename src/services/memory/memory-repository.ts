@@ -18,6 +18,7 @@ import {
   planForAppointmentEvent,
 } from "../notifications";
 import type {
+  AgendaSettings,
   AIRule,
   Appointment,
   AppointmentNotificationEvent,
@@ -46,10 +47,17 @@ import {
   type RepositoryActor,
   type RuleInput,
   type TransactionInput,
+  type WorkspaceLoadState,
   type WorkspaceRepository,
   type WorkspaceSnapshot,
 } from "../types";
-import { assertPermission, validateMessageBody } from "../guards";
+import {
+  assertPermission,
+  validateAgendaSettings,
+  validateMessageBody,
+} from "../guards";
+
+const READY: WorkspaceLoadState = { status: "ready", failed: [] };
 import {
   findConflict,
   markOverdue,
@@ -103,6 +111,19 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
   getSnapshot(): WorkspaceSnapshot {
     return this.snapshot;
   }
+
+  /** Em memoria tudo chega junto, na construcao: nao ha carga nem pagina. */
+  getLoadState(): WorkspaceLoadState {
+    return READY;
+  }
+
+  subscribeLoadState(): () => void {
+    return () => {};
+  }
+
+  retry(): void {}
+
+  async loadMore(): Promise<void> {}
 
   setActor(actor: RepositoryActor): void {
     this.actor = actor;
@@ -1218,7 +1239,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
   async updateNotificationSettings(
     settings: OrganizationNotificationSettings,
   ): Promise<void> {
-    this.assertPermission("organization:update");
+    this.assertPermission("notificationSettings:update");
     const now = this.now();
     const enabledRules = settings.rules.filter((rule) => rule.enabled).length;
 
@@ -1243,6 +1264,43 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
               enabled: settings.enabled,
               channels: settings.verifiedSenderChannels.join(",") || "nenhum",
               enabledRules,
+            },
+          },
+          now,
+        ),
+        ...this.snapshot.auditLogs,
+      ],
+    });
+  }
+
+  async updateAgendaSettings(settings: AgendaSettings): Promise<void> {
+    this.assertPermission("organization:update");
+    const agenda = validateAgendaSettings(
+      settings,
+      getProfession(this.snapshot.organization.primaryProfession).modalities,
+    );
+    const now = this.now();
+
+    this.commit({
+      ...this.snapshot,
+      organization: {
+        ...this.snapshot.organization,
+        settings: { ...this.snapshot.organization.settings, agenda },
+        updatedAt: now,
+        updatedBy: this.actor.userId,
+      },
+      auditLogs: [
+        this.audit(
+          {
+            action: "UPDATE",
+            actorType: "USER",
+            resource: { type: "organization", id: this.organizationId },
+            summary: `Horario de atendimento alterado para ${agenda.workdayStart} as ${agenda.workdayEnd}.`,
+            metadata: {
+              workingDays: agenda.workingDays.join(","),
+              workdayStart: agenda.workdayStart,
+              workdayEnd: agenda.workdayEnd,
+              slotIntervalMinutes: agenda.slotIntervalMinutes,
             },
           },
           now,

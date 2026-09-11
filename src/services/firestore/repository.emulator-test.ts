@@ -40,6 +40,7 @@ let repository: FirestoreWorkspaceRepository;
 /** Espera a proxima fotografia que satisfaca a condicao. */
 function nextSnapshot(
   predicate: (snapshot: WorkspaceSnapshot) => boolean,
+  target: FirestoreWorkspaceRepository = repository,
 ): Promise<WorkspaceSnapshot> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -47,7 +48,7 @@ function nextSnapshot(
       reject(new Error("A fotografia esperada nao chegou."));
     }, 10_000);
 
-    const unsubscribe = repository.subscribe((snapshot) => {
+    const unsubscribe = target.subscribe((snapshot) => {
       if (!predicate(snapshot)) return;
       clearTimeout(timer);
       // O unsubscribe ainda nao existe quando o repositorio emite de imediato.
@@ -284,5 +285,86 @@ describe("repositorio do Firestore contra o emulador", () => {
 
   it("restaurar dados nao existe fora da demonstracao", async () => {
     await expect(repository.reset()).rejects.toThrow(/demonstracao/);
+  });
+
+  it("le o vinculo de quem usa o painel e pagina a colecao ate o fim", async () => {
+    await setDoc(doc(db, paths.document(ORG, "members", "user-1")), {
+      id: "user-1",
+      organizationId: ORG,
+      userId: "user-1",
+      role: "ADMIN",
+      status: "ACTIVE",
+      invitedBy: null,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      createdBy: null,
+      updatedBy: null,
+    });
+    for (const name of ["Ana", "Bruno", "Carla", "Diego"]) {
+      await repository.createClient({
+        fullName: `${name} Paginacao`,
+        preferredName: null,
+        email: null,
+        phone: null,
+        status: "ACTIVE",
+        preferredModality: "ONLINE",
+        assignedProfessionalId: PROFESSIONAL,
+        acquisitionChannel: "OTHER",
+        tags: [],
+        administrativeNotes: null,
+      });
+    }
+
+    const paged = new FirestoreWorkspaceRepository(db, ORG, "PSYCHOLOGIST", {
+      userId: "user-1",
+      pageSizes: { clients: 2 },
+    });
+    try {
+      // "Cliente Um", do teste de cadastro, mais os quatro acima.
+      const first = await nextSnapshot(
+        (snapshot) => snapshot.membership?.role === "ADMIN" && snapshot.clients.length === 2,
+        paged,
+      );
+      expect(first.clients.map((item) => item.fullName)).toEqual(["Ana Paginacao", "Bruno Paginacao"]);
+      expect(first.pagination?.clients).toEqual({ hasMore: true, loading: false });
+
+      await paged.loadMore("clients");
+      expect(paged.getSnapshot()!.clients).toHaveLength(4);
+      expect(paged.getSnapshot()!.pagination?.clients?.hasMore).toBe(true);
+
+      await paged.loadMore("clients");
+      const last = paged.getSnapshot()!;
+      expect(last.clients).toHaveLength(5);
+      expect(last.pagination?.clients).toBeUndefined();
+      // Sem proxima pagina, pedir mais nao faz nada.
+      await paged.loadMore("clients");
+      expect(paged.getSnapshot()!.clients).toHaveLength(5);
+      expect(paged.getLoadState()).toEqual({ status: "ready", failed: [] });
+    } finally {
+      paged.dispose();
+    }
+  });
+
+  it("diz que a organizacao nao existe em vez de carregar para sempre", async () => {
+    const missing = new FirestoreWorkspaceRepository(db, "org-inexistente", "PSYCHOLOGIST");
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("O estado nao mudou.")), 10_000);
+        const check = () => {
+          if (missing.getLoadState().status !== "unavailable") return;
+          clearTimeout(timer);
+          resolve();
+        };
+        missing.subscribeLoadState(check);
+        check();
+      });
+      expect(missing.getLoadState()).toEqual({
+        status: "unavailable",
+        reason: "organization-missing",
+      });
+      expect(missing.getSnapshot()).toBeNull();
+    } finally {
+      missing.dispose();
+    }
   });
 });

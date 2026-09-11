@@ -23,16 +23,11 @@ import {
   where,
   type Firestore,
 } from "firebase/firestore";
-import {
-  connectFunctionsEmulator,
-  getFunctions,
-  httpsCallable,
-  type Functions,
-} from "firebase/functions";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { GRACE_PERIOD_DAYS } from "@/config/billing";
 import { paths } from "@/lib/firebase/paths";
+import { callFunction, tokenSession, type TokenSession } from "@/lib/testing/emulator-session";
 
 /**
  * Etapa 3: a cobranca da plataforma, provada de ponta a ponta.
@@ -57,6 +52,7 @@ const require = createRequire(import.meta.url);
 const PROJECT = "demo-atendara";
 const REGION = "southamerica-east1";
 const FUNCTIONS_PORT = 5002;
+const OPERATOR_UID = "operadora-da-cobranca";
 const WEBHOOK_SECRET = "whsec_apenas_para_o_emulador";
 const WEBHOOK_URL = `http://127.0.0.1:${FUNCTIONS_PORT}/${PROJECT}/${REGION}/stripeWebhook`;
 
@@ -65,7 +61,6 @@ const [FIRESTORE_HOST, FIRESTORE_PORT] = (
   process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8087"
 ).split(":");
 
-const ADMIN = { email: "operadora@atendara.test", password: "SenhaDeTeste-Operadora-1" };
 const OWNER = { email: "assinante@atendara.test", password: "SenhaDeTeste-Assinante-2" };
 const NEIGHBOUR = { email: "vizinho@atendara.test", password: "SenhaDeTeste-Vizinho-2" };
 const EMPLOYEE = { email: "secretaria@atendara.test", password: "SenhaDeTeste-Secretaria-1" };
@@ -81,7 +76,9 @@ const admin = require("../../../functions/node_modules/firebase-admin/lib/index.
 let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
-let functions: Functions;
+/** Operadora com TOTP, e a mesma conta sem o fator. */
+let operator: TokenSession;
+let operatorWithoutFactor: TokenSession;
 
 let ownerUid: string;
 let ownerOrg: string;
@@ -208,32 +205,32 @@ async function expectDenied(operation: Promise<unknown>): Promise<void> {
   await expect(operation).rejects.toMatchObject({ code: "permission-denied" });
 }
 
-/** Cadastra pelo caminho oficial e ja troca a senha inicial. */
+/** Callable com a sessao atual do Auth do emulador. */
+async function callAsSignedIn(name: string, data: unknown): Promise<unknown> {
+  return callFunction(name, data, { idToken: await auth.currentUser!.getIdToken() });
+}
+
+/**
+ * Cadastra pelo caminho oficial e ja troca a senha inicial. Sem concessao: a
+ * conta nasce pendente, e a liberacao tem que vir da cobranca.
+ */
 async function register(
   person: { email: string; password: string },
   displayName: string,
 ): Promise<{ uid: string; organizationId: string }> {
-  await signInWithEmailAndPassword(auth, ADMIN.email, ADMIN.password);
-  const result = await httpsCallable<
-    Record<string, unknown>,
-    { userId: string; temporaryPassword: string }
-  >(
-    functions,
-    "registerProfessional",
-  )({
+  const result = await operator.call<{ userId: string; temporaryPassword: string }>("registerProfessional", {
     displayName,
     email: person.email,
     professionId: "PSYCHOLOGIST",
     modules: ["dashboard", "agenda", "clientes"],
-    accessUntil: new Date(Date.now() + 30 * 86_400_000).toISOString(),
   });
 
-  await signInWithEmailAndPassword(auth, person.email, result.data.temporaryPassword);
-  await httpsCallable(functions, "completeInitialPassword")({ password: person.password });
+  await signInWithEmailAndPassword(auth, person.email, result.temporaryPassword);
+  await callAsSignedIn("completeInitialPassword", { password: person.password });
   await signInWithEmailAndPassword(auth, person.email, person.password);
 
-  const account = await accountOf(result.data.userId);
-  return { uid: result.data.userId, organizationId: account.organizationId as string };
+  const account = await accountOf(result.userId);
+  return { uid: result.userId, organizationId: account.organizationId as string };
 }
 
 beforeAll(async () => {
@@ -241,34 +238,26 @@ beforeAll(async () => {
   process.env.FIRESTORE_EMULATOR_HOST = `${FIRESTORE_HOST}:${FIRESTORE_PORT}`;
   admin.initializeApp({ projectId: PROJECT });
 
-  const adminUser = await admin.auth().createUser({
-    email: ADMIN.email,
-    password: ADMIN.password,
-    displayName: "Operadora de Teste",
-  });
-  await admin.firestore().doc(paths.account(adminUser.uid)).set({
-    userId: adminUser.uid,
-    email: ADMIN.email,
+  await admin.firestore().doc(paths.account(OPERATOR_UID)).set({
+    userId: OPERATOR_UID,
+    email: "operadora@atendara.test",
     displayName: "Operadora de Teste",
     platformRole: "PLATFORM_ADMIN",
     professionId: null,
     organizationId: null,
-    modules: ["dashboard", "agenda", "clientes", "mensagens", "financeiro", "agente", "configuracoes"],
+    modules: [],
     status: "ACTIVE",
-    subscriptionStatus: "ACTIVE",
-    accessUntil: null,
-    accessUntilMs: 0,
     mustChangePassword: false,
     createdAt: new Date().toISOString(),
   });
+  operator = tokenSession(OPERATOR_UID, "totp");
+  operatorWithoutFactor = tokenSession(OPERATOR_UID, null);
 
   app = initializeApp({ projectId: PROJECT, apiKey: "chave-de-emulador" }, "billing-access-tests");
   auth = getAuth(app);
   connectAuthEmulator(auth, `http://${AUTH_HOST}`, { disableWarnings: true });
   db = getFirestore(app);
   connectFirestoreEmulator(db, FIRESTORE_HOST, Number(FIRESTORE_PORT));
-  functions = getFunctions(app, REGION);
-  connectFunctionsEmulator(functions, "127.0.0.1", FUNCTIONS_PORT);
 
   const owner = await register(OWNER, "Assinante de Teste");
   ownerUid = owner.uid;
@@ -304,21 +293,12 @@ beforeAll(async () => {
     .firestore()
     .doc(paths.document(ownerOrg, "members", employee.uid))
     .set({ id: employee.uid, userId: employee.uid, organizationId: ownerOrg, role: "ASSISTANT", status: "ACTIVE" });
-
-  // O assinante comeca sem acesso pago, como quem acabou de se cadastrar: a
-  // liberacao tem que vir da cobranca, e nao do que o cadastro deixou pronto.
-  await signInWithEmailAndPassword(auth, ADMIN.email, ADMIN.password);
-  await httpsCallable(functions, "updateAccount")({
-    userId: ownerUid,
-    status: "ACTIVE",
-    subscriptionStatus: "PENDING",
-    accessUntil: new Date(Date.now() - 86_400_000).toISOString(),
-    modules: ["dashboard"],
-  });
 }, 120_000);
 
 afterAll(async () => {
   await signOut(auth).catch(() => {});
+  await operator.dispose();
+  await operatorWithoutFactor.dispose();
   await terminate(db);
   await deleteApp(app);
   await Promise.all(admin.apps.map((instance: { delete(): Promise<void> }) => instance.delete()));
@@ -499,8 +479,8 @@ describe("Etapa 3 — quem enxerga e quem escreve", () => {
     await signInWithEmailAndPassword(auth, EMPLOYEE.email, EMPLOYEE.password);
     await expectDenied(getDoc(doc(db, paths.platformSubscription(ownerOrg))));
     await expect(
-      httpsCallable(functions, "createSubscriptionCheckout")({ planId: PLAN }),
-    ).rejects.toMatchObject({ code: "functions/permission-denied" });
+      callAsSignedIn("createSubscriptionCheckout", { planId: PLAN }),
+    ).rejects.toMatchObject({ code: "permission-denied" });
   });
 
   it("o navegador nao ativa assinatura nem estende a propria validade", async () => {
@@ -535,30 +515,43 @@ describe("Etapa 3 — quem enxerga e quem escreve", () => {
     );
   });
 
-  it("a operadora enxerga tudo e mesmo assim nao escreve", async () => {
-    await signInWithEmailAndPassword(auth, ADMIN.email, ADMIN.password);
+  it("a operadora com TOTP enxerga a cobranca e mesmo assim nao escreve", async () => {
+    const operatorDb = operator.firestore;
 
-    await expect(getDocs(collection(db, paths.platformSubscriptions()))).resolves.toBeDefined();
-    await expect(getDocs(collection(db, paths.platformInvoices()))).resolves.toBeDefined();
-    await expect(getDocs(collection(db, paths.platformGatewayEvents()))).resolves.toBeDefined();
+    await expect(getDocs(collection(operatorDb, paths.platformSubscriptions()))).resolves.toBeDefined();
+    await expect(getDocs(collection(operatorDb, paths.platformInvoices()))).resolves.toBeDefined();
+    await expect(getDocs(collection(operatorDb, paths.platformGatewayEvents()))).resolves.toBeDefined();
 
     await expectDenied(
-      updateDoc(doc(db, paths.platformSubscription(ownerOrg)), { status: "ACTIVE" }),
+      updateDoc(doc(operatorDb, paths.platformSubscription(ownerOrg)), { status: "ACTIVE" }),
     );
     // Nem o indice que amarra cliente do gateway e organizacao.
-    await expectDenied(getDoc(doc(db, paths.platformCustomer(CUSTOMER))));
+    await expectDenied(getDoc(doc(operatorDb, paths.platformCustomer(CUSTOMER))));
+    // Nem o financeiro do assinante, que nunca foi da operadora.
+    await expectDenied(getDoc(doc(operatorDb, paths.document(ownerOrg, "transactions", "qualquer"))));
+
+    // Sem o segundo fator, a mesma conta nao e a operadora.
+    await expectDenied(getDocs(collection(operatorWithoutFactor.firestore, paths.platformSubscriptions())));
   });
 
   it("o checkout recusa sem chave do gateway, e nenhuma cobranca sai daqui", async () => {
     await signInWithEmailAndPassword(auth, OWNER.email, OWNER.password);
 
     await expect(
-      httpsCallable(functions, "createSubscriptionCheckout")({ planId: PLAN }),
-    ).rejects.toMatchObject({ code: "functions/failed-precondition" });
+      callAsSignedIn("createSubscriptionCheckout", { planId: PLAN }),
+    ).rejects.toMatchObject({ code: "failed-precondition" });
 
     await expect(
-      httpsCallable(functions, "createSubscriptionCheckout")({ planId: "plano-que-nao-existe" }),
-    ).rejects.toMatchObject({ code: "functions/invalid-argument" });
+      callAsSignedIn("createSubscriptionCheckout", { planId: "plano-que-nao-existe" }),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("sem atestado do App Check o checkout nem chega a ser avaliado", async () => {
+    await signInWithEmailAndPassword(auth, OWNER.email, OWNER.password);
+
+    await expect(
+      callFunction("createSubscriptionCheckout", { planId: PLAN }, { idToken: await auth.currentUser!.getIdToken(), appCheck: false }),
+    ).rejects.toMatchObject({ code: "unauthenticated" });
   });
 
   it("o vizinho nao consegue direcionar a cobranca para a organizacao alheia", async () => {

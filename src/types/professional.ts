@@ -19,6 +19,9 @@ export type Role = (typeof ROLES)[number];
 export const PERMISSIONS = [
   "organization:read",
   "organization:update",
+  // Separada de `organization:update` porque o titular da organizacao a recebe
+  // sem papel administrativo: configurar os avisos nao da acesso ao resto.
+  "notificationSettings:update",
   "organization:delete",
   "billing:manage",
   "member:read",
@@ -47,6 +50,10 @@ export const PERMISSIONS = [
   "notification:read",
   "notification:acknowledge",
   "auditLog:read",
+  // Pedidos do titular dos dados: exportar e eliminar o que a organizacao
+  // guarda sobre uma pessoa atendida. Executados so pelo backend.
+  "privacy:export",
+  "privacy:erase",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -94,6 +101,8 @@ export interface ActiveSession {
   user: AuthenticatedUser;
   organizationId: ID;
   role: Role;
+  /** `ownerId` da organizacao. Soma as permissoes de titular ao papel. */
+  isOrganizationHolder: boolean;
   permissions: Permission[];
   professionalId: ID | null;
 }

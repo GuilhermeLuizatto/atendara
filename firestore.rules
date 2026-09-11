@@ -7,10 +7,12 @@ rules_version = '2';
 // aqui, e o padrao no fim do arquivo e negar tudo o que nao foi explicitamente
 // liberado.
 //
-// Estas regras espelham a matriz RBAC de `src/config/permissions.ts`. Nao ha
-// como compartilhar codigo entre TypeScript e CEL, entao os dois arquivos
-// precisam ser alterados juntos — o teste `src/config/permissions.test.ts`
-// documenta os invariantes que ambos respeitam.
+// Estas regras espelham duas matrizes de `src/config/permissions.ts`:
+// `ROLE_PERMISSIONS` (papeis dentro de uma organizacao) e
+// `PLATFORM_ROLE_PERMISSIONS` (a operadora, que so alcanca `accounts` e as
+// colecoes `platform*`). Nao ha como compartilhar codigo entre TypeScript e
+// CEL, entao os dois arquivos precisam ser alterados juntos — o teste
+// `src/config/permissions.test.ts` documenta os invariantes que ambos respeitam.
 //
 // Custo: `isMember()` e `roleOf()` fazem `get()` no documento de membro. Cada
 // `get()` conta como uma leitura. Em troca, o isolamento por tenant nao depende
@@ -44,19 +46,34 @@ service cloud.firestore {
         && get(accountRef()).data.mustChangePassword == false;
     }
 
+    // Acesso operacional: so conta profissional, com validade vigente. A
+    // validade vem do webhook ou da concessao registrada, sempre pelo backend.
+    // A operadora nao passa por aqui em hipotese nenhuma.
     function activeAccount() {
       return signedInAccount()
-        && (get(accountRef()).data.platformRole == 'PLATFORM_ADMIN'
-          || (get(accountRef()).data.subscriptionStatus == 'ACTIVE'
-            && get(accountRef()).data.accessUntilMs > request.time.toMillis()));
+        && get(accountRef()).data.platformRole == 'PROFESSIONAL'
+        && get(accountRef()).data.subscriptionStatus == 'ACTIVE'
+        && get(accountRef()).data.accessUntilMs > request.time.toMillis();
     }
 
+    // A sessao entrou com o segundo fator exigido da operadora. O valor e o id
+    // do fator no token; `PLATFORM_ADMIN_SECOND_FACTORS` em
+    // `src/config/platform.ts` e o espelho TypeScript. `get` com padrao porque
+    // token sem segundo fator nao tem a chave, e chave ausente precisa negar.
+    function secondFactor() {
+      return request.auth.token.firebase.get('sign_in_second_factor', null) in ['totp'];
+    }
+
+    // A operadora. Alcanca `accounts` e as colecoes `platform*` — nunca dado de
+    // tenant. Uma sessao sem segundo fator nao e a operadora.
     function platformAdmin() {
-      return activeAccount() && get(accountRef()).data.platformRole == 'PLATFORM_ADMIN';
+      return signedInAccount()
+        && get(accountRef()).data.platformRole == 'PLATFORM_ADMIN'
+        && secondFactor();
     }
 
     function moduleAccess(orgId, moduleName) {
-      return isMember(orgId) && (platformAdmin() || moduleName in get(accountRef()).data.modules);
+      return isMember(orgId) && moduleName in get(accountRef()).data.modules;
     }
 
     function memberRef(orgId) {
@@ -64,11 +81,11 @@ service cloud.firestore {
     }
 
     function isMember(orgId) {
-      return platformAdmin() || (activeAccount()
+      return activeAccount()
         && get(accountRef()).data.organizationId == orgId
         && get(accountRef()).data.professionId == get(/databases/$(database)/documents/organizations/$(orgId)).data.primaryProfession
         && exists(memberRef(orgId))
-        && get(memberRef(orgId)).data.status == 'ACTIVE');
+        && get(memberRef(orgId)).data.status == 'ACTIVE';
     }
 
     function roleOf(orgId) {
@@ -76,7 +93,7 @@ service cloud.firestore {
     }
 
     function hasRole(orgId, roles) {
-      return platformAdmin() || (isMember(orgId) && roleOf(orgId) in roles);
+      return isMember(orgId) && roleOf(orgId) in roles;
     }
 
     // Papeis que podem alterar dados operacionais.
@@ -116,6 +133,36 @@ service cloud.firestore {
             && get(memberRef(orgId)).data.status == 'ACTIVE')));
     }
 
+    // O titular da organizacao (`ownerId`), qualquer que seja o papel dele.
+    // Espelha `ORGANIZATION_HOLDER_PERMISSIONS` de `src/config/permissions.ts`.
+    // Exige `isMember()`: ser `ownerId` sem vinculo ativo, painel aberto e a
+    // propria organizacao na conta nao vale nada.
+    function organizationHolder(orgId) {
+      return isMember(orgId)
+        && get(/databases/$(database)/documents/organizations/$(orgId)).data.ownerId == uid();
+    }
+
+    // Quem atende pedido de titular de dados (exportar, eliminar) e le o
+    // registro desses pedidos. Espelha `privacy:export`/`privacy:erase` de
+    // `src/config/permissions.ts` e `PRIVACY_RESPONSIBLE_ROLES`, mais o titular,
+    // pelo mesmo motivo de `subscriptionOwner`: o autonomo nasce PROFESSIONAL e
+    // dono.
+    function privacyResponsible(orgId) {
+      return isAdmin(orgId) || organizationHolder(orgId);
+    }
+
+    // A escrita troca somente a configuracao de avisos. E o unico alcance que
+    // o titular sem papel administrativo tem sobre o documento da organizacao:
+    // nome, dono, agenda, agente e privacidade continuam de OWNER/ADMIN.
+    // `get` com padrao porque a organizacao nasce sem `settings`.
+    function onlyNotificationSettings() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['settings', 'updatedAt', 'updatedBy'])
+        && request.resource.data.get('settings', {}).diff(resource.data.get('settings', {}))
+          .affectedKeys().hasOnly(['notifications'])
+        && request.resource.data.settings.notifications is map;
+    }
+
     // Defesa em profundidade: o documento carrega o proprio organizationId e
     // ele precisa bater com o caminho. Impede que um documento de um tenant
     // seja gravado dentro de outro por engano ou por manipulacao do cliente.
@@ -140,6 +187,9 @@ service cloud.firestore {
     }
 
     // Somente o backend confiavel cria papeis, validade e permissoes.
+    //
+    // A propria conta e legivel sem segundo fator: e o que a tela usa para
+    // saber que a operadora precisa cadastrar ou usar o TOTP.
     match /accounts/{userId} {
       allow get: if isSignedIn() && (uid() == userId || platformAdmin());
       allow list: if platformAdmin();
@@ -154,24 +204,28 @@ service cloud.firestore {
     match /organizations/{orgId} {
       allow read: if isMember(orgId);
 
-      // Criacao: quem cria e necessariamente o proprietario declarado.
-      allow create: if platformAdmin();
+      // Organizacao e vinculo nascem no backend, junto da conta do titular.
+      allow create: if false;
 
       // O proprietario nao pode ser trocado por update — isso exigiria um
       // fluxo de transferencia explicito, fora do alcance do cliente.
-      allow update: if isAdmin(orgId)
-        && request.resource.data.ownerId == resource.data.ownerId;
+      //
+      // O titular sem papel administrativo configura os proprios avisos
+      // (`notificationSettings:update`) e mais nada.
+      allow update: if request.resource.data.ownerId == resource.data.ownerId
+        && (isAdmin(orgId)
+          || (organizationHolder(orgId) && onlyNotificationSettings()));
 
-      allow delete: if hasRole(orgId, ['OWNER']);
+      // Apagar o documento da organizacao pelo navegador trancaria o tenant e
+      // deixaria as subcolecoes orfas. Exclusao e ato do backend.
+      allow delete: if false;
 
       // ------------------------------------------------------------- membros
 
       match /members/{memberId} {
         allow read: if isMember(orgId);
-        allow create, update: if platformAdmin();
-        // O proprietario nao pode ser removido enquanto for proprietario.
-        allow delete: if platformAdmin()
-          && get(/databases/$(database)/documents/organizations/$(orgId)).data.ownerId != memberId;
+        // Vinculo e papel sao escritos pelo SDK administrativo.
+        allow write: if false;
       }
 
       // ------------------------------------------------------- profissionais
@@ -255,7 +309,9 @@ service cloud.firestore {
       match /aiDecisions/{decisionId} {
         allow read: if moduleAccess(orgId, 'agente');
         allow create: if moduleAccess(orgId, 'agente') && belongsToOrg(orgId);
-        // Registro imutavel. Se pudesse ser alterado, nao seria auditoria.
+        // Registro imutavel. Se pudesse ser alterado, nao seria auditoria. A
+        // pseudonimizacao a pedido do titular e do backend, restrita aos campos
+        // de `src/config/privacy.ts`; pelo cliente, nada muda.
         allow update, delete: if false;
       }
 
@@ -313,11 +369,22 @@ service cloud.firestore {
       // ------------------------------------------------ trilha de auditoria
 
       match /auditLogs/{logId} {
-        // Somente administracao le a trilha completa.
+        // Somente administracao da propria organizacao le a trilha completa.
         allow read: if isAdmin(orgId);
         allow create: if isMember(orgId) && belongsToOrg(orgId);
-        // Append-only, sem excecao de papel.
+        // Append-only, sem excecao de papel. Como em `aiDecisions`, so o
+        // backend pseudonimiza, e nunca apaga.
         allow update, delete: if false;
+      }
+
+      // ------------------------------------ pedidos de titulares de dados
+
+      // Registro de cada exportacao e eliminacao atendida. Gravado pelo backend
+      // no mesmo ato; ninguem escreve pelo cliente, nem quem responde pela
+      // organizacao. A operadora nao le: e dado do tenant.
+      match /privacyRequests/{requestId} {
+        allow read: if privacyResponsible(orgId);
+        allow write: if false;
       }
     }
 
@@ -349,9 +416,9 @@ service cloud.firestore {
     //
     // NENHUMA delas aceita escrita do cliente, em nenhum papel. Ativar uma
     // assinatura, estender validade ou lancar uma fatura sao consequencias de
-    // um evento assinado pelo gateway, aplicado pelo backend. Voltar da tela de
-    // pagamento nao prova pagamento; por isso nao existe caminho do navegador
-    // ate estes documentos que nao seja leitura.
+    // um evento assinado pelo gateway, ou de uma concessao registrada, aplicadas
+    // pelo backend. Voltar da tela de pagamento nao prova pagamento; por isso
+    // nao existe caminho do navegador ate estes documentos que nao seja leitura.
 
     // Catalogo de planos: legivel por qualquer conta liberada, inclusive a que
     // esta com a mensalidade vencida — e ela quem mais precisa ver o catalogo.
@@ -387,6 +454,26 @@ service cloud.firestore {
     // organizacao e assinatura; se o cliente pudesse le-lo ou escreve-lo,
     // poderia apontar a cobranca de um para o beneficio de outro.
     match /platformCustomers/{customerId} {
+      allow read, write: if false;
+    }
+
+    // Concessao manual vigente, uma por organizacao. O titular ve que o acesso
+    // dele foi concedido e ate quando; a operadora ve todas. Conceder e revogar
+    // so pelas callables, com segundo fator e registro na mesma transacao.
+    match /platformAccessGrants/{orgId} {
+      allow read: if subscriptionOwner(orgId);
+      allow write: if false;
+    }
+
+    // Trilha append-only dos atos da operadora. Nem a operadora escreve pelo
+    // cliente: uma trilha que o autor edita nao prova nada.
+    match /platformAuditLogs/{logId} {
+      allow read: if platformAdmin();
+      allow write: if false;
+    }
+
+    // Contadores de abuso por usuario. Mecanismo interno do backend.
+    match /platformRateLimits/{key} {
       allow read, write: if false;
     }
 

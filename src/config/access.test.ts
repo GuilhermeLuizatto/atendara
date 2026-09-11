@@ -18,6 +18,18 @@ describe("Acesso por cadastro", () => {
     expect(accountPermissions(restricted)).toContain("appointment:update");
     expect(accountPermissions(restricted)).not.toContain("transaction:update");
   });
+  it("deriva a sessao do vinculo e da titularidade, dentro dos modulos liberados", () => {
+    const holder = { role: "PROFESSIONAL" as const, isOrganizationHolder: true };
+    expect(accountPermissions(account)).not.toContain("notificationSettings:update");
+    expect(accountPermissions(account, holder)).toContain("notificationSettings:update");
+    // Ser titular nao abre a trilha: essa continua de OWNER e ADMIN.
+    expect(accountPermissions(account, holder)).not.toContain("auditLog:read");
+    expect(accountPermissions(account, { role: "ADMIN", isOrganizationHolder: false })).toContain("auditLog:read");
+    const withoutSettings = { ...account, modules: account.modules.filter(area => area !== "configuracoes") };
+    const owner = { role: "OWNER" as const, isOrganizationHolder: true };
+    expect(accountPermissions(withoutSettings, owner)).not.toContain("auditLog:read");
+    expect(accountPermissions(withoutSettings, owner)).not.toContain("notificationSettings:update");
+  });
   it("admin acessa todas as profissoes depois da troca de senha", () => {
     const admin = { ...account, platformRole: "PLATFORM_ADMIN" as const, accessUntil: null, modules: [] };
     expect(canAccessProfession(admin, "DENTIST")).toBe(true);

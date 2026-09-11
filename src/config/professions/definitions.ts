@@ -9,12 +9,13 @@ import type { ProfessionConfig, ProfessionId, TermPair } from "@/types";
  * deste diretorio, o dado que falta deve virar um campo desta tabela.
  */
 
-function term(singular: string, plural: string): TermPair {
+function term(singular: string, plural: string, feminine = false): TermPair {
   return {
     singular,
     plural,
     singularLower: singular.toLocaleLowerCase("pt-BR"),
     pluralLower: plural.toLocaleLowerCase("pt-BR"),
+    feminine,
   };
 }
 
@@ -33,7 +34,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     accent: "violet",
     terminology: {
       client: term("Paciente", "Pacientes"),
-      appointment: term("Sessao", "Sessoes"),
+      appointment: term("Sessao", "Sessoes", true),
       professional: term("Psicologo", "Psicologos"),
     },
     defaultAppointmentDurationMinutes: 50,
@@ -105,7 +106,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     accent: "indigo",
     terminology: {
       client: term("Paciente", "Pacientes"),
-      appointment: term("Consulta", "Consultas"),
+      appointment: term("Consulta", "Consultas", true),
       professional: term("Psiquiatra", "Psiquiatras"),
     },
     defaultAppointmentDurationMinutes: 40,
@@ -179,7 +180,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     accent: "blue",
     terminology: {
       client: term("Paciente", "Pacientes"),
-      appointment: term("Consulta", "Consultas"),
+      appointment: term("Consulta", "Consultas", true),
       professional: term("Medico", "Medicos"),
     },
     defaultAppointmentDurationMinutes: 30,
@@ -252,7 +253,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     accent: "cyan",
     terminology: {
       client: term("Paciente", "Pacientes"),
-      appointment: term("Consulta", "Consultas"),
+      appointment: term("Consulta", "Consultas", true),
       professional: term("Dentista", "Dentistas"),
     },
     defaultAppointmentDurationMinutes: 45,
@@ -322,7 +323,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     accent: "emerald",
     terminology: {
       client: term("Paciente", "Pacientes"),
-      appointment: term("Consulta", "Consultas"),
+      appointment: term("Consulta", "Consultas", true),
       professional: term("Nutricionista", "Nutricionistas"),
     },
     defaultAppointmentDurationMinutes: 60,
@@ -392,7 +393,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     accent: "teal",
     terminology: {
       client: term("Paciente", "Pacientes"),
-      appointment: term("Sessao", "Sessoes"),
+      appointment: term("Sessao", "Sessoes", true),
       professional: term("Fisioterapeuta", "Fisioterapeutas"),
     },
     defaultAppointmentDurationMinutes: 50,
@@ -461,7 +462,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     accent: "rose",
     terminology: {
       client: term("Cliente", "Clientes"),
-      appointment: term("Sessao", "Sessoes"),
+      appointment: term("Sessao", "Sessoes", true),
       professional: term("Terapeuta", "Terapeutas"),
     },
     defaultAppointmentDurationMinutes: 60,

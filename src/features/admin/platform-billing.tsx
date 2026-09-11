@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
 
 import { Badge, Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
 import type { BadgeTone } from "@/components/ui";
+import { LoadMore } from "@/components/ui/load-more";
 import {
   BILLING_INTERVAL_LABELS,
   INVOICE_STATUS_LABELS,
@@ -14,11 +15,9 @@ import {
 import { computePlatformMetrics } from "@/lib/billing/metrics";
 import { formatCurrency, formatDate, formatDateTime, formatPercent } from "@/lib/utils/format";
 import { platformBillingClient } from "@/services/billing";
-import type {
-  PlatformGatewayEvent,
-  PlatformInvoice,
-  PlatformSubscription,
-} from "@/types";
+import type { PageRequest, PlatformGatewayEvent } from "@/types";
+
+import { usePagedList } from "./use-paged-list";
 
 const EVENT_TONE: Record<PlatformGatewayEvent["outcome"], BadgeTone> = {
   APPLIED: "success",
@@ -41,37 +40,16 @@ const EVENT_TONE: Record<PlatformGatewayEvent["outcome"], BadgeTone> = {
  */
 export function PlatformBillingPanel() {
   const billing = platformBillingClient();
-  const [subscriptions, setSubscriptions] = useState<PlatformSubscription[]>([]);
-  const [invoices, setInvoices] = useState<PlatformInvoice[]>([]);
-  const [events, setEvents] = useState<PlatformGatewayEvent[]>([]);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const fetchSubscriptions = useCallback((request: PageRequest) => billing.allSubscriptions(request), [billing]);
+  const fetchInvoices = useCallback((request: PageRequest) => billing.allInvoices(request), [billing]);
+  const fetchEvents = useCallback((request: PageRequest) => billing.recentGatewayEvents(request), [billing]);
+  const subscriptions = usePagedList(fetchSubscriptions, "Nao foi possivel carregar as assinaturas.");
+  const invoices = usePagedList(fetchInvoices, "Nao foi possivel carregar as cobrancas.");
+  const events = usePagedList(fetchEvents, "Nao foi possivel carregar os eventos do gateway.");
 
-  useEffect(() => {
-    let active = true;
-    Promise.all([
-      billing.allSubscriptions(),
-      billing.allInvoices(),
-      billing.recentGatewayEvents(),
-    ])
-      .then(([nextSubscriptions, nextInvoices, nextEvents]) => {
-        if (!active) return;
-        setSubscriptions(nextSubscriptions);
-        setInvoices(nextInvoices);
-        setEvents(nextEvents);
-      })
-      .catch(() => {
-        if (active) setError("Nao foi possivel carregar a cobranca da plataforma.");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [billing]);
-
-  const metrics = computePlatformMetrics(subscriptions, invoices);
+  const metrics = computePlatformMetrics(subscriptions.items, invoices.items);
+  const partial = subscriptions.page.hasMore || invoices.page.hasMore;
+  const error = subscriptions.error || invoices.error || events.error;
 
   return (
     <div className="space-y-6">
@@ -83,6 +61,13 @@ export function PlatformBillingPanel() {
       {error ? (
         <p role="alert" className="text-danger text-sm">
           {error}
+        </p>
+      ) : null}
+
+      {partial ? (
+        <p className="bg-warning-soft text-warning-soft-foreground rounded-lg p-3 text-sm">
+          Os indicadores abaixo consideram so as assinaturas e cobrancas ja
+          carregadas nas listas. Carregue o restante para incluir as demais.
         </p>
       ) : null}
 
@@ -125,25 +110,26 @@ export function PlatformBillingPanel() {
           <CardTitle>Assinaturas</CardTitle>
         </CardHeader>
         <CardBody>
-          {loading ? (
-            <p className="text-muted-foreground text-sm">Carregando...</p>
-          ) : subscriptions.length === 0 ? (
+          {subscriptions.status === "loading" ? (
+            <p role="status" className="text-muted-foreground text-sm">Carregando assinaturas...</p>
+          ) : subscriptions.items.length === 0 ? (
             <p className="text-muted-foreground text-sm">Nenhuma assinatura registrada.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
+                <caption className="sr-only">Assinaturas da plataforma</caption>
                 <thead className="text-muted-foreground text-left text-xs">
                   <tr>
-                    <th className="py-2 pr-4 font-medium">Assinante</th>
-                    <th className="py-2 pr-4 font-medium">Plano</th>
-                    <th className="py-2 pr-4 font-medium">Valor</th>
-                    <th className="py-2 pr-4 font-medium">Situacao</th>
-                    <th className="py-2 pr-4 font-medium">Ciclo ate</th>
-                    <th className="py-2 font-medium">Acesso ate</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">Assinante</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">Plano</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">Valor</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">Situacao</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">Ciclo ate</th>
+                    <th scope="col" className="py-2 font-medium">Acesso ate</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {subscriptions.map((subscription) => (
+                  {subscriptions.items.map((subscription) => (
                     <tr key={subscription.organizationId} className="border-border border-t">
                       <td className="py-2 pr-4">
                         <span className="text-foreground block">
@@ -178,6 +164,13 @@ export function PlatformBillingPanel() {
             </div>
           )}
         </CardBody>
+        <LoadMore
+          className="border-border border-t"
+          page={subscriptions.page}
+          summary={`Mostrando ${subscriptions.items.length} assinaturas.`}
+          label="Carregar mais assinaturas"
+          onLoadMore={() => void subscriptions.loadMore()}
+        />
       </Card>
 
       <Card>
@@ -185,23 +178,26 @@ export function PlatformBillingPanel() {
           <CardTitle>Cobrancas emitidas</CardTitle>
         </CardHeader>
         <CardBody>
-          {invoices.length === 0 ? (
+          {invoices.status === "loading" ? (
+            <p role="status" className="text-muted-foreground text-sm">Carregando cobrancas...</p>
+          ) : invoices.items.length === 0 ? (
             <p className="text-muted-foreground text-sm">Nenhuma cobranca emitida.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
+                <caption className="sr-only">Cobrancas emitidas pela plataforma</caption>
                 <thead className="text-muted-foreground text-left text-xs">
                   <tr>
-                    <th className="py-2 pr-4 font-medium">Emissao</th>
-                    <th className="py-2 pr-4 font-medium">Organizacao</th>
-                    <th className="py-2 pr-4 font-medium">Devido</th>
-                    <th className="py-2 pr-4 font-medium">Pago</th>
-                    <th className="py-2 pr-4 font-medium">Reembolsado</th>
-                    <th className="py-2 font-medium">Situacao</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">Emissao</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">Organizacao</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">Devido</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">Pago</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">Reembolsado</th>
+                    <th scope="col" className="py-2 font-medium">Situacao</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map((invoice) => (
+                  {invoices.items.map((invoice) => (
                     <tr key={invoice.id} className="border-border border-t">
                       <td className="py-2 pr-4 whitespace-nowrap">{formatDate(invoice.issuedAt)}</td>
                       <td className="text-subtle-foreground py-2 pr-4 font-mono text-xs">
@@ -224,6 +220,13 @@ export function PlatformBillingPanel() {
             </div>
           )}
         </CardBody>
+        <LoadMore
+          className="border-border border-t"
+          page={invoices.page}
+          summary={`Mostrando as ${invoices.items.length} cobrancas mais recentes.`}
+          label="Carregar cobrancas anteriores"
+          onLoadMore={() => void invoices.loadMore()}
+        />
       </Card>
 
       <Card>
@@ -235,14 +238,16 @@ export function PlatformBillingPanel() {
             Trilha append-only, chaveada pelo id do evento. E ela que faz um
             webhook repetido nao cobrar nem liberar duas vezes.
           </p>
-          {events.length === 0 ? (
+          {events.status === "loading" ? (
+            <p role="status" className="text-muted-foreground text-sm">Carregando eventos...</p>
+          ) : events.items.length === 0 ? (
             <p className="text-muted-foreground text-sm">Nenhum evento recebido.</p>
           ) : (
             <ul className="space-y-2">
-              {events.map((event) => (
+              {events.items.map((event) => (
                 <li key={event.id} className="border-border flex flex-wrap items-center gap-2 border-t pt-2 text-sm">
                   <Badge tone={EVENT_TONE[event.outcome]}>{event.outcome}</Badge>
-                  <span className="text-foreground font-mono text-xs">{event.type}</span>
+                  <span className="text-foreground font-mono text-xs break-all">{event.type}</span>
                   <span className="text-muted-foreground text-xs">{formatDateTime(event.receivedAt)}</span>
                   {event.reason ? (
                     <span className="text-subtle-foreground text-xs">{event.reason}</span>
@@ -252,6 +257,13 @@ export function PlatformBillingPanel() {
             </ul>
           )}
         </CardBody>
+        <LoadMore
+          className="border-border border-t"
+          page={events.page}
+          summary={`Mostrando os ${events.items.length} eventos mais recentes.`}
+          label="Carregar eventos anteriores"
+          onLoadMore={() => void events.loadMore()}
+        />
       </Card>
     </div>
   );

@@ -5,6 +5,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils/cn";
 import { useWorkspace } from "@/providers/workspace-provider";
 
+import { OnboardingPanel } from "@/features/onboarding/onboarding-panel";
+
 import { AgentActivity } from "./agent-activity";
 import { AlertsPanel } from "./alerts-panel";
 import { DashboardHeader } from "./dashboard-header";
@@ -29,8 +31,10 @@ export function DashboardView() {
       <DashboardHeader
         now={model.now}
         professionalName={session?.user.displayName ?? "Profissional"}
-        appointmentLabel={terminology.appointment.singular}
+        appointmentTerm={terminology.appointment}
       />
+
+      <OnboardingPanel />
 
       <KpiRow
         model={model}
@@ -41,7 +45,7 @@ export function DashboardView() {
         appointment={model.nextAppointment}
         inProgress={model.nextIsInProgress}
         now={model.now}
-        appointmentLabel={terminology.appointment.singular}
+        appointmentTerm={terminology.appointment}
         clientLabel={terminology.client.singular}
       />
 
@@ -50,7 +54,7 @@ export function DashboardView() {
           <UpcomingAppointments
             appointments={model.upcoming}
             now={model.now}
-            appointmentPlural={terminology.appointment.plural}
+            appointmentTerm={terminology.appointment}
           />
           <WaitingMessages
             conversations={model.waitingConversations}
@@ -88,7 +92,10 @@ export function DashboardView() {
  */
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6" aria-busy>
+    <div className="space-y-6" aria-busy="true">
+      <p role="status" className="sr-only">
+        Carregando o painel...
+      </p>
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-2">
           <Skeleton className="h-6 w-52" />

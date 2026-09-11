@@ -34,7 +34,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   if (status !== "authenticated") {
     return (
       <div className="bg-background flex min-h-dvh items-center justify-center">
-        <p className="text-muted-foreground text-sm">Carregando...</p>
+        <p role="status" className="text-muted-foreground text-sm">Carregando...</p>
       </div>
     );
   }

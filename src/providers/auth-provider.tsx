@@ -21,6 +21,8 @@ interface AuthContextValue {
   /** "demo" quando nao ha projeto Firebase configurado. */
   mode: AuthMode;
   signIn: (email: string, password: string) => Promise<void>;
+  /** Segunda etapa da entrada, depois de `SecondFactorRequiredError`. */
+  completeSecondFactor: (code: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -45,6 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus("authenticated");
   }, []);
 
+  const completeSecondFactor = useCallback(async (code: string) => {
+    const nextUser = await authAdapter.completeSecondFactorSignIn(code);
+    setUser(nextUser);
+    setStatus("authenticated");
+  }, []);
+
   const signOut = useCallback(async () => {
     await authAdapter.signOut();
     setUser(null);
@@ -52,8 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ status, user, mode: authAdapter.mode, signIn, signOut }),
-    [status, user, signIn, signOut],
+    () => ({ status, user, mode: authAdapter.mode, signIn, completeSecondFactor, signOut }),
+    [status, user, signIn, completeSecondFactor, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

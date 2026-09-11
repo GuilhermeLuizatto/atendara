@@ -23,13 +23,16 @@ export const ROOT_COLLECTIONS = {
     accounts: "accounts",
     initialPasswords: "initialPasswords",
 };
-/** Cobranca da plataforma. Fora de `organizations/` por natureza. */
+/** Cobranca e atos da operadora. Fora de `organizations/` por natureza. */
 export const PLATFORM_COLLECTIONS = {
     platformPlans: "platformPlans",
     platformSubscriptions: "platformSubscriptions",
     platformInvoices: "platformInvoices",
     platformGatewayEvents: "platformGatewayEvents",
     platformCustomers: "platformCustomers",
+    platformAccessGrants: "platformAccessGrants",
+    platformAuditLogs: "platformAuditLogs",
+    platformRateLimits: "platformRateLimits",
 };
 export const TENANT_COLLECTIONS = {
     professionals: "professionals",
@@ -47,6 +50,9 @@ export const TENANT_COLLECTIONS = {
     // fila de saida, com estado de entrega e tentativas.
     notificationDeliveries: "notificationDeliveries",
     auditLogs: "auditLogs",
+    // Registro de cada pedido de titular de dados atendido pela organizacao.
+    // Escrito so pelo backend, junto da exportacao ou da eliminacao.
+    privacyRequests: "privacyRequests",
 };
 export const paths = {
     accounts: () => ROOT_COLLECTIONS.accounts,
@@ -81,6 +87,17 @@ export const paths = {
      * exigiria varredura — ou, pior, confiar em algo que o cliente enviou.
      */
     platformCustomer: (customerId) => `${PLATFORM_COLLECTIONS.platformCustomers}/${customerId}`,
+    // ------------------------------------------------ atos da operadora
+    platformAccessGrants: () => PLATFORM_COLLECTIONS.platformAccessGrants,
+    /**
+     * Concessao vigente, chaveada pelo `organizationId` pelo mesmo motivo da
+     * assinatura: uma organizacao nao acumula duas concessoes.
+     */
+    platformAccessGrant: (organizationId) => `${PLATFORM_COLLECTIONS.platformAccessGrants}/${organizationId}`,
+    platformAuditLogs: () => PLATFORM_COLLECTIONS.platformAuditLogs,
+    platformAuditLog: (logId) => `${PLATFORM_COLLECTIONS.platformAuditLogs}/${logId}`,
+    /** Contador por usuario e callable. So o backend le e escreve. */
+    platformRateLimit: (key) => `${PLATFORM_COLLECTIONS.platformRateLimits}/${key}`,
 };
 /**
  * Mensagens ficam em subcolecao da conversa: o volume cresce muito mais rapido

@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, ChevronDown } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 
 import { listProfessions } from "@/config/professions";
 import { cn } from "@/lib/utils/cn";
@@ -23,24 +23,37 @@ export function ProfessionSwitcher() {
   const { profession, setProfession } = useWorkspace();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
 
   const close = useCallback(() => setOpen(false), []);
-  useDismissable(open, containerRef, close);
+  useDismissable(open, containerRef, close, triggerRef);
 
-  if (!isPlatformAdmin(user?.access)) return <span className="text-muted-foreground px-3 text-sm">{profession.label}</span>;
+  // Para quem nao e a operadora a profissao e fixa e ja esta na barra lateral;
+  // no celular o espaco do cabecalho vai para o que se usa.
+  if (!isPlatformAdmin(user?.access)) {
+    return (
+      <span className="text-muted-foreground hidden px-3 text-sm sm:inline">
+        {profession.label}
+      </span>
+    );
+  }
 
   const choose = (id: ProfessionId) => {
     setProfession(id);
     setOpen(false);
+    triggerRef.current?.focus();
   };
 
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
-        aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={panelId}
+        aria-label={`Profissao da demonstracao: ${profession.label}`}
         className={cn(
           "border-border inline-flex h-9 items-center gap-2 rounded-lg border px-2.5 sm:px-3",
           "bg-surface text-foreground text-sm font-medium transition-colors",
@@ -63,8 +76,7 @@ export function ProfessionSwitcher() {
 
       {open ? (
         <div
-          role="listbox"
-          aria-label="Profissao"
+          id={panelId}
           className={cn(
             "rounded-card absolute right-0 z-50 mt-2 overflow-hidden",
             "border-border bg-surface shadow-overlay w-[min(20rem,calc(100vw-2rem))] border",
@@ -80,8 +92,7 @@ export function ProfessionSwitcher() {
                 <li key={item.id}>
                   <button
                     type="button"
-                    role="option"
-                    aria-selected={selected}
+                    aria-pressed={selected}
                     onClick={() => choose(item.id)}
                     data-accent={item.accent}
                     className={cn(

@@ -1,6 +1,7 @@
 import type { MessageClassificationId } from "./classification";
 import type { ID, ISODateString, TenantScopedEntity } from "./common";
 import type { AttentionLevel } from "./conversation";
+import type { PrivacyRedactionMark } from "./privacy";
 import type { RuleLevel } from "./rules";
 
 export type AIActionTaken =
@@ -50,6 +51,11 @@ export interface AIDecision extends TenantScopedEntity {
   /** Relogio escolhido no simulador; separado do instante real de registro. */
   evaluatedAt?: ISODateString;
   latencyMs: number;
+  /**
+   * Presente quando o backend retirou o conteudo pessoal a pedido do titular.
+   * Classificacao, regras, acao e motivo continuam os originais.
+   */
+  privacyRedaction?: PrivacyRedactionMark | null;
 }
 
 /** Entrada do motor de decisao. Nao contem nada especifico de profissao. */

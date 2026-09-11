@@ -1,12 +1,24 @@
-import type { AuthenticatedUser } from "@/types";
-import type { AccessUpdate, ProfessionalRegistration } from "@/types/access";
+import type { AuthenticatedUser, Page, PageCursor, PageRequest } from "@/types";
+import type { AccessUpdate, AccountAccess, ProfessionalRegistration } from "@/types/access";
+import type { AccessGrantInput } from "@/types/platform";
 import { hasActiveAccess, isPlatformAdmin } from "@/config/access";
+import { accessGrantReasonError, accessGrantWindowError, isGrantInForce, resolveAccountGate } from "@/lib/platform/access-gate";
 import { readDemoAccounts, writeDemoAccounts, type DemoAccount } from "./demo-accounts";
 import { createTemporaryPassword, passwordDigest, passwordError } from "./passwords";
-import { accessUpdateSchema, registrationSchema } from "./registration";
-import { AuthError, type AuthAdapter } from "./types";
+import { accessGrantSchema, accessUpdateSchema, registrationSchema } from "./registration";
+import { AuthError, type AuthAdapter, type SecondFactorState, type TotpEnrollment } from "./types";
 
 const SESSION_KEY = "atendo:demo-session:v2";
+const DEMO_PAGE_SIZE = 25;
+const NO_SECOND_FACTOR = "A demonstracao local nao simula segundo fator.";
+// A demonstracao nao envia e-mail. O caminho equivalente e o administrador
+// gerar um novo cadastro, que ja nasce com senha inicial.
+const NO_PASSWORD_EMAIL = "A demonstracao local nao envia e-mail. Peca ao administrador um novo cadastro com senha inicial.";
+
+function assertGrant(until: string, reason: string) {
+  const error = accessGrantWindowError(until, Date.now()) ?? accessGrantReasonError(reason);
+  if (error) throw new AuthError(error);
+}
 
 // Esta simulacao local valida os fluxos de interface; a seguranca real pertence ao Firebase.
 export class DemoAuthAdapter implements AuthAdapter {
@@ -39,6 +51,7 @@ export class DemoAuthAdapter implements AuthAdapter {
     this.emit();
     return this.user()!;
   }
+  async completeSecondFactorSignIn(): Promise<AuthenticatedUser> { throw new AuthError(NO_SECOND_FACTOR); }
   async signOut() { localStorage.removeItem(SESSION_KEY); this.emit(); }
   private requireAdmin() {
     const access = this.current()?.access;
@@ -51,22 +64,43 @@ export class DemoAuthAdapter implements AuthAdapter {
     if (error) throw new AuthError(error);
     if (await passwordDigest(password, account.salt) === account.hash) throw new AuthError("Escolha uma senha diferente da inicial.");
     const salt = crypto.randomUUID();
-    const replacement = { access: { ...account.access, mustChangePassword: false }, salt, hash: await passwordDigest(password, salt) };
+    const replacement = { ...account, access: { ...account.access, mustChangePassword: false }, salt, hash: await passwordDigest(password, salt) };
     writeDemoAccounts(readDemoAccounts().map(a => a.access.userId === account.access.userId ? replacement : a));
     this.emit();
   }
-  async listAccounts() { this.requireAdmin(); return readDemoAccounts().map(a => a.access); }
+  async sendPasswordReset(): Promise<void> { throw new AuthError(NO_PASSWORD_EMAIL); }
+  async verifyPasswordReset(): Promise<string> { throw new AuthError(NO_PASSWORD_EMAIL); }
+  async confirmPasswordReset(): Promise<void> { throw new AuthError(NO_PASSWORD_EMAIL); }
+  async secondFactorState(): Promise<SecondFactorState> { return "not-applicable"; }
+  async sendEmailVerification() { throw new AuthError(NO_SECOND_FACTOR); }
+  async startTotpEnrollment(): Promise<TotpEnrollment> { throw new AuthError(NO_SECOND_FACTOR); }
+  async finishTotpEnrollment() { throw new AuthError(NO_SECOND_FACTOR); }
+  async listAccounts(request: PageRequest = {}): Promise<Page<AccountAccess>> {
+    this.requireAdmin();
+    const all = readDemoAccounts().map(a => a.access).sort((a, b) => a.email.localeCompare(b.email));
+    const offset = (request.cursor as unknown as { offset?: number } | null)?.offset ?? 0;
+    const size = request.size ?? DEMO_PAGE_SIZE;
+    const end = offset + size;
+    return { items: all.slice(offset, end), next: end < all.length ? ({ offset: end } as unknown as PageCursor) : null };
+  }
+  async accountsById(userIds: string[]) {
+    this.requireAdmin();
+    return readDemoAccounts().map(a => a.access).filter(access => userIds.includes(access.userId));
+  }
   async registerProfessional(input: ProfessionalRegistration) {
     this.requireAdmin();
-    const data = registrationSchema.parse(input);
-    if (Date.parse(data.accessUntil) <= Date.now()) throw new AuthError("Defina uma validade futura.");
+    const { initialGrant, ...data } = registrationSchema.parse(input);
+    if (initialGrant) assertGrant(initialGrant.until, initialGrant.reason);
     if (readDemoAccounts().some(a => a.access.email === data.email)) throw new AuthError("Este e-mail ja esta cadastrado.");
     const userId = crypto.randomUUID(), salt = crypto.randomUUID(), temporaryPassword = createTemporaryPassword();
     const hash = await passwordDigest(temporaryPassword, salt);
     this.requireAdmin();
-    writeDemoAccounts([...readDemoAccounts(), { salt, hash, access: {
+    // Mesma regra do backend: a conta nasce pendente; so a concessao abre.
+    const grant = initialGrant ? { ...initialGrant, until: new Date(initialGrant.until).toISOString(), revokedAt: null } : undefined;
+    const gate = resolveAccountGate({ subscription: null, grant, nowMs: Date.now() });
+    writeDemoAccounts([...readDemoAccounts(), { salt, hash, grant, access: {
       ...data, userId, organizationId: `org-${userId}`, platformRole: "PROFESSIONAL", status: "ACTIVE",
-      subscriptionStatus: "ACTIVE", mustChangePassword: true, createdAt: new Date().toISOString(),
+      subscriptionStatus: gate.subscriptionStatus, accessUntil: gate.accessUntil, mustChangePassword: true, createdAt: new Date().toISOString(),
     } }]);
     this.emit();
     return { userId, temporaryPassword };
@@ -79,6 +113,33 @@ export class DemoAuthAdapter implements AuthAdapter {
     if (!account || account.access.platformRole !== "PROFESSIONAL") throw new AuthError("Cadastro de profissional nao encontrado.");
     writeDemoAccounts(accounts.map(a => a === account ? { ...a, access: { ...a.access, ...data } } : a));
     this.emit();
+  }
+  private titularOf(organizationId: string): DemoAccount {
+    const account = readDemoAccounts().find(a => a.access.organizationId === organizationId && a.access.platformRole === "PROFESSIONAL");
+    if (!account) throw new AuthError("Organizacao sem titular profissional.");
+    return account;
+  }
+  private replace(account: DemoAccount) {
+    writeDemoAccounts(readDemoAccounts().map(a => a.access.userId === account.access.userId ? account : a));
+    this.emit();
+  }
+  async grantAccess(input: AccessGrantInput) {
+    this.requireAdmin();
+    const data = accessGrantSchema.parse(input);
+    assertGrant(data.until, data.reason);
+    const account = this.titularOf(data.organizationId);
+    const grant = { kind: data.kind, reason: data.reason, until: new Date(data.until).toISOString(), revokedAt: null };
+    const gate = resolveAccountGate({ subscription: null, grant, nowMs: Date.now() });
+    this.replace({ ...account, grant, access: { ...account.access, ...gate } });
+  }
+  async revokeAccess(organizationId: string, reason: string) {
+    this.requireAdmin();
+    const reasonError = accessGrantReasonError(reason);
+    if (reasonError) throw new AuthError(reasonError);
+    const account = this.titularOf(organizationId);
+    if (!account.grant || !isGrantInForce(account.grant, Date.now())) throw new AuthError("Nao ha concessao vigente para esta organizacao.");
+    const gate = resolveAccountGate({ subscription: null, grant: null, nowMs: Date.now() });
+    this.replace({ ...account, grant: { ...account.grant, revokedAt: new Date().toISOString() }, access: { ...account.access, ...gate } });
   }
 }
 export const demoAuthAdapter: AuthAdapter = new DemoAuthAdapter();

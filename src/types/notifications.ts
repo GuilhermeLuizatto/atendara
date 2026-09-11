@@ -1,4 +1,5 @@
 import type { ID, ISODateString, TenantScopedEntity } from "./common";
+import type { PrivacyRedactionMark } from "./privacy";
 
 /**
  * Avisos que SAEM do produto — distintos de `notification.ts`, que e o alerta
@@ -86,6 +87,12 @@ export interface NotificationConsent {
   /** Preenchido revoga tudo, independentemente de `channels`. */
   revokedAt: ISODateString | null;
   source: "CLIENT_FORM" | "WRITTEN" | "IMPORTED";
+  /**
+   * Versao do texto apresentado a pessoa quando autorizou
+   * (`NOTIFICATION_CONSENT_TEXT_VERSION`). Sem ela, nao ha como saber depois o
+   * que exatamente foi aceito. Ausente em cadastro anterior ao campo.
+   */
+  textVersion?: string | null;
 }
 
 /**
@@ -152,6 +159,7 @@ export interface NotificationDelivery extends TenantScopedEntity {
   contactHint: string;
   sentAt: ISODateString | null;
   cancelledAt: ISODateString | null;
+  privacyRedaction?: PrivacyRedactionMark | null;
 }
 
 /** Por que um evento da agenda nao produziu envio. */

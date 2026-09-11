@@ -1,6 +1,7 @@
 import { permissionsForRole } from "@/config/permissions";
 import { getProfession } from "@/config/professions";
 import { decide } from "@/lib/ai/decision-engine";
+import { decisionInputPreview } from "@/lib/privacy/decision-preview";
 import type { AIDecision, Conversation, ID, Message } from "@/types";
 
 import { assertPermission, validateMessageBody } from "../../guards";
@@ -278,7 +279,10 @@ export function planReceiveMessage(
     messageId,
     clientId: client.id,
     professionalId: conversation.professionalId,
-    inputPreview: body.slice(0, 500),
+    inputPreview: decisionInputPreview(
+      body,
+      getProfession(ctx.snapshot.organization.primaryProfession).sensitiveDataProfile,
+    ),
     decidedAt: ctx.now,
     evaluatedAt: evaluationDate.toISOString(),
     latencyMs: Math.round(performance.now() - started),

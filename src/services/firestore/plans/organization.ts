@@ -8,15 +8,15 @@ import { auditWrite, touch, type Plan, type PlanContext } from "../plan";
 /**
  * Horario de atendimento e padroes da agenda.
  *
- * Ato administrativo (`organization:update`). O titular sem papel
- * administrativo nao passa por aqui: o alcance dele sobre o documento da
- * organizacao e so a configuracao de avisos, e as rules recusam o resto.
+ * Exige `agendaSettings:update`: OWNER, ADMIN e o titular da organizacao, que
+ * nasce PROFESSIONAL e precisa mexer no proprio horario diante de imprevisto.
+ * Do titular as rules aceitam so `settings.agenda` e `settings.notifications`.
  */
 export function planUpdateAgendaSettings(
   ctx: PlanContext,
   settings: AgendaSettings,
 ): Plan {
-  assertPermission(ctx.actor, "organization:update");
+  assertPermission(ctx.actor, "agendaSettings:update");
   const agenda = validateAgendaSettings(
     settings,
     getProfession(ctx.snapshot.organization.primaryProfession).modalities,

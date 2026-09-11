@@ -106,7 +106,11 @@ export function AgentActivity({
 
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <p className="text-foreground text-sm leading-snug">
-                    &ldquo;{truncate(decision.inputPreview, 84)}&rdquo;
+                    {decision.inputPreview ? (
+                      <>&ldquo;{truncate(decision.inputPreview, 84)}&rdquo;</>
+                    ) : (
+                      "Trecho da mensagem nao guardado nesta profissao"
+                    )}
                   </p>
 
                   <div className="flex flex-wrap items-center gap-1.5">

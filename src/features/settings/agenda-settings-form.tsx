@@ -15,9 +15,10 @@ import type { AgendaSettings, ServiceModality } from "@/types";
 /**
  * Horario de atendimento da organizacao.
  *
- * Editar e ato administrativo (`organization:update`). Para quem nao tem esse
- * papel — inclusive o titular autonomo — a tela mostra o horario e diz o que
- * ele muda na pratica, sem oferecer um botao que o servidor recusaria.
+ * Editam OWNER, ADMIN e o titular da organizacao (`agendaSettings:update`): o
+ * autonomo precisa mexer no proprio horario diante de um imprevisto. Para os
+ * demais membros a tela mostra o horario e diz o que ele muda na pratica, sem
+ * oferecer um botao que o servidor recusaria.
  */
 export function AgendaSettingsForm({
   onDone,
@@ -35,7 +36,7 @@ export function AgendaSettingsForm({
   const [saving, setSaving] = useState(false);
 
   if (!current || !draft) return null;
-  const canEdit = session?.permissions.includes("organization:update") ?? false;
+  const canEdit = session?.permissions.includes("agendaSettings:update") ?? false;
 
   const defaults = (
     <p className="text-muted-foreground text-sm">
@@ -74,7 +75,7 @@ export function AgendaSettingsForm({
         </dl>
         {defaults}
         <p className="text-muted-foreground text-sm">
-          Este horario so e alterado por quem administra a organizacao. Na
+          Este horario so e alterado pelo titular ou por quem administra a organizacao. Na
           pratica ele nao limita nada: a agenda aceita e mostra qualquer horario
           que voce marcar, inclusive fora dele.
         </p>

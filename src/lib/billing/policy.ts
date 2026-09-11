@@ -76,12 +76,14 @@ function addDays(iso: ISODateString, days: number): ISODateString {
 }
 
 /**
- * Ate quando o painel fica aberto.
+ * Ate quando a conta PODE ter acesso — o teto, nao a garantia.
  *
- * A tolerancia (`GRACE_PERIOD_DAYS`) vale enquanto a assinatura ainda pode se
- * recuperar sozinha — inclusive em `PAST_DUE`, que e exatamente a janela em que
- * a Stripe retenta o cartao. Cancelamento e inadimplencia terminal nao ganham
- * tolerancia: o acesso vai ate o fim do ciclo pago e para ali.
+ * A tolerancia (`GRACE_PERIOD_DAYS`) entra enquanto a assinatura ainda pode se
+ * recuperar sozinha, inclusive em `PAST_DUE`. Quem abre o painel, porem, e a
+ * situacao da conta: `PAST_DUE` vira `PENDING` e as regras exigem `ACTIVE`, entao
+ * com cartao recusado o painel fecha na hora, por decisao do titular.
+ * Cancelamento e inadimplencia terminal nao ganham tolerancia: o teto e o fim
+ * do ciclo pago.
  *
  * `INCOMPLETE` devolve `null` porque nenhum pagamento foi confirmado: retornar
  * do checkout nao e prova de pagamento, e esta funcao e o lugar onde isso deixa

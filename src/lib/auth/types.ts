@@ -75,4 +75,7 @@ export interface AuthAdapter {
   updateAccount(userId: string, input: import("@/types/access").AccessUpdate): Promise<void>;
   grantAccess(input: AccessGrantInput): Promise<void>;
   revokeAccess(organizationId: string, reason: string): Promise<void>;
+  /** So a chave mestra. O novo administrador troca a senha e cadastra o segundo fator no primeiro acesso. */
+  createPlatformAdmin(input: import("@/types/access").PlatformAdminRegistration): Promise<{ userId: string; temporaryPassword: string }>;
+  setPlatformAdminStatus(userId: string, status: import("@/types/access").AccountAccess["status"]): Promise<void>;
 }

@@ -128,7 +128,7 @@ export function AccessGrantsPanel() {
             )}
           </Field>
           <Field label="Acesso ate">
-            {(props) => <Input {...props} name="until" type="date" required defaultValue={dateInputValue(30)} min={dateInputValue(0)} max={dateInputValue(LATEST_GRANT_OFFSET_DAYS)} />}
+            {(props) => <Input {...props} name="until" type="date" required defaultValue={dateInputValue(LATEST_GRANT_OFFSET_DAYS)} min={dateInputValue(0)} max={dateInputValue(LATEST_GRANT_OFFSET_DAYS)} />}
           </Field>
         </div>
         <LoadMore

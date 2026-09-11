@@ -290,7 +290,7 @@ export interface WorkspaceRepository {
   updateNotificationSettings(
     settings: OrganizationNotificationSettings,
   ): Promise<void>;
-  /** Horario de atendimento e padroes da agenda. Exige `organization:update`. */
+  /** Horario de atendimento e padroes da agenda. Exige `agendaSettings:update` (OWNER, ADMIN e o titular). */
   updateAgendaSettings(settings: AgendaSettings): Promise<void>;
   /**
    * Executa as entregas vencidas com o provedor simulado e grava o resultado.

@@ -4,6 +4,7 @@ import type {
   TenantCollection,
 } from "@/lib/firebase/paths";
 import type { Role } from "@/types/professional";
+import type { SensitiveDataProfile } from "@/types/profession";
 import { PROVISIONAL_RETENTION_DAYS } from "@/config/platform";
 
 /**
@@ -25,6 +26,19 @@ import { PROVISIONAL_RETENTION_DAYS } from "@/config/platform";
  */
 
 export const LEGAL_REVIEW_STATUS = "PENDING_LEGAL_REVIEW" as const;
+
+/**
+ * Quanto da mensagem avaliada a decisao do agente guarda em `inputPreview`, por
+ * grau de sensibilidade da profissao. Decisao do titular em 11/09/2026:
+ * profissoes de saude (`ELEVATED` e `HIGH`) nao guardam trecho nenhum. A
+ * decisao continua explicada por classificacao, confianca, regras e motivo, e
+ * a mensagem inteira fica na conversa, que eliminacao e retencao ja alcancam.
+ */
+export const DECISION_INPUT_PREVIEW_CHARS: Readonly<Record<SensitiveDataProfile, number>> = {
+  STANDARD: 200,
+  ELEVATED: 0,
+  HIGH: 0,
+};
 
 export type PersonalDataCollection =
   | keyof typeof ROOT_COLLECTIONS

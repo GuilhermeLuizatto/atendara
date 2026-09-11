@@ -1,11 +1,12 @@
 import type { AuthenticatedUser, Page, PageCursor, PageRequest } from "@/types";
-import type { AccessUpdate, AccountAccess, ProfessionalRegistration } from "@/types/access";
+import { APP_MODULES } from "@/types/access";
+import type { AccessUpdate, AccountAccess, PlatformAdminRegistration, ProfessionalRegistration } from "@/types/access";
 import type { AccessGrantInput } from "@/types/platform";
 import { hasActiveAccess, isPlatformAdmin } from "@/config/access";
 import { accessGrantReasonError, accessGrantWindowError, isGrantInForce, resolveAccountGate } from "@/lib/platform/access-gate";
 import { readDemoAccounts, writeDemoAccounts, type DemoAccount } from "./demo-accounts";
 import { createTemporaryPassword, passwordDigest, passwordError } from "./passwords";
-import { accessGrantSchema, accessUpdateSchema, registrationSchema } from "./registration";
+import { accessGrantSchema, accessUpdateSchema, platformAdminRegistrationSchema, registrationSchema } from "./registration";
 import { AuthError, type AuthAdapter, type SecondFactorState, type TotpEnrollment } from "./types";
 
 const SESSION_KEY = "atendo:demo-session:v2";
@@ -140,6 +141,32 @@ export class DemoAuthAdapter implements AuthAdapter {
     if (!account.grant || !isGrantInForce(account.grant, Date.now())) throw new AuthError("Nao ha concessao vigente para esta organizacao.");
     const gate = resolveAccountGate({ subscription: null, grant: null, nowMs: Date.now() });
     this.replace({ ...account, grant: { ...account.grant, revokedAt: new Date().toISOString() }, access: { ...account.access, ...gate } });
+  }
+  private requireMaster() {
+    this.requireAdmin();
+    if (this.current()?.access.platformMaster !== true) throw new AuthError("Somente a chave mestra gerencia administradores.");
+  }
+  async createPlatformAdmin(input: PlatformAdminRegistration) {
+    this.requireMaster();
+    const data = platformAdminRegistrationSchema.parse(input);
+    if (readDemoAccounts().some(a => a.access.email === data.email)) throw new AuthError("Este e-mail ja esta cadastrado.");
+    const userId = crypto.randomUUID(), salt = crypto.randomUUID(), temporaryPassword = createTemporaryPassword();
+    const hash = await passwordDigest(temporaryPassword, salt);
+    writeDemoAccounts([...readDemoAccounts(), { salt, hash, access: {
+      ...data, userId, platformRole: "PLATFORM_ADMIN", platformMaster: false, organizationId: null, professionId: null,
+      modules: [...APP_MODULES], status: "ACTIVE", subscriptionStatus: "ACTIVE", accessUntil: null, mustChangePassword: true,
+      createdAt: new Date().toISOString(),
+    } }]);
+    this.emit();
+    return { userId, temporaryPassword };
+  }
+  async setPlatformAdminStatus(userId: string, status: AccountAccess["status"]) {
+    this.requireMaster();
+    if (userId === this.current()?.access.userId) throw new AuthError("A chave mestra nao altera a propria conta por aqui.");
+    const account = readDemoAccounts().find(a => a.access.userId === userId);
+    if (!account || account.access.platformRole !== "PLATFORM_ADMIN") throw new AuthError("Administrador nao encontrado.");
+    if (account.access.platformMaster === true) throw new AuthError("Chave mestra nao e suspensa por aqui.");
+    this.replace({ ...account, access: { ...account.access, status } });
   }
 }
 export const demoAuthAdapter: AuthAdapter = new DemoAuthAdapter();

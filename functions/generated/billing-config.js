@@ -76,13 +76,14 @@ export function activePlans() {
     return PLATFORM_PLANS.filter((plan) => plan.active);
 }
 /**
- * Tolerancia depois do fim do ciclo antes de o painel fechar.
+ * Dias somados ao fim do ciclo em `accessUntil` enquanto a assinatura ainda
+ * pode se recuperar sozinha. Valor provisorio.
  *
- * Valor provisorio, ainda a confirmar pelo titular: cinco dias. A razao
- * de existir tolerancia e que a recusa de cartao quase sempre e transitoria
- * (limite, cartao vencido) e a Stripe retenta por alguns dias; fechar o painel
- * na primeira falha derrubaria o atendimento de quem so precisa trocar o
- * cartao. A razao de ser CURTA e que a tolerancia e credito nao cobrado.
+ * NAO mantem o painel aberto com cartao recusado: `PAST_DUE` leva a conta a
+ * `PENDING`, e as Security Rules exigem `ACTIVE`. Decisao do titular em
+ * 11/09/2026: recusou o cartao, o painel fecha na hora e volta quando o
+ * gateway confirmar o pagamento. A data so vira teto quando a situacao volta a
+ * `ACTIVE`.
  */
 export const GRACE_PERIOD_DAYS = 5;
 /**

@@ -20,9 +20,11 @@ export const PLATFORM_ADMIN_SECOND_FACTORS: readonly string[] = ["totp"];
 
 /**
  * Prazo maximo de uma concessao manual, contado a partir do ato. Renovar exige
- * nova concessao, com novo motivo. Valor sugerido, ainda a confirmar.
+ * nova concessao, com novo motivo. Quinze dias por decisao do titular em
+ * 11/09/2026, revisavel: curto o bastante para que uma cortesia esquecida nao
+ * vire acesso gratuito permanente.
  */
-export const MAX_ACCESS_GRANT_DAYS = 90;
+export const MAX_ACCESS_GRANT_DAYS = 15;
 
 export const ACCESS_GRANT_REASON_LENGTH = { min: 10, max: 500 } as const;
 
@@ -37,6 +39,9 @@ export const PLATFORM_AUDIT_ACTION_LABELS: Record<PlatformAuditAction, string> =
   ACCOUNT_UPDATED: "Alteracao de conta",
   ACCESS_GRANTED: "Concessao de acesso",
   ACCESS_REVOKED: "Revogacao de acesso",
+  PLATFORM_ADMIN_CREATED: "Cadastro de administrador",
+  PLATFORM_ADMIN_SUSPENDED: "Suspensao de administrador",
+  PLATFORM_ADMIN_REACTIVATED: "Reativacao de administrador",
   ORGANIZATION_DELETED: "Exclusao de organizacao pelo titular",
 };
 

@@ -18,6 +18,18 @@ import { PROVISIONAL_RETENTION_DAYS } from "./platform-config.js";
  * Compartilhado com o backend por `scripts/build-functions.mjs`.
  */
 export const LEGAL_REVIEW_STATUS = "PENDING_LEGAL_REVIEW";
+/**
+ * Quanto da mensagem avaliada a decisao do agente guarda em `inputPreview`, por
+ * grau de sensibilidade da profissao. Decisao do titular em 11/09/2026:
+ * profissoes de saude (`ELEVATED` e `HIGH`) nao guardam trecho nenhum. A
+ * decisao continua explicada por classificacao, confianca, regras e motivo, e
+ * a mensagem inteira fica na conversa, que eliminacao e retencao ja alcancam.
+ */
+export const DECISION_INPUT_PREVIEW_CHARS = {
+    STANDARD: 200,
+    ELEVATED: 0,
+    HIGH: 0,
+};
 // ----------------------------------------------------------- valores fixos
 /** Prefixo do pseudonimo. O resto e aleatorio e nao deriva do `clientId`. */
 export const PSEUDONYM_PREFIX = "titular-removido-";

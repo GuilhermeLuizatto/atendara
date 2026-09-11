@@ -231,7 +231,7 @@ describe("Ciclo de vida da assinatura", () => {
     expect(invoice("in_ciclo_2")).toMatchObject({ status: "PAID", amountPaidInCents: 19_900 });
   });
 
-  it("falha de pagamento registra a fatura e mantem o acesso ate o vencimento", async () => {
+  it("falha de pagamento registra a fatura e fecha o painel na hora", async () => {
     await applyGatewayEvent(checkoutEvent("evt_1"));
     await applyGatewayEvent(
       subscriptionEvent("evt_2", "customer.subscription.created", "active", PERIODO_1_FIM, "2026-09-09T12:00:05.000Z"),
@@ -249,6 +249,7 @@ describe("Ciclo de vida da assinatura", () => {
     await applyGatewayEvent(
       subscriptionEvent("evt_4", "customer.subscription.updated", "past_due", PERIODO_1_FIM, "2026-10-09T12:00:20.000Z"),
     );
+    // PENDING fecha o painel: as regras exigem ACTIVE, qualquer que seja a data.
     expect(account()).toMatchObject({ subscriptionStatus: "PENDING", accessUntil: antes });
   });
 

@@ -132,7 +132,7 @@ async function registerAndSignIn(titular: typeof TITULAR_A): Promise<Person> {
     email: titular.email,
     professionId: "PSYCHOLOGIST",
     modules: MODULES,
-    initialGrant: { kind: "PILOT", until: inDays(30), reason: "Piloto dos testes de privacidade." },
+    initialGrant: { kind: "PILOT", until: inDays(10), reason: "Piloto dos testes de privacidade." },
   });
   const app = initializeApp({ projectId: PROJECT, apiKey: "chave-de-emulador" }, `privacidade-${created.userId}`);
   const auth = getAuth(app);

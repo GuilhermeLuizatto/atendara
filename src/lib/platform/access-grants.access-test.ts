@@ -152,7 +152,7 @@ describe("Etapa 5B — concessao manual registrada", () => {
   });
 
   it("so a operadora com TOTP concede ou revoga", async () => {
-    const payload = { organizationId, kind: "COURTESY", until: inDays(30), reason: REASON };
+    const payload = { organizationId, kind: "COURTESY", until: inDays(10), reason: REASON };
 
     await expect(titularCall("grantAccess", payload)).rejects.toMatchObject({ code: "permission-denied" });
     await expect(titularCall("revokeAccess", { organizationId, reason: REASON })).rejects.toMatchObject({ code: "permission-denied" });
@@ -197,7 +197,7 @@ describe("Etapa 5B — concessao manual registrada", () => {
   }, 30_000);
 
   it("evento INCOMPLETE assinado nao fecha a concessao vigente", async () => {
-    const until = inDays(30);
+    const until = inDays(10);
     await operator.call("grantAccess", { organizationId, kind: "COURTESY", until, reason: REASON });
     const now = Math.floor(Date.now() / 1000);
 

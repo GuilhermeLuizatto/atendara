@@ -49,6 +49,10 @@ export const PLATFORM_AUDIT_ACTIONS = [
   "ACCOUNT_UPDATED",
   "ACCESS_GRANTED",
   "ACCESS_REVOKED",
+  // Atos da chave mestra sobre contas de administrador.
+  "PLATFORM_ADMIN_CREATED",
+  "PLATFORM_ADMIN_SUSPENDED",
+  "PLATFORM_ADMIN_REACTIVATED",
   // Unico ato desta trilha que nao e da operadora: o titular encerra a propria
   // organizacao. Fica aqui porque o tenant deixa de existir para guardar o
   // registro, e porque encerrar organizacao e assunto do contrato com a
@@ -86,5 +90,7 @@ export const PLATFORM_PERMISSIONS = [
   "accessGrant:revoke",
   "platformBilling:read",
   "platformAudit:read",
+  // So da chave mestra: criar, suspender e reativar administradores.
+  "platformAdmin:manage",
 ] as const;
 export type PlatformPermission = (typeof PLATFORM_PERMISSIONS)[number];

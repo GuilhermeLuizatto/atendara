@@ -85,7 +85,7 @@ export function AccountsPanel() {
         <label className="text-muted-foreground flex min-h-6 items-center gap-2 text-sm"><input type="checkbox" className="accent-primary size-4" checked={withGrant} onChange={e => setWithGrant(e.target.checked)} />Liberar acesso agora, por concessao registrada</label>
         {withGrant ? <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Tipo">{props => <Select {...props} name="kind">{ACCESS_GRANT_KINDS.map(kind => <option key={kind} value={kind}>{ACCESS_GRANT_KIND_LABELS[kind]}</option>)}</Select>}</Field>
-          <Field label="Acesso ate">{props => <Input {...props} name="until" type="date" required defaultValue={dateInputValue(30)} min={dateInputValue(0)} max={dateInputValue(LATEST_GRANT_OFFSET_DAYS)} />}</Field>
+          <Field label="Acesso ate">{props => <Input {...props} name="until" type="date" required defaultValue={dateInputValue(LATEST_GRANT_OFFSET_DAYS)} min={dateInputValue(0)} max={dateInputValue(LATEST_GRANT_OFFSET_DAYS)} />}</Field>
           <div className="sm:col-span-2"><Field label="Motivo" hint="Fica na trilha da operadora.">{props => <Textarea {...props} name="reason" required minLength={ACCESS_GRANT_REASON_LENGTH.min} maxLength={ACCESS_GRANT_REASON_LENGTH.max} />}</Field></div>
         </div> : null}
       </fieldset>

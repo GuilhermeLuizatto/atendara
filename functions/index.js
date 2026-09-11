@@ -2,13 +2,13 @@ import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
+import { randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { paths } from "./generated/paths.js";
 import { APP_MODULES } from "./generated/access.js";
 import { PROFESSION_IDS } from "./generated/profession.js";
 import { resolveAccountGate } from "./generated/access-gate.js";
-import { ACCOUNT_CALL_OPTIONS, accountOf, adminOf, parse } from "./platform-auth.js";
+import { ACCOUNT_CALL_OPTIONS, accountOf, adminOf, initialCredential, parse } from "./platform-auth.js";
 import { assertGrantWindow, auditEntry, gateFields, grantDocument, initialGrantSchema } from "./platform.js";
 
 initializeApp();
@@ -23,8 +23,7 @@ export const registerProfessional = onCall(ACCOUNT_CALL_OPTIONS, async request =
   const { initialGrant, ...input } = parse(registration, request.data);
   const nowMs = Date.now();
   if (initialGrant) assertGrantWindow(initialGrant.until, nowMs);
-  const temporaryPassword = `At!${randomBytes(24).toString("base64url")}`;
-  const salt = randomBytes(16).toString("hex");
+  const { temporaryPassword, verifier } = initialCredential();
   let user;
   try { user = await getAuth().createUser({ email: input.email, displayName: input.displayName, password: temporaryPassword }); }
   catch (error) { throw new HttpsError("already-exists", error.code === "auth/email-already-exists" ? "Este e-mail ja esta cadastrado." : "Nao foi possivel criar a conta."); }
@@ -38,7 +37,7 @@ export const registerProfessional = onCall(ACCOUNT_CALL_OPTIONS, async request =
   const batch = db.batch();
   const stamp = { createdAt, updatedAt: createdAt, createdBy: request.auth.uid, updatedBy: request.auth.uid };
   batch.create(db.doc(paths.account(user.uid)), account);
-  batch.create(db.doc(paths.initialPassword(user.uid)), { salt, hash: scryptSync(temporaryPassword, salt, 32).toString("hex") });
+  batch.create(db.doc(paths.initialPassword(user.uid)), verifier);
   batch.create(db.doc(paths.organization(organizationId)), { id: organizationId, name: input.displayName, slug: organizationId, primaryProfession: input.professionId, professions: [input.professionId], ownerId: user.uid, ...stamp });
   batch.create(db.doc(paths.document(organizationId, "members", user.uid)), { id: user.uid, userId: user.uid, organizationId, role: "PROFESSIONAL", status: "ACTIVE", invitedBy: request.auth.uid, ...stamp });
   // Sem perfil profissional a organizacao nasce sem quem atenda: a agenda
@@ -89,6 +88,9 @@ export const completeInitialPassword = onCall(ACCOUNT_CALL_OPTIONS, async reques
 
 // Concessao manual e revogacao: atos da operadora, com registro.
 export { grantAccess, revokeAccess } from "./platform.js";
+
+// Administradores da plataforma: so a chave mestra cria, suspende e reativa.
+export { createPlatformAdmin, setPlatformAdminStatus } from "./platform-admins.js";
 
 // Direitos do titular dos dados: exportacao e eliminacao, so pelo backend.
 export {

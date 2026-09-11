@@ -151,16 +151,19 @@ service cloud.firestore {
       return isAdmin(orgId) || organizationHolder(orgId);
     }
 
-    // A escrita troca somente a configuracao de avisos. E o unico alcance que
-    // o titular sem papel administrativo tem sobre o documento da organizacao:
-    // nome, dono, agenda, agente e privacidade continuam de OWNER/ADMIN.
-    // `get` com padrao porque a organizacao nasce sem `settings`.
-    function onlyNotificationSettings() {
+    // A escrita troca somente a configuracao de avisos e o horario de
+    // atendimento. E o unico alcance que o titular sem papel administrativo tem
+    // sobre o documento da organizacao: nome, dono, agente e privacidade
+    // continuam de OWNER/ADMIN. `get` com padrao porque a organizacao nasce sem
+    // `settings`, e cada bloco alterado precisa continuar sendo mapa.
+    function onlyHolderSettings() {
+      let after = request.resource.data.get('settings', {});
+      let changed = after.diff(resource.data.get('settings', {})).affectedKeys();
       return request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['settings', 'updatedAt', 'updatedBy'])
-        && request.resource.data.get('settings', {}).diff(resource.data.get('settings', {}))
-          .affectedKeys().hasOnly(['notifications'])
-        && request.resource.data.settings.notifications is map;
+        && changed.hasOnly(['notifications', 'agenda'])
+        && (!('notifications' in changed) || after.notifications is map)
+        && (!('agenda' in changed) || after.agenda is map);
     }
 
     // Defesa em profundidade: o documento carrega o proprio organizationId e
@@ -210,11 +213,12 @@ service cloud.firestore {
       // O proprietario nao pode ser trocado por update — isso exigiria um
       // fluxo de transferencia explicito, fora do alcance do cliente.
       //
-      // O titular sem papel administrativo configura os proprios avisos
-      // (`notificationSettings:update`) e mais nada.
+      // O titular sem papel administrativo configura os proprios avisos e o
+      // proprio horario (`notificationSettings:update`, `agendaSettings:update`)
+      // e mais nada.
       allow update: if request.resource.data.ownerId == resource.data.ownerId
         && (isAdmin(orgId)
-          || (organizationHolder(orgId) && onlyNotificationSettings()));
+          || (organizationHolder(orgId) && onlyHolderSettings()));
 
       // Apagar o documento da organizacao pelo navegador trancaria o tenant e
       // deixaria as subcolecoes orfas. Exclusao e ato do backend.

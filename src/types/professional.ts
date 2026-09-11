@@ -22,6 +22,9 @@ export const PERMISSIONS = [
   // Separada de `organization:update` porque o titular da organizacao a recebe
   // sem papel administrativo: configurar os avisos nao da acesso ao resto.
   "notificationSettings:update",
+  // Tambem separada: o titular ajusta o proprio horario de atendimento diante
+  // de um imprevisto sem receber o resto de `organization:update`.
+  "agendaSettings:update",
   "organization:delete",
   "billing:manage",
   "member:read",

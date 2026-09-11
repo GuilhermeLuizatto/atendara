@@ -4,15 +4,17 @@ import { useState } from "react";
 
 import { Tabs } from "@/components/ui/tabs";
 import { isPlatformAdmin } from "@/config/access";
+import { hasPlatformPermission } from "@/config/permissions";
 import { useAuth } from "@/providers/auth-provider";
 
 import { AccessGrantsPanel } from "./access-grants-panel";
 import { AccountsPanel } from "./accounts-panel";
+import { PlatformAdminsPanel } from "./platform-admins-panel";
 import { PlatformAuditPanel } from "./platform-audit-panel";
 import { PlatformBillingPanel } from "./platform-billing";
 import { SecondFactorGate } from "./second-factor-gate";
 
-type AdminTab = "cadastros" | "concessoes" | "cobranca" | "trilha";
+type AdminTab = "cadastros" | "concessoes" | "cobranca" | "trilha" | "administradores";
 
 const TABS: { value: AdminTab; label: string }[] = [
   { value: "cadastros", label: "Cadastros" },
@@ -30,6 +32,10 @@ export function AdminView() {
   const { user } = useAuth();
   const [tab, setTab] = useState<AdminTab>("cadastros");
   if (!isPlatformAdmin(user?.access)) return null;
+  // A aba so existe para a chave mestra; as callables recusam os demais.
+  const tabs: { value: AdminTab; label: string }[] = hasPlatformPermission(user?.access, "platformAdmin:manage")
+    ? [...TABS, { value: "administradores", label: "Administradores" }]
+    : TABS;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
@@ -40,11 +46,12 @@ export function AdminView() {
         </p>
       </div>
       <SecondFactorGate>
-        <Tabs options={TABS} value={tab} onChange={setTab} />
+        <Tabs options={tabs} value={tab} onChange={setTab} />
         {tab === "cadastros" ? <AccountsPanel /> : null}
         {tab === "concessoes" ? <AccessGrantsPanel /> : null}
         {tab === "cobranca" ? <PlatformBillingPanel /> : null}
         {tab === "trilha" ? <PlatformAuditPanel /> : null}
+        {tab === "administradores" ? <PlatformAdminsPanel /> : null}
       </SecondFactorGate>
     </div>
   );

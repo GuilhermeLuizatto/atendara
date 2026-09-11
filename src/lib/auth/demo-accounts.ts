@@ -18,7 +18,7 @@ export function readDemoAccounts(): DemoAccount[] {
   if (!DEMO_ADMIN_VERIFIER.salt || !DEMO_ADMIN_VERIFIER.hash) return [];
   return [{ ...DEMO_ADMIN_VERIFIER, access: {
     userId: "demo-platform-admin", email: PLATFORM_ADMIN_EMAIL, displayName: "Guilherme Luizatto",
-    platformRole: "PLATFORM_ADMIN", organizationId: null, professionId: null, modules: [...APP_MODULES],
+    platformRole: "PLATFORM_ADMIN", platformMaster: true, organizationId: null, professionId: null, modules: [...APP_MODULES],
     status: "ACTIVE", subscriptionStatus: "ACTIVE", accessUntil: null, mustChangePassword: true,
     createdAt: new Date().toISOString(),
   } }];

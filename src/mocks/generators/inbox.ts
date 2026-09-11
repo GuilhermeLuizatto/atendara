@@ -8,6 +8,7 @@ import {
 } from "@/mocks/content";
 import { addMinutesISO, atTime, shiftDays } from "@/mocks/dates";
 import { formatCurrency } from "@/lib/utils/format";
+import { decisionInputPreview } from "@/lib/privacy/decision-preview";
 import type {
   AIDecision,
   AIRule,
@@ -171,7 +172,7 @@ export function buildInbox(
       messageId: inboundId,
       clientId: client.id,
       professionalId: client.assignedProfessionalId,
-      inputPreview: questionText.slice(0, 140),
+      inputPreview: decisionInputPreview(questionText, profession.sensitiveDataProfile),
       classification,
       confidence: Number(confidence.toFixed(2)),
       appliedRules: buildAppliedRules(rules, appliedRule?.id ?? null, answered),

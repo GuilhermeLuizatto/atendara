@@ -9,6 +9,11 @@ export interface AccountAccess {
   email: string;
   displayName: string;
   platformRole: "PLATFORM_ADMIN" | "PROFESSIONAL";
+  /**
+   * Chave mestra da operadora: so ela cria, suspende e reativa administradores.
+   * Gravada pelo bootstrap, nunca por callable nem pela tela.
+   */
+  platformMaster?: boolean;
   organizationId: string | null;
   professionId: ProfessionId | null;
   modules: AppModule[];
@@ -38,3 +43,9 @@ export interface ProfessionalRegistration {
 }
 
 export type AccessUpdate = Pick<AccountAccess, "status" | "modules">;
+
+/** Cadastro de administrador pela chave mestra. Nasce sem chave mestra. */
+export interface PlatformAdminRegistration {
+  displayName: string;
+  email: string;
+}

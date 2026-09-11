@@ -190,7 +190,9 @@ function AgentWorkspace() {
             <Card key={decision.id} className="p-4">
               <details>
                 <summary className="cursor-pointer text-sm">
-                  <span className="font-medium">{decision.inputPreview}</span>
+                  <span className="font-medium">
+                    {decision.inputPreview || "Trecho da mensagem nao guardado nesta profissao"}
+                  </span>
                   <span className="text-muted-foreground mt-1 block text-xs">
                     {formatDateTime(decision.decidedAt)} ·{" "}
                     {data.clients.find(

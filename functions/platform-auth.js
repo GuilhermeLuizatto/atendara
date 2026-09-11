@@ -1,5 +1,6 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
+import { randomBytes, scryptSync } from "node:crypto";
 
 import { paths } from "./generated/paths.js";
 import { hasRequiredSecondFactor } from "./generated/access-gate.js";
@@ -51,4 +52,24 @@ export async function adminOf(request) {
     throw new HttpsError("permission-denied", "Entre com o segundo fator (aplicativo autenticador) para usar a administracao.");
   }
   return account;
+}
+
+/**
+ * A chave mestra: a operadora com `platformMaster`, gravado so pelo bootstrap.
+ * E a unica que cria, suspende e reativa administradores — assim uma conta de
+ * administrador comprometida nao multiplica administradores.
+ */
+export async function masterOf(request) {
+  const account = await adminOf(request);
+  if (account.platformMaster !== true) {
+    throw new HttpsError("permission-denied", "Somente a chave mestra gerencia administradores.");
+  }
+  return account;
+}
+
+/** Senha inicial aleatoria e o verificador que a troca obrigatoria confere. */
+export function initialCredential() {
+  const temporaryPassword = `At!${randomBytes(24).toString("base64url")}`;
+  const salt = randomBytes(16).toString("hex");
+  return { temporaryPassword, verifier: { salt, hash: scryptSync(temporaryPassword, salt, 32).toString("hex") } };
 }

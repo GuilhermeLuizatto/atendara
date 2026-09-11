@@ -167,7 +167,7 @@ function dataOf(write: WriteOperation): Record<string, unknown> {
 describe("configuracao da organizacao", () => {
   const notifications = { enabled: true, verifiedSenderChannels: ["SMS" as const], rules: [] };
 
-  it("deixa o titular sem papel administrativo configurar os avisos, e so eles", () => {
+  it("deixa o titular sem papel administrativo configurar avisos e horario, e so eles", () => {
     const holder = makeContext(undefined, {
       role: "PROFESSIONAL",
       permissions: permissionsForMembership("PROFESSIONAL", true),
@@ -180,12 +180,14 @@ describe("configuracao da organizacao", () => {
       ["settings.notifications", "updatedAt", "updatedBy"].sort(),
     );
 
-    expect(() =>
-      planUpdateAgendaSettings(holder, holder.snapshot.organization.settings.agenda),
-    ).toThrow("Sem permissao para esta acao.");
+    const agenda = planUpdateAgendaSettings(holder, holder.snapshot.organization.settings.agenda);
+    expect(collections(agenda.writes)).toEqual(["organizations", "auditLogs"]);
+    expect(Object.keys(dataOf(agenda.writes[0])).sort()).toEqual(
+      ["settings.agenda", "updatedAt", "updatedBy"].sort(),
+    );
   });
 
-  it("recusa os avisos a profissional que nao e o titular", () => {
+  it("recusa avisos e horario a profissional que nao e o titular", () => {
     const member = makeContext(undefined, {
       role: "PROFESSIONAL",
       permissions: permissionsForMembership("PROFESSIONAL", false),
@@ -193,6 +195,9 @@ describe("configuracao da organizacao", () => {
     expect(() => planUpdateNotificationSettings(member, notifications)).toThrow(
       "Sem permissao para esta acao.",
     );
+    expect(() =>
+      planUpdateAgendaSettings(member, member.snapshot.organization.settings.agenda),
+    ).toThrow("Sem permissao para esta acao.");
   });
 
   it("valida e normaliza o horario de atendimento antes de gravar", () => {

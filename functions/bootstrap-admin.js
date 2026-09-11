@@ -59,8 +59,9 @@ try {
   const salt = randomBytes(16).toString("hex");
   const db = getFirestore(), batch = db.batch();
   // A operadora nao tem validade: ela nunca alcanca dado de tenant, e situacao
-  // e validade so nascem do webhook ou de concessao registrada.
-  batch.create(db.doc(paths.account(user.uid)), { userId: user.uid, email, displayName: "Guilherme Luizatto", platformRole: "PLATFORM_ADMIN", professionId: null, organizationId: null, modules: [...APP_MODULES], status: "ACTIVE", mustChangePassword: true, createdAt: new Date().toISOString() });
+  // e validade so nascem do webhook ou de concessao registrada. E a chave
+  // mestra: so ela cria, suspende e reativa outros administradores.
+  batch.create(db.doc(paths.account(user.uid)), { userId: user.uid, email, displayName: "Guilherme Luizatto", platformRole: "PLATFORM_ADMIN", platformMaster: true, professionId: null, organizationId: null, modules: [...APP_MODULES], status: "ACTIVE", mustChangePassword: true, createdAt: new Date().toISOString() });
   batch.create(db.doc(paths.initialPassword(user.uid)), { salt, hash: scryptSync(password, salt, 32).toString("hex") });
   await batch.commit();
   console.log("Administrador criado. Credencial somente em .local/firebase-admin-initial-access.txt.");

@@ -12,7 +12,7 @@ export const MODULE_LABELS: Record<AppModule, string> = {
 const PERMISSION_MODULE: Partial<Record<string, AppModule>> = {
   appointment: "agenda", client: "clientes", conversation: "mensagens", transaction: "financeiro",
   rule: "agente", aiDecision: "agente", notification: "dashboard", organization: "dashboard",
-  notificationSettings: "configuracoes", auditLog: "configuracoes",
+  notificationSettings: "configuracoes", agendaSettings: "dashboard", auditLog: "configuracoes",
 };
 
 /**

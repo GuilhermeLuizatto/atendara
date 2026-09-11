@@ -18,3 +18,7 @@ export const accessUpdateSchema = z.object({
   status: z.enum(["ACTIVE", "SUSPENDED"]), modules: z.array(z.enum(APP_MODULES)).min(1),
 }).strict();
 export const accessGrantSchema = initialGrantSchema.extend({ organizationId: z.string().min(1).max(128) }).strict();
+// Mesmo formato de `createPlatformAdmin` (`functions/platform-admins.js`).
+export const platformAdminRegistrationSchema = z.object({
+  displayName: z.string().trim().min(3).max(100), email: z.email().trim().toLowerCase(),
+}).strict();

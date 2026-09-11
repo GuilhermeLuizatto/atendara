@@ -57,6 +57,7 @@ const ADMIN_PERMISSIONS: Permission[] = [
   "transaction:delete",
   "organization:update",
   "notificationSettings:update",
+  "agendaSettings:update",
   "member:invite",
   "member:update",
   "member:remove",
@@ -99,10 +100,12 @@ export const ROLE_DESCRIPTIONS: Record<Role, string> = {
  * configuraria os avisos que a propria organizacao envia. A lista e fechada de
  * proposito — ser titular nao e ser ADMIN, e nenhum outro membro ganha nada por
  * ela. Espelha `organizationHolder()` nas rules, que so abre para o titular a
- * troca de `settings.notifications` e a leitura de `privacyRequests`.
+ * troca de `settings.notifications` e `settings.agenda` e a leitura de
+ * `privacyRequests`.
  */
 export const ORGANIZATION_HOLDER_PERMISSIONS: readonly Permission[] = [
   "notificationSettings:update",
+  "agendaSettings:update",
   "privacy:export",
   "privacy:erase",
 ];
@@ -144,11 +147,19 @@ export function hasAnyPermission(
  * Nas duas pontas a permissao so vale com segundo fator na sessao; aqui fica o
  * "o que", la fica o "com qual prova".
  */
+/**
+ * Atos so da chave mestra (`platformMaster`). Ficam fora do papel de proposito:
+ * um administrador comprometido nao cria outros administradores. Espelha
+ * `masterOf()` nas callables; as rules nao precisam, porque contas so nascem e
+ * mudam pelo backend.
+ */
+export const PLATFORM_MASTER_PERMISSIONS: readonly PlatformPermission[] = ["platformAdmin:manage"];
+
 export const PLATFORM_ROLE_PERMISSIONS: Record<
   AccountAccess["platformRole"],
   PlatformPermission[]
 > = {
-  PLATFORM_ADMIN: [...PLATFORM_PERMISSIONS],
+  PLATFORM_ADMIN: PLATFORM_PERMISSIONS.filter((permission) => !PLATFORM_MASTER_PERMISSIONS.includes(permission)),
   PROFESSIONAL: [],
 };
 
@@ -157,5 +168,8 @@ export function hasPlatformPermission(
   permission: PlatformPermission,
 ): boolean {
   if (!account || account.status !== "ACTIVE" || account.mustChangePassword) return false;
+  if (PLATFORM_MASTER_PERMISSIONS.includes(permission)) {
+    return account.platformRole === "PLATFORM_ADMIN" && account.platformMaster === true;
+  }
   return PLATFORM_ROLE_PERMISSIONS[account.platformRole].includes(permission);
 }

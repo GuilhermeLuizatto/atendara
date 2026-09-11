@@ -36,7 +36,7 @@ const TOTP = { firebase: { sign_in_provider: "password", sign_in_second_factor: 
 const PASSWORD_ONLY = { firebase: { sign_in_provider: "password" } };
 const request = (data, { uid = "admin", token = TOTP } = {}) => ({ auth: { uid, token: { auth_time: Date.now() / 1000, ...token } }, data });
 const registration = extra => ({ email: "teste@example.com", displayName: "Teste profissional", professionId: "PSYCHOLOGIST", modules: ["agenda"], ...extra });
-const grant = extra => ({ organizationId: "org-p", kind: "PILOT", until: inDays(30), reason: "Piloto combinado com a clinica.", ...extra });
+const grant = extra => ({ organizationId: "org-p", kind: "PILOT", until: inDays(10), reason: "Piloto combinado com a clinica.", ...extra });
 const writesTo = path => mock.writes.filter(write => write.path === path);
 const auditWrites = () => mock.writes.filter(write => write.path.startsWith("platformAuditLogs/"));
 
@@ -131,7 +131,7 @@ describe("Concessao manual registrada", () => {
   });
 
   it("concede, grava a concessao, o portao e o registro na mesma transacao", async () => {
-    const until = inDays(20);
+    const until = inDays(12);
     await grantAccess(request(grant({ until })));
     const [grantWrite] = writesTo(paths.platformAccessGrant("org-p"));
     const [accountWrite] = writesTo(paths.account("professional"));
@@ -196,7 +196,7 @@ describe("Pontos de escrita da validade e atestado do aplicativo", () => {
   });
 
   it("toda callable exige App Check; o webhook, que o gateway chama, nao", () => {
-    const callables = ["registerProfessional", "updateAccount", "completeInitialPassword", "grantAccess", "revokeAccess", "createSubscriptionCheckout", "openBillingPortal", "cancelPlatformSubscription", "exportClientData", "eraseClientData", "startOrganizationExport", "exportOrganizationPage", "deleteOrganization"];
+    const callables = ["registerProfessional", "updateAccount", "completeInitialPassword", "grantAccess", "revokeAccess", "createPlatformAdmin", "setPlatformAdminStatus", "createSubscriptionCheckout", "openBillingPortal", "cancelPlatformSubscription", "exportClientData", "eraseClientData", "startOrganizationExport", "exportOrganizationPage", "deleteOrganization"];
     for (const name of callables) expect(backend[name].options, name).toMatchObject({ enforceAppCheck: true });
     expect(backend.stripeWebhook.options.enforceAppCheck).toBeUndefined();
   });

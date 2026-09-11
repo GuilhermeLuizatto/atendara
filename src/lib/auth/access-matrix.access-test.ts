@@ -68,7 +68,7 @@ let professionalUid: string;
 let temporaryPassword: string;
 let organizationId: string;
 
-function futureISO(days = 30): string {
+function futureISO(days = 10): string {
   return new Date(Date.now() + days * 86_400_000).toISOString();
 }
 
@@ -390,7 +390,7 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
       callAsSignedIn("grantAccess", {
         organizationId,
         kind: "COURTESY",
-        until: futureISO(60),
+        until: futureISO(10),
         reason: "Tentativa do proprio profissional.",
       }),
     ).rejects.toMatchObject({ code: "permission-denied" });

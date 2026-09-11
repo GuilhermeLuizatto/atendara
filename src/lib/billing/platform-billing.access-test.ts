@@ -426,7 +426,7 @@ describe("Etapa 3 — o webhook e a unica autoridade", () => {
     ).toMatchObject({ outcome: "OUT_OF_ORDER" });
   });
 
-  it("falha de pagamento marca a fatura e mantem o acesso ate o vencimento", async () => {
+  it("falha de pagamento marca a fatura e fecha o painel na hora", async () => {
     const antes = await accountOf(ownerUid);
 
     await deliver(invoiceEvent("evt_falha", "invoice.payment_failed", "in_falhou", PERIOD_2_END, "2026-11-09T12:00:00.000Z"));
@@ -437,11 +437,14 @@ describe("Etapa 3 — o webhook e a unica autoridade", () => {
     expect(
       (await admin.firestore().doc(paths.platformInvoice("in_falhou")).get()).data(),
     ).toMatchObject({ status: "PAST_DUE" });
-    // Inadimplencia recente nao derruba o atendimento: a data e a mesma.
+    // Cartao recusado fecha o painel na hora, por decisao do titular: a conta
+    // vai a PENDING e as regras exigem ACTIVE, qualquer que seja a data.
     expect(await accountOf(ownerUid)).toMatchObject({
       subscriptionStatus: "PENDING",
       accessUntil: antes.accessUntil,
     });
+    await signInWithEmailAndPassword(auth, OWNER.email, OWNER.password);
+    await expectDenied(getDoc(doc(db, paths.document(ownerOrg, "clients", "qualquer"))));
   });
 });
 

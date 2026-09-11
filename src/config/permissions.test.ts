@@ -4,6 +4,7 @@ import { PERMISSIONS, PLATFORM_PERMISSIONS, ROLES, type Role } from "@/types";
 
 import {
   ORGANIZATION_HOLDER_PERMISSIONS,
+  PLATFORM_MASTER_PERMISSIONS,
   PLATFORM_ROLE_PERMISSIONS,
   ROLE_PERMISSIONS,
   hasPermission,
@@ -65,18 +66,20 @@ describe("matriz de permissoes", () => {
     }
   });
 
-  it("reserva a configuracao de avisos a OWNER, ADMIN e ao titular", () => {
+  it("reserva a configuracao de avisos e do horario a OWNER, ADMIN e ao titular", () => {
     const allowed: Role[] = ["OWNER", "ADMIN"];
-    for (const role of ROLES) {
-      expect(hasPermission(role, "notificationSettings:update")).toBe(allowed.includes(role));
-      expect(permissionsForMembership(role, true)).toContain("notificationSettings:update");
+    for (const permission of ["notificationSettings:update", "agendaSettings:update"] as const) {
+      for (const role of ROLES) {
+        expect(hasPermission(role, permission)).toBe(allowed.includes(role));
+        expect(permissionsForMembership(role, true)).toContain(permission);
+      }
     }
   });
 
   it("da ao titular so a lista fechada, alem do proprio papel", () => {
-    // Espelha `organizationHolder()` nas rules: avisos e pedidos de titular.
+    // Espelha `organizationHolder()` nas rules: avisos, horario e pedidos de titular.
     expect(new Set(ORGANIZATION_HOLDER_PERMISSIONS)).toEqual(
-      new Set(["notificationSettings:update", "privacy:export", "privacy:erase"]),
+      new Set(["notificationSettings:update", "agendaSettings:update", "privacy:export", "privacy:erase"]),
     );
     const professional = new Set(permissionsForRole("PROFESSIONAL"));
     const gained = permissionsForMembership("PROFESSIONAL", true).filter(
@@ -121,12 +124,15 @@ describe("matriz de permissoes", () => {
     }
   });
 
-  it("nao da a operadora nenhuma permissao de tenant", () => {
+  it("nao da a operadora nenhuma permissao de tenant e reserva gerir administradores a chave mestra", () => {
     const tenant = new Set<string>(PERMISSIONS);
-    for (const permission of PLATFORM_ROLE_PERMISSIONS.PLATFORM_ADMIN) {
+    for (const permission of PLATFORM_PERMISSIONS) {
       expect(tenant.has(permission)).toBe(false);
     }
-    expect(new Set(PLATFORM_ROLE_PERMISSIONS.PLATFORM_ADMIN)).toEqual(new Set(PLATFORM_PERMISSIONS));
+    expect(new Set([...PLATFORM_ROLE_PERMISSIONS.PLATFORM_ADMIN, ...PLATFORM_MASTER_PERMISSIONS])).toEqual(
+      new Set(PLATFORM_PERMISSIONS),
+    );
+    expect(PLATFORM_ROLE_PERMISSIONS.PLATFORM_ADMIN).not.toContain("platformAdmin:manage");
   });
 
   it("reserva os atos de plataforma a operadora ativa", () => {
@@ -149,6 +155,10 @@ describe("matriz de permissoes", () => {
     expect(hasPlatformPermission(operator, "accessGrant:create")).toBe(true);
     expect(hasPlatformPermission({ ...operator, status: "SUSPENDED" }, "accessGrant:create")).toBe(false);
     expect(hasPlatformPermission({ ...operator, mustChangePassword: true }, "account:list")).toBe(false);
+    expect(hasPlatformPermission(operator, "platformAdmin:manage")).toBe(false);
+    expect(hasPlatformPermission({ ...operator, platformMaster: true }, "platformAdmin:manage")).toBe(true);
+    expect(hasPlatformPermission({ ...operator, platformMaster: true, status: "SUSPENDED" }, "platformAdmin:manage")).toBe(false);
+    expect(hasPlatformPermission({ ...professional, platformMaster: true }, "platformAdmin:manage")).toBe(false);
     for (const permission of PLATFORM_PERMISSIONS) {
       expect(hasPlatformPermission(professional, permission)).toBe(false);
     }

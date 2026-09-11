@@ -3,6 +3,7 @@ import { permissionsForRole } from "@/config/permissions";
 import { getProfession } from "@/config/professions";
 import { ruleInputSchema, validateRuleInput } from "@/lib/rules/validation";
 import { decide } from "@/lib/ai/decision-engine";
+import { decisionInputPreview } from "@/lib/privacy/decision-preview";
 import { buildMockDataset } from "@/mocks";
 import {
   dispatchDelivery,
@@ -996,7 +997,10 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       messageId,
       clientId: client.id,
       professionalId: conversation.professionalId,
-      inputPreview: body.slice(0, 500),
+      inputPreview: decisionInputPreview(
+        body,
+        getProfession(this.snapshot.organization.primaryProfession).sensitiveDataProfile,
+      ),
       decidedAt: now,
       evaluatedAt: evaluationDate.toISOString(),
       latencyMs: Math.round(performance.now() - started),
@@ -1274,7 +1278,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
   }
 
   async updateAgendaSettings(settings: AgendaSettings): Promise<void> {
-    this.assertPermission("organization:update");
+    this.assertPermission("agendaSettings:update");
     const agenda = validateAgendaSettings(
       settings,
       getProfession(this.snapshot.organization.primaryProfession).modalities,

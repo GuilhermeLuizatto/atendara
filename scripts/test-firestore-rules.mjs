@@ -326,15 +326,18 @@ try {
   await denied(updateDoc(doc(db("ownerRole"), own("aiDecisions")), { inputPreview: "[conteudo removido a pedido do titular dos dados]" }));
 
   // ------------------------------------------------------------- Etapa 6
-  // O titular da organizacao (`ownerId`) configura os proprios avisos sem papel
-  // administrativo — e nada mais do documento. "a" e PROFESSIONAL e titular de
+  // O titular da organizacao (`ownerId`) configura os proprios avisos e o
+  // proprio horario sem papel administrativo — e nada mais do documento. "a" e PROFESSIONAL e titular de
   // org-a; "b" e PROFESSIONAL de org-b, cujo titular tambem e "a".
   const notificationSettings = { enabled: false, verifiedSenderChannels: [], rules: [] };
   const orgA = () => paths.organization("org-a");
   await allowed(updateDoc(doc(db("a"), orgA()), { "settings.notifications": notificationSettings, updatedAt: new Date().toISOString(), updatedBy: "a" }));
   await denied(updateDoc(doc(db("a"), orgA()), { name: "Renomeada pelo titular" }));
   await denied(updateDoc(doc(db("a"), orgA()), { "settings.notifications": notificationSettings, name: "Junto com os avisos" }));
-  await denied(updateDoc(doc(db("a"), orgA()), { "settings.agenda": { workdayStart: "06:00" } }));
+  await allowed(updateDoc(doc(db("a"), orgA()), { "settings.agenda": { workdayStart: "06:00" }, updatedAt: new Date().toISOString(), updatedBy: "a" }));
+  await denied(updateDoc(doc(db("a"), orgA()), { "settings.agenda": "sempre" }));
+  await denied(updateDoc(doc(db("a"), orgA()), { "settings.agenda": { workdayStart: "06:00" }, name: "Junto com o horario" }));
+  await denied(updateDoc(doc(db("b"), paths.organization("org-b")), { "settings.agenda": { workdayStart: "06:00" } }));
   await denied(updateDoc(doc(db("a"), orgA()), { "settings.ai": { allowAutonomousReplies: true } }));
   await denied(updateDoc(doc(db("a"), orgA()), { "settings.notifications": notificationSettings, ownerId: "b" }));
   await denied(updateDoc(doc(db("a"), orgA()), { "settings.notifications": "ligado" }));
@@ -349,6 +352,6 @@ try {
   // O caminho administrativo nao mudou: ADMIN continua alterando a agenda.
   await allowed(updateDoc(doc(db("adminRole"), orgA()), { "settings.agenda": { workdayStart: "07:00" } }));
 
-  assert.equal(checks, 202);
+  assert.equal(checks, 205);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

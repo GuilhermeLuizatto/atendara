@@ -24,7 +24,7 @@ import { readPage } from "@/lib/firebase/paging";
 import { paths } from "@/lib/firebase/paths";
 import { hasRequiredSecondFactor } from "@/lib/platform/access-gate";
 import { passwordError } from "./passwords";
-import type { AccountAccess, AccessUpdate, ProfessionalRegistration } from "@/types/access";
+import type { AccountAccess, AccessUpdate, PlatformAdminRegistration, ProfessionalRegistration } from "@/types/access";
 import type { AccessGrantInput } from "@/types/platform";
 import type { AuthenticatedUser, Page, PageRequest } from "@/types";
 
@@ -269,6 +269,13 @@ class FirebaseAuthAdapter implements AuthAdapter {
   }
   async revokeAccess(organizationId: string, reason: string): Promise<void> {
     await callable<{ organizationId: string; reason: string }, { ok: boolean }>("revokeAccess")({ organizationId, reason });
+  }
+  async createPlatformAdmin(input: PlatformAdminRegistration): Promise<{ userId: string; temporaryPassword: string }> {
+    const result = await callable<PlatformAdminRegistration, { userId: string; temporaryPassword: string }>("createPlatformAdmin")(input);
+    return result.data;
+  }
+  async setPlatformAdminStatus(userId: string, status: AccountAccess["status"]): Promise<void> {
+    await callable<{ userId: string; status: AccountAccess["status"] }, { ok: boolean }>("setPlatformAdminStatus")({ userId, status });
   }
 }
 

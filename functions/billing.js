@@ -67,10 +67,10 @@ function appBaseUrl() {
   const configured = process.env.APP_BASE_URL?.trim();
   if (!configured) {
     if (emulator) return "http://127.0.0.1:3000";
-    throw new HttpsError("failed-precondition", "O endereco de retorno da cobranca (APP_BASE_URL) nao esta configurado neste ambiente.");
+    throw new HttpsError("failed-precondition", "O endereço de retorno da cobrança (APP_BASE_URL) não está configurado neste ambiente.");
   }
   if (!emulator && !configured.startsWith("https://")) {
-    throw new HttpsError("failed-precondition", "O endereco de retorno da cobranca (APP_BASE_URL) precisa usar https.");
+    throw new HttpsError("failed-precondition", "O endereço de retorno da cobrança (APP_BASE_URL) precisa usar https.");
   }
   return configured.replace(/\/$/, "");
 }
@@ -93,7 +93,7 @@ async function callerAccount(request) {
   const snapshot = await db().doc(paths.account(request.auth.uid)).get();
   const account = snapshot.data();
   if (!account || account.status !== "ACTIVE" || account.mustChangePassword) {
-    throw new HttpsError("permission-denied", "Cadastro nao liberado.");
+    throw new HttpsError("permission-denied", "Cadastro não liberado.");
   }
   return account;
 }
@@ -110,11 +110,11 @@ async function subscriptionOwner(request) {
   const account = await callerAccount(request);
   const organizationId = account.organizationId;
   if (!organizationId) {
-    throw new HttpsError("failed-precondition", "Esta conta nao tem organizacao para assinar.");
+    throw new HttpsError("failed-precondition", "Esta conta não tem organização para assinar.");
   }
 
   const organization = (await db().doc(paths.organization(organizationId)).get()).data();
-  if (!organization) throw new HttpsError("failed-precondition", "Organizacao nao encontrada.");
+  if (!organization) throw new HttpsError("failed-precondition", "Organização não encontrada.");
 
   const member = (
     await db().doc(paths.document(organizationId, "members", request.auth.uid)).get()
@@ -125,7 +125,7 @@ async function subscriptionOwner(request) {
     organization.ownerId === request.auth.uid ||
     (member?.role === "OWNER" && member?.status === "ACTIVE");
   if (!owns) {
-    throw new HttpsError("permission-denied", "Somente o responsavel pela organizacao gerencia a assinatura.");
+    throw new HttpsError("permission-denied", "Somente o responsável pela organização gerencia a assinatura.");
   }
 
   return { account, organizationId, organization };
@@ -136,11 +136,11 @@ function gatewayFailure(error) {
     logger.error("Gateway recusou a chamada.", { status: error.status, message: error.message });
     return new HttpsError(
       error.status === 503 ? "failed-precondition" : "internal",
-      error.status === 503 ? error.message : "Nao foi possivel falar com o gateway agora.",
+      error.status === 503 ? error.message : "Não foi possível falar com o gateway agora.",
     );
   }
-  logger.error("Falha inesperada na cobranca.", { message: String(error) });
-  return new HttpsError("internal", "Nao foi possivel concluir a operacao.");
+  logger.error("Falha inesperada na cobrança.", { message: String(error) });
+  return new HttpsError("internal", "Não foi possível concluir a operação.");
 }
 
 // ------------------------------------------------------------------ callables
@@ -159,31 +159,31 @@ export const createSubscriptionCheckout = onCall(callOptions, async (request) =>
   // checkout para outro membro cobraria um cartao cujo vinculo seria recusado
   // depois: dinheiro capturado sem acesso liberado.
   if (organization.ownerId !== request.auth.uid) {
-    throw new HttpsError("permission-denied", "Somente o titular da organizacao contrata a assinatura.");
+    throw new HttpsError("permission-denied", "Somente o titular da organização contrata a assinatura.");
   }
   const baseUrl = appBaseUrl();
   await consumeRateLimit(request.auth.uid, "createSubscriptionCheckout");
   const parsed = checkoutInput.safeParse(request.data);
-  if (!parsed.success) throw new HttpsError("invalid-argument", "Escolha um plano valido.");
+  if (!parsed.success) throw new HttpsError("invalid-argument", "Escolha um plano válido.");
 
   const plan = findPlan(parsed.data.planId);
-  if (!plan || !plan.active) throw new HttpsError("invalid-argument", "Plano indisponivel.");
+  if (!plan || !plan.active) throw new HttpsError("invalid-argument", "Plano indisponível.");
 
   const price = gatewayPriceFor(plan.id);
   if (!price) {
-    throw new HttpsError("failed-precondition", "O catalogo de precos do gateway nao esta configurado neste ambiente.");
+    throw new HttpsError("failed-precondition", "O catálogo de preços do gateway não está configurado neste ambiente.");
   }
 
   const subscriptionRef = db().doc(paths.platformSubscription(organizationId));
   const current = (await subscriptionRef.get()).data();
   if (current && (current.status === "ACTIVE" || current.status === "TRIALING")) {
-    throw new HttpsError("failed-precondition", "Esta organizacao ja tem uma assinatura vigente.");
+    throw new HttpsError("failed-precondition", "Esta organização já tem uma assinatura vigente.");
   }
   // Inadimplente ainda e assinatura viva: o gateway segue retentando o cartao.
   // Uma segunda cobraria duas vezes, e os eventos da antiga continuariam mexendo
   // no acesso da nova. Regulariza-se pelo portal.
   if (current?.status === "PAST_DUE") {
-    throw new HttpsError("failed-precondition", "Ha uma cobranca pendente. Atualize o pagamento em Gerenciar pagamento.");
+    throw new HttpsError("failed-precondition", "Há uma cobrança pendente. Atualize o pagamento em Gerenciar pagamento.");
   }
 
   try {
@@ -212,7 +212,7 @@ export const createSubscriptionCheckout = onCall(callOptions, async (request) =>
         client_reference_id: organizationId,
         line_items: [{ price, quantity: 1 }],
         locale: "pt-BR",
-        success_url: `${baseUrl}/assinatura/?retorno=concluido`,
+        success_url: `${baseUrl}/assinatura/?retorno=concluído`,
         cancel_url: `${baseUrl}/assinatura/?retorno=cancelado`,
         metadata: { organizationId, subscriberUserId: account.userId, planId: plan.id },
         subscription_data: {
@@ -241,7 +241,7 @@ export const openBillingPortal = onCall(callOptions, async (request) => {
   await consumeRateLimit(request.auth.uid, "openBillingPortal");
   const subscription = (await db().doc(paths.platformSubscription(organizationId)).get()).data();
   const customerId = subscription?.gateway?.customerId;
-  if (!customerId) throw new HttpsError("failed-precondition", "Esta organizacao ainda nao tem assinatura.");
+  if (!customerId) throw new HttpsError("failed-precondition", "Esta organização ainda não tem assinatura.");
 
   try {
     const session = await stripeRequest("billing_portal/sessions", {
@@ -265,7 +265,7 @@ export const cancelPlatformSubscription = onCall(callOptions, async (request) =>
   await consumeRateLimit(request.auth.uid, "cancelPlatformSubscription");
   const subscription = (await db().doc(paths.platformSubscription(organizationId)).get()).data();
   const subscriptionId = subscription?.gateway?.subscriptionId;
-  if (!subscriptionId) throw new HttpsError("failed-precondition", "Nao ha assinatura para cancelar.");
+  if (!subscriptionId) throw new HttpsError("failed-precondition", "Não há assinatura para cancelar.");
 
   try {
     await stripeRequest(`subscriptions/${encodeURIComponent(subscriptionId)}`, {
@@ -424,14 +424,14 @@ const REJECT = (reason, organizationId = null) => ({ outcome: "REJECTED", reason
  */
 async function handleCheckoutCompleted(transaction, event) {
   const session = event.data.object;
-  if (session.mode !== "subscription") return SKIP("Checkout que nao e de assinatura.");
+  if (session.mode !== "subscription") return SKIP("Checkout que não é de assinatura.");
 
   const organizationId = session.client_reference_id ?? organizationFromEvent(session);
   const subscriberUserId = session.metadata?.subscriberUserId ?? null;
   const planId = session.metadata?.planId ?? null;
   const customerId = customerIdOf(session);
   if (!organizationId || !subscriberUserId || !customerId) {
-    return SKIP("Sessao sem vinculo declarado.", organizationId);
+    return SKIP("Sessão sem vínculo declarado.", organizationId);
   }
 
   const subscriptionRef = db().doc(paths.platformSubscription(organizationId));
@@ -446,17 +446,17 @@ async function handleCheckoutCompleted(transaction, event) {
   // As duas pontas do vinculo, conferidas contra o nosso proprio banco. Nada
   // do que veio no evento e aceito como prova de quem manda em qual tenant.
   if (!account.exists || account.data().organizationId !== organizationId) {
-    return REJECT("Assinante nao pertence a organizacao declarada.", organizationId);
+    return REJECT("Assinante não pertence à organização declarada.", organizationId);
   }
   if (!organization.exists || organization.data().ownerId !== subscriberUserId) {
-    return REJECT("Assinante nao e o responsavel pela organizacao.", organizationId);
+    return REJECT("Assinante não é o responsável pela organização.", organizationId);
   }
   if (mapping.exists && mapping.data().organizationId !== organizationId) {
-    return REJECT("Cliente do gateway ja pertence a outra organizacao.", organizationId);
+    return REJECT("Cliente do gateway já pertence à outra organização.", organizationId);
   }
   const currentCustomer = existing.data()?.gateway?.customerId;
   if (currentCustomer && currentCustomer !== customerId) {
-    return REJECT("Organizacao ja associada a outro cliente do gateway.", organizationId);
+    return REJECT("Organização já associada a outro cliente do gateway.", organizationId);
   }
 
   const stamp = now();
@@ -507,23 +507,23 @@ async function handleCheckoutCompleted(transaction, event) {
 async function handleSubscriptionEvent(transaction, event) {
   const object = event.data.object;
   const organizationId = await resolveOrganization(transaction, object);
-  if (!organizationId) return SKIP("Evento sem organizacao associada.");
+  if (!organizationId) return SKIP("Evento sem organização associada.");
 
   const subscriptionRef = db().doc(paths.platformSubscription(organizationId));
   const existing = (await transaction.get(subscriptionRef)).data() ?? null;
   const gatewayCreatedAt = fromUnixSeconds(event.created) ?? now();
 
   if (isOutOfOrder(existing?.lastEventAt ?? null, gatewayCreatedAt)) {
-    return { outcome: "OUT_OF_ORDER", reason: "Evento anterior ao ultimo aplicado.", organizationId };
+    return { outcome: "OUT_OF_ORDER", reason: "Evento anterior ao último aplicado.", organizationId };
   }
   if (supersededBy(existing, object.id)) {
-    return REJECT("Evento de outra assinatura, diferente da vigente nesta organizacao.", organizationId);
+    return REJECT("Evento de outra assinatura, diferente da vigente nesta organização.", organizationId);
   }
 
   const subscriberUserId = object.metadata?.subscriberUserId ?? existing?.subscriberUserId ?? null;
   if (!subscriberUserId) return SKIP("Assinatura sem assinante conhecido.", organizationId);
   if (existing?.subscriberUserId && existing.subscriberUserId !== subscriberUserId) {
-    return REJECT("Assinante divergente do vinculo registrado.", organizationId);
+    return REJECT("Assinante divergente do vínculo registrado.", organizationId);
   }
   // Sem vinculo anterior, este evento seria o primeiro a apontar a organizacao
   // para alguem — e `customer.subscription.created` costuma chegar ANTES do
@@ -531,7 +531,7 @@ async function handleSubscriptionEvent(transaction, event) {
   if (!existing?.subscriberUserId) {
     const organization = (await transaction.get(db().doc(paths.organization(organizationId)))).data();
     if (organization?.ownerId !== subscriberUserId) {
-      return REJECT("Assinante nao e o responsavel pela organizacao.", organizationId);
+      return REJECT("Assinante não é o responsável pela organização.", organizationId);
     }
   }
 
@@ -599,7 +599,7 @@ async function handleInvoiceEvent(transaction, event) {
   if (!invoiceId) return SKIP("Fatura sem identificador.");
 
   const organizationId = await resolveOrganization(transaction, invoice);
-  if (!organizationId) return SKIP("Fatura sem organizacao associada.");
+  if (!organizationId) return SKIP("Fatura sem organização associada.");
 
   const invoiceRef = db().doc(paths.platformInvoice(invoiceId));
   const subscriptionRef = db().doc(paths.platformSubscription(organizationId));
@@ -612,10 +612,10 @@ async function handleInvoiceEvent(transaction, event) {
   const gatewayCreatedAt = fromUnixSeconds(event.created) ?? now();
 
   if (isOutOfOrder(stored?.lastEventAt ?? null, gatewayCreatedAt)) {
-    return { outcome: "OUT_OF_ORDER", reason: "Fatura ja refletiu um evento mais recente.", organizationId };
+    return { outcome: "OUT_OF_ORDER", reason: "Fatura já refletiu um evento mais recente.", organizationId };
   }
   if (stored && stored.organizationId !== organizationId) {
-    return REJECT("Fatura pertence a outra organizacao.", organizationId);
+    return REJECT("Fatura pertence à outra organização.", organizationId);
   }
 
   const status = INVOICE_STATUS_BY_EVENT[event.type] ?? stored?.status ?? "OPEN";
@@ -710,7 +710,7 @@ async function handleRefundEvent(transaction, event) {
   const gatewayCreatedAt = fromUnixSeconds(event.created) ?? now();
 
   if (isOutOfOrder(stored.lastEventAt ?? null, gatewayCreatedAt)) {
-    return { outcome: "OUT_OF_ORDER", reason: "Fatura ja refletiu um evento mais recente.", organizationId };
+    return { outcome: "OUT_OF_ORDER", reason: "Fatura já refletiu um evento mais recente.", organizationId };
   }
 
   const refunded = charge.amount_refunded ?? 0;
@@ -783,13 +783,13 @@ export async function applyGatewayEvent(event) {
   return db().runTransaction(async (transaction) => {
     const already = await transaction.get(eventRef);
     if (already.exists) {
-      return { outcome: "DUPLICATE", reason: "Evento ja processado.", organizationId: already.data().organizationId ?? null };
+      return { outcome: "DUPLICATE", reason: "Evento já processado.", organizationId: already.data().organizationId ?? null };
     }
 
     const handler = HANDLERS[event.type];
     const result = handler
       ? await handler(transaction, event)
-      : SKIP("Tipo de evento sem efeito sobre acesso ou cobranca.");
+      : SKIP("Tipo de evento sem efeito sobre acesso ou cobrança.");
 
     transaction.create(eventRef, {
       id: event.id,
@@ -817,22 +817,22 @@ export async function applyGatewayEvent(event) {
  */
 export const stripeWebhook = onRequest(webhookOptions, async (request, response) => {
   if (request.method !== "POST") {
-    response.status(405).send("Metodo nao suportado.");
+    response.status(405).send("Método não suportado.");
     return;
   }
 
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) {
     logger.error("Webhook sem segredo configurado.");
-    response.status(503).send("Cobranca nao configurada.");
+    response.status(503).send("Cobrança não configurada.");
     return;
   }
 
   const event = verifyWebhookSignature(request.rawBody, request.get("stripe-signature"), secret);
   if (!event || typeof event.id !== "string" || typeof event.type !== "string") {
     // Sem detalhe na resposta: quem nao assina corretamente nao merece pista.
-    logger.warn("Webhook recusado por assinatura invalida.");
-    response.status(400).send("Assinatura invalida.");
+    logger.warn("Webhook recusado por assinatura inválida.");
+    response.status(400).send("Assinatura inválida.");
     return;
   }
 

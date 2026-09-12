@@ -43,17 +43,17 @@ interface ProfessionalRuleSeed {
 const PROFESSIONAL_RULE_SEEDS: ProfessionalRuleSeed[] = [
   {
     id: "rule-pricing",
-    name: "Informar precos",
+    name: "Informar preços",
     description:
-      "O agente pode informar o valor e a duracao do atendimento quando perguntado.",
+      "O agente pode informar o valor e a duração do atendimento quando perguntado.",
     category: "PRICING",
     enabled: true,
     priority: 100,
   },
   {
     id: "rule-scheduling",
-    name: "Informar horarios",
-    description: "O agente pode consultar a agenda e oferecer horarios livres.",
+    name: "Informar horários",
+    description: "O agente pode consultar a agenda e oferecer horários livres.",
     category: "SCHEDULING",
     enabled: true,
     priority: 90,
@@ -62,7 +62,7 @@ const PROFESSIONAL_RULE_SEEDS: ProfessionalRuleSeed[] = [
     id: "rule-confirmation",
     name: "Confirmar atendimento",
     description:
-      "O agente pode confirmar um atendimento ja agendado a pedido do cliente.",
+      "O agente pode confirmar um atendimento já agendado a pedido do cliente.",
     category: "CONFIRMATION",
     enabled: true,
     priority: 80,
@@ -71,16 +71,16 @@ const PROFESSIONAL_RULE_SEEDS: ProfessionalRuleSeed[] = [
     id: "rule-rescheduling",
     name: "Reagendar",
     description:
-      "O agente pode oferecer horarios alternativos e reservar a remarcacao.",
+      "O agente pode oferecer horários alternativos e reservar a remarcação.",
     category: "RESCHEDULING",
     enabled: true,
     priority: 70,
   },
   {
     id: "rule-location",
-    name: "Informar localizacao",
+    name: "Informar localização",
     description:
-      "O agente pode informar endereco, referencia e estacionamento proximo.",
+      "O agente pode informar endereço, referência e estacionamento próximo.",
     category: "LOCATION",
     enabled: true,
     priority: 60,
@@ -142,9 +142,9 @@ export function buildRules(ctx: GeneratorContext): AIRule[] {
     organizationId,
     ...stamp(now),
     professionalId: "prof-owner",
-    name: "Preco conforme a modalidade",
+    name: "Preço conforme a modalidade",
     description:
-      "Quando o cliente pergunta preco: se a modalidade dele for online, informar o valor online; caso contrario, o presencial.",
+      "Quando o cliente pergunta preço: se a modalidade dele for online, informar o valor online; caso contrário, o presencial.",
     level: "CONTEXTUAL",
     category: "PRICING",
     enabled: true,
@@ -179,9 +179,9 @@ export function buildRules(ctx: GeneratorContext): AIRule[] {
     organizationId,
     ...stamp(now),
     professionalId: "prof-owner",
-    name: "Nao oferecer horarios aos domingos",
+    name: "Não oferecer horários aos domingos",
     description:
-      "O agente nunca sugere domingo ao propor horarios, mesmo que a agenda esteja livre.",
+      "O agente nunca sugere domingo ao propor horários, mesmo que a agenda esteja livre.",
     level: "PREFERENCE",
     category: "AVAILABILITY",
     enabled: true,
@@ -196,7 +196,7 @@ export function buildRules(ctx: GeneratorContext): AIRule[] {
     source: "NATURAL_LANGUAGE",
     immutable: false,
     version: 1,
-    naturalLanguageInput: "Nao quero atender aos domingos.",
+    naturalLanguageInput: "Não quero atender aos domingos.",
     lastAppliedAt: null,
   };
 
@@ -243,7 +243,7 @@ export function buildNotifications(
       // O nome no titulo e o que torna o alerta acionavel de relance: sem ele,
       // varios alertas do mesmo tipo ficam indistinguiveis na lista.
       title: isRisk
-        ? `Possivel risco: ${clientName}`
+        ? `Possível risco: ${clientName}`
         : `${clientName} aguarda resposta`,
       body: decision.reason,
       professionalId: decision.professionalId,
@@ -267,7 +267,7 @@ export function buildNotifications(
       priority: "ATTENTION",
       status: "UNREAD",
       title: "Atendimento cancelado",
-      body: `${appointment.clientName} cancelou o horario de ${appointment.startsAt.slice(11, 16)}.`,
+      body: `${appointment.clientName} cancelou o horário de ${appointment.startsAt.slice(11, 16)}.`,
       professionalId: appointment.professionalId,
       target: { type: "appointment", id: appointment.id },
       channels: ["DASHBOARD"],
@@ -288,7 +288,7 @@ export function buildNotifications(
       priority: "ATTENTION",
       status: "READ",
       title: "Pagamento em atraso",
-      body: `${transaction.clientName} esta com pagamento pendente.`,
+      body: `${transaction.clientName} está com pagamento pendente.`,
       professionalId: transaction.professionalId,
       target: { type: "transaction", id: transaction.id },
       channels: ["DASHBOARD"],
@@ -305,7 +305,7 @@ export function buildNotifications(
     priority: "NORMAL",
     status: "READ",
     title: "Novo cadastro",
-    body: "Um novo contato foi cadastrado a partir do formulario do site.",
+    body: "Um novo contato foi cadastrado a partir do formulário do site.",
     professionalId: "prof-owner",
     target: null,
     channels: ["DASHBOARD"],
@@ -360,7 +360,7 @@ export function buildAuditLogs(
       ...stamp(atTime(shiftDays(today, -3), 16, 20)),
       actorType: "USER",
       actorId: "demo-user",
-      actorName: "Voce",
+      actorName: "Você",
       action: "RULE_ENABLED",
       resource: { type: "aiRule", id: editableRule.id },
       summary: `Regra "${editableRule.name}" ativada.`,
@@ -374,7 +374,7 @@ export function buildAuditLogs(
     ...stamp(atTime(shiftDays(today, -5), 8, 5)),
     actorType: "USER",
     actorId: "demo-user",
-    actorName: "Voce",
+    actorName: "Você",
     action: "LOGIN",
     resource: { type: "session", id: "demo-user" },
     summary: "Acesso ao painel.",

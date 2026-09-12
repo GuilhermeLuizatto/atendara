@@ -42,16 +42,16 @@ try {
     const savedUid = savedAccess.match(/^UID: (.+)$/m)?.[1];
     password = savedAccess.match(/^Senha inicial: (.+)$/m)?.[1];
     if (!user || savedEmail !== email || savedUid !== user.uid || !password) {
-      throw new Error("O acesso local existente nao corresponde a conta Firebase; revise manualmente.");
+      throw new Error("O acesso local existente não corresponde à conta Firebase; revise manualmente.");
     }
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
-    if (user) throw new Error("A conta Firebase ja existe sem credencial local; revise manualmente.");
+    if (user) throw new Error("A conta Firebase já existe sem credencial local; revise manualmente.");
     const file = await open(accessFilePath, "wx");
     password = `At!${randomBytes(24).toString("base64url")}`;
     try {
       user = await getAuth().createUser({ email, password, displayName: "Guilherme Luizatto" });
-      await file.writeFile(`Nexo — conta Firebase\nProjeto: ${projectId}\nEmail: ${email}\nUID: ${user.uid}\nSenha inicial: ${password}\nTroca obrigatoria no primeiro acesso. Nao e a senha do Google.\n`);
+      await file.writeFile(`Nexo — conta Firebase\nProjeto: ${projectId}\nEmail: ${email}\nUID: ${user.uid}\nSenha inicial: ${password}\nTroca obrigatória no primeiro acesso. Não é a senha do Google.\n`);
     } finally {
       await file.close();
     }

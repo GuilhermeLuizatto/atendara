@@ -44,7 +44,7 @@ function activateAppCheck(app: FirebaseApp): void {
     (self as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
   }
   if (!appCheckSiteKey) {
-    console.warn("App Check sem chave de site: as callables vao recusar este aplicativo.");
+    console.warn("App Check sem chave de site: as callables vão recusar este aplicativo.");
     return;
   }
   initializeAppCheck(app, {

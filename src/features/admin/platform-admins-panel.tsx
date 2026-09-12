@@ -21,7 +21,7 @@ import { usePagedList } from "./use-paged-list";
 export function PlatformAdminsPanel() {
   const { user } = useAuth();
   const fetchAccounts = useCallback((request: PageRequest) => authAdapter.listAccounts(request), []);
-  const accounts = usePagedList(fetchAccounts, "Nao foi possivel carregar as contas.");
+  const accounts = usePagedList(fetchAccounts, "Não foi possível carregar as contas.");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [credential, setCredential] = useState<{ email: string; password: string } | null>(null);
@@ -40,7 +40,7 @@ export function PlatformAdminsPanel() {
       await accounts.reload();
       form.reset();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Nao foi possivel cadastrar.");
+      setError(caught instanceof Error ? caught.message : "Não foi possível cadastrar.");
     } finally {
       setBusy(false);
     }
@@ -53,7 +53,7 @@ export function PlatformAdminsPanel() {
       await authAdapter.setPlatformAdminStatus(account.userId, status);
       await accounts.reload();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Nao foi possivel alterar.");
+      setError(caught instanceof Error ? caught.message : "Não foi possível alterar.");
     } finally {
       setBusy(false);
     }
@@ -65,8 +65,8 @@ export function PlatformAdminsPanel() {
   return (
     <div className="space-y-6">
       <p className="bg-surface-muted text-muted-foreground rounded-lg p-3 text-sm">
-        Administradores cadastram profissionais e concedem acesso. Criar, suspender e reativar administradores e
-        so da chave mestra. O novo administrador troca a senha inicial e cadastra o aplicativo autenticador no
+        Administradores cadastram profissionais e concedem acesso. Criar, suspender e reativar administradores é
+        só da chave mestra. O novo administrador troca a senha inicial e cadastra o aplicativo autenticador no
         primeiro acesso, e cada ato fica na trilha da operadora.
       </p>
       {shownError ? <p role="alert" className="text-danger text-sm">{shownError}</p> : null}

@@ -45,7 +45,7 @@ export function WaitingMessages({
             </Link>
           }
         >
-          Aguardando voce
+          Aguardando você
         </CardTitle>
       </CardHeader>
 
@@ -109,7 +109,7 @@ export function WaitingMessages({
                     ) : null}
                     {critical ? (
                       <Badge tone={ATTENTION_TONE.CRITICAL} dot>
-                        Automacao interrompida
+                        Automação interrompida
                       </Badge>
                     ) : null}
                     <span className="text-subtle-foreground text-[11px]">

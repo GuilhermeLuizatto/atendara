@@ -34,7 +34,7 @@ export function parse(schema, data) {
 export async function accountOf(request) {
   if (!request.auth) throw new HttpsError("unauthenticated", "Entre na sua conta.");
   const account = (await db().doc(paths.account(request.auth.uid)).get()).data();
-  if (!account || account.status !== "ACTIVE") throw new HttpsError("permission-denied", "Cadastro nao liberado.");
+  if (!account || account.status !== "ACTIVE") throw new HttpsError("permission-denied", "Cadastro não liberado.");
   return account;
 }
 
@@ -49,7 +49,7 @@ export async function adminOf(request) {
     throw new HttpsError("permission-denied", "Apenas o administrador pode gerenciar acessos.");
   }
   if (!hasRequiredSecondFactor(request.auth.token)) {
-    throw new HttpsError("permission-denied", "Entre com o segundo fator (aplicativo autenticador) para usar a administracao.");
+    throw new HttpsError("permission-denied", "Entre com o segundo fator (aplicativo autenticador) para usar a administração.");
   }
   return account;
 }

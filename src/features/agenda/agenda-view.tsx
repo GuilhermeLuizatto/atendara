@@ -38,7 +38,7 @@ import { useAgenda, type AgendaMode } from "./use-agenda";
 const MODE_OPTIONS: { value: AgendaMode; label: string }[] = [
   { value: "day", label: "Dia" },
   { value: "week", label: "Semana" },
-  { value: "month", label: "Mes" },
+  { value: "month", label: "Mês" },
 ];
 
 export function AgendaView() {
@@ -110,7 +110,7 @@ export function AgendaView() {
     <div className="space-y-5">
       <PageHeader
         title="Agenda"
-        description={`${agenda.visibleCount} ${agenda.visibleCount === 1 ? terminology.appointment.singularLower : terminology.appointment.pluralLower} no periodo.`}
+        description={`${agenda.visibleCount} ${agenda.visibleCount === 1 ? terminology.appointment.singularLower : terminology.appointment.pluralLower} no período.`}
         actions={
           <Button size="md" onClick={() => openCreate()}>
             <Plus className="size-4" aria-hidden strokeWidth={2} />
@@ -126,7 +126,7 @@ export function AgendaView() {
               variant="ghost"
               size="icon"
               onClick={agenda.goPrevious}
-              aria-label="Periodo anterior"
+              aria-label="Período anterior"
             >
               <ChevronLeft className="size-4" aria-hidden strokeWidth={1.75} />
             </Button>
@@ -134,7 +134,7 @@ export function AgendaView() {
               variant="ghost"
               size="icon"
               onClick={agenda.goNext}
-              aria-label="Proximo periodo"
+              aria-label="Próximo período"
             >
               <ChevronRight className="size-4" aria-hidden strokeWidth={1.75} />
             </Button>
@@ -185,8 +185,8 @@ export function AgendaView() {
         <Card>
           <LoadMore
             page={page}
-            summary={`${terminology.appointment.plural} anteriores a ${formatDate(oldestLoaded)} ainda nao foram carregados.`}
-            label="Carregar periodo anterior"
+            summary={`${terminology.appointment.plural} anteriores a ${formatDate(oldestLoaded)} ainda não foram carregados.`}
+            label="Carregar período anterior"
             onLoadMore={() => void loadMore("appointments")}
           />
         </Card>
@@ -209,7 +209,7 @@ export function AgendaView() {
           <EmptyState
             icon={<CalendarOff className="size-5" aria-hidden />}
             title="Nenhum atendimento neste dia"
-            description="Clique em um horario da grade para agendar."
+            description="Clique em um horário da grade para agendar."
             action={
               <Button size="sm" onClick={() => openCreate(agenda.cursor)}>
                 Agendar

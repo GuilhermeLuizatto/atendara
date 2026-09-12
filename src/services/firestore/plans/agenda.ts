@@ -40,7 +40,7 @@ function assertNoConflict(
 ): void {
   const conflict = findConflict(ctx.snapshot.appointments, candidate);
   if (conflict && !ctx.snapshot.organization.settings.agenda.allowDoubleBooking) {
-    throw new RepositoryError(`Conflito de horario com ${conflict.clientName}.`);
+    throw new RepositoryError(`Conflito de horário com ${conflict.clientName}.`);
   }
 }
 

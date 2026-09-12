@@ -62,7 +62,7 @@ function MessagesWorkspace() {
       <div className="space-y-5">
         <PageHeader
           title="Mensagens"
-          description="Acompanhe as conversas e assuma os casos que precisam de atencao."
+          description="Acompanhe as conversas e assuma os casos que precisam de atenção."
         />
         <Card>
           <EmptyState
@@ -70,8 +70,8 @@ function MessagesWorkspace() {
             title="Nenhuma conversa ainda"
             description={
               demonstrative
-                ? "Os dados de demonstracao foram esvaziados. Restaure-os pelo menu da sua conta."
-                : "A central recebe conversas quando um canal de mensagens estiver integrado. Hoje nenhum canal esta ativo: nenhuma mensagem chega nem sai por aqui."
+                ? "Os dados de demonstração foram esvaziados. Restaure-os pelo menu da sua conta."
+                : "A central recebe conversas quando um canal de mensagens estiver integrado. Hoje nenhum canal está ativo: nenhuma mensagem chega nem sai por aqui."
             }
           />
         </Card>
@@ -100,8 +100,8 @@ function MessagesWorkspace() {
     <div className="space-y-5">
       <PageHeader
         title="Mensagens"
-        description="Acompanhe as conversas e assuma os casos que precisam de atencao."
-        actions={demonstrative ? <Badge tone="info">Conversas de demonstracao</Badge> : null}
+        description="Acompanhe as conversas e assuma os casos que precisam de atenção."
+        actions={demonstrative ? <Badge tone="info">Conversas de demonstração</Badge> : null}
       />
       <div className="grid items-start gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
         <Card className={cn(selected && "hidden lg:block")}>
@@ -123,7 +123,7 @@ function MessagesWorkspace() {
               <option value="WAITING_PROFESSIONAL">
                 Aguardando profissional
               </option>
-              <option value="CRITICAL">Prioridade critica</option>
+              <option value="CRITICAL">Prioridade crítica</option>
               <option value="RESOLVED">Resolvidas</option>
             </Select>
           </div>
@@ -197,7 +197,7 @@ function MessagesWorkspace() {
           />
         ) : (
           <Card className="text-muted-foreground flex min-h-80 items-center justify-center p-5 text-sm">
-            Selecione uma conversa para ver mensagens e decisoes.
+            Selecione uma conversa para ver mensagens e decisões.
           </Card>
         )}
       </div>
@@ -238,7 +238,7 @@ function ConversationPanel({
     setBusy(true);
     const result = await run(
       (repo) => repo.replyToConversation(conversation.id, text),
-      "Resposta registrada na demonstracao.",
+      "Resposta registrada na demonstração.",
     );
     if (result !== null) setText("");
     setBusy(false);
@@ -258,7 +258,7 @@ function ConversationPanel({
         </div>
         {conversation.escalated && (
           <p className="bg-warning-soft text-warning-soft-foreground rounded-lg p-3 text-sm">
-            Automacao pausada. {conversation.escalationReason}
+            Automação pausada. {conversation.escalationReason}
           </p>
         )}
         {canReply && (
@@ -316,7 +316,7 @@ function ConversationPanel({
         >
           <Field
             label="Resposta do profissional"
-            hint="Neste prototipo, a resposta fica somente nesta conversa de demonstracao."
+            hint="Neste protótipo, a resposta fica somente nesta conversa de demonstração."
           >
             {(props) => (
               <Textarea
@@ -362,7 +362,7 @@ function MessageBubble({ message }: { message: Message }) {
       {decision && (
         <details>
           <summary className="text-primary cursor-pointer text-xs">
-            Decisao da IA · {AI_ACTION_LABELS[decision.action]}
+            Decisão da IA · {AI_ACTION_LABELS[decision.action]}
           </summary>
           <div className="mt-3">
             <DecisionDetails decision={decision} />

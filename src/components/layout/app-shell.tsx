@@ -42,7 +42,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             "-translate-y-16 focus:translate-y-0",
           )}
         >
-          Pular para o conteudo
+          Pular para o conteúdo
         </a>
 
         <Sidebar />
@@ -58,7 +58,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               ref={menuRef}
               role="dialog"
               aria-modal="true"
-              aria-label="Menu de navegacao"
+              aria-label="Menu de navegação"
               tabIndex={-1}
               className={cn(
                 "border-border bg-surface absolute inset-y-0 left-0 w-72 max-w-[85vw] border-r outline-none",

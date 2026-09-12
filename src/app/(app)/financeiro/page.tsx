@@ -67,14 +67,14 @@ export default function FinancePage() {
     <div className="space-y-6">
       <ModulePlaceholder
         title="Financeiro"
-        description="Receitas, pendencias e atrasos derivados da agenda. Valores em centavos, sem ponto flutuante."
+        description="Receitas, pendências e atrasos derivados da agenda. Valores em centavos, sem ponto flutuante."
         phase="Fase 1"
         stats={stats}
         upcoming={[
-          "Lancamento manual de receitas e despesas",
-          "Filtros por periodo, status, cliente e forma de pagamento",
-          "Conciliacao entre atendimento realizado e pagamento",
-          "Arquitetura preparada para gateways de cobranca",
+          "Lançamento manual de receitas e despesas",
+          "Filtros por período, status, cliente e forma de pagamento",
+          "Conciliação entre atendimento realizado e pagamento",
+          "Arquitetura preparada para gateways de cobrança",
         ]}
       />
 
@@ -82,8 +82,8 @@ export default function FinancePage() {
         <Card>
           <EmptyState
             icon={<Wallet className="size-5" aria-hidden />}
-            title="Nenhum lancamento ainda"
-            description={`As receitas aparecem aqui quando voce marca ${terminology.appointment.pluralLower} com valor na agenda. Os indicadores acima comecam em zero.`}
+            title="Nenhum lançamento ainda"
+            description={`As receitas aparecem aqui quando você marca ${terminology.appointment.pluralLower} com valor na agenda. Os indicadores acima começam em zero.`}
           />
         </Card>
       ) : null}
@@ -92,8 +92,8 @@ export default function FinancePage() {
         <Card>
           <LoadMore
             page={page}
-            summary={`Indicadores calculados sobre os ${data?.transactions.length ?? 0} lancamentos mais recentes. Os mais antigos ainda nao foram carregados.`}
-            label="Carregar lancamentos anteriores"
+            summary={`Indicadores calculados sobre os ${data?.transactions.length ?? 0} lançamentos mais recentes. Os mais antigos ainda não foram carregados.`}
+            label="Carregar lançamentos anteriores"
             onLoadMore={() => void loadMore("transactions")}
           />
         </Card>

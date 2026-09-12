@@ -53,7 +53,7 @@ export function ProfessionSwitcher() {
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls={panelId}
-        aria-label={`Profissao da demonstracao: ${profession.label}`}
+        aria-label={`Profissão da demonstração: ${profession.label}`}
         className={cn(
           "border-border inline-flex h-9 items-center gap-2 rounded-lg border px-2.5 sm:px-3",
           "bg-surface text-foreground text-sm font-medium transition-colors",
@@ -83,7 +83,7 @@ export function ProfessionSwitcher() {
           )}
         >
           <p className="border-border text-subtle-foreground border-b px-3 py-2 text-[11px] font-medium tracking-wide uppercase">
-            Trocar profissao
+            Trocar profissão
           </p>
           <ul className="scrollbar-slim max-h-80 overflow-y-auto p-1">
             {listProfessions().map((item) => {

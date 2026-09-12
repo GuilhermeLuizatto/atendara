@@ -7,10 +7,10 @@ import { allTerm, firstTerm, newTerm, nextPluralTerm, noTerm } from "./terms";
 describe("concordancia com o termo da profissao", () => {
   it("flexiona artigo e adjetivo pelo genero do termo", () => {
     const psychologist = getProfession("PSYCHOLOGIST").terminology;
-    expect(newTerm(psychologist.appointment)).toBe("Nova sessao");
-    expect(noTerm(psychologist.appointment)).toBe("Nenhuma sessao");
-    expect(nextPluralTerm(psychologist.appointment)).toBe("Proximas sessoes");
-    expect(allTerm(psychologist.appointment)).toBe("todas as sessoes");
+    expect(newTerm(psychologist.appointment)).toBe("Nova sessão");
+    expect(noTerm(psychologist.appointment)).toBe("Nenhuma sessão");
+    expect(nextPluralTerm(psychologist.appointment)).toBe("Próximas sessões");
+    expect(allTerm(psychologist.appointment)).toBe("todas as sessões");
     expect(firstTerm(psychologist.client)).toBe("o primeiro paciente");
 
     const trainer = getProfession("PERSONAL_TRAINER").terminology;

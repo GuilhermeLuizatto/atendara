@@ -48,14 +48,14 @@ export const NAV_ITEMS: NavItem[] = [
     icon: "dashboard",
     label: "Dashboard",
     permission: "organization:read",
-    description: "Visao geral do dia",
+    description: "Visão geral do dia",
   },
   {
     href: "/agenda",
     icon: "calendar",
     label: "Agenda",
     permission: "appointment:read",
-    description: "Atendimentos e horarios",
+    description: "Atendimentos e horários",
   },
   {
     href: "/clientes",
@@ -77,21 +77,21 @@ export const NAV_ITEMS: NavItem[] = [
     icon: "finance",
     label: "Financeiro",
     permission: "transaction:read",
-    description: "Receitas e pendencias",
+    description: "Receitas e pendências",
   },
   {
     href: "/agente",
     icon: "agent",
     label: AI_ASSISTANT_NAME,
     permission: "rule:read",
-    description: "Regras, decisoes e simulador",
+    description: "Regras, decisões e simulador",
   },
   {
     href: "/configuracoes",
     icon: "settings",
-    label: "Configuracoes",
+    label: "Configurações",
     permission: "organization:read",
-    description: "Profissao, equipe e privacidade",
+    description: "Profissão, equipe e privacidade",
   },
 ];
 

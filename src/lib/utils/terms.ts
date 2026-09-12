@@ -25,12 +25,12 @@ export function noTerm(term: TermPair): string {
 
 /** "Proxima sessao", "Proximo treino". */
 export function nextTerm(term: TermPair): string {
-  return `${byGender(term, "Proximo", "Proxima")} ${term.singularLower}`;
+  return `${byGender(term, "Próximo", "Próxima")} ${term.singularLower}`;
 }
 
 /** "Proximas sessoes", "Proximos treinos". */
 export function nextPluralTerm(term: TermPair): string {
-  return `${byGender(term, "Proximos", "Proximas")} ${term.pluralLower}`;
+  return `${byGender(term, "Próximos", "Próximas")} ${term.pluralLower}`;
 }
 
 /** "todas as sessoes", "todos os treinos". */

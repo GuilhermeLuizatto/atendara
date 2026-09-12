@@ -48,7 +48,7 @@ export function UpcomingAppointments({
       {appointments.length === 0 ? (
         <EmptyState
           icon={<CalendarRange className="size-5" aria-hidden />}
-          title="Nada agendado a frente"
+          title="Nada agendado à frente"
           description="Novos agendamentos aparecem aqui automaticamente."
         />
       ) : (

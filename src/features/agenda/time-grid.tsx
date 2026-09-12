@@ -98,7 +98,7 @@ export function DayColumn({
             onClick={() =>
               onCreateAt(dateKey, `${String(hour).padStart(2, "0")}:00`)
             }
-            aria-label={`Agendar em ${dayLabel(dateKey)}, as ${String(hour).padStart(2, "0")}:00`}
+            aria-label={`Agendar em ${dayLabel(dateKey)}, às ${String(hour).padStart(2, "0")}:00`}
             style={{ height: PIXELS_PER_HOUR }}
             className="border-border hover:bg-surface-muted/50 block w-full border-b transition-colors"
           />

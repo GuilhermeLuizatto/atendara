@@ -151,11 +151,11 @@ describe("isolamento do tenant nos planos de escrita", () => {
     });
 
     expect(() => planCreateClient(ctx, clientInput)).toThrow(
-      "Sem permissao para esta acao.",
+      "Sem permissão para esta ação.",
     );
     expect(() =>
       planDeleteClient(ctx, ctx.snapshot.clients[0].id),
-    ).toThrow("Sem permissao para esta acao.");
+    ).toThrow("Sem permissão para esta ação.");
   });
 });
 
@@ -193,11 +193,11 @@ describe("configuracao da organizacao", () => {
       permissions: permissionsForMembership("PROFESSIONAL", false),
     });
     expect(() => planUpdateNotificationSettings(member, notifications)).toThrow(
-      "Sem permissao para esta acao.",
+      "Sem permissão para esta ação.",
     );
     expect(() =>
       planUpdateAgendaSettings(member, member.snapshot.organization.settings.agenda),
-    ).toThrow("Sem permissao para esta acao.");
+    ).toThrow("Sem permissão para esta ação.");
   });
 
   it("valida e normaliza o horario de atendimento antes de gravar", () => {
@@ -321,7 +321,7 @@ describe("agenda e financeiro", () => {
         priceInCents: 18000,
         administrativeNotes: null,
       }),
-    ).toThrow(/Conflito de horario/);
+    ).toThrow(/Conflito de horário/);
   });
 
   it("remarcar acerta valor e vencimento da receita ligada", () => {
@@ -406,7 +406,7 @@ describe("regras do agente", () => {
 
     expect(() =>
       planCreateRule(ctx, { ...editable, level: "SECURITY" }),
-    ).toThrow(/profissional, contextuais e de preferencia/);
+    ).toThrow(/profissional, contextuais e de preferência/);
   });
 
   it("cada alteracao incrementa a versao citada na auditoria", () => {

@@ -41,7 +41,7 @@ function toAuthenticatedUser(user: User): AuthenticatedUser {
   return {
     userId: user.uid,
     email: user.email ?? "",
-    displayName: user.displayName ?? user.email?.split("@")[0] ?? "Usuario",
+    displayName: user.displayName ?? user.email?.split("@")[0] ?? "Usuário",
     avatarUrl: user.photoURL,
   };
 }
@@ -51,21 +51,21 @@ function errorCode(error: unknown): string {
 }
 
 /** Mensagens de erro do Firebase traduzidas, sem vazar detalhe interno. */
-function translate(code: unknown, fallback = "Nao foi possivel entrar. Tente novamente."): string {
+function translate(code: unknown, fallback = "Não foi possível entrar. Tente novamente."): string {
   const errorCode = typeof code === "string" ? code : "";
   switch (errorCode) {
     case "auth/invalid-email":
     case "auth/missing-email":
-      return "Informe um e-mail valido.";
+      return "Informe um e-mail válido.";
     case "auth/expired-action-code":
-      return "Este link venceu. Peca um novo na tela de entrada, em Esqueci minha senha.";
+      return "Este link venceu. Peça um novo na tela de entrada, em Esqueci minha senha.";
     case "auth/invalid-action-code":
-      return "Este link ja foi usado ou esta incompleto. Peca um novo na tela de entrada, em Esqueci minha senha.";
+      return "Este link já foi usado ou está incompleto. Peça um novo na tela de entrada, em Esqueci minha senha.";
     case "auth/weak-password":
     case "auth/password-does-not-meet-requirements":
       return "Escolha uma senha mais forte, de 12 a 128 caracteres.";
     case "auth/user-disabled":
-      return "Esta conta esta desativada.";
+      return "Esta conta está desativada.";
     case "auth/invalid-credential":
     case "auth/wrong-password":
     case "auth/user-not-found":
@@ -73,15 +73,15 @@ function translate(code: unknown, fallback = "Nao foi possivel entrar. Tente nov
     case "auth/too-many-requests":
       return "Muitas tentativas. Aguarde alguns minutos.";
     case "auth/network-request-failed":
-      return "Falha de conexao. Verifique sua internet.";
+      return "Falha de conexão. Verifique sua internet.";
     case "auth/invalid-verification-code":
-      return "Codigo incorreto ou vencido. Confira o aplicativo e tente de novo.";
+      return "Código incorreto ou vencido. Confira o aplicativo e tente de novo.";
     case "auth/unverified-email":
       return "Confirme o e-mail da conta antes de cadastrar o segundo fator.";
     case "auth/requires-recent-login":
       return "Entre novamente para cadastrar o segundo fator.";
     case "auth/operation-not-allowed":
-      return "O segundo fator ainda nao esta habilitado neste projeto.";
+      return "O segundo fator ainda não está habilitado neste projeto.";
     default:
       return fallback;
   }
@@ -137,7 +137,7 @@ class FirebaseAuthAdapter implements AuthAdapter {
   async completeSecondFactorSignIn(code: string): Promise<AuthenticatedUser> {
     const resolver = this.resolver;
     const hint = resolver?.hints.find(item => item.factorId === TotpMultiFactorGenerator.FACTOR_ID);
-    if (!resolver || !hint) throw new AuthError("Entre com e-mail e senha antes do codigo.");
+    if (!resolver || !hint) throw new AuthError("Entre com e-mail e senha antes do código.");
     try {
       const credential = await resolver.resolveSignIn(TotpMultiFactorGenerator.assertionForSignIn(hint.uid, code.trim()));
       this.resolver = null;
@@ -177,7 +177,7 @@ class FirebaseAuthAdapter implements AuthAdapter {
       }
     } catch (error) {
       if (errorCode(error) === "auth/user-not-found") return;
-      throw new AuthError(translate(errorCode(error), "Nao foi possivel enviar o link agora. Tente novamente."));
+      throw new AuthError(translate(errorCode(error), "Não foi possível enviar o link agora. Tente novamente."));
     }
   }
 
@@ -185,7 +185,7 @@ class FirebaseAuthAdapter implements AuthAdapter {
     try {
       return await verifyPasswordResetCode(getFirebaseAuth(), code);
     } catch (error) {
-      throw new AuthError(translate(errorCode(error), "Nao foi possivel conferir este link. Tente novamente."));
+      throw new AuthError(translate(errorCode(error), "Não foi possível conferir este link. Tente novamente."));
     }
   }
 
@@ -195,7 +195,7 @@ class FirebaseAuthAdapter implements AuthAdapter {
     try {
       await confirmFirebasePasswordReset(getFirebaseAuth(), code, password);
     } catch (error) {
-      throw new AuthError(translate(errorCode(error), "Nao foi possivel salvar a nova senha. Tente novamente."));
+      throw new AuthError(translate(errorCode(error), "Não foi possível salvar a nova senha. Tente novamente."));
     }
   }
 
@@ -236,7 +236,7 @@ class FirebaseAuthAdapter implements AuthAdapter {
   async finishTotpEnrollment(code: string): Promise<void> {
     const user = this.currentUser();
     const secret = this.pendingSecret;
-    if (!secret) throw new AuthError("Gere o segredo antes de confirmar o codigo.");
+    if (!secret) throw new AuthError("Gere o segredo antes de confirmar o código.");
     try {
       await multiFactor(user).enroll(TotpMultiFactorGenerator.assertionForEnrollment(secret, code.trim()), "Aplicativo autenticador");
       this.pendingSecret = null;

@@ -6,7 +6,7 @@ import { formatDateTime } from "@/lib/utils/format";
 
 const OUTCOMES = {
   MATCHED: "Aplicada",
-  NOT_MATCHED: "Condicao nao atendida",
+  NOT_MATCHED: "Condição não atendida",
   BLOCKED_BY_HIGHER_LEVEL: "Bloqueada por regra superior",
   DISABLED: "Desativada",
 };
@@ -17,7 +17,7 @@ export function DecisionDetails({ decision }: { decision: DecisionOutcome }) {
       {"evaluatedAt" in decision &&
         typeof decision.evaluatedAt === "string" && (
           <p className="text-muted-foreground text-xs">
-            Horario avaliado na simulacao:{" "}
+            Horário avaliado na simulação:{" "}
             {formatDateTime(decision.evaluatedAt)}
           </p>
         )}
@@ -26,7 +26,7 @@ export function DecisionDetails({ decision }: { decision: DecisionOutcome }) {
           {AI_ACTION_LABELS[decision.action]}
         </Badge>
         <Badge>{classificationMeta(decision.classification).label}</Badge>
-        <Badge>{Math.round(decision.confidence * 100)}% de confianca</Badge>
+        <Badge>{Math.round(decision.confidence * 100)}% de confiança</Badge>
       </div>
       <p>{decision.reason}</p>
       {decision.responseText && (

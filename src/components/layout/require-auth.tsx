@@ -49,8 +49,8 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     ? canManageSubscription(user?.access)
     : hasActiveAccess(user?.access) && (area === "admin" ? isPlatformAdmin(user?.access) : APP_MODULES.includes(area as AppModule) && canAccessModule(user?.access, area as AppModule));
   if (!allowed) return <main className="bg-background flex min-h-dvh items-center justify-center p-6"><div className="max-w-md space-y-4">
-    <h1 className="text-foreground text-xl font-semibold">Acesso nao liberado</h1>
-    <p className="text-muted-foreground text-sm">Seu cadastro precisa estar ativo, com mensalidade vigente e permissao para esta area. Consulte o administrador.</p>
+    <h1 className="text-foreground text-xl font-semibold">Acesso não liberado</h1>
+    <p className="text-muted-foreground text-sm">Seu cadastro precisa estar ativo, com mensalidade vigente e permissão para esta área. Consulte o administrador.</p>
     {hasActiveAccess(user?.access) ? <Button onClick={() => router.replace(`/${user?.access?.modules[0] ?? "dashboard"}` as "/dashboard")}>Abrir meu painel</Button> : null}
     <Button variant="outline" onClick={() => void signOut()}>Sair</Button>
   </div></main>;

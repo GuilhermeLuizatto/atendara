@@ -31,18 +31,18 @@ export const ACCESS_GRANT_REASON_LENGTH = { min: 10, max: 500 } as const;
 export const ACCESS_GRANT_KIND_LABELS: Record<AccessGrantKind, string> = {
   COURTESY: "Cortesia",
   PILOT: "Piloto",
-  CORRECTION: "Correcao",
+  CORRECTION: "Correção",
 };
 
 export const PLATFORM_AUDIT_ACTION_LABELS: Record<PlatformAuditAction, string> = {
   ACCOUNT_REGISTERED: "Cadastro de profissional",
-  ACCOUNT_UPDATED: "Alteracao de conta",
-  ACCESS_GRANTED: "Concessao de acesso",
-  ACCESS_REVOKED: "Revogacao de acesso",
+  ACCOUNT_UPDATED: "Alteração de conta",
+  ACCESS_GRANTED: "Concessão de acesso",
+  ACCESS_REVOKED: "Revogação de acesso",
   PLATFORM_ADMIN_CREATED: "Cadastro de administrador",
-  PLATFORM_ADMIN_SUSPENDED: "Suspensao de administrador",
-  PLATFORM_ADMIN_REACTIVATED: "Reativacao de administrador",
-  ORGANIZATION_DELETED: "Exclusao de organizacao pelo titular",
+  PLATFORM_ADMIN_SUSPENDED: "Suspensão de administrador",
+  PLATFORM_ADMIN_REACTIVATED: "Reativação de administrador",
+  ORGANIZATION_DELETED: "Exclusão de organização pelo titular",
 };
 
 /**

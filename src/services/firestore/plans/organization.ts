@@ -35,7 +35,7 @@ export function planUpdateAgendaSettings(
         action: "UPDATE",
         actorType: "USER",
         resource: { type: "organization", id: ctx.organizationId },
-        summary: `Horario de atendimento alterado para ${agenda.workdayStart} as ${agenda.workdayEnd}.`,
+        summary: `Horário de atendimento alterado para ${agenda.workdayStart} às ${agenda.workdayEnd}.`,
         metadata: {
           workingDays: agenda.workingDays.join(","),
           workdayStart: agenda.workdayStart,

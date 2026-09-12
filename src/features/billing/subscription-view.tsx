@@ -86,7 +86,7 @@ export function SubscriptionView() {
         setInvoices(history);
         setGrant(currentGrant);
       })
-      .catch(() => setError("Nao foi possivel carregar sua assinatura agora."))
+      .catch(() => setError("Não foi possível carregar sua assinatura agora."))
       .finally(() => setLoading(false));
   }, [access, billing, organizationId]);
 
@@ -100,7 +100,7 @@ export function SubscriptionView() {
     try {
       window.location.href = await action();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Nao foi possivel continuar.");
+      setError(caught instanceof Error ? caught.message : "Não foi possível continuar.");
       setBusy(false);
     }
   }
@@ -112,7 +112,7 @@ export function SubscriptionView() {
       await billing.requestCancellation();
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Nao foi possivel solicitar o cancelamento.");
+      setError(caught instanceof Error ? caught.message : "Não foi possível solicitar o cancelamento.");
     } finally {
       setBusy(false);
     }
@@ -127,7 +127,7 @@ export function SubscriptionView() {
     <div className="space-y-6">
       <PageHeader
         title="Minha assinatura"
-        description={`O que voce paga a ${OPERATOR_NAME} pelo uso do ${APP_NAME}. Esta area nao se mistura com o financeiro do seu negocio.`}
+        description={`O que você paga à ${OPERATOR_NAME} pelo uso do ${APP_NAME}. Esta área não se mistura com o financeiro do seu negócio.`}
         actions={
           subscription ? (
             <Badge tone={STATUS_TONE[subscription.status]} dot>
@@ -147,8 +147,8 @@ export function SubscriptionView() {
         <Card>
           <CardBody>
             <p className="text-muted-foreground text-sm">
-              A cobranca depende de um projeto real configurado. No modo
-              demonstracao nao existe assinatura — e nao inventamos uma.
+              A cobrança depende de um projeto real configurado. No modo
+              demonstração não existe assinatura — e não inventamos uma.
             </p>
           </CardBody>
         </Card>
@@ -169,11 +169,11 @@ export function SubscriptionView() {
           </CardHeader>
           <CardBody className="space-y-2">
             <p className="text-foreground text-sm">
-              {`A ${OPERATOR_NAME} liberou seu acesso ate ${formatDate(grant.until)} (${ACCESS_GRANT_KIND_LABELS[grant.kind].toLowerCase()}).`}
+              {`A ${OPERATOR_NAME} liberou seu acesso até ${formatDate(grant.until)} (${ACCESS_GRANT_KIND_LABELS[grant.kind].toLowerCase()}).`}
             </p>
             <p className="text-muted-foreground text-sm">
-              Nao e cobranca: nenhuma fatura corresponde a este periodo. Se voce assinar, o acesso segue ate a data
-              mais distante entre a assinatura e esta concessao.
+              Não é cobrança: nenhuma fatura corresponde a este período. Se você assinar, o acesso segue até a data
+              mais distante entre a assinatura e esta concessão.
             </p>
           </CardBody>
         </Card>
@@ -194,32 +194,32 @@ export function SubscriptionView() {
                 value={`${formatCurrency(subscription.amountInCents)} / ${BILLING_INTERVAL_LABELS[subscription.interval]}`}
               />
               <Detail
-                label={subscription.cancelAtPeriodEnd ? "Encerra em" : "Proxima cobranca"}
+                label={subscription.cancelAtPeriodEnd ? "Encerra em" : "Próxima cobrança"}
                 value={subscription.currentPeriodEnd ? formatDate(subscription.currentPeriodEnd) : "—"}
               />
               <Detail
-                label="Acesso liberado ate"
+                label="Acesso liberado até"
                 value={subscription.accessUntil ? formatDate(subscription.accessUntil) : "—"}
-                hint="Inclui a tolerancia apos o fim do ciclo."
+                hint="Inclui a tolerância após o fim do ciclo."
               />
             </dl>
           ) : (
             <p className="text-muted-foreground text-sm">
-              Voce ainda nao tem uma assinatura. Escolha um plano abaixo.
+              Você ainda não tem uma assinatura. Escolha um plano abaixo.
             </p>
           )}
 
           {subscription?.cancelAtPeriodEnd ? (
             <p className="bg-warning-soft text-warning-soft-foreground rounded-lg p-3 text-sm">
-              O cancelamento esta agendado. O acesso continua ate o fim do ciclo
-              ja pago e nao havera nova cobranca.
+              O cancelamento está agendado. O acesso continua até o fim do ciclo
+              já pago e não haverá nova cobrança.
             </p>
           ) : null}
 
           <p className="bg-surface-muted text-muted-foreground rounded-lg p-3 text-sm">
-            A liberacao acontece quando o gateway confirma o pagamento, e nao
-            quando voce volta da tela de pagamento. Se acabou de pagar, atualize
-            esta pagina em instantes.
+            A liberação acontece quando o gateway confirma o pagamento, e não
+            quando você volta da tela de pagamento. Se acabou de pagar, atualize
+            esta página em instantes.
           </p>
 
           {subscription ? (
@@ -257,7 +257,7 @@ export function SubscriptionView() {
                   </p>
                   {option.trialDays > 0 ? (
                     <p className="text-subtle-foreground text-xs">
-                      {option.trialDays} dias de teste antes da primeira cobranca.
+                      {option.trialDays} dias de teste antes da primeira cobrança.
                     </p>
                   ) : null}
                   <Button
@@ -276,20 +276,20 @@ export function SubscriptionView() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Cobrancas</CardTitle>
+          <CardTitle>Cobranças</CardTitle>
         </CardHeader>
         <CardBody>
           {invoices.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Nenhuma cobranca emitida ainda.</p>
+            <p className="text-muted-foreground text-sm">Nenhuma cobrança emitida ainda.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-muted-foreground text-left text-xs">
                   <tr>
-                    <th className="py-2 pr-4 font-medium">Emissao</th>
-                    <th className="py-2 pr-4 font-medium">Periodo</th>
+                    <th className="py-2 pr-4 font-medium">Emissão</th>
+                    <th className="py-2 pr-4 font-medium">Período</th>
                     <th className="py-2 pr-4 font-medium">Valor</th>
-                    <th className="py-2 pr-4 font-medium">Situacao</th>
+                    <th className="py-2 pr-4 font-medium">Situação</th>
                     <th className="py-2 font-medium">Comprovante</th>
                   </tr>
                 </thead>
@@ -298,7 +298,7 @@ export function SubscriptionView() {
                     <tr key={invoice.id} className="border-border border-t">
                       <td className="py-2 pr-4 whitespace-nowrap">{formatDate(invoice.issuedAt)}</td>
                       <td className="text-muted-foreground py-2 pr-4 whitespace-nowrap">
-                        {invoice.periodEnd ? `ate ${formatDate(invoice.periodEnd)}` : "—"}
+                        {invoice.periodEnd ? `até ${formatDate(invoice.periodEnd)}` : "—"}
                       </td>
                       <td className="py-2 pr-4 tabular-nums whitespace-nowrap">
                         {formatCurrency(invoice.amountDueInCents)}

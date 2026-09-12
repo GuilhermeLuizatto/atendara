@@ -68,7 +68,7 @@ export function formatShortDate(iso: ISODateString): string {
 }
 
 export function formatDateTime(iso: ISODateString): string {
-  return `${formatDate(iso)} as ${formatTime(iso)}`;
+  return `${formatDate(iso)} às ${formatTime(iso)}`;
 }
 
 export function formatWeekday(iso: ISODateString): string {
@@ -84,13 +84,13 @@ export function formatRelativeToNow(
   const diffMinutes = Math.round(diffMs / 60_000);
 
   if (diffMinutes < 1) return "agora";
-  if (diffMinutes < 60) return `ha ${diffMinutes} min`;
+  if (diffMinutes < 60) return `há ${diffMinutes} min`;
 
   const diffHours = Math.round(diffMinutes / 60);
-  if (diffHours < 24) return `ha ${diffHours} h`;
+  if (diffHours < 24) return `há ${diffHours} h`;
 
   const diffDays = Math.round(diffHours / 24);
-  if (diffDays < 30) return `ha ${diffDays} d`;
+  if (diffDays < 30) return `há ${diffDays} d`;
 
   return formatShortDate(iso);
 }
@@ -111,8 +111,8 @@ export function formatTimeUntil(
   if (diffHours < 12) return `em ${diffHours} h`;
 
   const daysApart = calendarDaysApart(now, new Date(iso));
-  if (daysApart === 0) return `hoje as ${formatTime(iso)}`;
-  if (daysApart === 1) return `amanha as ${formatTime(iso)}`;
+  if (daysApart === 0) return `hoje às ${formatTime(iso)}`;
+  if (daysApart === 1) return `amanhã às ${formatTime(iso)}`;
   if (daysApart < 7) return weekdayOnlyFormatter.format(new Date(iso));
 
   return formatShortDate(iso);

@@ -70,7 +70,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <nav aria-label="Principal" className="scrollbar-slim flex-1 overflow-y-auto px-2 pb-4">
         <ul className="space-y-0.5">
-          {isPlatformAdmin(user?.access) ? <li><Link href="/admin" onClick={onNavigate} className="text-primary block rounded-lg px-3 py-2 text-sm font-medium">Administracao</Link></li> : null}
+          {isPlatformAdmin(user?.access) ? <li><Link href="/admin" onClick={onNavigate} className="text-primary block rounded-lg px-3 py-2 text-sm font-medium">Administração</Link></li> : null}
           {NAV_ITEMS.filter((item) => canAccessModule(user?.access, item.href.slice(1) as AppModule)).map(
             (item) => {
               const active =

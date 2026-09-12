@@ -60,7 +60,7 @@ export function planAppendMessage(
 ): Plan<ID> {
   const conversation = requireConversation(ctx, input.conversationId);
   if (conversation.clientId !== input.clientId) {
-    throw new RepositoryError("Cliente nao pertence a conversa.");
+    throw new RepositoryError("Cliente não pertence à conversa.");
   }
   const body = validateMessageBody(input.body);
   const id = ctx.newMessageId(input.conversationId);
@@ -210,7 +210,7 @@ export function planReceiveMessage(
 
   const evaluationDate = new Date(evaluatedAt ?? ctx.now);
   if (!Number.isFinite(evaluationDate.getTime())) {
-    throw new RepositoryError("Data de simulacao invalida.");
+    throw new RepositoryError("Data de simulação inválida.");
   }
 
   const outcome = decide({
@@ -303,7 +303,7 @@ export function planReceiveMessage(
             ? "POSSIBLE_RISK_DETECTED"
             : "CLIENT_WAITING",
         priority: decision.attention,
-        title: `${client.fullName} aguarda atencao`,
+        title: `${client.fullName} aguarda atenção`,
         body: decision.reason,
         professionalId: conversation.professionalId,
         target: { type: "conversation", id: conversationId },

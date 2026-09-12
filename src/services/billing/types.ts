@@ -43,7 +43,7 @@ export interface PlatformBillingClient {
 }
 
 export class BillingUnavailableError extends Error {
-  constructor(message = "A cobranca nao esta disponivel neste ambiente.") {
+  constructor(message = "A cobrança não está disponível neste ambiente.") {
     super(message);
     this.name = "BillingUnavailableError";
   }

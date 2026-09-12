@@ -280,11 +280,11 @@ describe("repositorio do Firestore contra o emulador", () => {
         classificationConfidence: null,
         aiDecisionId: null,
       }),
-    ).rejects.toThrow(/nao pertence a conversa/);
+    ).rejects.toThrow(/não pertence à conversa/);
   });
 
   it("restaurar dados nao existe fora da demonstracao", async () => {
-    await expect(repository.reset()).rejects.toThrow(/demonstracao/);
+    await expect(repository.reset()).rejects.toThrow(/demonstração/);
   });
 
   it("le o vinculo de quem usa o painel e pagina a colecao ate o fim", async () => {

@@ -22,7 +22,7 @@ import type { AgendaSettings, ServiceModality } from "@/types";
  */
 export function AgendaSettingsForm({
   onDone,
-  doneLabel = "Salvar horario",
+  doneLabel = "Salvar horário",
 }: {
   /** Chamado depois de salvar, ou de confirmar a leitura quando nao pode editar. */
   onDone?: () => void;
@@ -41,7 +41,7 @@ export function AgendaSettingsForm({
   const defaults = (
     <p className="text-muted-foreground text-sm">
       Cada {terminology.appointment.singularLower}{" "}
-      {byGender(terminology.appointment, "novo", "nova")} comeca com{" "}
+      {byGender(terminology.appointment, "novo", "nova")} começa com{" "}
       {profession.defaultAppointmentDurationMinutes} minutos e{" "}
       {formatCurrency(profession.defaultPriceInCents)}. Da para mudar os dois em
       cada agendamento.
@@ -59,9 +59,9 @@ export function AgendaSettingsForm({
             </dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Horario</dt>
+            <dt className="text-muted-foreground">Horário</dt>
             <dd className="text-foreground">
-              {current.workdayStart} as {current.workdayEnd}
+              {current.workdayStart} às {current.workdayEnd}
             </dd>
           </div>
           <div>
@@ -69,15 +69,15 @@ export function AgendaSettingsForm({
             <dd className="text-foreground">{current.slotIntervalMinutes} minutos</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Modalidade padrao</dt>
+            <dt className="text-muted-foreground">Modalidade padrão</dt>
             <dd className="text-foreground">{MODALITY_LABELS[current.defaultModality]}</dd>
           </div>
         </dl>
         {defaults}
         <p className="text-muted-foreground text-sm">
-          Este horario so e alterado pelo titular ou por quem administra a organizacao. Na
-          pratica ele nao limita nada: a agenda aceita e mostra qualquer horario
-          que voce marcar, inclusive fora dele.
+          Este horário só é alterado pelo titular ou por quem administra a organização. Na
+          prática ele não limita nada: a agenda aceita e mostra qualquer horário
+          que você marcar, inclusive fora dele.
         </p>
         {onDone ? (
           <Button variant="secondary" size="sm" onClick={onDone}>
@@ -99,7 +99,7 @@ export function AgendaSettingsForm({
       return;
     }
     if (draft.workdayStart >= draft.workdayEnd) {
-      setError("O inicio do expediente precisa ser antes do fim.");
+      setError("O início do expediente precisa ser antes do fim.");
       return;
     }
     setError("");
@@ -135,7 +135,7 @@ export function AgendaSettingsForm({
       </fieldset>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Inicio do expediente">
+        <Field label="Início do expediente">
           {(props) => (
             <Input
               {...props}
@@ -172,7 +172,7 @@ export function AgendaSettingsForm({
             </Select>
           )}
         </Field>
-        <Field label="Modalidade padrao">
+        <Field label="Modalidade padrão">
           {(props) => (
             <Select
               {...props}

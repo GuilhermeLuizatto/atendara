@@ -26,10 +26,10 @@ describe("texto de consentimento dos avisos", () => {
     expect(statement.reviewStatus).toBe("DRAFT_PENDING_LEGAL_REVIEW");
     expect(text).toContain("Clinica Exemplo pode enviar");
     expect(text).toContain("E-mail e WhatsApp");
-    expect(text).toContain("lembrete antes do horario e cancelamento do horario");
+    expect(text).toContain("lembrete antes do horário e cancelamento do horário");
     expect(text).toContain(CHANNEL_META.WHATSAPP.consentIntermediary);
     expect(text).toContain("opcional");
-    expect(text).toContain("retirar a autorizacao");
+    expect(text).toContain("retirar a autorização");
     expect(text).not.toContain("quem atende");
   });
 
@@ -55,7 +55,7 @@ describe("texto de consentimento dos avisos", () => {
       });
       const text = fold(statement.paragraphs.join(" "));
       for (const term of FORBIDDEN_TEMPLATE_TERMS) expect(text, `${profession.id}: ${term}`).not.toContain(term);
-      expect(statement.paragraphs[0].startsWith("Esta organizacao")).toBe(true);
+      expect(statement.paragraphs[0].startsWith("Esta organização")).toBe(true);
     }
   });
 });

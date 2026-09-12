@@ -46,7 +46,7 @@ export const MODALITY_LABELS: Record<ServiceModality, string> = {
   IN_PERSON: "Presencial",
   ONLINE: "Online",
   HOME_VISIT: "Domiciliar",
-  HYBRID: "Hibrido",
+  HYBRID: "Híbrido",
 };
 
 export const CHANNEL_LABELS: Record<MessageChannel, string> = {
@@ -68,24 +68,24 @@ export const CONVERSATION_STATUS_LABELS: Record<ConversationStatus, string> = {
 
 export const ATTENTION_LABELS: Record<AttentionLevel, string> = {
   NORMAL: "Normal",
-  ATTENTION: "Atencao",
+  ATTENTION: "Atenção",
   HIGH: "Alta",
-  CRITICAL: "Critica",
+  CRITICAL: "Crítica",
 };
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
-  CREATE: "Criacao",
-  UPDATE: "Alteracao",
-  DELETE: "Exclusao",
-  READ_SENSITIVE: "Leitura de dado sensivel",
+  CREATE: "Criação",
+  UPDATE: "Alteração",
+  DELETE: "Exclusão",
+  READ_SENSITIVE: "Leitura de dado sensível",
   LOGIN: "Entrada",
-  LOGOUT: "Saida",
+  LOGOUT: "Saída",
   RULE_ENABLED: "Regra ativada",
   RULE_DISABLED: "Regra desativada",
-  AI_AUTO_RESPONSE: "Resposta automatica",
+  AI_AUTO_RESPONSE: "Resposta automática",
   AI_ESCALATION: "Encaminhamento ao profissional",
-  PERMISSION_CHANGED: "Permissao alterada",
-  EXPORT: "Exportacao",
+  PERMISSION_CHANGED: "Permissão alterada",
+  EXPORT: "Exportação",
 };
 
 export const AUDIT_ACTOR_LABELS: Record<AuditActorType, string> = {
@@ -96,14 +96,14 @@ export const AUDIT_ACTOR_LABELS: Record<AuditActorType, string> = {
 
 /** Tipo de registro afetado. Tipo desconhecido aparece como foi gravado. */
 export const AUDIT_RESOURCE_LABELS: Record<string, string> = {
-  organization: "Organizacao",
+  organization: "Organização",
   client: "Cadastro",
   appointment: "Atendimento",
-  transaction: "Lancamento",
+  transaction: "Lançamento",
   rule: "Regra do agente",
   conversation: "Conversa",
   message: "Mensagem",
-  aiDecision: "Decisao do agente",
+  aiDecision: "Decisão do agente",
   notification: "Alerta",
   notificationDelivery: "Aviso ao cliente",
   privacyRequest: "Pedido de titular",
@@ -113,11 +113,11 @@ export const AUDIT_RESOURCE_LABELS: Record<string, string> = {
 export const WEEKDAY_LABELS = [
   "Domingo",
   "Segunda",
-  "Terca",
+  "Terça",
   "Quarta",
   "Quinta",
   "Sexta",
-  "Sabado",
+  "Sábado",
 ] as const;
 
 export const TRANSACTION_STATUS_LABELS: Record<TransactionStatus, string> = {
@@ -130,16 +130,16 @@ export const TRANSACTION_STATUS_LABELS: Record<TransactionStatus, string> = {
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   PIX: "Pix",
-  CREDIT_CARD: "Cartao de credito",
-  DEBIT_CARD: "Cartao de debito",
-  BANK_TRANSFER: "Transferencia",
+  CREDIT_CARD: "Cartão de crédito",
+  DEBIT_CARD: "Cartão de débito",
+  BANK_TRANSFER: "Transferência",
   CASH: "Dinheiro",
-  INSURANCE: "Convenio",
+  INSURANCE: "Convênio",
   OTHER: "Outro",
 };
 
 export const ACQUISITION_CHANNEL_LABELS: Record<AcquisitionChannel, string> = {
-  REFERRAL: "Indicacao",
+  REFERRAL: "Indicação",
   INSTAGRAM: "Instagram",
   GOOGLE: "Google",
   WHATSAPP: "WhatsApp",
@@ -148,42 +148,42 @@ export const ACQUISITION_CHANNEL_LABELS: Record<AcquisitionChannel, string> = {
 };
 
 export const ORGANIZATION_KIND_LABELS: Record<OrganizationKind, string> = {
-  SOLO_PRACTITIONER: "Profissional autonomo",
-  CLINIC: "Clinica",
-  OFFICE: "Consultorio",
-  STUDIO: "Estudio",
+  SOLO_PRACTITIONER: "Profissional autônomo",
+  CLINIC: "Clínica",
+  OFFICE: "Consultório",
+  STUDIO: "Estúdio",
   GYM: "Academia",
   TEAM: "Equipe",
 };
 
 export const PLAN_LABELS: Record<PlanTier, string> = {
-  TRIAL: "Avaliacao",
+  TRIAL: "Avaliação",
   SOLO: "Individual",
-  CLINIC: "Clinica",
+  CLINIC: "Clínica",
   ENTERPRISE: "Corporativo",
 };
 
 export const RULE_LEVEL_LABELS: Record<RuleLevel, string> = {
-  SECURITY: "Seguranca do sistema",
+  SECURITY: "Segurança do sistema",
   SYSTEM: "Regra fundamental",
-  PROFESSION: "Regra da profissao",
+  PROFESSION: "Regra da profissão",
   PROFESSIONAL: "Regra do profissional",
   CONTEXTUAL: "Regra contextual",
-  PREFERENCE: "Preferencia de comunicacao",
+  PREFERENCE: "Preferência de comunicação",
 };
 
 export const RULE_CATEGORY_LABELS: Record<RuleCategory, string> = {
-  SAFETY: "Seguranca",
+  SAFETY: "Segurança",
   IDENTITY: "Identidade",
   PRIVACY: "Privacidade",
-  PRICING: "Precos",
+  PRICING: "Preços",
   SCHEDULING: "Agendamento",
-  CONFIRMATION: "Confirmacao",
-  RESCHEDULING: "Remarcacao",
+  CONFIRMATION: "Confirmação",
+  RESCHEDULING: "Remarcação",
   CANCELLATION: "Cancelamento",
-  LOCATION: "Localizacao",
+  LOCATION: "Localização",
   AVAILABILITY: "Disponibilidade",
-  SERVICES: "Servicos",
+  SERVICES: "Serviços",
   PAYMENT: "Pagamento",
   ESCALATION: "Escalonamento",
   TONE: "Tom de voz",
@@ -192,21 +192,21 @@ export const RULE_CATEGORY_LABELS: Record<RuleCategory, string> = {
 
 export const AI_ACTION_LABELS: Record<AIActionTaken, string> = {
   AUTO_RESPONSE: "Respondido",
-  SUGGEST_RESPONSE: "Sugestao pronta",
-  ESCALATE_TO_PROFESSIONAL: "Encaminhado a voce",
+  SUGGEST_RESPONSE: "Sugestão pronta",
+  ESCALATE_TO_PROFESSIONAL: "Encaminhado a você",
   CREATE_ALERT: "Alerta gerado",
-  NO_ACTION: "Sem acao",
+  NO_ACTION: "Sem ação",
   BLOCKED: "Bloqueado",
 };
 
 export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
-  POSSIBLE_RISK_DETECTED: "Possivel risco",
+  POSSIBLE_RISK_DETECTED: "Possível risco",
   NEW_MESSAGE: "Nova mensagem",
   CLIENT_WAITING: "Cliente aguardando",
   APPOINTMENT_CANCELLED: "Cancelamento",
-  APPOINTMENT_CONFIRMED: "Confirmacao",
+  APPOINTMENT_CONFIRMED: "Confirmação",
   NEW_CLIENT: "Novo cadastro",
   PAYMENT_OVERDUE: "Pagamento atrasado",
-  AUTOMATION_FAILURE: "Falha de automacao",
+  AUTOMATION_FAILURE: "Falha de automação",
   RULE_CHANGED: "Regra alterada",
 };

@@ -142,7 +142,7 @@ export function planDeleteClient(ctx: PlanContext, id: ID): Plan {
   );
   if (open.length > 0) {
     throw new RepositoryError(
-      "Ha pendencias financeiras em aberto para este cadastro.",
+      "Há pendências financeiras em aberto para este cadastro.",
     );
   }
 
@@ -154,7 +154,7 @@ export function planDeleteClient(ctx: PlanContext, id: ID): Plan {
         action: "DELETE",
         actorType: "USER",
         resource: { type: "client", id },
-        summary: `Cadastro de ${existing.fullName} excluido.`,
+        summary: `Cadastro de ${existing.fullName} excluído.`,
       }),
     ],
   };

@@ -16,7 +16,7 @@ export class AuthError extends Error {
  */
 export class SecondFactorRequiredError extends AuthError {
   constructor() {
-    super("Digite o codigo de 6 digitos do seu aplicativo autenticador.");
+    super("Digite o código de 6 dígitos do seu aplicativo autenticador.");
     this.name = "SecondFactorRequiredError";
   }
 }

@@ -33,7 +33,7 @@ const CHANNELS: AcquisitionChannel[] = [
   "WEBSITE",
 ];
 
-const TAG_POOL = ["semanal", "quinzenal", "manha", "noite", "retorno"];
+const TAG_POOL = ["semanal", "quinzenal", "manhã", "noite", "retorno"];
 
 /** Os nomes ficticios sao escritos sem acento, entao basta normalizar caixa. */
 function slugifyEmail(name: string): string {
@@ -124,7 +124,7 @@ export function buildClients(
       lastAppointmentAt: null,
       nextAppointmentAt: null,
       administrativeNotes: rng.bool(0.25)
-        ? "Prefere horarios no fim da tarde."
+        ? "Prefere horários no fim da tarde."
         : null,
       totalAppointments: 0,
       outstandingBalanceInCents: 0,

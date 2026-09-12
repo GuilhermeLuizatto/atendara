@@ -30,7 +30,7 @@ describe("Fluxo de cadastro e senha inicial", () => {
     // Sem concessao inicial a conta nasce pendente, como no backend.
     const pending = await adapter.registerProfessional({ email: "pendente@example.com", displayName: "Profissional pendente", professionId: "PSYCHOLOGIST", modules: [...APP_MODULES] });
     expect((await adapter.listAccounts()).items.find(a => a.userId === pending.userId)).toMatchObject({ subscriptionStatus: "PENDING", accessUntil: null });
-    await expect(adapter.registerProfessional({ email: "longo@example.com", displayName: "Prazo longo", professionId: "PSYCHOLOGIST", modules: [...APP_MODULES], initialGrant: { kind: "PILOT", until: "2099-01-01T00:00:00Z", reason: "Piloto combinado com a clinica." } })).rejects.toThrow("maximo");
+    await expect(adapter.registerProfessional({ email: "longo@example.com", displayName: "Prazo longo", professionId: "PSYCHOLOGIST", modules: [...APP_MODULES], initialGrant: { kind: "PILOT", until: "2099-01-01T00:00:00Z", reason: "Piloto combinado com a clinica." } })).rejects.toThrow("máximo");
     const until = new Date(Date.now() + 10 * 86_400_000).toISOString();
     const created = await adapter.registerProfessional({ email: "prof@example.com", displayName: "Profissional teste", professionId: "PSYCHOLOGIST", modules: [...APP_MODULES], initialGrant: { kind: "PILOT", until, reason: "Piloto combinado com a clinica." } });
     const organizationId = (await adapter.listAccounts()).items.find(a => a.userId === created.userId)!.organizationId!;

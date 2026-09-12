@@ -45,7 +45,7 @@ export function composeResponse(
   const agent = organization.settings.ai.displayName;
   const appointment = profession.terminology.appointment.singularLower;
   const professional = profession.terminology.professional.singularLower;
-  const signature = `Sou o assistente virtual do consultorio — ${agent}.`;
+  const signature = `Sou o assistente virtual do consultório — ${agent}.`;
   const payload = rule.actions.find((action) =>
     ["ALLOW_TOPIC", "PROVIDE_INFO", "AUTO_RESPONSE"].includes(action.type),
   )?.payload;
@@ -61,8 +61,8 @@ export function composeResponse(
   switch (intent) {
     case "PRICING":
       return [
-        `O valor do ${appointment} e ${formatCurrency(price)}`,
-        `e a duracao e de ${duration} minutos.`,
+        `O valor do ${appointment} é ${formatCurrency(price)}`,
+        `e a duração é de ${duration} minutos.`,
         signature,
       ].join(" ");
 
@@ -75,15 +75,15 @@ export function composeResponse(
 
     case "RESCHEDULING":
       return [
-        `Para solicitar a remarcacao do ${appointment}, informe o dia e horario desejados.`,
-        `A alteracao depende da confirmacao do ${professional}.`,
+        `Para solicitar a remarcação do ${appointment}, informe o dia e horário desejados.`,
+        `A alteração depende da confirmação do ${professional}.`,
         signature,
       ].join(" ");
 
     case "CONFIRMATION":
       return [
-        `Informe a data e o horario do ${appointment} que deseja confirmar.`,
-        `O ${professional} verificara a confirmacao na agenda.`,
+        `Informe a data e o horário do ${appointment} que deseja confirmar.`,
+        `O ${professional} verificará a confirmação na agenda.`,
         signature,
       ].join(" ");
 
@@ -108,7 +108,7 @@ export function composeResponse(
     case "SERVICES":
       return [
         `Posso explicar como funciona o atendimento e o que levar na primeira vez.`,
-        `Detalhes especificos ficam com o ${professional}.`,
+        `Detalhes específicos ficam com o ${professional}.`,
         signature,
       ].join(" ");
   }

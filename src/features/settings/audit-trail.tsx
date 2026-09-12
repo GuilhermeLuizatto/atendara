@@ -58,7 +58,7 @@ export function AuditTrail() {
   if (!session?.permissions.includes("auditLog:read")) {
     return (
       <p className="text-muted-foreground text-sm">
-        A trilha de auditoria e lida por quem administra a organizacao.
+        A trilha de auditoria é lida por quem administra a organização.
       </p>
     );
   }
@@ -69,10 +69,10 @@ export function AuditTrail() {
   return (
     <div className="space-y-4">
       <p className="text-muted-foreground text-sm leading-relaxed">
-        Cada alteracao feita no painel deixa um registro aqui, na mesma gravacao
-        da propria alteracao. Ninguem edita nem apaga registro pelo aplicativo —
-        nem o proprietario. Pedido de titular de dados troca o nome da pessoa por
-        um pseudonimo e deixa a marca no registro.
+        Cada alteração feita no painel deixa um registro aqui, na mesma gravação
+        da própria alteração. Ninguém edita nem apaga registro pelo aplicativo —
+        nem o proprietário. Pedido de titular de dados troca o nome da pessoa por
+        um pseudônimo e deixa a marca no registro.
       </p>
 
       <Card className="p-3">
@@ -124,7 +124,7 @@ export function AuditTrail() {
             title={logs.length === 0 ? "Nenhum registro ainda" : "Nenhum registro com esses filtros"}
             description={
               logs.length === 0
-                ? "Os registros aparecem assim que alguem cadastrar, agendar ou alterar uma configuracao."
+                ? "Os registros aparecem assim que alguém cadastrar, agendar ou alterar uma configuração."
                 : "Limpe a busca ou escolha outro tipo."
             }
           />
@@ -174,7 +174,7 @@ export function AuditTrail() {
             <LoadMore
               className="border-border border-t"
               page={page}
-              summary={`Mostrando os ${logs.length} registros mais recentes. Os mais antigos ainda nao foram carregados.`}
+              summary={`Mostrando os ${logs.length} registros mais recentes. Os mais antigos ainda não foram carregados.`}
               label="Carregar registros mais antigos"
               onLoadMore={() => void loadMore("auditLogs")}
             />

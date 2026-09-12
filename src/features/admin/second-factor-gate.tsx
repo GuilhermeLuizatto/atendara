@@ -29,7 +29,7 @@ export function SecondFactorGate({ children }: { children: ReactNode }) {
       authAdapter
         .secondFactorState()
         .then(setState)
-        .catch(() => setError("Nao foi possivel conferir o segundo fator desta sessao.")),
+        .catch(() => setError("Não foi possível conferir o segundo fator desta sessão.")),
     [],
   );
 
@@ -43,7 +43,7 @@ export function SecondFactorGate({ children }: { children: ReactNode }) {
     try {
       await action();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Nao foi possivel concluir.");
+      setError(caught instanceof Error ? caught.message : "Não foi possível concluir.");
     } finally {
       setBusy(false);
     }
@@ -55,7 +55,7 @@ export function SecondFactorGate({ children }: { children: ReactNode }) {
       await authAdapter.finishTotpEnrollment(code);
       setEnrollment(null);
       setCode("");
-      setNotice("Aplicativo autenticador cadastrado. Saia e entre de novo: o codigo sera pedido depois da senha.");
+      setNotice("Aplicativo autenticador cadastrado. Saia e entre de novo: o código será pedido depois da senha.");
       setState("sign-in-again");
     });
   }
@@ -66,7 +66,7 @@ export function SecondFactorGate({ children }: { children: ReactNode }) {
       <>
         {mode === "demo" ? (
           <p className="bg-surface-muted text-muted-foreground rounded-lg p-3 text-sm">
-            Demonstracao local: o segundo fator exigido da operadora em producao nao e simulado aqui.
+            Demonstração local: o segundo fator exigido da operadora em produção não é simulado aqui.
           </p>
         ) : null}
         {children}
@@ -76,12 +76,12 @@ export function SecondFactorGate({ children }: { children: ReactNode }) {
 
   return (
     <section aria-label="Segundo fator da operadora" className="bg-surface border-border max-w-xl space-y-4 rounded-xl border p-5">
-      <h2 className="text-foreground font-semibold">Segundo fator obrigatorio</h2>
+      <h2 className="text-foreground font-semibold">Segundo fator obrigatório</h2>
       <p className="text-muted-foreground text-sm">
-        A administracao so abre com uma sessao que entrou usando o codigo de um aplicativo autenticador (TOTP).
-        Senha sozinha nao cadastra, nao altera conta e nao concede acesso.
+        A administração só abre com uma sessão que entrou usando o código de um aplicativo autenticador (TOTP).
+        Senha sozinha não cadastra, não altera conta e não concede acesso.
       </p>
-      {state === "loading" && !error ? <p className="text-muted-foreground text-sm">Conferindo a sessao...</p> : null}
+      {state === "loading" && !error ? <p className="text-muted-foreground text-sm">Conferindo a sessão...</p> : null}
       {notice ? <p role="status" className="bg-success-soft text-success-soft-foreground rounded-lg p-3 text-sm">{notice}</p> : null}
       {error ? <p role="alert" className="text-danger text-sm">{error}</p> : null}
 
@@ -89,11 +89,11 @@ export function SecondFactorGate({ children }: { children: ReactNode }) {
         <div className="space-y-3">
           <p className="text-foreground text-sm">Antes do cadastro do aplicativo, confirme o e-mail desta conta.</p>
           <div className="flex flex-wrap gap-2">
-            <Button disabled={busy} onClick={() => void run(async () => { await authAdapter.sendEmailVerification(); setNotice("Enviamos o link de confirmacao para o e-mail da conta."); })}>
-              Enviar confirmacao de e-mail
+            <Button disabled={busy} onClick={() => void run(async () => { await authAdapter.sendEmailVerification(); setNotice("Enviamos o link de confirmação para o e-mail da conta."); })}>
+              Enviar confirmação de e-mail
             </Button>
             <Button variant="outline" disabled={busy} onClick={() => void run(async () => { await refresh(); })}>
-              Ja confirmei
+              Já confirmei
             </Button>
           </div>
         </div>
@@ -112,7 +112,7 @@ export function SecondFactorGate({ children }: { children: ReactNode }) {
           <p className="text-muted-foreground text-sm">
             No celular, o link <a className="text-primary underline" href={enrollment.uri}>abre direto no aplicativo</a>.
           </p>
-          <Field label="Codigo de 6 digitos">
+          <Field label="Código de 6 dígitos">
             {(props) => (
               <Input {...props} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={(event) => setCode(event.target.value)} />
             )}
@@ -123,8 +123,8 @@ export function SecondFactorGate({ children }: { children: ReactNode }) {
 
       {state === "sign-in-again" ? (
         <div className="space-y-3">
-          {!notice ? <p className="text-foreground text-sm">Esta sessao entrou sem o codigo. Saia e entre de novo para usar a administracao.</p> : null}
-          <Button onClick={() => void signOut()}>Sair e entrar com o codigo</Button>
+          {!notice ? <p className="text-foreground text-sm">Esta sessão entrou sem o código. Saia e entre de novo para usar a administração.</p> : null}
+          <Button onClick={() => void signOut()}>Sair e entrar com o código</Button>
         </div>
       ) : null}
     </section>

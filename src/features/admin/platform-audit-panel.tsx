@@ -17,13 +17,13 @@ function summarize(log: PlatformAuditLog): string[] {
   const details = log.details as Record<string, unknown>;
   const lines: string[] = [];
   if (typeof details.kind === "string") lines.push(ACCESS_GRANT_KIND_LABELS[details.kind as AccessGrantKind] ?? details.kind);
-  if (typeof details.until === "string") lines.push(`ate ${formatDate(details.until)}`);
-  if (typeof details.resultingAccessUntil === "string") lines.push(`acesso resultante ate ${formatDate(details.resultingAccessUntil)}`);
+  if (typeof details.until === "string") lines.push(`até ${formatDate(details.until)}`);
+  if (typeof details.resultingAccessUntil === "string") lines.push(`acesso resultante até ${formatDate(details.resultingAccessUntil)}`);
   const status = details.status as { from?: string; to?: string } | undefined;
-  if (status?.from !== status?.to && status?.to) lines.push(`situacao ${status.from} -> ${status.to}`);
+  if (status?.from !== status?.to && status?.to) lines.push(`situação ${status.from} -> ${status.to}`);
   const modules = details.modules;
-  if (Array.isArray(modules)) lines.push(`modulos: ${modules.join(", ")}`);
-  else if (modules && typeof modules === "object" && "to" in modules && Array.isArray(modules.to)) lines.push(`modulos: ${modules.to.join(", ")}`);
+  if (Array.isArray(modules)) lines.push(`módulos: ${modules.join(", ")}`);
+  else if (modules && typeof modules === "object" && "to" in modules && Array.isArray(modules.to)) lines.push(`módulos: ${modules.to.join(", ")}`);
   return lines;
 }
 
@@ -34,7 +34,7 @@ function summarize(log: PlatformAuditLog): string[] {
 export function PlatformAuditPanel() {
   const reader = platformAccessReader();
   const fetchLogs = useCallback((request: PageRequest) => reader.recentAuditLogs(request), [reader]);
-  const logs = usePagedList(fetchLogs, "Nao foi possivel carregar a trilha da operadora.");
+  const logs = usePagedList(fetchLogs, "Não foi possível carregar a trilha da operadora.");
   // So as contas citadas na pagina: ler todos os cadastros para trocar id por
   // e-mail seria uma leitura por conta a cada abertura da aba.
   const [accounts, setAccounts] = useState<AccountAccess[]>([]);
@@ -61,13 +61,13 @@ export function PlatformAuditPanel() {
   const emailOf = (userId: string | null) => (userId ? (accounts.find((item) => item.userId === userId)?.email ?? userId) : "—");
 
   if (!reader.available) {
-    return <p className="text-muted-foreground text-sm">Na demonstracao nao existe trilha: nada aqui seria registro real.</p>;
+    return <p className="text-muted-foreground text-sm">Na demonstração não existe trilha: nada aqui seria registro real.</p>;
   }
 
   return (
     <section className="space-y-3" aria-busy={logs.status === "loading" || undefined}>
       <p className="text-muted-foreground text-sm">
-        Cada cadastro, alteracao de conta, concessao e revogacao grava uma entrada na mesma transacao do ato. Ninguem
+        Cada cadastro, alteração de conta, concessão e revogação grava uma entrada na mesma transação do ato. Ninguém
         edita nem apaga pelo aplicativo.
       </p>
       {logs.error ? <p role="alert" className="text-danger text-sm">{logs.error}</p> : null}

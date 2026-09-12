@@ -53,7 +53,7 @@ export function KpiRow({
         value={String(model.waitingConversations.length)}
         hint={
           model.criticalConversations > 0
-            ? `${model.criticalConversations} com possivel risco`
+            ? `${model.criticalConversations} com possível risco`
             : "Aguardando sua resposta"
         }
         icon={MessageSquare}
@@ -67,7 +67,7 @@ export function KpiRow({
       />
 
       <StatCard
-        label="Faturamento do mes"
+        label="Faturamento do mês"
         value={formatCurrency(model.receivedInCents)}
         hint={`${formatCurrency(model.pendingInCents)} a receber`}
         icon={Wallet}
@@ -87,8 +87,8 @@ export function KpiRow({
         value={String(model.unreadAlerts)}
         hint={
           model.criticalAlerts > 0
-            ? `${model.criticalAlerts} critico(s) aguardando`
-            : "Nenhum alerta critico"
+            ? `${model.criticalAlerts} crítico(s) aguardando`
+            : "Nenhum alerta crítico"
         }
         icon={Bell}
         tone={model.criticalAlerts > 0 ? "danger" : "default"}

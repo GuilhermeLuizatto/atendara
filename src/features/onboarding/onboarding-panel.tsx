@@ -77,36 +77,36 @@ export function OnboardingPanel() {
 
   const content: Record<OnboardingStepId, { title: string; body: ReactNode }> = {
     profession: {
-      title: "Confira a sua profissao",
+      title: "Confira a sua profissão",
       body: (
         <div className="space-y-3">
           <p className="text-foreground text-sm">
-            Seu acesso foi liberado para <strong>{profession.label}</strong>. E isso que
+            Seu acesso foi liberado para <strong>{profession.label}</strong>. É isso que
             define os nomes do painel — {clientTerm.pluralLower} e{" "}
             {appointmentTerm.pluralLower} — e as modalidades oferecidas:{" "}
             {profession.modalities.map((modality) => MODALITY_LABELS[modality].toLocaleLowerCase("pt-BR")).join(", ")}.
           </p>
           <p className="text-muted-foreground text-sm">
-            Se a profissao estiver errada, pare aqui e fale com a {OPERATOR_NAME}: so a
-            operadora altera a profissao de um cadastro.
+            Se a profissão estiver errada, pare aqui e fale com a {OPERATOR_NAME}: só a
+            operadora altera a profissão de um cadastro.
           </p>
           <Button size="sm" onClick={() => confirm("profession")}>
-            A profissao esta certa
+            A profissão está certa
           </Button>
         </div>
       ),
     },
     agenda: {
-      title: "Veja o horario de atendimento",
-      body: <AgendaSettingsForm onDone={() => confirm("agenda")} doneLabel="Confirmar horario" />,
+      title: "Veja o horário de atendimento",
+      body: <AgendaSettingsForm onDone={() => confirm("agenda")} doneLabel="Confirmar horário" />,
     },
     client: {
       title: `Cadastre ${firstTerm(clientTerm)}`,
       body: (
         <div className="space-y-3">
           <p className="text-muted-foreground text-sm">
-            So dados administrativos: nome, contato e preferencias. Informacao clinica
-            nao pertence a este cadastro.
+            Só dados administrativos: nome, contato e preferências. Informação clínica
+            não pertence a este cadastro.
           </p>
           <Button size="sm" onClick={() => setClientFormOpen(true)}>
             Cadastrar {clientTerm.singularLower}
@@ -119,8 +119,8 @@ export function OnboardingPanel() {
       body: firstClient ? (
         <div className="space-y-3">
           <p className="text-muted-foreground text-sm">
-            Escolha data e horario para {firstClient.fullName}. Marcar ou confirmar{" "}
-            {indefiniteTerm(appointmentTerm)} nao envia mensagem para ninguem.
+            Escolha data e horário para {firstClient.fullName}. Marcar ou confirmar{" "}
+            {indefiniteTerm(appointmentTerm)} não envia mensagem para ninguém.
           </p>
           <Button size="sm" onClick={() => setAppointmentFormOpen(true)}>
             Agendar {appointmentTerm.singularLower}
@@ -128,7 +128,7 @@ export function OnboardingPanel() {
         </div>
       ) : (
         <p className="text-muted-foreground text-sm">
-          Primeiro cadastre {indefiniteTerm(clientTerm)}: o agendamento e feito para essa pessoa.
+          Primeiro cadastre {indefiniteTerm(clientTerm)}: o agendamento é feito para essa pessoa.
         </p>
       ),
     },
@@ -145,7 +145,7 @@ export function OnboardingPanel() {
             Primeiros passos
           </h2>
           <p className="text-muted-foreground text-sm">
-            {summary.done} de {summary.total} concluidos. Leva poucos minutos.
+            {summary.done} de {summary.total} concluídos. Leva poucos minutos.
           </p>
         </div>
         <Button
@@ -163,7 +163,7 @@ export function OnboardingPanel() {
         aria-valuemin={0}
         aria-valuemax={summary.total}
         aria-valuenow={summary.done}
-        aria-valuetext={`${summary.done} de ${summary.total} passos concluidos`}
+        aria-valuetext={`${summary.done} de ${summary.total} passos concluídos`}
         className="bg-surface-muted mt-4 h-1.5 w-full overflow-hidden rounded-full"
       >
         <div
@@ -177,9 +177,9 @@ export function OnboardingPanel() {
           const isOpen = open === step.id;
           const panelId = `${titleId}-${step.id}`;
           const status = !step.available
-            ? "nao liberado no seu cadastro"
+            ? "não liberado no seu cadastro"
             : step.done
-              ? "concluido"
+              ? "concluído"
               : "pendente";
           return (
             <li key={step.id} className="border-border rounded-lg border">
@@ -225,7 +225,7 @@ export function OnboardingPanel() {
                     content[step.id].body
                   ) : (
                     <p className="text-muted-foreground text-sm">
-                      Seu cadastro nao inclui esta area. Fale com a {OPERATOR_NAME} se
+                      Seu cadastro não inclui esta área. Fale com a {OPERATOR_NAME} se
                       precisar dela.
                     </p>
                   )}

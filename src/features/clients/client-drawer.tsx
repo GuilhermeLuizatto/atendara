@@ -124,7 +124,7 @@ export function ClientDrawer({
                 tone={client.outstandingBalanceInCents > 0 ? "warning" : "default"}
               />
               <Metric
-                label="Ultimo"
+                label="Último"
                 value={
                   client.lastAppointmentAt
                     ? formatDate(client.lastAppointmentAt)
@@ -132,7 +132,7 @@ export function ClientDrawer({
                 }
               />
               <Metric
-                label="Proximo"
+                label="Próximo"
                 value={
                   client.nextAppointmentAt
                     ? formatDate(client.nextAppointmentAt)
@@ -148,7 +148,7 @@ export function ClientDrawer({
               <Row label="E-mail" value={client.email ?? "—"} />
               <Row
                 label={terminology.professional.singular}
-                value={professional?.displayName ?? "Sem responsavel"}
+                value={professional?.displayName ?? "Sem responsável"}
               />
               <Row
                 label="Como conheceu"
@@ -157,13 +157,13 @@ export function ClientDrawer({
             </dl>
           </Section>
 
-          <Section title="Observacoes administrativas">
+          <Section title="Observações administrativas">
             <p className="text-muted-foreground text-sm leading-relaxed">
-              {client.administrativeNotes ?? "Nenhuma observacao registrada."}
+              {client.administrativeNotes ?? "Nenhuma observação registrada."}
             </p>
           </Section>
 
-          <Section title={`Historico de ${terminology.appointment.pluralLower}`}>
+          <Section title={`Histórico de ${terminology.appointment.pluralLower}`}>
             {history.length === 0 ? (
               <p className="text-muted-foreground text-sm">
                 {noTerm(terminology.appointment)}{" "}
@@ -205,7 +205,7 @@ export function ClientDrawer({
           });
         }}
         title={`Excluir ${terminology.client.singularLower}`}
-        message={`O cadastro de ${client.fullName} sera removido. Atendimentos futuros ou pendencias financeiras impedem a exclusao.`}
+        message={`O cadastro de ${client.fullName} será removido. Atendimentos futuros ou pendências financeiras impedem a exclusão.`}
         confirmLabel="Excluir"
       />
     </>

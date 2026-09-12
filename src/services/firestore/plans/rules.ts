@@ -34,17 +34,17 @@ function validate(ctx: PlanContext, input: RuleInput): RuleInput {
 function assertEditableLevel(level: AIRule["level"]): void {
   if (level === "SECURITY" || level === "SYSTEM" || level === "PROFESSION") {
     throw new RepositoryError(
-      "Somente regras do profissional, contextuais e de preferencia podem ser criadas.",
+      "Somente regras do profissional, contextuais e de preferência podem ser criadas.",
     );
   }
 }
 
 function requireEditableRule(ctx: PlanContext, id: ID): AIRule {
   const rule = ctx.snapshot.rules.find((item) => item.id === id);
-  if (!rule) throw new RepositoryError("Regra nao encontrada.");
+  if (!rule) throw new RepositoryError("Regra não encontrada.");
   if (rule.immutable) {
     throw new RepositoryError(
-      "Regras fundamentais nao podem ser alteradas nem desativadas.",
+      "Regras fundamentais não podem ser alteradas nem desativadas.",
     );
   }
   return rule;
@@ -132,7 +132,7 @@ export function planDeleteRule(ctx: PlanContext, id: ID): Plan {
         action: "DELETE",
         actorType: "USER",
         resource: { type: "aiRule", id },
-        summary: `Regra "${existing.name}" excluida.`,
+        summary: `Regra "${existing.name}" excluída.`,
       }),
     ],
   };

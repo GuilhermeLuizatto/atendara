@@ -98,7 +98,7 @@ export function UserMenu() {
             <li>
               <Link href="/configuracoes" onClick={close} className={ITEM_CLASSES}>
                 <Settings className="size-4" aria-hidden strokeWidth={1.75} />
-                Configuracoes
+                Configurações
               </Link>
             </li>
             {/* O prototipo guarda as alteracoes no navegador; sem uma saida
@@ -114,7 +114,7 @@ export function UserMenu() {
                   className={ITEM_CLASSES}
                 >
                   <RotateCcw className="size-4" aria-hidden strokeWidth={1.75} />
-                  Restaurar dados de demonstracao
+                  Restaurar dados de demonstração
                 </button>
               </li>
             ) : null}

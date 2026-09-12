@@ -19,7 +19,7 @@ export function providerFor(channel: OutboundChannel): NotificationProvider {
   const expected = CHANNEL_META[channel].providerId;
   if (expected !== "SIMULATED") {
     throw new Error(
-      `Canal ${channel} declara o provedor ${expected}, que nao existe. Nenhum envio real esta implementado.`,
+      `Canal ${channel} declara o provedor ${expected}, que não existe. Nenhum envio real está implementado.`,
     );
   }
   return createSimulatedProvider();

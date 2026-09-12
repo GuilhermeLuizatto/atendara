@@ -105,7 +105,7 @@ export function touch(ctx: PlanContext) {
 
 export function requireClient(ctx: PlanContext, id: ID): Client {
   const client = ctx.snapshot.clients.find((item) => item.id === id);
-  if (!client) throw new RepositoryError("Cadastro nao encontrado.");
+  if (!client) throw new RepositoryError("Cadastro não encontrado.");
   return client;
 }
 
@@ -113,19 +113,19 @@ export function requireProfessional(ctx: PlanContext, id: ID): Professional {
   const professional = ctx.snapshot.professionals.find(
     (item) => item.id === id,
   );
-  if (!professional) throw new RepositoryError("Profissional nao encontrado.");
+  if (!professional) throw new RepositoryError("Profissional não encontrado.");
   return professional;
 }
 
 export function requireAppointment(ctx: PlanContext, id: ID): Appointment {
   const appointment = ctx.snapshot.appointments.find((item) => item.id === id);
-  if (!appointment) throw new RepositoryError("Atendimento nao encontrado.");
+  if (!appointment) throw new RepositoryError("Atendimento não encontrado.");
   return appointment;
 }
 
 export function requireTransaction(ctx: PlanContext, id: ID): Transaction {
   const transaction = ctx.snapshot.transactions.find((item) => item.id === id);
-  if (!transaction) throw new RepositoryError("Lancamento nao encontrado.");
+  if (!transaction) throw new RepositoryError("Lançamento não encontrado.");
   return transaction;
 }
 
@@ -133,7 +133,7 @@ export function requireConversation(ctx: PlanContext, id: ID): Conversation {
   const conversation = ctx.snapshot.conversations.find(
     (item) => item.id === id,
   );
-  if (!conversation) throw new RepositoryError("Conversa nao encontrada.");
+  if (!conversation) throw new RepositoryError("Conversa não encontrada.");
   return conversation;
 }
 

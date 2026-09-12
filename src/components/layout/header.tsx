@@ -30,7 +30,7 @@ export function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
         size="icon"
         className="lg:hidden"
         onClick={onOpenMenu}
-        aria-label="Abrir menu de navegacao"
+        aria-label="Abrir menu de navegação"
       >
         <Menu className="size-5" aria-hidden strokeWidth={1.75} />
       </Button>
@@ -40,9 +40,9 @@ export function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
           prontuario e cadastrar gente de verdade. */}
       {demonstrative && repository ? (
         <Badge tone="warning">
-          <span className="sm:hidden">Demonstracao</span>
+          <span className="sm:hidden">Demonstração</span>
           <span className="hidden sm:inline">
-            {mode === "demo" ? "Modo demonstracao" : "Dados demonstrativos locais"}
+            {mode === "demo" ? "Modo demonstração" : "Dados demonstrativos locais"}
           </span>
         </Badge>
       ) : null}

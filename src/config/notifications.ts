@@ -54,8 +54,8 @@ export const CHANNEL_META: Record<OutboundChannel, ChannelMeta> = {
     providerId: "SIMULATED",
     maxBodyLength: 600,
     activationRequirement:
-      "Dominio remetente verificado no provedor de e-mail e registro de retorno configurado.",
-    consentIntermediary: "pelo provedor de e-mail usado pela organizacao",
+      "Domínio remetente verificado no provedor de e-mail e registro de retorno configurado.",
+    consentIntermediary: "pelo provedor de e-mail usado pela organização",
   },
   SMS: {
     label: "SMS",
@@ -63,7 +63,7 @@ export const CHANNEL_META: Record<OutboundChannel, ChannelMeta> = {
     providerId: "SIMULATED",
     maxBodyLength: 160,
     activationRequirement:
-      "Numero remetente habilitado na operadora e telefone do destinatario em formato internacional.",
+      "Número remetente habilitado na operadora e telefone do destinatário em formato internacional.",
     consentIntermediary: "pela operadora de telefonia",
   },
   WHATSAPP: {
@@ -72,8 +72,8 @@ export const CHANNEL_META: Record<OutboundChannel, ChannelMeta> = {
     providerId: "SIMULATED",
     maxBodyLength: 400,
     activationRequirement:
-      "Numero aprovado na API oficial do WhatsApp Business e modelo de mensagem homologado pela Meta.",
-    consentIntermediary: "pelo WhatsApp, servico da Meta",
+      "Número aprovado na API oficial do WhatsApp Business e modelo de mensagem homologado pela Meta.",
+    consentIntermediary: "pelo WhatsApp, serviço da Meta",
   },
 };
 
@@ -105,36 +105,36 @@ export const APPOINTMENT_EVENT_META: Record<
 > = {
   APPOINTMENT_SCHEDULED: {
     label: "Agendamento registrado",
-    description: "Avisa quando um novo horario e marcado.",
+    description: "Avisa quando um novo horário é marcado.",
     defaultEnabled: false,
     allowedLeadMinutes: [0],
     anchor: "CHANGE",
-    consentLabel: "horario marcado",
+    consentLabel: "horário marcado",
   },
   APPOINTMENT_REMINDER: {
     label: "Lembrete",
-    description: "Avisa antes do horario marcado.",
+    description: "Avisa antes do horário marcado.",
     defaultEnabled: false,
     allowedLeadMinutes: [60, 180, 720, 1_440, 2_880],
     anchor: "START",
-    consentLabel: "lembrete antes do horario",
+    consentLabel: "lembrete antes do horário",
   },
   APPOINTMENT_CONFIRMED: {
-    label: "Confirmacao registrada",
+    label: "Confirmação registrada",
     description:
-      "Avisa que o horario foi confirmado. Confirmar na agenda NAO envia nada por si so: sem esta regra habilitada, a confirmacao apenas muda o atendimento.",
+      "Avisa que o horário foi confirmado. Confirmar na agenda NÃO envia nada por si só: sem esta regra habilitada, a confirmação apenas muda o atendimento.",
     defaultEnabled: false,
     allowedLeadMinutes: [0],
     anchor: "CHANGE",
-    consentLabel: "confirmacao do horario",
+    consentLabel: "confirmação do horário",
   },
   APPOINTMENT_CANCELLED: {
     label: "Cancelamento",
-    description: "Avisa que o horario foi cancelado.",
+    description: "Avisa que o horário foi cancelado.",
     defaultEnabled: false,
     allowedLeadMinutes: [0],
     anchor: "CHANGE",
-    consentLabel: "cancelamento do horario",
+    consentLabel: "cancelamento do horário",
   },
 };
 
@@ -148,7 +148,7 @@ export const APPOINTMENT_EVENT_META: Record<
  * RASCUNHO: redacao, base legal e necessidade do consentimento para cada
  * evento dependem de revisao por profissional qualificado.
  */
-export const NOTIFICATION_CONSENT_TEXT_VERSION = "2026-09-10-rascunho";
+export const NOTIFICATION_CONSENT_TEXT_VERSION = "2026-09-11-rascunho";
 
 export const NOTIFICATION_CONSENT_REVIEW_STATUS = "DRAFT_PENDING_LEGAL_REVIEW" as const;
 
@@ -158,16 +158,16 @@ export const NOTIFICATION_CONSENT_REVIEW_STATUS = "DRAFT_PENDING_LEGAL_REVIEW" a
  * do que o renderizador interpola seria consentimento para outra coisa.
  */
 export const CONSENT_DISCLOSURE_PHRASES: Record<AppointmentDisclosureLevel, string> = {
-  TIME_ONLY: "trazem apenas o seu nome, o nome da organizacao, a data e o horario",
+  TIME_ONLY: "trazem apenas o seu nome, o nome da organização, a data e o horário",
   TIME_AND_PROFESSIONAL:
-    "trazem o seu nome, o nome da organizacao, o nome de quem atende, a data e o horario",
+    "trazem o seu nome, o nome da organização, o nome de quem atende, a data e o horário",
   TIME_PROFESSIONAL_AND_SERVICE:
-    "trazem o seu nome, o nome da organizacao, o nome de quem atende, o tipo de atendimento, a data e o horario",
+    "trazem o seu nome, o nome da organização, o nome de quem atende, o tipo de atendimento, a data e o horário",
 };
 
 /** Orientacao para a equipe, fora do texto que a pessoa le. */
 export const CONSENT_STAFF_INSTRUCTION =
-  "Leia ou mostre o texto acima a pessoa. Marque somente se ela autorizou, e so os canais que ela escolheu.";
+  "Leia ou mostre o texto acima à pessoa. Marque somente se ela autorizou, e só os canais que ela escolheu.";
 
 // ------------------------------------------------------------- modelos
 
@@ -259,34 +259,34 @@ export const DEFAULT_NOTIFICATION_SETTINGS: OrganizationNotificationSettings = {
 // --------------------------------------------------------------- rotulos
 
 export const SKIP_REASON_LABELS: Record<NotificationSkipReason, string> = {
-  ORGANIZATION_DISABLED: "A organizacao nao ativou o envio de avisos.",
-  SENDER_NOT_VERIFIED: "O canal nao tem remetente comprovado.",
+  ORGANIZATION_DISABLED: "A organização não ativou o envio de avisos.",
+  SENDER_NOT_VERIFIED: "O canal não tem remetente comprovado.",
   NO_RULE_FOR_EVENT: "Nenhuma regra cobre este evento.",
-  RULE_DISABLED: "A regra existe, mas esta desativada.",
+  RULE_DISABLED: "A regra existe, mas está desativada.",
   EVENT_NOT_ALLOWED_FOR_PROFESSION:
-    "A profissao nao permite aviso para este evento.",
+    "A profissão não permite aviso para este evento.",
   CHANNEL_NOT_ALLOWED_FOR_PROFESSION:
-    "A profissao nao permite este canal pelo grau de sensibilidade dos dados.",
-  MISSING_CONTACT: "O cadastro nao tem contato para este canal.",
-  INVALID_CONTACT: "O contato do cadastro nao passa na validacao do canal.",
-  MISSING_CONSENT: "O cadastro nao registrou consentimento.",
+    "A profissão não permite este canal pelo grau de sensibilidade dos dados.",
+  MISSING_CONTACT: "O cadastro não tem contato para este canal.",
+  INVALID_CONTACT: "O contato do cadastro não passa na validação do canal.",
+  MISSING_CONSENT: "O cadastro não registrou consentimento.",
   CONSENT_REVOKED: "O consentimento foi revogado.",
-  CHANNEL_NOT_CONSENTED: "O consentimento nao inclui este canal.",
-  SCHEDULE_IN_THE_PAST: "O horario de envio ja passou.",
-  ALREADY_PLANNED: "Ja existe um envio planejado igual a este.",
-  TEMPLATE_REJECTED: "O modelo foi recusado pela politica de conteudo.",
+  CHANNEL_NOT_CONSENTED: "O consentimento não inclui este canal.",
+  SCHEDULE_IN_THE_PAST: "O horário de envio já passou.",
+  ALREADY_PLANNED: "Já existe um envio planejado igual a este.",
+  TEMPLATE_REJECTED: "O modelo foi recusado pela política de conteúdo.",
 };
 
 export const DELIVERY_FAILURE_LABELS: Record<DeliveryFailureCode, string> = {
-  PROVIDER_UNAVAILABLE: "Provedor indisponivel",
-  INVALID_DESTINATION: "Destino invalido",
+  PROVIDER_UNAVAILABLE: "Provedor indisponível",
+  INVALID_DESTINATION: "Destino inválido",
   RATE_LIMITED: "Limite de envio atingido",
-  SENDER_NOT_ALLOWED: "Remetente nao autorizado",
+  SENDER_NOT_ALLOWED: "Remetente não autorizado",
   ATTEMPTS_EXHAUSTED: "Tentativas esgotadas",
 };
 
 export const PLATFORM_NOTICE_LABELS: Record<PlatformNoticeEvent, string> = {
-  TRIAL_ENDING: "Periodo de teste terminando",
+  TRIAL_ENDING: "Período de teste terminando",
   PAYMENT_PENDING: "Pagamento pendente",
   ACCESS_ENDING: "Acesso vencendo",
   SUBSCRIPTION_CANCELED: "Assinatura cancelada",

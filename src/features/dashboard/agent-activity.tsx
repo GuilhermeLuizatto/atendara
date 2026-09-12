@@ -68,14 +68,14 @@ export function AgentActivity({
           value={String(escalations)}
           tone="warning"
         />
-        <Summary label="Automacao" value={formatPercent(automationRate)} />
+        <Summary label="Automação" value={formatPercent(automationRate)} />
       </CardBody>
 
       {decisions.length === 0 ? (
         <EmptyState
           icon={<Bot className="size-5" aria-hidden />}
           title="Sem atividade ainda"
-          description="As decisoes do agente aparecem aqui assim que as mensagens chegarem."
+          description="As decisões do agente aparecem aqui assim que as mensagens chegarem."
         />
       ) : (
         <ul className="divide-border divide-y">
@@ -109,7 +109,7 @@ export function AgentActivity({
                     {decision.inputPreview ? (
                       <>&ldquo;{truncate(decision.inputPreview, 84)}&rdquo;</>
                     ) : (
-                      "Trecho da mensagem nao guardado nesta profissao"
+                      "Trecho da mensagem não guardado nesta profissão"
                     )}
                   </p>
 
@@ -121,7 +121,7 @@ export function AgentActivity({
                       {AI_ACTION_LABELS[decision.action]}
                     </Badge>
                     <span className="text-subtle-foreground text-[11px] tabular-nums">
-                      {formatPercent(decision.confidence)} de confianca
+                      {formatPercent(decision.confidence)} de confiança
                     </span>
                   </div>
 
@@ -147,7 +147,7 @@ export function AgentActivity({
           href="/agente"
           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
         >
-          Auditoria completa das decisoes
+          Auditoria completa das decisões
           <ArrowUpRight className="size-3" aria-hidden strokeWidth={2} />
         </Link>
       </CardBody>

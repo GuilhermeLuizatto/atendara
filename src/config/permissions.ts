@@ -78,19 +78,19 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 };
 
 export const ROLE_LABELS: Record<Role, string> = {
-  OWNER: "Proprietario",
+  OWNER: "Proprietário",
   ADMIN: "Administrador",
   PROFESSIONAL: "Profissional",
-  ASSISTANT: "Secretaria",
+  ASSISTANT: "Secretária",
   VIEWER: "Visualizador",
 };
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  OWNER: "Controle total, incluindo faturamento e exclusao da organizacao.",
-  ADMIN: "Gerencia equipe, configuracoes e todos os dados operacionais.",
-  PROFESSIONAL: "Atende, gerencia a propria agenda e as regras do agente.",
-  ASSISTANT: "Apoia a operacao: agenda, cadastros e mensagens.",
-  VIEWER: "Apenas leitura. Nao altera nenhum dado.",
+  OWNER: "Controle total, incluindo faturamento e exclusão da organização.",
+  ADMIN: "Gerencia equipe, configurações e todos os dados operacionais.",
+  PROFESSIONAL: "Atende, gerencia a própria agenda e as regras do agente.",
+  ASSISTANT: "Apoia a operação: agenda, cadastros e mensagens.",
+  VIEWER: "Apenas leitura. Não altera nenhum dado.",
 };
 
 /**

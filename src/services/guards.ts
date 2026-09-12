@@ -20,7 +20,7 @@ export function assertPermission(
     ? actor.permissions.includes(permission)
     : hasPermission(actor.role ?? "VIEWER", permission);
 
-  if (!allowed) throw new RepositoryError("Sem permissao para esta acao.");
+  if (!allowed) throw new RepositoryError("Sem permissão para esta ação.");
 }
 
 const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -45,13 +45,13 @@ export function validateAgendaSettings(
     !CLOCK_TIME.test(settings.workdayEnd) ||
     settings.workdayStart >= settings.workdayEnd
   ) {
-    throw new RepositoryError("O inicio do expediente precisa ser antes do fim.");
+    throw new RepositoryError("O início do expediente precisa ser antes do fim.");
   }
   if (!(AGENDA_SLOT_INTERVALS as readonly number[]).includes(settings.slotIntervalMinutes)) {
     throw new RepositoryError("Escolha um intervalo de agenda da lista.");
   }
   if (!modalities.includes(settings.defaultModality)) {
-    throw new RepositoryError("Modalidade nao atendida por esta profissao.");
+    throw new RepositoryError("Modalidade não atendida por esta profissão.");
   }
 
   return {

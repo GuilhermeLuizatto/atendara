@@ -46,7 +46,7 @@ export function ResetPasswordForm() {
             message:
               caught instanceof AuthError
                 ? caught.message
-                : "Nao foi possivel conferir este link.",
+                : "Não foi possível conferir este link.",
           });
         }
       });
@@ -68,7 +68,7 @@ export function ResetPasswordForm() {
       await authAdapter.confirmPasswordReset(code!, password);
       setState({ step: "done" });
     } catch (caught) {
-      setError(caught instanceof AuthError ? caught.message : "Nao foi possivel salvar a nova senha.");
+      setError(caught instanceof AuthError ? caught.message : "Não foi possível salvar a nova senha.");
     } finally {
       setBusy(false);
     }
@@ -79,7 +79,7 @@ export function ResetPasswordForm() {
       <div className="mt-4 space-y-4">
         <p role="alert" className="bg-danger-soft text-danger-soft-foreground rounded-lg px-3 py-2 text-sm">
           {incomplete
-            ? "Este link esta incompleto. Abra o link exatamente como chegou no e-mail, ou peca um novo."
+            ? "Este link está incompleto. Abra o link exatamente como chegou no e-mail, ou peça um novo."
             : (state as { message: string }).message}
         </p>
         <Link href="/login" className={buttonStyles({ size: "lg", className: "w-full justify-center" })}>

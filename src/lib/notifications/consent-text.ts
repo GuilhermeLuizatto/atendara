@@ -39,8 +39,8 @@ function joinList(items: readonly string[]): string {
 
 export function consentStatement(input: ConsentStatementInput): ConsentStatement {
   const name = input.organizationName.trim();
-  const subject = name || "Esta organizacao";
-  const object = name || "esta organizacao";
+  const subject = name || "Esta organização";
+  const object = name || "esta organização";
   const channels = joinList(input.channels.map((channel) => CHANNEL_META[channel].label));
   const events = joinList(input.events.map((event) => APPOINTMENT_EVENT_META[event].consentLabel));
   const intermediaries = joinList([
@@ -51,10 +51,10 @@ export function consentStatement(input: ConsentStatementInput): ConsentStatement
     version: NOTIFICATION_CONSENT_TEXT_VERSION,
     reviewStatus: NOTIFICATION_CONSENT_REVIEW_STATUS,
     paragraphs: [
-      `${subject} pode enviar avisos sobre os seus horarios de atendimento (${events}) pelos canais que voce escolher entre: ${channels}.`,
-      `Os avisos ${CONSENT_DISCLOSURE_PHRASES[input.disclosure]}. Nao informam o motivo do atendimento.`,
-      `Para chegar ate voce, cada aviso passa ${intermediaries}.`,
-      `Autorizar e opcional e nao muda o seu atendimento. Voce pode retirar a autorizacao quando quiser, de um canal ou de todos, pedindo a ${object}.`,
+      `${subject} pode enviar avisos sobre os seus horários de atendimento (${events}) pelos canais que você escolher entre: ${channels}.`,
+      `Os avisos ${CONSENT_DISCLOSURE_PHRASES[input.disclosure]}. Não informam o motivo do atendimento.`,
+      `Para chegar até você, cada aviso passa ${intermediaries}.`,
+      `Autorizar é opcional e não muda o seu atendimento. Você pode retirar a autorização quando quiser, de um canal ou de todos, pedindo a ${object}.`,
     ],
   };
 }

@@ -47,16 +47,16 @@ export function accessGrantWindowError(until, nowMs) {
     if (!Number.isFinite(untilMs) || untilMs <= nowMs)
         return "Defina uma validade futura.";
     if (untilMs > nowMs + MAX_ACCESS_GRANT_DAYS * DAY_MS) {
-        return `A concessao vale no maximo ${MAX_ACCESS_GRANT_DAYS} dias. Para ir alem, conceda de novo com novo motivo.`;
+        return `A concessão vale no máximo ${MAX_ACCESS_GRANT_DAYS} dias. Para ir além, conceda de novo com novo motivo.`;
     }
     return null;
 }
 export function accessGrantReasonError(reason) {
     const length = reason.trim().length;
     if (length < ACCESS_GRANT_REASON_LENGTH.min)
-        return "Explique o motivo da concessao.";
+        return "Explique o motivo da concessão.";
     if (length > ACCESS_GRANT_REASON_LENGTH.max)
-        return "Resuma o motivo da concessao.";
+        return "Resuma o motivo da concessão.";
     return null;
 }
 /**

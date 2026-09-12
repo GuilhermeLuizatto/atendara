@@ -43,7 +43,7 @@ export function NextAppointment({
         <EmptyState
           icon={<CalendarCheck className="size-5" aria-hidden />}
           title={`${noTerm(appointmentTerm)} pela frente`}
-          description="Sua agenda esta livre pelo resto do dia. Aproveite para revisar pendencias."
+          description="Sua agenda está livre pelo resto do dia. Aproveite para revisar pendências."
           action={
             <Link href="/agenda" className={buttonStyles({ variant: "secondary", size: "sm" })}>
               Abrir agenda
@@ -114,7 +114,7 @@ export function NextAppointment({
             <p className="text-subtle-foreground text-xs">
               {clientLabel} de {appointment.professionalName}
             </p>
-            <p className="text-subtle-foreground text-xs">Confirmar atualiza somente a agenda. Nenhuma mensagem sera enviada.</p>
+            <p className="text-subtle-foreground text-xs">Confirmar atualiza somente a agenda. Nenhuma mensagem será enviada.</p>
           </div>
         </div>
 

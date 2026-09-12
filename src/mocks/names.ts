@@ -54,11 +54,11 @@ export const LAST_NAMES = [
 
 /** Nome ficticio da organizacao por profissao. */
 export const ORGANIZATION_NAMES: Record<ProfessionId, string> = {
-  PSYCHOLOGIST: "Consultorio Nucleo",
+  PSYCHOLOGIST: "Consultório Núcleo",
   PSYCHIATRIST: "Instituto Meridiano",
-  DOCTOR: "Clinica Vitalis",
+  DOCTOR: "Clínica Vitalis",
   DENTIST: "Odonto Aurora",
-  NUTRITIONIST: "Espaco Raiz Nutricao",
+  NUTRITIONIST: "Espaço Raiz Nutrição",
   PHYSIOTHERAPIST: "Movimento Fisioterapia",
   THERAPIST: "Casa Serena",
   PERSONAL_TRAINER: "Studio Impulso",
@@ -91,10 +91,10 @@ export const LICENSE_PREFIX: Record<ProfessionId, string> = {
 export const SPECIALTIES: Record<ProfessionId, string[]> = {
   PSYCHOLOGIST: ["Terapia cognitivo-comportamental", "Ansiedade", "Casal"],
   PSYCHIATRIST: ["Transtornos de humor", "Ansiedade", "Sono"],
-  DOCTOR: ["Clinica geral", "Check-up", "Medicina preventiva"],
-  DENTIST: ["Clinica geral", "Estetica", "Ortodontia"],
-  NUTRITIONIST: ["Emagrecimento", "Nutricao esportiva", "Comportamental"],
-  PHYSIOTHERAPIST: ["Ortopedica", "Pos-operatorio", "RPG"],
+  DOCTOR: ["Clínica geral", "Check-up", "Medicina preventiva"],
+  DENTIST: ["Clínica geral", "Estética", "Ortodontia"],
+  NUTRITIONIST: ["Emagrecimento", "Nutrição esportiva", "Comportamental"],
+  PHYSIOTHERAPIST: ["Ortopédica", "Pós-operatório", "RPG"],
   THERAPIST: ["Integrativa", "Mindfulness", "Florais"],
   PERSONAL_TRAINER: ["Hipertrofia", "Emagrecimento", "Condicionamento"],
 };

@@ -50,7 +50,7 @@ function AgentWorkspace() {
   if (!data) return <AgentSkeleton />;
   const groups = [
     {
-      title: "1. Regras fundamentais e da profissao",
+      title: "1. Regras fundamentais e da profissão",
       rules: data.rules.filter((r) => r.immutable),
     },
     {
@@ -60,7 +60,7 @@ function AgentWorkspace() {
       ),
     },
     {
-      title: "3. Regras contextuais e preferencias",
+      title: "3. Regras contextuais e preferências",
       rules: data.rules.filter(
         (r) => !r.immutable && r.level !== "PROFESSIONAL",
       ),
@@ -76,7 +76,7 @@ function AgentWorkspace() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs
           idBase="agente"
-          label={`Secoes de ${AI_ASSISTANT_NAME}`}
+          label={`Seções de ${AI_ASSISTANT_NAME}`}
           value={tab}
           onChange={setTab}
           options={[
@@ -165,7 +165,7 @@ function AgentWorkspace() {
             ))}
             {!group.rules.length && (
               <p className="text-muted-foreground text-sm">
-                Nenhuma regra neste nivel.
+                Nenhuma regra neste nível.
               </p>
             )}
           </section>
@@ -175,11 +175,11 @@ function AgentWorkspace() {
         <Card>
           <EmptyState
             icon={<ScrollText className="size-5" aria-hidden />}
-            title="Nenhuma decisao registrada"
+            title="Nenhuma decisão registrada"
             description={
               repository?.mode === "memory"
-                ? "Use Testar para simular uma mensagem; a decisao aparece aqui."
-                : "Cada mensagem avaliada pelo agente deixa uma decisao aqui. Sem canal de mensagens integrado, a lista fica vazia ate la."
+                ? "Use Testar para simular uma mensagem; a decisão aparece aqui."
+                : "Cada mensagem avaliada pelo agente deixa uma decisão aqui. Sem canal de mensagens integrado, a lista fica vazia até lá."
             }
           />
         </Card>
@@ -191,7 +191,7 @@ function AgentWorkspace() {
               <details>
                 <summary className="cursor-pointer text-sm">
                   <span className="font-medium">
-                    {decision.inputPreview || "Trecho da mensagem nao guardado nesta profissao"}
+                    {decision.inputPreview || "Trecho da mensagem não guardado nesta profissão"}
                   </span>
                   <span className="text-muted-foreground mt-1 block text-xs">
                     {formatDateTime(decision.decidedAt)} ·{" "}
@@ -203,7 +203,7 @@ function AgentWorkspace() {
                 <div className="mt-4">
                   <DecisionDetails decision={decision} />
                   <p className="text-muted-foreground mt-2 text-xs">
-                    Organizacao: {decision.organizationId} · Decisao:{" "}
+                    Organização: {decision.organizationId} · Decisão:{" "}
                     {decision.id}
                   </p>
                 </div>
@@ -213,8 +213,8 @@ function AgentWorkspace() {
           <Card>
             <LoadMore
               page={data.pagination?.decisions}
-              summary={`Mostrando as ${data.decisions.length} decisoes mais recentes.`}
-              label="Carregar decisoes anteriores"
+              summary={`Mostrando as ${data.decisions.length} decisões mais recentes.`}
+              label="Carregar decisões anteriores"
               onLoadMore={() => void actions.loadMore("decisions")}
             />
           </Card>
@@ -235,7 +235,7 @@ function AgentWorkspace() {
           if (deleting) void actions.deleteRule(deleting.id);
         }}
         title="Excluir regra"
-        message={`Excluir "${deleting?.name}"? As decisoes anteriores permanecem na auditoria.`}
+        message={`Excluir "${deleting?.name}"? As decisões anteriores permanecem na auditoria.`}
         confirmLabel="Excluir regra"
       />
     </div>

@@ -43,9 +43,9 @@ export function PlatformBillingPanel() {
   const fetchSubscriptions = useCallback((request: PageRequest) => billing.allSubscriptions(request), [billing]);
   const fetchInvoices = useCallback((request: PageRequest) => billing.allInvoices(request), [billing]);
   const fetchEvents = useCallback((request: PageRequest) => billing.recentGatewayEvents(request), [billing]);
-  const subscriptions = usePagedList(fetchSubscriptions, "Nao foi possivel carregar as assinaturas.");
-  const invoices = usePagedList(fetchInvoices, "Nao foi possivel carregar as cobrancas.");
-  const events = usePagedList(fetchEvents, "Nao foi possivel carregar os eventos do gateway.");
+  const subscriptions = usePagedList(fetchSubscriptions, "Não foi possível carregar as assinaturas.");
+  const invoices = usePagedList(fetchInvoices, "Não foi possível carregar as cobranças.");
+  const events = usePagedList(fetchEvents, "Não foi possível carregar os eventos do gateway.");
 
   const metrics = computePlatformMetrics(subscriptions.items, invoices.items);
   const partial = subscriptions.page.hasMore || invoices.page.hasMore;
@@ -55,7 +55,7 @@ export function PlatformBillingPanel() {
     <div className="space-y-6">
       {!billing.available ? (
         <p className="bg-surface-muted text-muted-foreground rounded-lg p-3 text-sm">
-          Sem projeto configurado nao ha cobranca para exibir.
+          Sem projeto configurado não há cobrança para exibir.
         </p>
       ) : null}
       {error ? (
@@ -66,7 +66,7 @@ export function PlatformBillingPanel() {
 
       {partial ? (
         <p className="bg-warning-soft text-warning-soft-foreground rounded-lg p-3 text-sm">
-          Os indicadores abaixo consideram so as assinaturas e cobrancas ja
+          Os indicadores abaixo consideram só as assinaturas e cobranças já
           carregadas nas listas. Carregue o restante para incluir as demais.
         </p>
       ) : null}
@@ -88,15 +88,15 @@ export function PlatformBillingPanel() {
           definition={METRIC_DEFINITIONS.outstanding}
         />
         <Metric
-          label="Recebido liquido"
+          label="Recebido líquido"
           value={formatCurrency(metrics.netCollectedInCents)}
           definition={METRIC_DEFINITIONS.netCollected}
         />
       </section>
 
-      <section aria-label="Assinaturas por situacao" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="Assinaturas por situação" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Assinaturas ativas" value={String(metrics.activeSubscriptions)} />
-        <Metric label="Em periodo de teste" value={String(metrics.trialingSubscriptions)} />
+        <Metric label="Em período de teste" value={String(metrics.trialingSubscriptions)} />
         <Metric label="Inadimplentes" value={String(metrics.delinquentSubscriptions)} />
         <Metric
           label="Cancelamento"
@@ -123,9 +123,9 @@ export function PlatformBillingPanel() {
                     <th scope="col" className="py-2 pr-4 font-medium">Assinante</th>
                     <th scope="col" className="py-2 pr-4 font-medium">Plano</th>
                     <th scope="col" className="py-2 pr-4 font-medium">Valor</th>
-                    <th scope="col" className="py-2 pr-4 font-medium">Situacao</th>
-                    <th scope="col" className="py-2 pr-4 font-medium">Ciclo ate</th>
-                    <th scope="col" className="py-2 font-medium">Acesso ate</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">Situação</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">Ciclo até</th>
+                    <th scope="col" className="py-2 font-medium">Acesso até</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -175,25 +175,25 @@ export function PlatformBillingPanel() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Cobrancas emitidas</CardTitle>
+          <CardTitle>Cobranças emitidas</CardTitle>
         </CardHeader>
         <CardBody>
           {invoices.status === "loading" ? (
-            <p role="status" className="text-muted-foreground text-sm">Carregando cobrancas...</p>
+            <p role="status" className="text-muted-foreground text-sm">Carregando cobranças...</p>
           ) : invoices.items.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Nenhuma cobranca emitida.</p>
+            <p className="text-muted-foreground text-sm">Nenhuma cobrança emitida.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <caption className="sr-only">Cobrancas emitidas pela plataforma</caption>
+                <caption className="sr-only">Cobranças emitidas pela plataforma</caption>
                 <thead className="text-muted-foreground text-left text-xs">
                   <tr>
-                    <th scope="col" className="py-2 pr-4 font-medium">Emissao</th>
-                    <th scope="col" className="py-2 pr-4 font-medium">Organizacao</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">Emissão</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">Organização</th>
                     <th scope="col" className="py-2 pr-4 font-medium">Devido</th>
                     <th scope="col" className="py-2 pr-4 font-medium">Pago</th>
                     <th scope="col" className="py-2 pr-4 font-medium">Reembolsado</th>
-                    <th scope="col" className="py-2 font-medium">Situacao</th>
+                    <th scope="col" className="py-2 font-medium">Situação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -223,8 +223,8 @@ export function PlatformBillingPanel() {
         <LoadMore
           className="border-border border-t"
           page={invoices.page}
-          summary={`Mostrando as ${invoices.items.length} cobrancas mais recentes.`}
-          label="Carregar cobrancas anteriores"
+          summary={`Mostrando as ${invoices.items.length} cobranças mais recentes.`}
+          label="Carregar cobranças anteriores"
           onLoadMore={() => void invoices.loadMore()}
         />
       </Card>
@@ -235,8 +235,8 @@ export function PlatformBillingPanel() {
         </CardHeader>
         <CardBody className="space-y-3">
           <p className="text-muted-foreground text-sm">
-            Trilha append-only, chaveada pelo id do evento. E ela que faz um
-            webhook repetido nao cobrar nem liberar duas vezes.
+            Trilha append-only, chaveada pelo id do evento. É ela que faz um
+            webhook repetido não cobrar nem liberar duas vezes.
           </p>
           {events.status === "loading" ? (
             <p role="status" className="text-muted-foreground text-sm">Carregando eventos...</p>

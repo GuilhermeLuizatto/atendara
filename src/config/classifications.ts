@@ -19,7 +19,7 @@ export const CLASSIFICATION_META: Record<
     id: "ADMINISTRATIVE",
     label: "Administrativo",
     description:
-      "Horarios, precos, endereco, confirmacao, remarcacao, pagamento.",
+      "Horários, preços, endereço, confirmação, remarcação, pagamento.",
     tone: "informative",
     autoResponseEligible: true,
     alwaysEscalates: false,
@@ -27,9 +27,9 @@ export const CLASSIFICATION_META: Record<
   },
   PROFESSIONAL: {
     id: "PROFESSIONAL",
-    label: "Tecnico",
+    label: "Técnico",
     description:
-      "Duvida que exige julgamento do profissional. Nunca respondida pelo agente.",
+      "Dúvida que exige julgamento do profissional. Nunca respondida pelo agente.",
     tone: "professional",
     autoResponseEligible: false,
     alwaysEscalates: true,
@@ -37,9 +37,9 @@ export const CLASSIFICATION_META: Record<
   },
   CLINICAL: {
     id: "CLINICAL",
-    label: "Clinico",
+    label: "Clínico",
     description:
-      "Sintomas, medicacao, evolucao do tratamento. Exclusivo do profissional.",
+      "Sintomas, medicação, evolução do tratamento. Exclusivo do profissional.",
     tone: "professional",
     autoResponseEligible: false,
     alwaysEscalates: true,
@@ -49,7 +49,7 @@ export const CLASSIFICATION_META: Record<
     id: "TRAINING",
     label: "Treino",
     description:
-      "Execucao de exercicio, carga, progressao, montagem de treino.",
+      "Execução de exercício, carga, progressão, montagem de treino.",
     tone: "professional",
     autoResponseEligible: false,
     alwaysEscalates: true,
@@ -57,9 +57,9 @@ export const CLASSIFICATION_META: Record<
   },
   HEALTH_RELATED: {
     id: "HEALTH_RELATED",
-    label: "Saude",
+    label: "Saúde",
     description:
-      "Dor, lesao, restricao ou condicao de saude relatada pelo cliente.",
+      "Dor, lesão, restrição ou condição de saúde relatada pelo cliente.",
     tone: "warning",
     autoResponseEligible: false,
     alwaysEscalates: true,
@@ -68,7 +68,7 @@ export const CLASSIFICATION_META: Record<
   URGENT: {
     id: "URGENT",
     label: "Urgente",
-    description: "Situacao que pede resposta imediata do profissional.",
+    description: "Situação que pede resposta imediata do profissional.",
     tone: "critical",
     autoResponseEligible: false,
     alwaysEscalates: true,
@@ -77,7 +77,7 @@ export const CLASSIFICATION_META: Record<
   FINANCIAL: {
     id: "FINANCIAL",
     label: "Financeiro",
-    description: "Cobranca, nota fiscal, reembolso, comprovante.",
+    description: "Cobrança, nota fiscal, reembolso, comprovante.",
     tone: "informative",
     autoResponseEligible: false,
     alwaysEscalates: false,
@@ -85,9 +85,9 @@ export const CLASSIFICATION_META: Record<
   },
   POSSIBLE_RISK: {
     id: "POSSIBLE_RISK",
-    label: "Possivel risco",
+    label: "Possível risco",
     description:
-      "Sinais que exigem atencao humana imediata. Automacao e interrompida.",
+      "Sinais que exigem atenção humana imediata. Automação é interrompida.",
     tone: "critical",
     autoResponseEligible: false,
     alwaysEscalates: true,
@@ -95,9 +95,9 @@ export const CLASSIFICATION_META: Record<
   },
   UNKNOWN: {
     id: "UNKNOWN",
-    label: "Nao classificado",
+    label: "Não classificado",
     description:
-      "O agente nao reconheceu a intencao. Na duvida, escala para o humano.",
+      "O agente não reconheceu a intenção. Na dúvida, escala para o humano.",
     tone: "neutral",
     autoResponseEligible: false,
     alwaysEscalates: true,
@@ -114,5 +114,5 @@ export function classificationMeta(
 export function classificationLabel(
   id: MessageClassificationId | null,
 ): string {
-  return id ? CLASSIFICATION_META[id].label : "Sem classificacao";
+  return id ? CLASSIFICATION_META[id].label : "Sem classificação";
 }

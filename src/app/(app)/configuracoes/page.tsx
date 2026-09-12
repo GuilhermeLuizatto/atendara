@@ -38,13 +38,13 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
-        title="Configuracoes"
-        description="Seu acesso, o horario de atendimento, os avisos que a organizacao envia e a trilha de auditoria."
+        title="Configurações"
+        description="Seu acesso, o horário de atendimento, os avisos que a organização envia e a trilha de auditoria."
       />
 
       <Tabs
         idBase={ID_BASE}
-        label="Secoes das configuracoes"
+        label="Seções das configurações"
         options={options}
         value={active}
         onChange={setSection}
@@ -62,21 +62,21 @@ export default function SettingsPage() {
                   {user?.displayName} · <span className="text-muted-foreground">{user?.email}</span>
                 </p>
                 <p className="text-foreground">
-                  {admin ? "Administrador da plataforma — todas as profissoes" : profession.label}
+                  {admin ? "Administrador da plataforma — todas as profissões" : profession.label}
                 </p>
                 <p className="text-muted-foreground">
                   {admin
-                    ? "Voce gerencia os cadastros e acessos na Administracao."
-                    : `Acesso valido ate ${access?.accessUntil ? formatDate(access.accessUntil) : "a liberacao pela operadora"}.`}
+                    ? "Você gerencia os cadastros e acessos na Administração."
+                    : `Acesso válido até ${access?.accessUntil ? formatDate(access.accessUntil) : "a liberação pela operadora"}.`}
                 </p>
                 <p className="text-muted-foreground">
-                  Areas liberadas:{" "}
+                  Áreas liberadas:{" "}
                   {admin ? "todas" : access?.modules.map((area) => MODULE_LABELS[area]).join(", ")}
                 </p>
                 {session && !admin ? (
                   <p className="text-muted-foreground">
-                    Papel na organizacao: {ROLE_LABELS[session.role]}
-                    {session.isOrganizationHolder ? ", titular da organizacao" : ""}.
+                    Papel na organização: {ROLE_LABELS[session.role]}
+                    {session.isOrganizationHolder ? ", titular da organização" : ""}.
                   </p>
                 ) : null}
               </CardBody>
@@ -85,7 +85,7 @@ export default function SettingsPage() {
             {data && organization ? (
               <Card>
                 <CardHeader>
-                  <CardTitle>Horario de atendimento</CardTitle>
+                  <CardTitle>Horário de atendimento</CardTitle>
                 </CardHeader>
                 <CardBody>
                   <AgendaSettingsForm />

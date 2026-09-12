@@ -339,7 +339,7 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
   private onOrganizationError(error: unknown): void {
     const code = (error as { code?: string })?.code;
     if (code !== "permission-denied") {
-      console.error("Falha ao carregar a organizacao do Firestore.", error);
+      console.error("Falha ao carregar a organização do Firestore.", error);
     }
     // Sem limpar a parte, a proxima colecao que chegasse remontaria o painel
     // com a organizacao antiga — justamente depois de o acesso ter sido negado.
@@ -526,7 +526,7 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
   private context(snapshot?: WorkspaceSnapshot): PlanContext {
     const current = snapshot ?? this.snapshot;
     if (!current) {
-      throw new RepositoryError("Os dados ainda estao carregando.");
+      throw new RepositoryError("Os dados ainda estão carregando.");
     }
 
     return {
@@ -626,7 +626,7 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
       await runTransaction(this.db, async (transaction) => {
         const current = await transaction.get(appointmentRef);
         if (!current.exists()) {
-          throw new RepositoryError("Atendimento nao encontrado.");
+          throw new RepositoryError("Atendimento não encontrado.");
         }
 
         const linked = await Promise.all(
@@ -828,7 +828,7 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
 
   async reset(): Promise<void> {
     throw new RepositoryError(
-      "Restaurar dados existe apenas na demonstracao local.",
+      "Restaurar dados existe apenas na demonstração local.",
     );
   }
 }
@@ -844,12 +844,12 @@ function toRepositoryError(error: unknown): Error {
   const code = (error as { code?: string })?.code;
   if (code === "permission-denied") {
     return new RepositoryError(
-      "O servidor recusou esta acao. Confira suas permissoes e a validade do acesso.",
+      "O servidor recusou esta ação. Confira suas permissões e a validade do acesso.",
     );
   }
   if (code === "unavailable") {
     return new RepositoryError(
-      "Sem conexao com o servidor. Tente novamente em instantes.",
+      "Sem conexão com o servidor. Tente novamente em instantes.",
     );
   }
 

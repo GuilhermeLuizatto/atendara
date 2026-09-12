@@ -76,7 +76,7 @@ export function buildAppointments(
         modality: client.preferredModality,
         status,
         priceInCents: profession.defaultPriceInCents,
-        administrativeNotes: rng.bool(0.15) ? "Primeira vez no horario." : null,
+        administrativeNotes: rng.bool(0.15) ? "Primeira vez no horário." : null,
         origin: rng.bool(0.2) ? "AI_AGENT" : "MANUAL",
         confirmedAt: status === "CONFIRMED" ? now : null,
         cancelledAt: status === "CANCELLED" ? startsAt : null,

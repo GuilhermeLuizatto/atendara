@@ -18,8 +18,8 @@ type AdminTab = "cadastros" | "concessoes" | "cobranca" | "trilha" | "administra
 
 const TABS: { value: AdminTab; label: string }[] = [
   { value: "cadastros", label: "Cadastros" },
-  { value: "concessoes", label: "Concessoes de acesso" },
-  { value: "cobranca", label: "Cobranca da plataforma" },
+  { value: "concessoes", label: "Concessões de acesso" },
+  { value: "cobranca", label: "Cobrança da plataforma" },
   { value: "trilha", label: "Trilha da operadora" },
 ];
 
@@ -40,9 +40,9 @@ export function AdminView() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
       <div>
-        <h1 className="text-foreground text-2xl font-semibold">Administracao</h1>
+        <h1 className="text-foreground text-2xl font-semibold">Administração</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Profissionais, concessoes de acesso, cobranca da plataforma e a trilha dos atos da operadora.
+          Profissionais, concessões de acesso, cobrança da plataforma e a trilha dos atos da operadora.
         </p>
       </div>
       <SecondFactorGate>

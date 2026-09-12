@@ -45,7 +45,7 @@ export const isFirebaseConfigured = isComplete(rawConfig);
 export function getFirebaseConfig(): FirebaseClientConfig {
   if (!isComplete(rawConfig)) {
     throw new Error(
-      "Firebase nao configurado. Defina as variaveis NEXT_PUBLIC_FIREBASE_* (ver .env.example).",
+      "Firebase não configurado. Defina as variáveis NEXT_PUBLIC_FIREBASE_* (ver .env.example).",
     );
   }
   return rawConfig;

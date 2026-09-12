@@ -18,7 +18,7 @@ export function PasswordSetup() {
     if (validation || password !== confirmation) { setError(validation ?? "As senhas precisam ser iguais."); return; }
     setBusy(true); setError("");
     try { await authAdapter.completeInitialPassword(password); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : "Nao foi possivel salvar sua senha."); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Não foi possível salvar sua senha."); }
     finally { setBusy(false); }
   }
   return <main className="bg-background flex min-h-dvh items-center justify-center p-6">

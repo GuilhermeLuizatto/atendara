@@ -95,7 +95,7 @@ export function RuleForm({
       enabled: false,
     });
     setWarnings([
-      `Interpretacao com ${Math.round(draft.confidence * 100)}% de confianca. Revise antes de salvar.`,
+      `Interpretação com ${Math.round(draft.confidence * 100)}% de confiança. Revise antes de salvar.`,
       ...draft.warnings,
     ]);
     setErrors([]);
@@ -154,7 +154,7 @@ export function RuleForm({
             />
           )}
         </Field>
-        <Field label="Descricao">
+        <Field label="Descrição">
           {(props) => (
             <Textarea
               {...props}
@@ -165,7 +165,7 @@ export function RuleForm({
           )}
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Nivel">
+          <Field label="Nível">
             {(props) => (
               <Select
                 {...props}
@@ -205,7 +205,7 @@ export function RuleForm({
               </Select>
             )}
           </Field>
-          <Field label="Acao">
+          <Field label="Ação">
             {(props) => (
               <Select
                 {...props}
@@ -223,23 +223,23 @@ export function RuleForm({
                 }
               >
                 <option value="ALLOW_TOPIC">
-                  Permitir informacao administrativa
+                  Permitir informação administrativa
                 </option>
                 <option value="DENY_TOPIC">
-                  Nao responder sobre o assunto
+                  Não responder sobre o assunto
                 </option>
                 <option value="ESCALATE">Encaminhar ao profissional</option>
                 {!["ALLOW_TOPIC", "DENY_TOPIC", "ESCALATE"].includes(
                   input.actions[0].type,
                 ) && (
-                  <option value={input.actions[0].type}>Acao existente</option>
+                  <option value={input.actions[0].type}>Ação existente</option>
                 )}
               </Select>
             )}
           </Field>
           <Field
             label="Prioridade"
-            hint="Maior numero prevalece dentro do mesmo nivel."
+            hint="Maior número prevalece dentro do mesmo nível."
           >
             {(props) => (
               <Input
@@ -261,7 +261,7 @@ export function RuleForm({
                   update({ professionalId: e.target.value || null })
                 }
               >
-                <option value="">Toda a organizacao</option>
+                <option value="">Toda a organização</option>
                 {data?.professionals.map((person) => (
                   <option key={person.id} value={person.id}>
                     {person.displayName}
@@ -302,7 +302,7 @@ export function RuleForm({
                   />
                 )}
               </Field>
-              <Field label="Duracao em minutos">
+              <Field label="Duração em minutos">
                 {(props) => (
                   <Input
                     {...props}
@@ -320,7 +320,7 @@ export function RuleForm({
           )}
         </div>
         <div className="space-y-2">
-          <p className="text-sm font-medium">Condicoes adicionais</p>
+          <p className="text-sm font-medium">Condições adicionais</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Modalidade">
               {(props) => (
@@ -394,11 +394,11 @@ export function RuleForm({
                   {[
                     "Domingo",
                     "Segunda",
-                    "Terca",
+                    "Terça",
                     "Quarta",
                     "Quinta",
                     "Sexta",
-                    "Sabado",
+                    "Sábado",
                   ].map((day, index) => (
                     <option key={day} value={index}>
                       {day}
@@ -427,7 +427,7 @@ export function RuleForm({
             checked={input.enabled}
             onChange={(e) => update({ enabled: e.target.checked })}
           />
-          Ativar apos salvar
+          Ativar após salvar
         </label>
         {errors.length > 0 && (
           <div role="alert" className="text-danger text-sm">

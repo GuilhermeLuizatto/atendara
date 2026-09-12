@@ -98,7 +98,7 @@ export interface PersonalDataPolicy {
 
 /** Prefixo do pseudonimo. O resto e aleatorio e nao deriva do `clientId`. */
 export const PSEUDONYM_PREFIX = "titular-removido-";
-export const REDACTED_TEXT = "[conteudo removido a pedido do titular dos dados]";
+export const REDACTED_TEXT = "[conteúdo removido a pedido do titular dos dados]";
 export const REDACTED_NAME = "Pessoa removida";
 export const MASKED_CONTACT = "***";
 
@@ -286,7 +286,7 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     retention: WHILE_ORGANIZATION,
     onClientErasure: {
       action: "KEEP",
-      why: "Regra do profissional, sem vinculo com titular. O texto livre de origem pode citar alguem e nao e varrido.",
+      why: "Regra do profissional, sem vínculo com titular. O texto livre de origem pode citar alguém e não é varrido.",
     },
     onOrganizationDeletion: DELETE,
   },
@@ -367,7 +367,7 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     onClientErasure: NOT_APPLICABLE,
     onOrganizationDeletion: {
       action: "KEEP",
-      why: "Registro da cobranca da plataforma; prazo fiscal a confirmar. O link leva a pagina do gateway, que mostra nome e e-mail do assinante.",
+      why: "Registro da cobrança da plataforma; prazo fiscal a confirmar. O link leva à página do gateway, que mostra nome e e-mail do assinante.",
     },
   },
   platformGatewayEvents: {
@@ -380,7 +380,7 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     onClientErasure: NOT_APPLICABLE,
     onOrganizationDeletion: {
       action: "KEEP",
-      why: "Trava de idempotencia do webhook. Guarda ids, tipo e resultado — nunca payload.",
+      why: "Trava de idempotência do webhook. Guarda ids, tipo e resultado — nunca payload.",
     },
   },
   platformCustomers: {
@@ -389,7 +389,7 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     onClientErasure: NOT_APPLICABLE,
     onOrganizationDeletion: {
       action: "KEEP",
-      why: "Liga evento tardio do gateway a organizacao excluida, para que seja recusado e nao aplicado a outra.",
+      why: "Liga evento tardio do gateway à organização excluída, para que seja recusado e não aplicado à outra.",
     },
   },
   platformAccessGrants: {
@@ -398,7 +398,7 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     onClientErasure: NOT_APPLICABLE,
     onOrganizationDeletion: {
       action: "KEEP",
-      why: "Ato registrado da operadora. O motivo e texto livre e deve ser escrito sem dado pessoal.",
+      why: "Ato registrado da operadora. O motivo é texto livre e deve ser escrito sem dado pessoal.",
     },
   },
   platformAuditLogs: {
@@ -407,7 +407,7 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     onClientErasure: NOT_APPLICABLE,
     onOrganizationDeletion: {
       action: "KEEP",
-      why: "Trilha append-only dos atos de plataforma, inclusive da propria exclusao. Guarda ids, nunca nome ou e-mail.",
+      why: "Trilha append-only dos atos de plataforma, inclusive da própria exclusão. Guarda ids, nunca nome ou e-mail.",
     },
   },
   platformRateLimits: {

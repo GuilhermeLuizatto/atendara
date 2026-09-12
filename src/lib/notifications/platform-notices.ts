@@ -40,7 +40,7 @@ export function platformNoticesFor(
         severity: "ATTENTION",
         channel: "IN_APP",
         title: "Nenhuma assinatura ativa",
-        body: "Escolha um plano para manter o painel aberto depois do periodo de avaliacao.",
+        body: "Escolha um plano para manter o painel aberto depois do período de avaliação.",
         actionLabel: "Ver planos",
         actionHref: "/assinatura",
       },
@@ -60,8 +60,8 @@ export function platformNoticesFor(
       event: "TRIAL_ENDING",
       severity: "INFO",
       channel: "IN_APP",
-      title: "Periodo de teste terminando",
-      body: "A primeira cobranca acontece no fim do periodo de teste. Confira o plano e a forma de pagamento.",
+      title: "Período de teste terminando",
+      body: "A primeira cobrança acontece no fim do período de teste. Confira o plano e a forma de pagamento.",
       actionLabel: "Ver assinatura",
       actionHref: "/assinatura",
     });
@@ -73,7 +73,7 @@ export function platformNoticesFor(
       severity: "ATTENTION",
       channel: "IN_APP",
       title: "Pagamento pendente",
-      body: "A ultima cobranca nao foi confirmada. Atualize a forma de pagamento para nao perder o acesso.",
+      body: "A última cobrança não foi confirmada. Atualize a forma de pagamento para não perder o acesso.",
       actionLabel: "Regularizar",
       actionHref: "/assinatura",
     });
@@ -86,8 +86,8 @@ export function platformNoticesFor(
       channel: "IN_APP",
       title: "Assinatura encerrada",
       body: untilAccessEnds !== null && untilAccessEnds > 0
-        ? "O acesso vai ate o fim do ciclo ja pago. Depois disso, so uma nova assinatura reabre o painel."
-        : "O acesso ao painel esta encerrado. Uma nova assinatura reabre o painel.",
+        ? "O acesso vai até o fim do ciclo já pago. Depois disso, só uma nova assinatura reabre o painel."
+        : "O acesso ao painel está encerrado. Uma nova assinatura reabre o painel.",
       actionLabel: "Assinar novamente",
       actionHref: "/assinatura",
     });
@@ -111,7 +111,7 @@ export function platformNoticesFor(
       severity: untilAccessEnds <= 1 ? "CRITICAL" : "ATTENTION",
       channel: "IN_APP",
       title: "Acesso vencendo",
-      body: "A validade do acesso esta perto do fim. A renovacao e confirmada pelo pagamento.",
+      body: "A validade do acesso está perto do fim. A renovação é confirmada pelo pagamento.",
       actionLabel: "Ver assinatura",
       actionHref: "/assinatura",
     });

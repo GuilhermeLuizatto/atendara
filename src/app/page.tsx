@@ -24,22 +24,22 @@ const PILLARS = [
   {
     icon: CalendarDays,
     title: "Agenda e CRM",
-    body: "Atendimentos, cadastro e relacionamento em uma base unica, adaptada ao vocabulario de cada profissao.",
+    body: "Atendimentos, cadastro e relacionamento em uma base única, adaptada ao vocabulário de cada profissão.",
   },
   {
     icon: Bot,
     title: `${AI_ASSISTANT_NAME}, sua assistente de IA`,
-    body: "Responde o administrativo dentro de regras que voce define, e encaminha tudo o mais para voce.",
+    body: "Responde o administrativo dentro de regras que você define, e encaminha tudo o mais para você.",
   },
   {
     icon: ShieldCheck,
-    title: "Decisoes rastreaveis",
-    body: "Cada resposta automatica registra classificacao, confianca, regras aplicadas e motivo.",
+    title: "Decisões rastreáveis",
+    body: "Cada resposta automática registra classificação, confiança, regras aplicadas e motivo.",
   },
   {
     icon: Users,
-    title: "Do autonomo a clinica",
-    body: "Isolamento por organizacao e papeis de acesso desde a fundacao, nao como remendo depois.",
+    title: "Do autônomo à clínica",
+    body: "Isolamento por organização e papéis de acesso desde a fundação, não como remendo depois.",
   },
 ];
 
@@ -58,7 +58,7 @@ export default function LandingPage() {
       <main className="mx-auto w-full max-w-5xl px-6 pb-20">
         <section className="py-12 sm:py-20">
           <Badge tone="accent" dot>
-            Prototipo navegavel
+            Protótipo navegável
           </Badge>
           <h1 className="text-foreground mt-5 max-w-2xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
             {APP_TAGLINE}
@@ -72,7 +72,7 @@ export default function LandingPage() {
               <ArrowRight className="size-4" aria-hidden strokeWidth={2} />
             </Link>
             <p className="text-muted-foreground text-xs">
-              Dados ficticios. Nenhuma informacao real e usada.
+              Dados fictícios. Nenhuma informação real é usada.
             </p>
           </div>
         </section>
@@ -98,11 +98,11 @@ export default function LandingPage() {
 
         <section className="mt-12">
           <h2 className="text-foreground text-sm font-semibold">
-            Uma plataforma, varias profissoes
+            Uma plataforma, várias profissões
           </h2>
           <p className="text-muted-foreground mt-1.5 text-sm">
-            O nucleo nao conhece profissao. Terminologia, taxonomia de mensagens
-            e regras vem de configuracao.
+            O núcleo não conhece profissão. Terminologia, taxonomia de mensagens
+            e regras vêm de configuração.
           </p>
           <ul className="mt-4 flex flex-wrap gap-2">
             {listProfessions().map((profession) => (
@@ -123,7 +123,7 @@ export default function LandingPage() {
         </section>
 
         <footer className="border-border text-muted-foreground mt-12 border-t pt-6 text-xs">
-          {APP_NAME} e uma plataforma {OPERATOR_NAME}.
+          {APP_NAME} é uma plataforma {OPERATOR_NAME}.
         </footer>
       </main>
     </div>

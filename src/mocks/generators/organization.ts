@@ -22,7 +22,7 @@ export function buildOrganization(
     kind: defaultOrganizationKind(profession.id),
     primaryProfession: profession.id,
     professions: [profession.id],
-    address: "Rua das Laranjeiras, 210 — sala 12, Sao Paulo",
+    address: "Rua das Laranjeiras, 210 — sala 12, São Paulo",
     timezone: DEFAULT_TIMEZONE,
     locale: DEFAULT_LOCALE,
     currency: "BRL",

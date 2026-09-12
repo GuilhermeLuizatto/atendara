@@ -26,7 +26,7 @@ export const registerProfessional = onCall(ACCOUNT_CALL_OPTIONS, async request =
   const { temporaryPassword, verifier } = initialCredential();
   let user;
   try { user = await getAuth().createUser({ email: input.email, displayName: input.displayName, password: temporaryPassword }); }
-  catch (error) { throw new HttpsError("already-exists", error.code === "auth/email-already-exists" ? "Este e-mail ja esta cadastrado." : "Nao foi possivel criar a conta."); }
+  catch (error) { throw new HttpsError("already-exists", error.code === "auth/email-already-exists" ? "Este e-mail já está cadastrado." : "Não foi possível criar a conta."); }
   const organizationId = randomUUID();
   const createdAt = new Date(nowMs).toISOString();
   // A conta nasce pendente e sem validade. A concessao inicial, quando pedida,
@@ -51,7 +51,7 @@ export const registerProfessional = onCall(ACCOUNT_CALL_OPTIONS, async request =
     batch.create(db.doc(paths.platformAccessGrant(organizationId)), grant);
     batch.create(granted.ref, granted.data);
   }
-  try { await batch.commit(); } catch { await getAuth().deleteUser(user.uid); throw new HttpsError("internal", "Nao foi possivel concluir o cadastro."); }
+  try { await batch.commit(); } catch { await getAuth().deleteUser(user.uid); throw new HttpsError("internal", "Não foi possível concluir o cadastro."); }
   return { userId: user.uid, temporaryPassword };
 });
 export const updateAccount = onCall(ACCOUNT_CALL_OPTIONS, async request => {
@@ -70,7 +70,7 @@ export const updateAccount = onCall(ACCOUNT_CALL_OPTIONS, async request => {
 });
 export const completeInitialPassword = onCall(ACCOUNT_CALL_OPTIONS, async request => {
   const account = await accountOf(request);
-  if (!account.mustChangePassword) throw new HttpsError("failed-precondition", "A senha inicial ja foi substituida.");
+  if (!account.mustChangePassword) throw new HttpsError("failed-precondition", "A senha inicial já foi substituída.");
   if (Date.now() / 1000 - request.auth.token.auth_time > 300) throw new HttpsError("unauthenticated", "Entre novamente para alterar sua senha.");
   const { password } = parse(z.object({ password: z.string().min(12).max(128) }).strict(), request.data);
   const verifierRef = db.doc(paths.initialPassword(request.auth.uid));

@@ -5,7 +5,7 @@ import { permissionsForMembership, permissionsForRole } from "./permissions";
 export const PLATFORM_ADMIN_EMAIL = "guilhermeluizatto@gmail.com";
 export const MODULE_LABELS: Record<AppModule, string> = {
   dashboard: "Dashboard", agenda: "Agenda", clientes: "Clientes", mensagens: "Mensagens",
-  financeiro: "Financeiro", agente: "Dara", configuracoes: "Configuracoes",
+  financeiro: "Financeiro", agente: "Dara", configuracoes: "Configurações",
 };
 // Permissao sem area aqui fica fora da sessao: membros, cobranca e pedidos de
 // titular ainda nao tem tela, e o que nao tem tela nao precisa estar liberado.

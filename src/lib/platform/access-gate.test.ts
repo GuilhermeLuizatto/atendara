@@ -85,7 +85,7 @@ describe("portao da conta com assinatura e concessao", () => {
 describe("limites da concessao", () => {
   it("recusa validade passada e acima do prazo maximo", () => {
     expect(accessGrantWindowError(iso(-1), NOW)).toMatch(/futura/);
-    expect(accessGrantWindowError(iso(MAX_ACCESS_GRANT_DAYS + 0.001), NOW)).toMatch(/maximo/);
+    expect(accessGrantWindowError(iso(MAX_ACCESS_GRANT_DAYS + 0.001), NOW)).toMatch(/máximo/);
     expect(accessGrantWindowError(iso(MAX_ACCESS_GRANT_DAYS), NOW)).toBeNull();
     expect(accessGrantWindowError("nao-e-data", NOW)).toMatch(/futura/);
   });

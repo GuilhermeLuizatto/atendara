@@ -28,8 +28,8 @@ export function AccessGrantsPanel() {
   const now = useNow().getTime();
   const fetchAccounts = useCallback((request: PageRequest) => authAdapter.listAccounts(request), []);
   const fetchGrants = useCallback((request: PageRequest) => reader.allAccessGrants(request), [reader]);
-  const accounts = usePagedList(fetchAccounts, "Nao foi possivel carregar os cadastros.");
-  const grants = usePagedList(fetchGrants, "Nao foi possivel carregar as concessoes.");
+  const accounts = usePagedList(fetchAccounts, "Não foi possível carregar os cadastros.");
+  const grants = usePagedList(fetchGrants, "Não foi possível carregar as concessões.");
   // Titular citado numa concessao que ainda nao apareceu na pagina de cadastros.
   const [cited, setCited] = useState<AccountAccess[]>([]);
   const looked = useRef(new Set<string>());
@@ -64,7 +64,7 @@ export function AccessGrantsPanel() {
       await action();
       await Promise.all([accounts.reload(), grants.reload()]);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Nao foi possivel concluir.");
+      setError(caught instanceof Error ? caught.message : "Não foi possível concluir.");
     } finally {
       setBusy(false);
     }
@@ -95,9 +95,9 @@ export function AccessGrantsPanel() {
   return (
     <div className="space-y-6">
       <p className="bg-surface-muted text-muted-foreground rounded-lg p-3 text-sm">
-        Concessao libera acesso sem cobranca, por no maximo {MAX_ACCESS_GRANT_DAYS} dias, com tipo e motivo. O
-        acesso vale ate a maior data entre a assinatura paga e a concessao vigente: conceder nunca encurta um ciclo
-        pago, e revogar fecha so a parte concedida.
+        Concessão libera acesso sem cobrança, por no máximo {MAX_ACCESS_GRANT_DAYS} dias, com tipo e motivo. O
+        acesso vale até a maior data entre a assinatura paga e a concessão vigente: conceder nunca encurta um ciclo
+        pago, e revogar fecha só a parte concedida.
       </p>
       {shownError ? <p role="alert" className="text-danger text-sm">{shownError}</p> : null}
 
@@ -127,14 +127,14 @@ export function AccessGrantsPanel() {
               </Select>
             )}
           </Field>
-          <Field label="Acesso ate">
+          <Field label="Acesso até">
             {(props) => <Input {...props} name="until" type="date" required defaultValue={dateInputValue(LATEST_GRANT_OFFSET_DAYS)} min={dateInputValue(0)} max={dateInputValue(LATEST_GRANT_OFFSET_DAYS)} />}
           </Field>
         </div>
         <LoadMore
           className="px-0"
           page={accounts.page}
-          summary="O titular procurado pode estar nos cadastros ainda nao carregados."
+          summary="O titular procurado pode estar nos cadastros ainda não carregados."
           label="Carregar mais cadastros"
           onLoadMore={() => void accounts.loadMore()}
         />
@@ -145,13 +145,13 @@ export function AccessGrantsPanel() {
       </form>
 
       <section className="space-y-3" aria-busy={grants.status === "loading" || undefined}>
-        <h2 className="text-foreground font-semibold">Concessoes registradas</h2>
+        <h2 className="text-foreground font-semibold">Concessões registradas</h2>
         {!reader.available ? (
-          <p className="text-muted-foreground text-sm">Na demonstracao, concessoes nao tem registro; o efeito aparece em Cadastros.</p>
+          <p className="text-muted-foreground text-sm">Na demonstração, concessões não têm registro; o efeito aparece em Cadastros.</p>
         ) : grants.status === "loading" ? (
-          <p role="status" className="text-muted-foreground text-sm">Carregando concessoes...</p>
+          <p role="status" className="text-muted-foreground text-sm">Carregando concessões...</p>
         ) : grants.items.length === 0 && grants.status === "ready" ? (
-          <p className="text-muted-foreground text-sm">Nenhuma concessao registrada.</p>
+          <p className="text-muted-foreground text-sm">Nenhuma concessão registrada.</p>
         ) : (
           <ul className="space-y-3">
             {grants.items.map((item) => {
@@ -163,7 +163,7 @@ export function AccessGrantsPanel() {
                       {item.revokedAt ? "Revogada" : inForce ? "Vigente" : "Vencida"}
                     </Badge>
                     <span className="text-foreground font-medium break-words">{nameOf(item.subscriberUserId)}</span>
-                    <span className="text-muted-foreground">{ACCESS_GRANT_KIND_LABELS[item.kind]} · ate {formatDate(item.until)}</span>
+                    <span className="text-muted-foreground">{ACCESS_GRANT_KIND_LABELS[item.kind]} · até {formatDate(item.until)}</span>
                   </div>
                   <p className="text-muted-foreground">{item.reason}</p>
                   <p className="text-subtle-foreground text-xs">
@@ -177,12 +177,12 @@ export function AccessGrantsPanel() {
                   ) : null}
                   {inForce && revoking === item.organizationId ? (
                     <div className="space-y-2">
-                      <Field label="Motivo da revogacao">
+                      <Field label="Motivo da revogação">
                         {(props) => <Textarea {...props} required minLength={ACCESS_GRANT_REASON_LENGTH.min} maxLength={ACCESS_GRANT_REASON_LENGTH.max} value={revokeReason} onChange={(event) => setRevokeReason(event.target.value)} />}
                       </Field>
                       <div className="flex flex-wrap gap-2">
                         <Button disabled={busy} onClick={() => void run(async () => { await authAdapter.revokeAccess(item.organizationId, revokeReason); setRevoking(null); })}>
-                          Confirmar revogacao
+                          Confirmar revogação
                         </Button>
                         <Button variant="ghost" disabled={busy} onClick={() => setRevoking(null)}>Cancelar</Button>
                       </div>
@@ -195,8 +195,8 @@ export function AccessGrantsPanel() {
         )}
         <LoadMore
           page={grants.page}
-          summary={`Mostrando as ${grants.items.length} concessoes mais recentes.`}
-          label="Carregar concessoes anteriores"
+          summary={`Mostrando as ${grants.items.length} concessões mais recentes.`}
+          label="Carregar concessões anteriores"
           onLoadMore={() => void grants.loadMore()}
         />
       </section>

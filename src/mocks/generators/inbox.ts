@@ -256,7 +256,7 @@ export function buildInbox(
       status: "RESOLVED",
       attention: "NORMAL",
       lastClassification: "ADMINISTRATIVE",
-      lastMessagePreview: "Perfeito, obrigado! Ate quinta.",
+      lastMessagePreview: "Perfeito, obrigado! Até quinta.",
       lastMessageAt: resolvedAt,
       unreadCount: 0,
       escalated: false,

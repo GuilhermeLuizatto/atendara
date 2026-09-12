@@ -68,7 +68,7 @@ export function isGatewayConfigured() {
 
 export async function stripeRequest(path, params = {}, options = {}) {
   const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new GatewayError("Cobranca nao configurada neste ambiente.", 503);
+  if (!key) throw new GatewayError("Cobrança não configurada neste ambiente.", 503);
   if (!key.startsWith("sk_test_")) {
     throw new GatewayError("Esta etapa opera somente no ambiente de testes do gateway.", 503);
   }
@@ -89,7 +89,7 @@ export async function stripeRequest(path, params = {}, options = {}) {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new GatewayError(payload?.error?.message ?? "Falha na comunicacao com o gateway.", response.status);
+    throw new GatewayError(payload?.error?.message ?? "Falha na comunicação com o gateway.", response.status);
   }
   return payload;
 }

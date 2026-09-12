@@ -141,7 +141,7 @@ function validate(draft: ClientInput): Errors {
     errors.fullName = "Informe o nome completo.";
   }
   if (draft.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(draft.email)) {
-    errors.email = "E-mail invalido.";
+    errors.email = "E-mail inválido.";
   }
   if (draft.phone && draft.phone.replace(/\D/g, "").length < 10) {
     errors.phone = "Telefone incompleto.";
@@ -218,7 +218,7 @@ export function ClientForm({
       title={client ? `Editar ${term}` : newTerm(terminology.client)}
       description={
         client
-          ? "Dados administrativos. Informacoes sensiveis nao pertencem a este cadastro."
+          ? "Dados administrativos. Informações sensíveis não pertencem a este cadastro."
           : `Cadastro administrativo de ${term}.`
       }
       size="lg"
@@ -232,7 +232,7 @@ export function ClientForm({
               </p>
             ))}
             <p className="text-muted-foreground text-xs">
-              Texto versao {statement.version}
+              Texto versão {statement.version}
             </p>
           </div>
           <p className="text-muted-foreground text-xs">{CONSENT_STAFF_INSTRUCTION}</p>
@@ -248,7 +248,7 @@ export function ClientForm({
           {draft.appointmentNotificationsEnabled ? (
             <div className="space-y-1 pl-6">
               <p className="text-muted-foreground text-xs">
-                Por quais canais. O consentimento vale por canal: marcar aqui nao
+                Por quais canais. O consentimento vale por canal: marcar aqui não
                 autoriza os demais.
               </p>
               {allowedChannels.map((channel) => (
@@ -275,9 +275,9 @@ export function ClientForm({
           ) : null}
 
           <p className="text-muted-foreground text-xs">
-            Nenhuma mensagem sai enquanto a organizacao nao configurar canal,
-            evento, antecedencia e modelo em Configuracoes. Confirmar na agenda,
-            por si so, nao envia nada.
+            Nenhuma mensagem sai enquanto a organização não configurar canal,
+            evento, antecedência e modelo em Configurações. Confirmar na agenda,
+            por si só, não envia nada.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -339,7 +339,7 @@ export function ClientForm({
             </Field>
           </div>
 
-          <Field label="Situacao">
+          <Field label="Situação">
             {(props) => (
               <Select
                 {...props}
@@ -386,7 +386,7 @@ export function ClientForm({
                   patch({ assignedProfessionalId: event.target.value || null })
                 }
               >
-                <option value="">Sem responsavel</option>
+                <option value="">Sem responsável</option>
                 {professionals.map((professional) => (
                   <option key={professional.id} value={professional.id}>
                     {professional.displayName}
@@ -421,8 +421,8 @@ export function ClientForm({
 
           <div className="sm:col-span-2">
             <Field
-              label="Observacoes administrativas"
-              hint="Preferencia de horario, forma de pagamento, acesso. Nao registre informacao sensivel aqui."
+              label="Observações administrativas"
+              hint="Preferência de horário, forma de pagamento, acesso. Não registre informação sensível aqui."
             >
               {(props) => (
                 <Textarea

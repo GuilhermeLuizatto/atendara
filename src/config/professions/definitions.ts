@@ -20,22 +20,22 @@ function term(singular: string, plural: string, feminine = false): TermPair {
 }
 
 const HEALTH_COMPLIANCE_NOTICE =
-  "Profissao de saude: as conversas podem conter dados sensiveis. O agente responde apenas assuntos administrativos e nunca copia conteudo de conversa para o cadastro.";
+  "Profissão de saúde: as conversas podem conter dados sensíveis. O agente responde apenas assuntos administrativos e nunca copia conteúdo de conversa para o cadastro.";
 
 const WELLNESS_COMPLIANCE_NOTICE =
-  "O agente responde apenas assuntos administrativos. Relatos de dor, lesao ou condicao de saude sao sempre encaminhados ao profissional.";
+  "O agente responde apenas assuntos administrativos. Relatos de dor, lesão ou condição de saúde são sempre encaminhados ao profissional.";
 
 export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
   PSYCHOLOGIST: {
     id: "PSYCHOLOGIST",
-    label: "Psicologo",
-    labelPlural: "Psicologos",
-    description: "Atendimento psicologico individual, casal ou grupo.",
+    label: "Psicólogo",
+    labelPlural: "Psicólogos",
+    description: "Atendimento psicológico individual, casal ou grupo.",
     accent: "violet",
     terminology: {
       client: term("Paciente", "Pacientes"),
-      appointment: term("Sessao", "Sessoes", true),
-      professional: term("Psicologo", "Psicologos"),
+      appointment: term("Sessão", "Sessões", true),
+      professional: term("Psicólogo", "Psicólogos"),
     },
     defaultAppointmentDurationMinutes: 50,
     defaultPriceInCents: 18000,
@@ -50,16 +50,16 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     complianceNotice: HEALTH_COMPLIANCE_NOTICE,
     suggestedRules: [
       {
-        name: "Nunca discutir conteudo de sessao",
+        name: "Nunca discutir conteúdo de sessão",
         description:
-          "O agente nao comenta, resume ou responde nada relacionado ao conteudo terapeutico.",
+          "O agente não comenta, resume ou responde nada relacionado ao conteúdo terapêutico.",
         category: "SAFETY",
         action: "DENY_TOPIC",
         enabled: true,
       },
       {
-        name: "Informar valor e duracao da sessao",
-        description: "Responder preco e duracao quando o paciente perguntar.",
+        name: "Informar valor e duração da sessão",
+        description: "Responder preço e duração quando o paciente perguntar.",
         category: "PRICING",
         action: "ALLOW_TOPIC",
         enabled: true,
@@ -81,13 +81,13 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       defaultLeadMinutes: 1440,
       templates: {
         APPOINTMENT_SCHEDULED:
-          "Ola, {{clientName}}. Seu horario em {{organizationName}} ficou marcado para {{date}} as {{time}}.",
+          "Olá, {{clientName}}. Seu horário em {{organizationName}} ficou marcado para {{date}} às {{time}}.",
         APPOINTMENT_REMINDER:
-          "Ola, {{clientName}}. Lembrete do seu horario em {{date}} as {{time}}. Responda esta mensagem se precisar remarcar.",
+          "Olá, {{clientName}}. Lembrete do seu horário em {{date}} às {{time}}. Responda esta mensagem se precisar remarcar.",
         APPOINTMENT_CONFIRMED:
-          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} esta confirmado.",
+          "Olá, {{clientName}}. Seu horário em {{date}} às {{time}} está confirmado.",
         APPOINTMENT_CANCELLED:
-          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+          "Olá, {{clientName}}. Seu horário em {{date}} às {{time}} foi cancelado. Responda para remarcar.",
       },
     },
     features: {
@@ -102,7 +102,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     id: "PSYCHIATRIST",
     label: "Psiquiatra",
     labelPlural: "Psiquiatras",
-    description: "Consulta psiquiatrica, acompanhamento e prescricao.",
+    description: "Consulta psiquiátrica, acompanhamento e prescrição.",
     accent: "indigo",
     terminology: {
       client: term("Paciente", "Pacientes"),
@@ -123,17 +123,17 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     complianceNotice: HEALTH_COMPLIANCE_NOTICE,
     suggestedRules: [
       {
-        name: "Nunca orientar sobre medicacao",
+        name: "Nunca orientar sobre medicação",
         description:
-          "Duvidas sobre dose, efeito ou troca de medicacao vao direto para o profissional.",
+          "Dúvidas sobre dose, efeito ou troca de medicação vão direto para o profissional.",
         category: "SAFETY",
         action: "DENY_TOPIC",
         enabled: true,
       },
       {
-        name: "Informar politica de receitas",
+        name: "Informar política de receitas",
         description:
-          "Explicar o procedimento administrativo para solicitar renovacao de receita.",
+          "Explicar o procedimento administrativo para solicitar renovação de receita.",
         category: "SERVICES",
         action: "ALLOW_TOPIC",
         enabled: true,
@@ -155,13 +155,13 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       defaultLeadMinutes: 1440,
       templates: {
         APPOINTMENT_SCHEDULED:
-          "Ola, {{clientName}}. Seu horario em {{organizationName}} ficou marcado para {{date}} as {{time}}.",
+          "Olá, {{clientName}}. Seu horário em {{organizationName}} ficou marcado para {{date}} às {{time}}.",
         APPOINTMENT_REMINDER:
-          "Ola, {{clientName}}. Lembrete do seu horario em {{date}} as {{time}}. Responda esta mensagem se precisar remarcar.",
+          "Olá, {{clientName}}. Lembrete do seu horário em {{date}} às {{time}}. Responda esta mensagem se precisar remarcar.",
         APPOINTMENT_CONFIRMED:
-          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} esta confirmado.",
+          "Olá, {{clientName}}. Seu horário em {{date}} às {{time}} está confirmado.",
         APPOINTMENT_CANCELLED:
-          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+          "Olá, {{clientName}}. Seu horário em {{date}} às {{time}} foi cancelado. Responda para remarcar.",
       },
     },
     features: {
@@ -174,14 +174,14 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
 
   DOCTOR: {
     id: "DOCTOR",
-    label: "Medico",
-    labelPlural: "Medicos",
-    description: "Consulta medica, retorno e acompanhamento clinico.",
+    label: "Médico",
+    labelPlural: "Médicos",
+    description: "Consulta médica, retorno e acompanhamento clínico.",
     accent: "blue",
     terminology: {
       client: term("Paciente", "Pacientes"),
       appointment: term("Consulta", "Consultas", true),
-      professional: term("Medico", "Medicos"),
+      professional: term("Médico", "Médicos"),
     },
     defaultAppointmentDurationMinutes: 30,
     defaultPriceInCents: 40000,
@@ -197,16 +197,16 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     complianceNotice: HEALTH_COMPLIANCE_NOTICE,
     suggestedRules: [
       {
-        name: "Nunca sugerir diagnostico ou conduta",
+        name: "Nunca sugerir diagnóstico ou conduta",
         description:
-          "Qualquer relato de sintoma e encaminhado, sem opiniao do agente.",
+          "Qualquer relato de sintoma é encaminhado, sem opinião do agente.",
         category: "SAFETY",
         action: "DENY_TOPIC",
         enabled: true,
       },
       {
-        name: "Informar convenios atendidos",
-        description: "Responder quais convenios sao aceitos e como funciona.",
+        name: "Informar convênios atendidos",
+        description: "Responder quais convênios são aceitos e como funciona.",
         category: "SERVICES",
         action: "ALLOW_TOPIC",
         enabled: true,
@@ -228,13 +228,13 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       defaultLeadMinutes: 1440,
       templates: {
         APPOINTMENT_SCHEDULED:
-          "Ola, {{clientName}}. Seu horario em {{organizationName}} ficou marcado para {{date}} as {{time}}.",
+          "Olá, {{clientName}}. Seu horário em {{organizationName}} ficou marcado para {{date}} às {{time}}.",
         APPOINTMENT_REMINDER:
-          "Ola, {{clientName}}. Lembrete do seu horario em {{date}} as {{time}}. Responda esta mensagem se precisar remarcar.",
+          "Olá, {{clientName}}. Lembrete do seu horário em {{date}} às {{time}}. Responda esta mensagem se precisar remarcar.",
         APPOINTMENT_CONFIRMED:
-          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} esta confirmado.",
+          "Olá, {{clientName}}. Seu horário em {{date}} às {{time}} está confirmado.",
         APPOINTMENT_CANCELLED:
-          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+          "Olá, {{clientName}}. Seu horário em {{date}} às {{time}} foi cancelado. Responda para remarcar.",
       },
     },
     features: {
@@ -249,7 +249,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     id: "DENTIST",
     label: "Dentista",
     labelPlural: "Dentistas",
-    description: "Consulta odontologica, procedimentos e manutencao.",
+    description: "Consulta odontológica, procedimentos e manutenção.",
     accent: "cyan",
     terminology: {
       client: term("Paciente", "Pacientes"),
@@ -270,9 +270,9 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     complianceNotice: HEALTH_COMPLIANCE_NOTICE,
     suggestedRules: [
       {
-        name: "Informar valor de avaliacao inicial",
+        name: "Informar valor de avaliação inicial",
         description:
-          "Responder o valor da primeira avaliacao. Orcamento de procedimento nao e automatizado.",
+          "Responder o valor da primeira avaliação. Orçamento de procedimento não é automatizado.",
         category: "PRICING",
         action: "ALLOW_TOPIC",
         enabled: true,
@@ -280,7 +280,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       {
         name: "Encaminhar relato de dor",
         description:
-          "Relato de dor ou urgencia vira alerta imediato para a equipe.",
+          "Relato de dor ou urgência vira alerta imediato para a equipe.",
         category: "ESCALATION",
         action: "ESCALATE",
         enabled: true,
@@ -298,13 +298,13 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       defaultLeadMinutes: 1440,
       templates: {
         APPOINTMENT_SCHEDULED:
-          "Ola, {{clientName}}. Seu horario com {{professionalName}} ficou marcado para {{date}} as {{time}}.",
+          "Olá, {{clientName}}. Seu horário com {{professionalName}} ficou marcado para {{date}} às {{time}}.",
         APPOINTMENT_REMINDER:
-          "Ola, {{clientName}}. Lembrete do seu horario com {{professionalName}} em {{date}} as {{time}}.",
+          "Olá, {{clientName}}. Lembrete do seu horário com {{professionalName}} em {{date}} às {{time}}.",
         APPOINTMENT_CONFIRMED:
-          "Ola, {{clientName}}. Seu horario com {{professionalName}} em {{date}} as {{time}} esta confirmado.",
+          "Olá, {{clientName}}. Seu horário com {{professionalName}} em {{date}} às {{time}} está confirmado.",
         APPOINTMENT_CANCELLED:
-          "Ola, {{clientName}}. Seu horario com {{professionalName}} em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+          "Olá, {{clientName}}. Seu horário com {{professionalName}} em {{date}} às {{time}} foi cancelado. Responda para remarcar.",
       },
     },
     features: {
@@ -342,7 +342,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       {
         name: "Nunca ajustar plano alimentar",
         description:
-          "Substituicoes, quantidades e restricoes sao decisao do profissional.",
+          "Substituições, quantidades e restrições são decisão do profissional.",
         category: "SAFETY",
         action: "DENY_TOPIC",
         enabled: true,
@@ -350,7 +350,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       {
         name: "Informar o que levar na consulta",
         description:
-          "Responder exames e informacoes necessarias para o retorno.",
+          "Responder exames e informações necessárias para o retorno.",
         category: "SERVICES",
         action: "ALLOW_TOPIC",
         enabled: true,
@@ -368,13 +368,13 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       defaultLeadMinutes: 1440,
       templates: {
         APPOINTMENT_SCHEDULED:
-          "Ola, {{clientName}}. Seu horario com {{professionalName}} ficou marcado para {{date}} as {{time}}.",
+          "Olá, {{clientName}}. Seu horário com {{professionalName}} ficou marcado para {{date}} às {{time}}.",
         APPOINTMENT_REMINDER:
-          "Ola, {{clientName}}. Lembrete do seu horario com {{professionalName}} em {{date}} as {{time}}.",
+          "Olá, {{clientName}}. Lembrete do seu horário com {{professionalName}} em {{date}} às {{time}}.",
         APPOINTMENT_CONFIRMED:
-          "Ola, {{clientName}}. Seu horario com {{professionalName}} em {{date}} as {{time}} esta confirmado.",
+          "Olá, {{clientName}}. Seu horário com {{professionalName}} em {{date}} às {{time}} está confirmado.",
         APPOINTMENT_CANCELLED:
-          "Ola, {{clientName}}. Seu horario com {{professionalName}} em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+          "Olá, {{clientName}}. Seu horário com {{professionalName}} em {{date}} às {{time}} foi cancelado. Responda para remarcar.",
       },
     },
     features: {
@@ -389,11 +389,11 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     id: "PHYSIOTHERAPIST",
     label: "Fisioterapeuta",
     labelPlural: "Fisioterapeutas",
-    description: "Sessao de fisioterapia, reabilitacao e acompanhamento.",
+    description: "Sessão de fisioterapia, reabilitação e acompanhamento.",
     accent: "teal",
     terminology: {
       client: term("Paciente", "Pacientes"),
-      appointment: term("Sessao", "Sessoes", true),
+      appointment: term("Sessão", "Sessões", true),
       professional: term("Fisioterapeuta", "Fisioterapeutas"),
     },
     defaultAppointmentDurationMinutes: 50,
@@ -410,16 +410,16 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     complianceNotice: WELLNESS_COMPLIANCE_NOTICE,
     suggestedRules: [
       {
-        name: "Nunca orientar exercicio por mensagem",
+        name: "Nunca orientar exercício por mensagem",
         description:
-          "Duvida sobre execucao ou dor durante exercicio vai para o profissional.",
+          "Dúvida sobre execução ou dor durante exercício vai para o profissional.",
         category: "SAFETY",
         action: "DENY_TOPIC",
         enabled: true,
       },
       {
-        name: "Informar valor do pacote de sessoes",
-        description: "Responder valores de sessao avulsa e pacote fechado.",
+        name: "Informar valor do pacote de sessões",
+        description: "Responder valores de sessão avulsa e pacote fechado.",
         category: "PRICING",
         action: "ALLOW_TOPIC",
         enabled: true,
@@ -437,13 +437,13 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       defaultLeadMinutes: 720,
       templates: {
         APPOINTMENT_SCHEDULED:
-          "Ola, {{clientName}}. Seu horario com {{professionalName}} ficou marcado para {{date}} as {{time}}.",
+          "Olá, {{clientName}}. Seu horário com {{professionalName}} ficou marcado para {{date}} às {{time}}.",
         APPOINTMENT_REMINDER:
-          "Ola, {{clientName}}. Lembrete do seu horario com {{professionalName}} em {{date}} as {{time}}.",
+          "Olá, {{clientName}}. Lembrete do seu horário com {{professionalName}} em {{date}} às {{time}}.",
         APPOINTMENT_CONFIRMED:
-          "Ola, {{clientName}}. Seu horario com {{professionalName}} em {{date}} as {{time}} esta confirmado.",
+          "Olá, {{clientName}}. Seu horário com {{professionalName}} em {{date}} às {{time}} está confirmado.",
         APPOINTMENT_CANCELLED:
-          "Ola, {{clientName}}. Seu horario com {{professionalName}} em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+          "Olá, {{clientName}}. Seu horário com {{professionalName}} em {{date}} às {{time}} foi cancelado. Responda para remarcar.",
       },
     },
     features: {
@@ -458,11 +458,11 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     id: "THERAPIST",
     label: "Terapeuta",
     labelPlural: "Terapeutas",
-    description: "Sessoes de terapia integrativa e acompanhamento.",
+    description: "Sessões de terapia integrativa e acompanhamento.",
     accent: "rose",
     terminology: {
       client: term("Cliente", "Clientes"),
-      appointment: term("Sessao", "Sessoes", true),
+      appointment: term("Sessão", "Sessões", true),
       professional: term("Terapeuta", "Terapeutas"),
     },
     defaultAppointmentDurationMinutes: 60,
@@ -478,15 +478,15 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     complianceNotice: WELLNESS_COMPLIANCE_NOTICE,
     suggestedRules: [
       {
-        name: "Nunca discutir conteudo de sessao",
+        name: "Nunca discutir conteúdo de sessão",
         description:
-          "O agente nao comenta nada relacionado ao processo terapeutico.",
+          "O agente não comenta nada relacionado ao processo terapêutico.",
         category: "SAFETY",
         action: "DENY_TOPIC",
         enabled: true,
       },
       {
-        name: "Informar horarios disponiveis",
+        name: "Informar horários disponíveis",
         description: "Responder janelas livres da agenda quando solicitado.",
         category: "SCHEDULING",
         action: "ALLOW_TOPIC",
@@ -509,13 +509,13 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       defaultLeadMinutes: 1440,
       templates: {
         APPOINTMENT_SCHEDULED:
-          "Ola, {{clientName}}. Seu horario em {{organizationName}} ficou marcado para {{date}} as {{time}}.",
+          "Olá, {{clientName}}. Seu horário em {{organizationName}} ficou marcado para {{date}} às {{time}}.",
         APPOINTMENT_REMINDER:
-          "Ola, {{clientName}}. Lembrete do seu horario em {{date}} as {{time}}. Responda esta mensagem se precisar remarcar.",
+          "Olá, {{clientName}}. Lembrete do seu horário em {{date}} às {{time}}. Responda esta mensagem se precisar remarcar.",
         APPOINTMENT_CONFIRMED:
-          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} esta confirmado.",
+          "Olá, {{clientName}}. Seu horário em {{date}} às {{time}} está confirmado.",
         APPOINTMENT_CANCELLED:
-          "Ola, {{clientName}}. Seu horario em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+          "Olá, {{clientName}}. Seu horário em {{date}} às {{time}} foi cancelado. Responda para remarcar.",
       },
     },
     features: {
@@ -530,7 +530,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     id: "PERSONAL_TRAINER",
     label: "Personal trainer",
     labelPlural: "Personal trainers",
-    description: "Treino individual, avaliacao fisica e acompanhamento.",
+    description: "Treino individual, avaliação física e acompanhamento.",
     accent: "amber",
     terminology: {
       client: term("Aluno", "Alunos"),
@@ -553,7 +553,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       {
         name: "Nunca prescrever treino por mensagem",
         description:
-          "Carga, serie e progressao sao decisao do profissional, nunca do agente.",
+          "Carga, série e progressão são decisão do profissional, nunca do agente.",
         category: "SAFETY",
         action: "DENY_TOPIC",
         enabled: true,
@@ -580,13 +580,13 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       defaultLeadMinutes: 180,
       templates: {
         APPOINTMENT_SCHEDULED:
-          "Ola, {{clientName}}. Seu {{serviceTerm}} com {{professionalName}} ficou marcado para {{date}} as {{time}}.",
+          "Olá, {{clientName}}. Seu {{serviceTerm}} com {{professionalName}} ficou marcado para {{date}} às {{time}}.",
         APPOINTMENT_REMINDER:
-          "Ola, {{clientName}}. Lembrete do seu {{serviceTerm}} com {{professionalName}} em {{date}} as {{time}}.",
+          "Olá, {{clientName}}. Lembrete do seu {{serviceTerm}} com {{professionalName}} em {{date}} às {{time}}.",
         APPOINTMENT_CONFIRMED:
-          "Ola, {{clientName}}. Seu {{serviceTerm}} com {{professionalName}} em {{date}} as {{time}} esta confirmado.",
+          "Olá, {{clientName}}. Seu {{serviceTerm}} com {{professionalName}} em {{date}} às {{time}} está confirmado.",
         APPOINTMENT_CANCELLED:
-          "Ola, {{clientName}}. Seu {{serviceTerm}} com {{professionalName}} em {{date}} as {{time}} foi cancelado. Responda para remarcar.",
+          "Olá, {{clientName}}. Seu {{serviceTerm}} com {{professionalName}} em {{date}} às {{time}} foi cancelado. Responda para remarcar.",
       },
     },
     features: {

@@ -54,9 +54,9 @@ function systemRule(
 export const SYSTEM_RULES: SystemRuleDefinition[] = [
   systemRule({
     key: "tenant-isolation",
-    name: "Nunca acessar dados de outra organizacao",
+    name: "Nunca acessar dados de outra organização",
     description:
-      "O agente opera exclusivamente dentro do tenant da conversa. Qualquer leitura fora dele e negada pelas Security Rules antes de chegar ao motor.",
+      "O agente opera exclusivamente dentro do tenant da conversa. Qualquer leitura fora dele é negada pelas Security Rules antes de chegar ao motor.",
     level: "SECURITY",
     category: "PRIVACY",
     priority: 1000,
@@ -65,9 +65,9 @@ export const SYSTEM_RULES: SystemRuleDefinition[] = [
   }),
   systemRule({
     key: "respect-permissions",
-    name: "Nunca executar acao sem permissao",
+    name: "Nunca executar ação sem permissão",
     description:
-      "O agente nao realiza nenhuma acao que o papel do profissional responsavel nao autorize.",
+      "O agente não realiza nenhuma ação que o papel do profissional responsável não autorize.",
     level: "SECURITY",
     category: "PRIVACY",
     priority: 990,
@@ -78,7 +78,7 @@ export const SYSTEM_RULES: SystemRuleDefinition[] = [
     key: "no-private-data-disclosure",
     name: "Nunca revelar dados privados",
     description:
-      "Dados de outros clientes, informacoes financeiras de terceiros e conteudo de conversas nunca sao divulgados.",
+      "Dados de outros clientes, informações financeiras de terceiros e conteúdo de conversas nunca são divulgados.",
     level: "SECURITY",
     category: "PRIVACY",
     priority: 980,
@@ -87,9 +87,9 @@ export const SYSTEM_RULES: SystemRuleDefinition[] = [
   }),
   systemRule({
     key: "no-hallucination",
-    name: "Nunca inventar informacoes",
+    name: "Nunca inventar informações",
     description:
-      "O agente responde apenas com informacao presente nas regras ativas ou nos dados da organizacao. Sem fonte, escala.",
+      "O agente responde apenas com informação presente nas regras ativas ou nos dados da organização. Sem fonte, escala.",
     level: "SYSTEM",
     category: "SAFETY",
     priority: 900,
@@ -100,7 +100,7 @@ export const SYSTEM_RULES: SystemRuleDefinition[] = [
     key: "no-impersonation",
     name: "Nunca se passar pelo profissional",
     description:
-      "O agente se identifica como assistente em toda resposta automatica. Nao assina como o profissional.",
+      "O agente se identifica como assistente em toda resposta automática. Não assina como o profissional.",
     level: "SYSTEM",
     category: "IDENTITY",
     priority: 890,
@@ -109,9 +109,9 @@ export const SYSTEM_RULES: SystemRuleDefinition[] = [
   }),
   systemRule({
     key: "risk-always-escalates",
-    name: "Nunca ignorar possivel situacao de risco",
+    name: "Nunca ignorar possível situação de risco",
     description:
-      "Mensagem classificada como possivel risco interrompe a automacao, gera alerta critico e aguarda o profissional.",
+      "Mensagem classificada como possível risco interrompe a automação, gera alerta crítico e aguarda o profissional.",
     level: "SYSTEM",
     category: "ESCALATION",
     priority: 880,
@@ -134,7 +134,7 @@ export const SYSTEM_RULES: SystemRuleDefinition[] = [
     key: "administrative-only",
     name: "Responder automaticamente apenas assuntos administrativos",
     description:
-      "Somente mensagens classificadas como administrativas podem receber resposta automatica. Qualquer outra classificacao vai para o profissional.",
+      "Somente mensagens classificadas como administrativas podem receber resposta automática. Qualquer outra classificação vai para o profissional.",
     level: "SYSTEM",
     category: "SAFETY",
     priority: 870,
@@ -152,9 +152,9 @@ export const SYSTEM_RULES: SystemRuleDefinition[] = [
   }),
   systemRule({
     key: "unknown-escalates",
-    name: "Na duvida, escalar",
+    name: "Na dúvida, escalar",
     description:
-      "Intencao nao reconhecida ou confianca abaixo do limite configurado sempre resulta em encaminhamento ao profissional.",
+      "Intenção não reconhecida ou confiança abaixo do limite configurado sempre resulta em encaminhamento ao profissional.",
     level: "SYSTEM",
     category: "ESCALATION",
     priority: 860,
@@ -174,7 +174,7 @@ export const SYSTEM_RULES: SystemRuleDefinition[] = [
     key: "no-lower-level-override",
     name: "Nenhuma regra inferior sobrescreve uma superior",
     description:
-      "A precedencia entre niveis e resolvida pelo motor. Uma regra do profissional nao pode liberar o que uma regra fundamental proibe.",
+      "A precedência entre níveis é resolvida pelo motor. Uma regra do profissional não pode liberar o que uma regra fundamental proíbe.",
     level: "SYSTEM",
     category: "SAFETY",
     priority: 850,

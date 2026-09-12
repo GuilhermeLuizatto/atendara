@@ -74,11 +74,11 @@ export function grantDocument({ organizationId, subscriberUserId, input, actorId
  */
 async function readTitular(transaction, organizationId) {
   const organization = (await transaction.get(db().doc(paths.organization(organizationId)))).data();
-  if (!organization?.ownerId) throw new HttpsError("not-found", "Organizacao nao encontrada.");
+  if (!organization?.ownerId) throw new HttpsError("not-found", "Organização não encontrada.");
   const accountRef = db().doc(paths.account(organization.ownerId));
   const account = (await transaction.get(accountRef)).data();
   if (!account || account.platformRole !== "PROFESSIONAL" || account.organizationId !== organizationId) {
-    throw new HttpsError("failed-precondition", "O titular desta organizacao nao tem conta profissional.");
+    throw new HttpsError("failed-precondition", "O titular desta organização não tem conta profissional.");
   }
   return { accountRef, subscriberUserId: organization.ownerId };
 }
@@ -138,7 +138,7 @@ export const revokeAccess = onCall(ACCOUNT_CALL_OPTIONS, async (request) => {
     const grant = (await transaction.get(grantRef)).data() ?? null;
     const subscription = (await transaction.get(subscriptionRef)).data() ?? null;
     if (!isGrantInForce(grant, nowMs)) {
-      throw new HttpsError("failed-precondition", "Nao ha concessao vigente para esta organizacao.");
+      throw new HttpsError("failed-precondition", "Não há concessão vigente para esta organização.");
     }
 
     const stamp = new Date(nowMs).toISOString();

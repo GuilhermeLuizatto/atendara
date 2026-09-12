@@ -55,7 +55,7 @@ export function NotificationsMenu() {
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={
-          unread > 0 ? `Notificacoes: ${unread} nao lidas` : "Notificacoes"
+          unread > 0 ? `Notificações: ${unread} não lidas` : "Notificações"
         }
       >
         <Bell className="size-4" aria-hidden strokeWidth={1.75} />
@@ -74,7 +74,7 @@ export function NotificationsMenu() {
       {open ? (
         <div
           role="dialog"
-          aria-label="Notificacoes"
+          aria-label="Notificações"
           className={cn(
             "rounded-card border-border bg-surface shadow-overlay absolute right-0 z-50",
             "mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden border",

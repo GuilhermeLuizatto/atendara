@@ -3,7 +3,7 @@ import Link from "next/link";
 import { buttonStyles } from "@/components/ui/button";
 import { APP_NAME } from "@/config/app";
 
-export const metadata = { title: "Pagina nao encontrada" };
+export const metadata = { title: "Página não encontrada" };
 
 /** Endereco que nao existe, digitado ou vindo de um link antigo. */
 export default function NotFound() {
@@ -12,17 +12,17 @@ export default function NotFound() {
       <div className="max-w-md space-y-4 text-center">
         <p className="text-muted-foreground text-sm font-medium">{APP_NAME}</p>
         <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-          Pagina nao encontrada
+          Página não encontrada
         </h1>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          O endereco pode ter sido digitado errado ou a pagina mudou de lugar.
+          O endereço pode ter sido digitado errado ou a página mudou de lugar.
         </p>
         <div className="flex flex-wrap justify-center gap-2">
           <Link href="/dashboard" className={buttonStyles()}>
             Abrir o painel
           </Link>
           <Link href="/" className={buttonStyles({ variant: "outline" })}>
-            Pagina inicial
+            Página inicial
           </Link>
         </div>
       </div>

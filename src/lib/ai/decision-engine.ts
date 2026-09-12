@@ -90,9 +90,9 @@ export function decide(request: DecisionRequest): DecisionResult {
   const attention = attentionFor(classification.classification);
 
   steps.push({
-    label: "Classificacao",
+    label: "Classificação",
     outcome: "info",
-    detail: `${meta.label} · ${Math.round(classification.confidence * 100)}% de confianca${
+    detail: `${meta.label} · ${Math.round(classification.confidence * 100)}% de confiança${
       classification.matchedTerms.length
         ? ` · sinais: ${classification.matchedTerms.slice(0, 3).join(", ")}`
         : ""
@@ -141,11 +141,11 @@ export function decide(request: DecisionRequest): DecisionResult {
   steps.push({
     label: "Regras avaliadas",
     outcome: "info",
-    detail: `${trail.length} regras percorridas em ordem de precedencia; ${effective.length} aplicaveis.`,
+    detail: `${trail.length} regras percorridas em ordem de precedência; ${effective.length} aplicáveis.`,
   });
 
   const escalate = (reason: string, detail: string): DecisionResult => {
-    steps.push({ label: "Decisao", outcome: "blocked", detail });
+    steps.push({ label: "Decisão", outcome: "blocked", detail });
     return {
       classification: classification.classification,
       confidence: classification.confidence,
@@ -164,30 +164,30 @@ export function decide(request: DecisionRequest): DecisionResult {
 
   if (classification.classification === "POSSIBLE_RISK") {
     return escalate(
-      "Possivel situacao de risco. Automacao interrompida e alerta critico gerado.",
-      "Regra fundamental: nunca ignorar possivel situacao de risco.",
+      "Possível situação de risco. Automação interrompida e alerta crítico gerado.",
+      "Regra fundamental: nunca ignorar possível situação de risco.",
     );
   }
 
   if (!meta.autoResponseEligible) {
     return escalate(
-      `Conteudo classificado como ${meta.label.toLowerCase()}: decisao e do profissional.`,
+      `Conteúdo classificado como ${meta.label.toLowerCase()}: decisão é do profissional.`,
       "Regra fundamental: somente assunto administrativo pode ser respondido automaticamente.",
     );
   }
 
   if (classification.intent === "NONE") {
     return escalate(
-      "Intencao nao reconhecida com confianca suficiente.",
-      "Regra fundamental: na duvida, escalar.",
+      "Intenção não reconhecida com confiança suficiente.",
+      "Regra fundamental: na dúvida, escalar.",
     );
   }
 
   const threshold = organization.settings.ai.autoResponseConfidenceThreshold;
   if (classification.confidence < threshold) {
     return escalate(
-      `Confianca de ${Math.round(classification.confidence * 100)}% abaixo do limite configurado (${Math.round(threshold * 100)}%).`,
-      "Limite de confianca da organizacao nao atingido.",
+      `Confiança de ${Math.round(classification.confidence * 100)}% abaixo do limite configurado (${Math.round(threshold * 100)}%).`,
+      "Limite de confiança da organização não atingido.",
     );
   }
 
@@ -195,20 +195,20 @@ export function decide(request: DecisionRequest): DecisionResult {
 
   if (!request.permissions.includes("conversation:reply")) {
     return escalate(
-      "Sem permissao para responder conversas.",
-      "Permissao do responsavel insuficiente.",
+      "Sem permissão para responder conversas.",
+      "Permissão do responsável insuficiente.",
     );
   }
   if (request.humanHandoff) {
     return escalate(
       "Conversa sob responsabilidade humana.",
-      "Automacao pausada ate a liberacao do profissional.",
+      "Automação pausada até a liberação do profissional.",
     );
   }
 
   if (!organization.settings.ai.enabled) {
     return escalate(
-      "Agente desativado nas configuracoes da organizacao.",
+      "Agente desativado nas configurações da organização.",
       "Agente desligado.",
     );
   }
@@ -220,8 +220,8 @@ export function decide(request: DecisionRequest): DecisionResult {
     withinWindow(minutes, quietHoursStart, quietHoursEnd)
   ) {
     return escalate(
-      `Mensagem recebida dentro da janela de silencio (${quietHoursStart}–${quietHoursEnd}).`,
-      "Janela de silencio ativa: o agente registra, mas nao responde.",
+      `Mensagem recebida dentro da janela de silêncio (${quietHoursStart}–${quietHoursEnd}).`,
+      "Janela de silêncio ativa: o agente registra, mas não responde.",
     );
   }
 
@@ -243,7 +243,7 @@ export function decide(request: DecisionRequest): DecisionResult {
   if (restriction) {
     return escalate(
       `A regra "${restriction.name}" exige atendimento humano.`,
-      "Restricao ativa impede a resposta automatica.",
+      "Restrição ativa impede a resposta automática.",
     );
   }
   const authorizing = effective.find(
@@ -263,7 +263,7 @@ export function decide(request: DecisionRequest): DecisionResult {
   if (!authorizing) {
     return escalate(
       `Nenhuma regra ativa autoriza o agente a tratar "${requiredCategory.toLowerCase()}".`,
-      "Sem autorizacao explicita, o agente nao responde.",
+      "Sem autorização explícita, o agente não responde.",
     );
   }
 
@@ -275,23 +275,23 @@ export function decide(request: DecisionRequest): DecisionResult {
 
   if (!responseText) {
     return escalate(
-      "Nao ha informacao cadastrada para responder com seguranca.",
-      "Regra fundamental: nunca inventar informacoes.",
+      "Não há informação cadastrada para responder com segurança.",
+      "Regra fundamental: nunca inventar informações.",
     );
   }
 
   if (!organization.settings.ai.allowAutonomousReplies) {
     steps.push({
-      label: "Decisao",
+      label: "Decisão",
       outcome: "info",
-      detail: "Resposta preparada, aguardando aprovacao do profissional.",
+      detail: "Resposta preparada, aguardando aprovação do profissional.",
     });
     return {
       classification: classification.classification,
       confidence: classification.confidence,
       action: "SUGGEST_RESPONSE",
       responseText,
-      reason: `Sugestao pronta com base na regra "${authorizing.name}". Envio automatico esta desligado.`,
+      reason: `Sugestão pronta com base na regra "${authorizing.name}". Envio automático está desligado.`,
       attention,
       escalated: false,
       appliedRules: trail,
@@ -301,9 +301,9 @@ export function decide(request: DecisionRequest): DecisionResult {
   }
 
   steps.push({
-    label: "Decisao",
+    label: "Decisão",
     outcome: "ok",
-    detail: `Resposta automatica autorizada pela regra "${authorizing.name}" (v${authorizing.version}).`,
+    detail: `Resposta automática autorizada pela regra "${authorizing.name}" (v${authorizing.version}).`,
   });
 
   return {

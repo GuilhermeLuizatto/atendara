@@ -11,10 +11,10 @@ import { AuthError, type AuthAdapter, type SecondFactorState, type TotpEnrollmen
 
 const SESSION_KEY = "atendo:demo-session:v2";
 const DEMO_PAGE_SIZE = 25;
-const NO_SECOND_FACTOR = "A demonstracao local nao simula segundo fator.";
+const NO_SECOND_FACTOR = "A demonstração local não simula segundo fator.";
 // A demonstracao nao envia e-mail. O caminho equivalente e o administrador
 // gerar um novo cadastro, que ja nasce com senha inicial.
-const NO_PASSWORD_EMAIL = "A demonstracao local nao envia e-mail. Peca ao administrador um novo cadastro com senha inicial.";
+const NO_PASSWORD_EMAIL = "A demonstração local não envia e-mail. Peça ao administrador um novo cadastro com senha inicial.";
 
 function assertGrant(until: string, reason: string) {
   const error = accessGrantWindowError(until, Date.now()) ?? accessGrantReasonError(reason);
@@ -92,7 +92,7 @@ export class DemoAuthAdapter implements AuthAdapter {
     this.requireAdmin();
     const { initialGrant, ...data } = registrationSchema.parse(input);
     if (initialGrant) assertGrant(initialGrant.until, initialGrant.reason);
-    if (readDemoAccounts().some(a => a.access.email === data.email)) throw new AuthError("Este e-mail ja esta cadastrado.");
+    if (readDemoAccounts().some(a => a.access.email === data.email)) throw new AuthError("Este e-mail já está cadastrado.");
     const userId = crypto.randomUUID(), salt = crypto.randomUUID(), temporaryPassword = createTemporaryPassword();
     const hash = await passwordDigest(temporaryPassword, salt);
     this.requireAdmin();
@@ -111,13 +111,13 @@ export class DemoAuthAdapter implements AuthAdapter {
     const data = accessUpdateSchema.parse(input);
     const accounts = readDemoAccounts();
     const account = accounts.find(a => a.access.userId === userId);
-    if (!account || account.access.platformRole !== "PROFESSIONAL") throw new AuthError("Cadastro de profissional nao encontrado.");
+    if (!account || account.access.platformRole !== "PROFESSIONAL") throw new AuthError("Cadastro de profissional não encontrado.");
     writeDemoAccounts(accounts.map(a => a === account ? { ...a, access: { ...a.access, ...data } } : a));
     this.emit();
   }
   private titularOf(organizationId: string): DemoAccount {
     const account = readDemoAccounts().find(a => a.access.organizationId === organizationId && a.access.platformRole === "PROFESSIONAL");
-    if (!account) throw new AuthError("Organizacao sem titular profissional.");
+    if (!account) throw new AuthError("Organização sem titular profissional.");
     return account;
   }
   private replace(account: DemoAccount) {
@@ -138,7 +138,7 @@ export class DemoAuthAdapter implements AuthAdapter {
     const reasonError = accessGrantReasonError(reason);
     if (reasonError) throw new AuthError(reasonError);
     const account = this.titularOf(organizationId);
-    if (!account.grant || !isGrantInForce(account.grant, Date.now())) throw new AuthError("Nao ha concessao vigente para esta organizacao.");
+    if (!account.grant || !isGrantInForce(account.grant, Date.now())) throw new AuthError("Não há concessão vigente para esta organização.");
     const gate = resolveAccountGate({ subscription: null, grant: null, nowMs: Date.now() });
     this.replace({ ...account, grant: { ...account.grant, revokedAt: new Date().toISOString() }, access: { ...account.access, ...gate } });
   }
@@ -149,7 +149,7 @@ export class DemoAuthAdapter implements AuthAdapter {
   async createPlatformAdmin(input: PlatformAdminRegistration) {
     this.requireMaster();
     const data = platformAdminRegistrationSchema.parse(input);
-    if (readDemoAccounts().some(a => a.access.email === data.email)) throw new AuthError("Este e-mail ja esta cadastrado.");
+    if (readDemoAccounts().some(a => a.access.email === data.email)) throw new AuthError("Este e-mail já está cadastrado.");
     const userId = crypto.randomUUID(), salt = crypto.randomUUID(), temporaryPassword = createTemporaryPassword();
     const hash = await passwordDigest(temporaryPassword, salt);
     writeDemoAccounts([...readDemoAccounts(), { salt, hash, access: {
@@ -162,10 +162,10 @@ export class DemoAuthAdapter implements AuthAdapter {
   }
   async setPlatformAdminStatus(userId: string, status: AccountAccess["status"]) {
     this.requireMaster();
-    if (userId === this.current()?.access.userId) throw new AuthError("A chave mestra nao altera a propria conta por aqui.");
+    if (userId === this.current()?.access.userId) throw new AuthError("A chave mestra não altera a própria conta por aqui.");
     const account = readDemoAccounts().find(a => a.access.userId === userId);
-    if (!account || account.access.platformRole !== "PLATFORM_ADMIN") throw new AuthError("Administrador nao encontrado.");
-    if (account.access.platformMaster === true) throw new AuthError("Chave mestra nao e suspensa por aqui.");
+    if (!account || account.access.platformRole !== "PLATFORM_ADMIN") throw new AuthError("Administrador não encontrado.");
+    if (account.access.platformMaster === true) throw new AuthError("Chave mestra não é suspensa por aqui.");
     this.replace({ ...account, access: { ...account.access, status } });
   }
 }

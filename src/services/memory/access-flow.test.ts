@@ -17,7 +17,7 @@ describe("Acesso e confirmacao", () => {
   it("permissoes explicitas limitam ate um ator com papel OWNER", async () => {
     const repo = new MemoryWorkspaceRepository("PSYCHOLOGIST");
     repo.setActor({ userId: "u", name: "Teste", role: "OWNER", permissions: [] });
-    await expect(repo.setAppointmentStatus(repo.getSnapshot().appointments[0].id, "CONFIRMED")).rejects.toThrow("Sem permissao");
+    await expect(repo.setAppointmentStatus(repo.getSnapshot().appointments[0].id, "CONFIRMED")).rejects.toThrow("Sem permissão");
   });
   it("isola alteracoes entre contas da mesma profissao", async () => {
     vi.useFakeTimers();

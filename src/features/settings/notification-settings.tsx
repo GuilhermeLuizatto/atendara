@@ -141,8 +141,8 @@ export function NotificationSettings() {
           id={readOnlyNoteId}
           className="bg-surface-muted text-muted-foreground rounded-lg p-3 text-sm"
         >
-          Somente o titular da organizacao, o proprietario ou um administrador
-          altera os avisos. Voce pode consultar como estao configurados.
+          Somente o titular da organização, o proprietário ou um administrador
+          altera os avisos. Você pode consultar como estão configurados.
         </p>
       ) : null}
 
@@ -161,12 +161,12 @@ export function NotificationSettings() {
         <CardBody className="space-y-3">
           <p className="text-muted-foreground text-sm">
             Nenhuma mensagem sai enquanto esta chave estiver desligada. Ligada,
-            ainda e preciso um canal com remetente comprovado, uma regra para o
-            evento e, do outro lado, contato valido e consentimento por canal.
+            ainda é preciso um canal com remetente comprovado, uma regra para o
+            evento e, do outro lado, contato válido e consentimento por canal.
           </p>
           <p className="text-warning-soft-foreground text-sm">
-            Todos os canais usam um provedor simulado. Nada e enviado para
-            ninguem, em nenhuma circunstancia, ate que um provedor real seja
+            Todos os canais usam um provedor simulado. Nada é enviado para
+            ninguém, em nenhuma circunstância, até que um provedor real seja
             integrado.
           </p>
           <label className="text-foreground flex min-h-6 items-center gap-2 text-sm">
@@ -178,7 +178,7 @@ export function NotificationSettings() {
               aria-describedby={describedBy}
               onChange={(event) => toggleMaster(event.target.checked)}
             />
-            Permitir que esta organizacao envie avisos sobre atendimentos
+            Permitir que esta organização envie avisos sobre atendimentos
           </label>
         </CardBody>
       </Card>
@@ -190,8 +190,8 @@ export function NotificationSettings() {
         <CardBody>
           <fieldset className="space-y-3">
             <legend className="text-muted-foreground mb-3 text-sm">
-              Marcar um canal declara que a organizacao esta habilitada como
-              remetente nele. Ter um numero ou um e-mail nao e a mesma coisa que
+              Marcar um canal declara que a organização está habilitada como
+              remetente nele. Ter um número ou um e-mail não é a mesma coisa que
               estar habilitado a enviar por ele.
             </legend>
             {profession.notifications.allowedChannels.map((channel) => (
@@ -216,7 +216,7 @@ export function NotificationSettings() {
           {profession.notifications.allowedChannels.length <
           Object.keys(CHANNEL_META).length ? (
             <p className="text-muted-foreground mt-3 text-xs">
-              Alguns canais nao aparecem porque a profissao {profession.label} nao
+              Alguns canais não aparecem porque a profissão {profession.label} não
               os permite, pelo grau de sensibilidade dos dados que trafega.
             </p>
           ) : null}
@@ -259,7 +259,7 @@ export function NotificationSettings() {
 
                       {meta.anchor === "START" ? (
                         <label className="text-muted-foreground flex items-center gap-2 text-xs">
-                          Antecedencia por {CHANNEL_META[channel].label}
+                          Antecedência por {CHANNEL_META[channel].label}
                           <select
                             className="border-input bg-surface text-foreground h-8 rounded border px-2"
                             value={
@@ -300,9 +300,9 @@ export function NotificationSettings() {
           {preview ? (
             <>
               <p className="text-muted-foreground text-sm">
-                Simulado contra o proximo atendimento marcado —{" "}
-                {formatDateTime(preview.appointment.startsAt)}. Este e o mesmo
-                calculo que a agenda faz.
+                Simulado contra o próximo atendimento marcado —{" "}
+                {formatDateTime(preview.appointment.startsAt)}. Este é o mesmo
+                cálculo que a agenda faz.
               </p>
               {preview.results.map(({ event, plan }) => (
                 <div key={event} className="border-border rounded-lg border p-3">
@@ -341,7 +341,7 @@ export function NotificationSettings() {
             </>
           ) : (
             <p className="text-muted-foreground text-sm">
-              Sem atendimento futuro no periodo carregado, nao ha caso concreto
+              Sem atendimento futuro no período carregado, não há caso concreto
               para simular. Marque um atendimento na agenda para ver o que seria
               enviado.
             </p>
@@ -358,18 +358,18 @@ export function NotificationSettings() {
                 disabled={deliveries.length === 0}
                 onClick={() => void dispatchDueNotifications()}
               >
-                Executar simulacao
+                Executar simulação
               </Button>
             }
           >
-            Fila de saida
+            Fila de saída
           </CardTitle>
         </CardHeader>
         <CardBody className="space-y-2">
           <p className="text-muted-foreground text-sm">
             {deliveries.length === 0
               ? "Nenhum envio planejado."
-              : "Executar processa os envios ja vencidos com o provedor simulado. Nada sai do produto."}
+              : "Executar processa os envios já vencidos com o provedor simulado. Nada sai do produto."}
           </p>
           <ul className="space-y-2">
             {deliveries.slice(0, 10).map((delivery) => (

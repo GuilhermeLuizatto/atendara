@@ -275,7 +275,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     this.assertPermission("client:update");
     const now = this.now();
     const existing = this.snapshot.clients.find((client) => client.id === id);
-    if (!existing) throw new RepositoryError("Cadastro nao encontrado.");
+    if (!existing) throw new RepositoryError("Cadastro não encontrado.");
 
     const updated: Client = {
       ...existing,
@@ -321,7 +321,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     this.assertPermission("client:delete");
     const now = this.now();
     const existing = this.snapshot.clients.find((client) => client.id === id);
-    if (!existing) throw new RepositoryError("Cadastro nao encontrado.");
+    if (!existing) throw new RepositoryError("Cadastro não encontrado.");
 
     // Excluir alguem com agenda futura apagaria compromissos silenciosamente.
     const future = this.snapshot.appointments.filter(
@@ -343,7 +343,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     );
     if (open.length > 0) {
       throw new RepositoryError(
-        "Ha pendencias financeiras em aberto para este cadastro.",
+        "Há pendências financeiras em aberto para este cadastro.",
       );
     }
 
@@ -356,7 +356,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
             action: "DELETE",
             actorType: "USER",
             resource: { type: "client", id },
-            summary: `Cadastro de ${existing.fullName} excluido.`,
+            summary: `Cadastro de ${existing.fullName} excluído.`,
           },
           now,
         ),
@@ -384,7 +384,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       !this.snapshot.organization.settings.agenda.allowDoubleBooking
     ) {
       throw new RepositoryError(
-        `Conflito de horario com ${conflict.clientName}.`,
+        `Conflito de horário com ${conflict.clientName}.`,
       );
     }
 
@@ -503,7 +503,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       !this.snapshot.organization.settings.agenda.allowDoubleBooking
     ) {
       throw new RepositoryError(
-        `Conflito de horario com ${conflict.clientName}.`,
+        `Conflito de horário com ${conflict.clientName}.`,
       );
     }
 
@@ -724,7 +724,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
             action: "CREATE",
             actorType: "USER",
             resource: { type: "transaction", id },
-            summary: `Lancamento "${input.description}" criado.`,
+            summary: `Lançamento "${input.description}" criado.`,
             metadata: { amountInCents: input.amountInCents, type: input.type },
           },
           now,
@@ -745,7 +745,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     const existing = this.snapshot.transactions.find(
       (transaction) => transaction.id === id,
     );
-    if (!existing) throw new RepositoryError("Lancamento nao encontrado.");
+    if (!existing) throw new RepositoryError("Lançamento não encontrado.");
 
     const status = input.status ?? existing.status;
     const client = input.clientId
@@ -780,7 +780,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
             action: "UPDATE",
             actorType: "USER",
             resource: { type: "transaction", id },
-            summary: `Lancamento "${updated.description}" atualizado.`,
+            summary: `Lançamento "${updated.description}" atualizado.`,
             metadata: { status },
           },
           now,
@@ -796,7 +796,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     const existing = this.snapshot.transactions.find(
       (transaction) => transaction.id === id,
     );
-    if (!existing) throw new RepositoryError("Lancamento nao encontrado.");
+    if (!existing) throw new RepositoryError("Lançamento não encontrado.");
 
     this.commit({
       ...this.snapshot,
@@ -809,7 +809,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
             action: "DELETE",
             actorType: "USER",
             resource: { type: "transaction", id },
-            summary: `Lancamento "${existing.description}" excluido.`,
+            summary: `Lançamento "${existing.description}" excluído.`,
           },
           now,
         ),
@@ -910,7 +910,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
             action: "DELETE",
             actorType: "USER",
             resource: { type: "aiRule", id },
-            summary: `Regra "${existing.name}" excluida.`,
+            summary: `Regra "${existing.name}" excluída.`,
           },
           now,
         ),
@@ -968,7 +968,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     const now = this.now();
     const evaluationDate = new Date(evaluatedAt ?? now);
     if (!Number.isFinite(evaluationDate.getTime()))
-      throw new RepositoryError("Data de simulacao invalida.");
+      throw new RepositoryError("Data de simulação inválida.");
     const outcome = decide({
       text: body,
       profession: getProfession(this.snapshot.organization.primaryProfession),
@@ -1044,7 +1044,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
                 ? "POSSIBLE_RISK_DETECTED"
                 : "CLIENT_WAITING",
             priority: decision.attention,
-            title: `${client.fullName} aguarda atencao`,
+            title: `${client.fullName} aguarda atenção`,
             body: decision.reason,
             professionalId: conversation.professionalId,
             target: { type: "conversation", id: conversationId },
@@ -1134,7 +1134,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
   async appendMessage(input: MessageInput): Promise<ID> {
     const conversation = this.requireConversation(input.conversationId);
     if (conversation.clientId !== input.clientId)
-      throw new RepositoryError("Cliente nao pertence a conversa.");
+      throw new RepositoryError("Cliente não pertence à conversa.");
     this.validateMessage(input.body);
     const now = this.now();
     const id = this.nextId("msg");
@@ -1299,7 +1299,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
             action: "UPDATE",
             actorType: "USER",
             resource: { type: "organization", id: this.organizationId },
-            summary: `Horario de atendimento alterado para ${agenda.workdayStart} as ${agenda.workdayEnd}.`,
+            summary: `Horário de atendimento alterado para ${agenda.workdayStart} às ${agenda.workdayEnd}.`,
             metadata: {
               workingDays: agenda.workingDays.join(","),
               workdayStart: agenda.workdayStart,
@@ -1490,13 +1490,13 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     const conversation = this.snapshot.conversations.find(
       (item) => item.id === id,
     );
-    if (!conversation) throw new RepositoryError("Conversa nao encontrada.");
+    if (!conversation) throw new RepositoryError("Conversa não encontrada.");
     return conversation;
   }
 
   private requireClient(id: ID): Client {
     const client = this.snapshot.clients.find((item) => item.id === id);
-    if (!client) throw new RepositoryError("Cadastro nao encontrado.");
+    if (!client) throw new RepositoryError("Cadastro não encontrado.");
     return client;
   }
 
@@ -1505,7 +1505,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       (item) => item.id === id,
     );
     if (!professional)
-      throw new RepositoryError("Profissional nao encontrado.");
+      throw new RepositoryError("Profissional não encontrado.");
     return professional;
   }
 
@@ -1513,7 +1513,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     const appointment = this.snapshot.appointments.find(
       (item) => item.id === id,
     );
-    if (!appointment) throw new RepositoryError("Atendimento nao encontrado.");
+    if (!appointment) throw new RepositoryError("Atendimento não encontrado.");
     return appointment;
   }
 
@@ -1524,10 +1524,10 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
    */
   private requireEditableRule(id: ID): AIRule {
     const rule = this.snapshot.rules.find((item) => item.id === id);
-    if (!rule) throw new RepositoryError("Regra nao encontrada.");
+    if (!rule) throw new RepositoryError("Regra não encontrada.");
     if (rule.immutable) {
       throw new RepositoryError(
-        "Regras fundamentais nao podem ser alteradas nem desativadas.",
+        "Regras fundamentais não podem ser alteradas nem desativadas.",
       );
     }
     return rule;
@@ -1536,7 +1536,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
   private assertEditableLevel(level: AIRule["level"]): void {
     if (level === "SECURITY" || level === "SYSTEM" || level === "PROFESSION") {
       throw new RepositoryError(
-        "Somente regras do profissional, contextuais e de preferencia podem ser criadas.",
+        "Somente regras do profissional, contextuais e de preferência podem ser criadas.",
       );
     }
   }

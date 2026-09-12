@@ -27,8 +27,8 @@ import { useClients, type ClientSort } from "./use-clients";
 
 const SORT_LABELS: Record<ClientSort, string> = {
   name: "Nome",
-  recent: "Ultimo atendimento",
-  next: "Proximo atendimento",
+  recent: "Último atendimento",
+  next: "Próximo atendimento",
   balance: "Valor em aberto",
 };
 
@@ -103,10 +103,10 @@ export function ClientsView() {
                 status: event.target.value as ClientStatus | "ALL",
               })
             }
-            aria-label="Filtrar por situacao"
+            aria-label="Filtrar por situação"
           >
             <option value="ALL">
-              Todas as situacoes ({countsByStatus.get("ALL") ?? 0})
+              Todas as situações ({countsByStatus.get("ALL") ?? 0})
             </option>
             {Object.entries(CLIENT_STATUS_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -177,9 +177,9 @@ export function ClientsView() {
             <thead>
               <tr className="border-border text-subtle-foreground border-b text-left text-[11px] tracking-wide uppercase">
                 <th className="px-4 py-2.5 font-medium">Nome</th>
-                <th className="px-4 py-2.5 font-medium">Situacao</th>
+                <th className="px-4 py-2.5 font-medium">Situação</th>
                 <th className="px-4 py-2.5 font-medium">Contato</th>
-                <th className="px-4 py-2.5 font-medium">Proximo</th>
+                <th className="px-4 py-2.5 font-medium">Próximo</th>
                 <th className="px-4 py-2.5 text-right font-medium">Em aberto</th>
               </tr>
             </thead>
@@ -269,7 +269,7 @@ export function ClientsView() {
           <LoadMore
             className="border-border border-t"
             page={page}
-            summary={`Mostrando ${total} ${terminology.client.pluralLower} em ordem alfabetica. Busca e filtros consideram so os carregados.`}
+            summary={`Mostrando ${total} ${terminology.client.pluralLower} em ordem alfabética. Busca e filtros consideram só os carregados.`}
             label={`Carregar mais ${terminology.client.pluralLower}`}
             onLoadMore={() => void loadMore("clients")}
           />

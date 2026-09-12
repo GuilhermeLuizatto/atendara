@@ -50,7 +50,7 @@ export default function LoginPage() {
       setError(
         caught instanceof AuthError
           ? caught.message
-          : "Nao foi possivel entrar. Tente novamente.",
+          : "Não foi possível entrar. Tente novamente.",
       );
     } finally {
       setSubmitting(false);
@@ -65,13 +65,13 @@ export default function LoginPage() {
     try {
       await authAdapter.sendPasswordReset(email);
       setNotice(
-        "Se houver uma conta com este e-mail, enviamos um link para criar uma nova senha. O link vale por 1 hora; confira tambem a caixa de spam.",
+        "Se houver uma conta com este e-mail, enviamos um link para criar uma nova senha. O link vale por 1 hora; confira também a caixa de spam.",
       );
     } catch (caught) {
       setError(
         caught instanceof AuthError
           ? caught.message
-          : "Nao foi possivel enviar o link agora. Tente novamente.",
+          : "Não foi possível enviar o link agora. Tente novamente.",
       );
     } finally {
       setSubmitting(false);
@@ -82,7 +82,7 @@ export default function LoginPage() {
     return (
       <AuthCard title="Criar uma nova senha">
         <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-          Informe o e-mail da sua conta. Vamos enviar um link para voce escolher
+          Informe o e-mail da sua conta. Vamos enviar um link para você escolher
           uma senha nova.
         </p>
 
@@ -127,7 +127,7 @@ export default function LoginPage() {
     <AuthCard title="Entrar no painel">
       {mode === "demo" ? (
         <p className="border-border bg-surface-muted text-muted-foreground mt-2 rounded-lg border px-3 py-2.5 text-xs leading-relaxed">
-          Demonstracao local. Entre com um cadastro criado pelo administrador.
+          Demonstração local. Entre com um cadastro criado pelo administrador.
           As contas e os dados deste modo ficam apenas neste navegador.
         </p>
       ) : null}
@@ -136,7 +136,7 @@ export default function LoginPage() {
         {step === "code" ? (
           <div className="space-y-1.5">
             <label htmlFor="code" className="text-foreground block text-xs font-medium">
-              Codigo do aplicativo autenticador
+              Código do aplicativo autenticador
             </label>
             <input
               id="code"
@@ -206,7 +206,7 @@ export default function LoginPage() {
           className="w-full justify-center"
           disabled={submitting}
         >
-          {submitting ? "Entrando..." : step === "code" ? "Confirmar codigo" : "Entrar"}
+          {submitting ? "Entrando..." : step === "code" ? "Confirmar código" : "Entrar"}
         </Button>
       </form>
     </AuthCard>

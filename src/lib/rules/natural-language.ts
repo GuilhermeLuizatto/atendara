@@ -119,7 +119,7 @@ export function interpretRuleText(input: string): RuleDraft {
 
   if (!matcher) {
     warnings.push(
-      "Nao identificamos o assunto da regra. Revise a categoria antes de ativar.",
+      "Não identificamos o assunto da regra. Revise a categoria antes de ativar.",
     );
   }
 
@@ -185,20 +185,20 @@ export function interpretRuleText(input: string): RuleDraft {
   if (!matcher) confidence -= 0.4;
   if (raw.length < 15) {
     confidence -= 0.15;
-    warnings.push("Texto muito curto para uma interpretacao segura.");
+    warnings.push("Texto muito curto para uma interpretação segura.");
   }
   if (priceMatch && !matcher) {
     warnings.push("Valor identificado, mas sem assunto claro associado.");
   }
   if (conditions.length === 1 && text.includes(" se ")) {
     warnings.push(
-      "Ha uma condicao no texto que nao foi reconhecida. Revise antes de ativar.",
+      "Há uma condição no texto que não foi reconhecida. Revise antes de ativar.",
     );
     confidence -= 0.15;
   }
 
   const name = matcher
-    ? `${negated ? "Nao informar" : "Informar"} ${RULE_CATEGORY_LABELS[matcher.category].toLowerCase()}`
+    ? `${negated ? "Não informar" : "Informar"} ${RULE_CATEGORY_LABELS[matcher.category].toLowerCase()}`
     : "Regra personalizada";
 
   return {

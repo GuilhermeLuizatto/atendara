@@ -52,7 +52,7 @@ export function useWorkspaceActions() {
         show(
           error instanceof RepositoryError
             ? error.message
-            : "Nao foi possivel concluir a acao. Tente novamente.",
+            : "Não foi possível concluir a ação. Tente novamente.",
           "danger",
         );
         return null;
@@ -70,7 +70,7 @@ export function useWorkspaceActions() {
       updateClient: (id: ID, input: Partial<ClientInput>) =>
         run((repo) => repo.updateClient(id, input), "Cadastro atualizado."),
       deleteClient: (id: ID) =>
-        run((repo) => repo.deleteClient(id), "Cadastro excluido."),
+        run((repo) => repo.deleteClient(id), "Cadastro excluído."),
 
       createAppointment: (input: AppointmentInput) =>
         run((repo) => repo.createAppointment(input), "Atendimento agendado."),
@@ -90,21 +90,21 @@ export function useWorkspaceActions() {
         ),
 
       createTransaction: (input: TransactionInput) =>
-        run((repo) => repo.createTransaction(input), "Lancamento criado."),
+        run((repo) => repo.createTransaction(input), "Lançamento criado."),
       updateTransaction: (id: ID, input: Partial<TransactionInput>) =>
         run(
           (repo) => repo.updateTransaction(id, input),
-          "Lancamento atualizado.",
+          "Lançamento atualizado.",
         ),
       deleteTransaction: (id: ID) =>
-        run((repo) => repo.deleteTransaction(id), "Lancamento excluido."),
+        run((repo) => repo.deleteTransaction(id), "Lançamento excluído."),
 
       createRule: (input: RuleInput) =>
         run((repo) => repo.createRule(input), "Regra criada."),
       updateRule: (id: ID, input: Partial<RuleInput>) =>
         run((repo) => repo.updateRule(id, input), "Regra atualizada."),
       deleteRule: (id: ID) =>
-        run((repo) => repo.deleteRule(id), "Regra excluida."),
+        run((repo) => repo.deleteRule(id), "Regra excluída."),
       setRuleEnabled: (id: ID, enabled: boolean) =>
         run(
           (repo) => repo.setRuleEnabled(id, enabled),
@@ -126,7 +126,7 @@ export function useWorkspaceActions() {
       updateAgendaSettings: (settings: AgendaSettings) =>
         run(
           (repo) => repo.updateAgendaSettings(settings),
-          "Horario de atendimento salvo.",
+          "Horário de atendimento salvo.",
         ),
       loadMore: (collection: WorkspaceCollection) =>
         run((repo) => repo.loadMore(collection)),
@@ -135,7 +135,7 @@ export function useWorkspaceActions() {
       dispatchDueNotifications: () =>
         run(
           (repo) => repo.dispatchDueNotifications(),
-          "Simulacao executada. Nenhuma mensagem real foi enviada.",
+          "Simulação executada. Nenhuma mensagem real foi enviada.",
         ),
 
       acknowledgeNotification: (id: ID) =>

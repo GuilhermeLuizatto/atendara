@@ -97,10 +97,10 @@ async function settle(writer, results) {
 async function responsibleMember(request) {
   const account = await accountOf(request);
   if (account.platformRole !== "PROFESSIONAL" || account.mustChangePassword || !account.organizationId) {
-    throw new HttpsError("permission-denied", "Somente quem responde por uma organizacao atende pedidos de titulares.");
+    throw new HttpsError("permission-denied", "Somente quem responde por uma organização atende pedidos de titulares.");
   }
   if (account.subscriptionStatus !== "ACTIVE" || !(account.accessUntilMs > Date.now())) {
-    throw new HttpsError("permission-denied", "O acesso desta organizacao nao esta vigente.");
+    throw new HttpsError("permission-denied", "O acesso desta organização não está vigente.");
   }
 
   const organizationId = account.organizationId;
@@ -116,10 +116,10 @@ async function responsibleMember(request) {
     organization.primaryProfession !== account.professionId ||
     member?.status !== "ACTIVE"
   ) {
-    throw new HttpsError("permission-denied", "Cadastro sem vinculo ativo com a organizacao.");
+    throw new HttpsError("permission-denied", "Cadastro sem vínculo ativo com a organização.");
   }
   if (organization.ownerId !== request.auth.uid && !PRIVACY_RESPONSIBLE_ROLES.includes(member.role)) {
-    throw new HttpsError("permission-denied", "Somente quem responde pela organizacao atende pedidos de titulares.");
+    throw new HttpsError("permission-denied", "Somente quem responde pela organização atende pedidos de titulares.");
   }
   return { account, organizationId, organization };
 }
@@ -230,7 +230,7 @@ async function existingClient(organizationId, clientId) {
   const snapshot = await db().doc(paths.document(organizationId, "clients", clientId)).get();
   // Mesma resposta para "nao existe" e "e de outra organizacao": o id de um
   // cliente alheio nao revela nada.
-  if (!snapshot.exists) throw new HttpsError("not-found", "Cadastro nao encontrado nesta organizacao.");
+  if (!snapshot.exists) throw new HttpsError("not-found", "Cadastro não encontrado nesta organização.");
   return snapshot;
 }
 
@@ -306,7 +306,7 @@ export const eraseClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
   // Pendencia em aberto e resolvida antes, por quem cobra — sem nome no
   // lancamento, depois nao haveria de quem cobrar.
   if (linked.transactions.some((transaction) => ["PENDING", "OVERDUE"].includes(transaction.data().status))) {
-    throw new HttpsError("failed-precondition", "Ha pendencias financeiras em aberto para este cadastro. Receba, cancele ou estorne antes de eliminar.");
+    throw new HttpsError("failed-precondition", "Há pendências financeiras em aberto para este cadastro. Receba, cancele ou estorne antes de eliminar.");
   }
 
   const at = new Date();
@@ -364,7 +364,7 @@ export const startOrganizationExport = onCall(PRIVACY_CALL_OPTIONS, async (reque
   const at = new Date();
   const requestId = randomUUID();
   const record = privacyRequestRecord({ id: requestId, organizationId, type: "ORGANIZATION_EXPORT", subjectId: null, receivedVia: null, actorId: request.auth.uid, counts: {}, at });
-  const audit = tenantAuditEntry({ organizationId, actorId: request.auth.uid, actorName: account.displayName, action: "EXPORT", resource: { type: "organization", id: organizationId }, summary: "Exportacao completa da organizacao iniciada.", requestId, at });
+  const audit = tenantAuditEntry({ organizationId, actorId: request.auth.uid, actorName: account.displayName, action: "EXPORT", resource: { type: "organization", id: organizationId }, summary: "Exportação completa da organização iniciada.", requestId, at });
   const batch = db().batch();
   batch.create(record.ref, record.data);
   batch.create(audit.ref, audit.data);
@@ -393,13 +393,13 @@ export const exportOrganizationPage = onCall(PRIVACY_CALL_OPTIONS, async (reques
 
   const started = (await db().doc(paths.document(organizationId, "privacyRequests", input.exportId)).get()).data();
   if (!started || started.type !== "ORGANIZATION_EXPORT") {
-    throw new HttpsError("not-found", "Exportacao nao encontrada. Inicie uma nova.");
+    throw new HttpsError("not-found", "Exportação não encontrada. Inicie uma nova.");
   }
   if (started.requestedBy !== request.auth.uid) {
-    throw new HttpsError("permission-denied", "Esta exportacao foi iniciada por outra pessoa.");
+    throw new HttpsError("permission-denied", "Esta exportação foi iniciada por outra pessoa.");
   }
   if (started.executedAt.toMillis() + ORGANIZATION_EXPORT_WINDOW_MINUTES * 60_000 < Date.now()) {
-    throw new HttpsError("failed-precondition", "Esta exportacao expirou. Inicie uma nova.");
+    throw new HttpsError("failed-precondition", "Esta exportação expirou. Inicie uma nova.");
   }
 
   const size = input.pageSize ?? ORGANIZATION_EXPORT_PAGE_SIZE.default;
@@ -412,7 +412,7 @@ export const exportOrganizationPage = onCall(PRIVACY_CALL_OPTIONS, async (reques
     if (input.cursor) {
       if (!input.cursor.conversationId) throw new HttpsError("invalid-argument", "Confira os dados informados.");
       const last = await db().doc(messagePath(organizationId, input.cursor.conversationId, input.cursor.id)).get();
-      if (!last.exists) throw new HttpsError("failed-precondition", "A exportacao mudou durante a leitura. Inicie uma nova.");
+      if (!last.exists) throw new HttpsError("failed-precondition", "A exportação mudou durante a leitura. Inicie uma nova.");
       query = query.startAfter(last);
     }
   } else {
@@ -506,32 +506,32 @@ const deletionRequest = z.object({ confirmOrganizationId: z.string().min(1).max(
 export const deleteOrganization = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
   const account = await accountOf(request);
   if (account.platformRole !== "PROFESSIONAL" || account.mustChangePassword || !account.organizationId) {
-    throw new HttpsError("permission-denied", "Somente o titular exclui a propria organizacao.");
+    throw new HttpsError("permission-denied", "Somente o titular exclui a própria organização.");
   }
   const input = parse(deletionRequest, request.data);
   const organizationId = account.organizationId;
   const organizationRef = db().doc(paths.organization(organizationId));
   const organization = (await organizationRef.get()).data();
   if (!organization || organization.deletion?.status === "DONE") {
-    throw new HttpsError("not-found", "Organizacao nao encontrada.");
+    throw new HttpsError("not-found", "Organização não encontrada.");
   }
   // O titular, e so ele: um OWNER promovido gerencia a organizacao, mas nao a
   // encerra — do mesmo modo que nao contrata a assinatura.
   if (organization.ownerId !== request.auth.uid) {
-    throw new HttpsError("permission-denied", "Somente o titular exclui a organizacao.");
+    throw new HttpsError("permission-denied", "Somente o titular exclui a organização.");
   }
   if (input.confirmOrganizationId !== organizationId) {
-    throw new HttpsError("failed-precondition", "A confirmacao nao corresponde a esta organizacao.");
+    throw new HttpsError("failed-precondition", "A confirmação não corresponde a esta organização.");
   }
   if (Date.now() / 1000 - request.auth.token.auth_time > RECENT_LOGIN_SECONDS) {
-    throw new HttpsError("unauthenticated", "Entre novamente para excluir a organizacao.");
+    throw new HttpsError("unauthenticated", "Entre novamente para excluir a organização.");
   }
   await consumeRateLimit(request.auth.uid, "deleteOrganization");
 
   const subscriptionRef = db().doc(paths.platformSubscription(organizationId));
   const subscription = (await subscriptionRef.get()).data();
   if (subscription && subscription.status !== "CANCELED") {
-    throw new HttpsError("failed-precondition", "Cancele a assinatura antes de excluir a organizacao.");
+    throw new HttpsError("failed-precondition", "Cancele a assinatura antes de excluir a organização.");
   }
 
   const at = new Date();

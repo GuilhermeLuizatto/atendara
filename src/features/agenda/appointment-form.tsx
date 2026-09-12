@@ -48,17 +48,17 @@ function centsToInput(cents: number): string {
 function validate(draft: Draft): Errors {
   const errors: Errors = {};
 
-  if (!draft.clientId) errors.clientId = "Selecione quem sera atendido.";
+  if (!draft.clientId) errors.clientId = "Selecione quem será atendido.";
   if (!draft.professionalId) errors.professionalId = "Selecione o profissional.";
   if (!draft.date) errors.date = "Informe a data.";
-  if (!draft.time) errors.time = "Informe o horario.";
+  if (!draft.time) errors.time = "Informe o horário.";
   if (!Number.isFinite(draft.durationMinutes) || draft.durationMinutes < 5) {
-    errors.durationMinutes = "Duracao minima de 5 minutos.";
+    errors.durationMinutes = "Duração mínima de 5 minutos.";
   }
 
   const price = Number(draft.priceInReais.replace(",", "."));
   if (!Number.isFinite(price) || price < 0) {
-    errors.priceInReais = "Valor invalido.";
+    errors.priceInReais = "Valor inválido.";
   }
 
   return errors;
@@ -171,7 +171,7 @@ export function AppointmentForm({
       <form onSubmit={handleSubmit} className="space-y-4">
         {clients.length === 0 ? (
           <p className="bg-warning-soft text-warning-soft-foreground rounded-lg px-3 py-2 text-sm">
-            O agendamento e feito para {indefiniteTerm(terminology.client)} ja{" "}
+            O agendamento é feito para {indefiniteTerm(terminology.client)} já{" "}
             {byGender(terminology.client, "cadastrado", "cadastrada")}.{" "}
             <Link href="/clientes" onClick={onClose} className="font-medium underline underline-offset-2">
               Cadastrar {terminology.client.singularLower}
@@ -215,7 +215,7 @@ export function AppointmentForm({
             )}
           </Field>
 
-          <Field label="Horario" required error={errors.time}>
+          <Field label="Horário" required error={errors.time}>
             {(props) => (
               <Input
                 {...props}
@@ -229,7 +229,7 @@ export function AppointmentForm({
           </Field>
 
           <Field
-            label="Duracao (minutos)"
+            label="Duração (minutos)"
             required
             error={errors.durationMinutes}
           >
@@ -281,7 +281,7 @@ export function AppointmentForm({
             )}
           </Field>
 
-          <Field label="Situacao">
+          <Field label="Situação">
             {(props) => (
               <Select
                 {...props}
@@ -327,8 +327,8 @@ export function AppointmentForm({
 
           <div className="sm:col-span-2">
             <Field
-              label="Observacao administrativa"
-              hint="Visivel para a equipe. Nao registre informacao sensivel."
+              label="Observação administrativa"
+              hint="Visível para a equipe. Não registre informação sensível."
             >
               {(props) => (
                 <Textarea

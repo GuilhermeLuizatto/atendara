@@ -73,6 +73,13 @@ SaaS multiprofissional de gestao e automacao. Leia
 - Link com cara de botao usa `buttonStyles()`, nunca `<Button>` dentro de
   `<Link>`. Dialogo usa `Modal`/`Drawer`, que prendem e devolvem o foco.
 - Codigo e enums em ingles; interface e comentarios em pt-BR.
+- Texto que chega a tela, a mensagem de erro, ao modelo de aviso ou ao
+  consentimento leva acentuacao correta. Identificadores continuam sem acento:
+  ids de modulo e de aba, rotas, chaves e as listas de termos comparadas com
+  texto normalizado (`classify.ts`, `natural-language.ts`,
+  `FORBIDDEN_TEMPLATE_TERMS`) — acentuar uma delas faz a comparacao falhar em
+  silencio. Mudou o texto do consentimento? Troque
+  `NOTIFICATION_CONSENT_TEXT_VERSION`.
 - Comentario explica **por que**, nunca **o que**.
 - Arquivos pequenos e coesos. `config/` guarda politica, `lib/` guarda mecanismo.
 - Estado do cliente vindo de `localStorage` usa `useSyncExternalStore`

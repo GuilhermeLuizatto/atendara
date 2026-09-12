@@ -86,7 +86,7 @@ export function ModulePlaceholder({
 
       <Card>
         <CardHeader>
-          <CardTitle>Nesta tela, na proxima fase</CardTitle>
+          <CardTitle>Nesta tela, na próxima fase</CardTitle>
         </CardHeader>
         <CardBody>
           <ul className="space-y-2.5">

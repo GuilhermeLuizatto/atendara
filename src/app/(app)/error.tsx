@@ -36,12 +36,12 @@ export default function AppError({
       </h1>
       <p className="text-muted-foreground text-sm leading-relaxed">
         Nada foi apagado. Tente abrir a tela de novo; se o erro continuar,
-        recarregue a pagina.
+        recarregue a página.
       </p>
       <div className="flex flex-wrap justify-center gap-2">
         <Button onClick={() => retry()}>Tentar de novo</Button>
         <Link href="/dashboard" className={buttonStyles({ variant: "outline" })}>
-          Voltar ao inicio
+          Voltar ao início
         </Link>
       </div>
     </section>

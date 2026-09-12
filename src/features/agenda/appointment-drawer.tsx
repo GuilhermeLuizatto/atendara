@@ -129,7 +129,7 @@ export function AppointmentDrawer({
 
           <dl className="border-border divide-border divide-y rounded-lg border">
             <Row
-              label="Horario"
+              label="Horário"
               value={`${formatTime(appointment.startsAt)} – ${formatTime(appointment.endsAt)} (${appointment.durationMinutes} min)`}
             />
             <Row
@@ -142,7 +142,7 @@ export function AppointmentDrawer({
             />
             {linkedTransaction ? (
               <Row
-                label="Cobranca"
+                label="Cobrança"
                 value={
                   linkedTransaction.status === "PAID"
                     ? "Paga"
@@ -183,7 +183,7 @@ export function AppointmentDrawer({
           {appointment.administrativeNotes ? (
             <section className="space-y-2">
               <h3 className="text-subtle-foreground text-[11px] font-medium tracking-wide uppercase">
-                Observacao administrativa
+                Observação administrativa
               </h3>
               <p className="text-muted-foreground text-sm leading-relaxed">
                 {appointment.administrativeNotes}
@@ -213,7 +213,7 @@ export function AppointmentDrawer({
           );
         }}
         title="Cancelar atendimento"
-        message={`O atendimento de ${appointment.clientName} sera cancelado e a cobranca pendente vinculada tambem.`}
+        message={`O atendimento de ${appointment.clientName} será cancelado e a cobrança pendente vinculada também.`}
         confirmLabel="Cancelar atendimento"
       />
     </>

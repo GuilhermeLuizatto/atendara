@@ -36,11 +36,11 @@ export function AuthCard({
 
         <p className="text-muted-foreground mt-6 text-center text-xs">
           <Link href="/" className="underline underline-offset-2">
-            Voltar para a apresentacao
+            Voltar para a apresentação
           </Link>
         </p>
         <p className="text-muted-foreground mt-2 text-center text-xs">
-          {APP_NAME} e uma plataforma {OPERATOR_NAME}.
+          {APP_NAME} é uma plataforma {OPERATOR_NAME}.
         </p>
       </main>
     </div>

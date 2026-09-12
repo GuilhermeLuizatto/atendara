@@ -53,7 +53,7 @@ export function AlertsPanel({
             Alertas
             {criticalCount > 0 ? (
               <Badge tone="danger" dot>
-                {criticalCount} critico{criticalCount > 1 ? "s" : ""}
+                {criticalCount} crítico{criticalCount > 1 ? "s" : ""}
               </Badge>
             ) : null}
           </span>
@@ -64,7 +64,7 @@ export function AlertsPanel({
         <EmptyState
           icon={<BellOff className="size-5" aria-hidden />}
           title="Nenhum alerta aberto"
-          description="Voce sera avisado aqui quando o agente precisar de voce."
+          description="Você será avisado aqui quando o agente precisar de você."
         />
       ) : (
         <ul className="divide-border divide-y">

@@ -23,7 +23,7 @@ export function Simulator() {
       <Card className="p-5">
         <h2 className="font-semibold">Testar agente</h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          O teste usa uma conversa existente, e esta organizacao ainda nao tem
+          O teste usa uma conversa existente, e esta organização ainda não tem
           nenhuma: sem canal de mensagens integrado, nenhuma conversa chega. As
           regras continuam valendo e podem ser revisadas na aba Regras.
         </p>
@@ -46,7 +46,7 @@ export function Simulator() {
           text,
           fromDateAndTime(toDateKey(new Date()), time),
         ),
-      "Simulacao registrada na conversa e na auditoria.",
+      "Simulação registrada na conversa e na auditoria.",
     );
     setSelectedId(conversationId);
     setDecisionId(id);
@@ -63,8 +63,8 @@ export function Simulator() {
         </p>
         <form onSubmit={submit} className="mt-4 space-y-4">
           <Field
-            label="Horario simulado de hoje"
-            hint="Horario de Sao Paulo. A janela de silencio e respeitada."
+            label="Horário simulado de hoje"
+            hint="Horário de São Paulo. A janela de silêncio é respeitada."
           >
             {(props) => (
               <Input
@@ -76,7 +76,7 @@ export function Simulator() {
               />
             )}
           </Field>
-          <Field label="Conversa de demonstracao">
+          <Field label="Conversa de demonstração">
             {(props) => (
               <Select
                 {...props}
@@ -100,7 +100,7 @@ export function Simulator() {
               "Qual o valor da consulta?",
               "Quero remarcar minha consulta.",
               "Quero falar de um assunto diferente.",
-              "Nao aguento mais, preciso de ajuda.",
+              "Não aguento mais, preciso de ajuda.",
             ].map((sample) => (
               <Button
                 key={sample}
@@ -137,7 +137,7 @@ export function Simulator() {
           <DecisionDetails decision={decision} />
         ) : (
           <div className="text-muted-foreground flex min-h-60 items-center justify-center text-center text-sm">
-            A classificacao, as regras e a decisao aparecerao aqui.
+            A classificação, as regras e a decisão aparecerão aqui.
           </div>
         )}
       </Card>

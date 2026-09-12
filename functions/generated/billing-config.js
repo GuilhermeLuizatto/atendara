@@ -96,19 +96,19 @@ export const BILLING_INTERVAL_LABELS = {
     YEAR: "anual",
 };
 export const SUBSCRIPTION_STATUS_LABELS = {
-    TRIALING: "Periodo de teste",
+    TRIALING: "Período de teste",
     ACTIVE: "Ativa",
     PAST_DUE: "Pagamento pendente",
     CANCELED: "Cancelada",
-    INCOMPLETE: "Aguardando confirmacao",
-    UNPAID: "Nao paga",
+    INCOMPLETE: "Aguardando confirmação",
+    UNPAID: "Não paga",
 };
 export const INVOICE_STATUS_LABELS = {
     OPEN: "Em aberto",
     PAID: "Paga",
     PAST_DUE: "Vencida",
     VOID: "Cancelada",
-    UNCOLLECTIBLE: "Nao recebida",
+    UNCOLLECTIBLE: "Não recebida",
     REFUNDED: "Reembolsada",
     PARTIALLY_REFUNDED: "Reembolsada em parte",
 };
@@ -118,9 +118,9 @@ export const INVOICE_STATUS_LABELS = {
  * pessoa interpreta de um jeito — e receita recorrente e o caso classico disso.
  */
 export const METRIC_DEFINITIONS = {
-    monthlyRecurringRevenue: "Soma do valor mensal normalizado das assinaturas ativas. Plano anual entra dividido por 12. Periodo de teste e inadimplencia nao entram.",
-    annualRunRate: "Receita recorrente mensal multiplicada por 12. E uma projecao do ritmo atual, nao o faturamento do ano.",
-    outstanding: "Soma das faturas em aberto e vencidas. Nao inclui faturas canceladas nem dadas como incobraveis.",
-    netCollected: "Total recebido nas faturas menos o total reembolsado, sobre todo o periodo carregado.",
+    monthlyRecurringRevenue: "Soma do valor mensal normalizado das assinaturas ativas. Plano anual entra dividido por 12. Período de teste e inadimplência não entram.",
+    annualRunRate: "Receita recorrente mensal multiplicada por 12. É uma projeção do ritmo atual, não o faturamento do ano.",
+    outstanding: "Soma das faturas em aberto e vencidas. Não inclui faturas canceladas nem dadas como incobráveis.",
+    netCollected: "Total recebido nas faturas menos o total reembolsado, sobre todo o período carregado.",
     churnRate: "Assinaturas canceladas sobre o total de assinaturas conhecidas (ativas, em teste, inadimplentes e canceladas).",
 };

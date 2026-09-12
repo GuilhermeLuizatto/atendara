@@ -31,7 +31,7 @@ export const createPlatformAdmin = onCall(ACCOUNT_CALL_OPTIONS, async (request) 
   try {
     user = await getAuth().createUser({ email: input.email, displayName: input.displayName, password: temporaryPassword });
   } catch (error) {
-    throw new HttpsError("already-exists", error?.code === "auth/email-already-exists" ? "Este e-mail ja esta cadastrado." : "Nao foi possivel criar a conta.");
+    throw new HttpsError("already-exists", error?.code === "auth/email-already-exists" ? "Este e-mail já está cadastrado." : "Não foi possível criar a conta.");
   }
 
   const createdAt = new Date().toISOString();
@@ -60,7 +60,7 @@ export const createPlatformAdmin = onCall(ACCOUNT_CALL_OPTIONS, async (request) 
     await batch.commit();
   } catch {
     await getAuth().deleteUser(user.uid);
-    throw new HttpsError("internal", "Nao foi possivel concluir o cadastro.");
+    throw new HttpsError("internal", "Não foi possível concluir o cadastro.");
   }
   return { userId: user.uid, temporaryPassword };
 });
@@ -74,17 +74,17 @@ export const setPlatformAdminStatus = onCall(ACCOUNT_CALL_OPTIONS, async (reques
   await masterOf(request);
   const { userId, status } = parse(statusChange, request.data);
   if (userId === request.auth.uid) {
-    throw new HttpsError("failed-precondition", "A chave mestra nao altera a propria conta por aqui.");
+    throw new HttpsError("failed-precondition", "A chave mestra não altera a própria conta por aqui.");
   }
 
   const ref = db().doc(paths.account(userId));
   const previous = await db().runTransaction(async (transaction) => {
     const account = (await transaction.get(ref)).data();
     if (!account || account.platformRole !== "PLATFORM_ADMIN") {
-      throw new HttpsError("not-found", "Administrador nao encontrado.");
+      throw new HttpsError("not-found", "Administrador não encontrado.");
     }
     if (account.platformMaster === true) {
-      throw new HttpsError("permission-denied", "Chave mestra nao e suspensa por esta callable.");
+      throw new HttpsError("permission-denied", "Chave mestra não é suspensa por esta callable.");
     }
     if (account.status === status) return account.status;
 

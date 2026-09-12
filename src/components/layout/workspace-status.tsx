@@ -20,7 +20,7 @@ const COLLECTION_LABELS: Record<WorkspaceCollection, string> = {
   messages: "mensagens",
   transactions: "financeiro",
   rules: "regras do agente",
-  decisions: "decisoes do agente",
+  decisions: "decisões do agente",
   notifications: "alertas",
   notificationDeliveries: "fila de avisos",
   auditLogs: "trilha de auditoria",
@@ -54,7 +54,7 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
         <Banner
           role="status"
           icon={<RefreshCw className="size-4" aria-hidden />}
-          message="Esta demorando mais que o normal para carregar. A conexao pode estar lenta."
+          message="Está demorando mais que o normal para carregar. A conexão pode estar lenta."
           onRetry={retry}
         />
       ) : null}
@@ -62,7 +62,7 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
         <Banner
           role="alert"
           icon={<TriangleAlert className="size-4" aria-hidden />}
-          message={`Nao foi possivel carregar: ${loadState.failed.map((name) => COLLECTION_LABELS[name]).join(", ")}. O que aparece vazio nessas areas pode nao estar vazio.`}
+          message={`Não foi possível carregar: ${loadState.failed.map((name) => COLLECTION_LABELS[name]).join(", ")}. O que aparece vazio nessas áreas pode não estar vazio.`}
           onRetry={retry}
         />
       ) : null}
@@ -108,23 +108,23 @@ function UnavailablePanel({
   const content = {
     offline: {
       icon: CloudOff,
-      title: "Sem conexao com o servidor",
+      title: "Sem conexão com o servidor",
       body: "Nada foi perdido: seus dados ficam guardados no servidor. Confira a internet e tente de novo.",
     },
     "organization-missing": {
       icon: TriangleAlert,
-      title: "Sua area de trabalho ainda nao esta pronta",
-      body: `O cadastro existe, mas a organizacao dele nao foi encontrada. Fale com a ${OPERATOR_NAME} para concluir a liberacao.`,
+      title: "Sua área de trabalho ainda não está pronta",
+      body: `O cadastro existe, mas a organização dele não foi encontrada. Fale com a ${OPERATOR_NAME} para concluir a liberação.`,
     },
     "access-denied": {
       icon: ShieldAlert,
-      title: "Seu acesso nao abre este painel agora",
-      body: `A validade do acesso pode ter terminado, o cadastro pode estar suspenso ou a organizacao ainda nao foi liberada. Nenhum dado foi apagado. Se nao souber o motivo, fale com a ${OPERATOR_NAME}.`,
+      title: "Seu acesso não abre este painel agora",
+      body: `A validade do acesso pode ter terminado, o cadastro pode estar suspenso ou a organização ainda não foi liberada. Nenhum dado foi apagado. Se não souber o motivo, fale com a ${OPERATOR_NAME}.`,
     },
     failed: {
       icon: TriangleAlert,
-      title: "Nao foi possivel carregar o painel",
-      body: "Tente de novo em instantes. Se continuar, recarregue a pagina.",
+      title: "Não foi possível carregar o painel",
+      body: "Tente de novo em instantes. Se continuar, recarregue a página.",
     },
   }[reason];
   const Icon = content.icon;

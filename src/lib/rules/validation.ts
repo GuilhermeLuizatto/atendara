@@ -40,7 +40,7 @@ const conditionSchema = z.object({
 
 const conditionGroupSchema = z.object({
   combinator: z.enum(["AND", "OR"]),
-  conditions: z.array(conditionSchema).max(10, "No maximo 10 condicoes."),
+  conditions: z.array(conditionSchema).max(10, "No máximo 10 condições."),
 });
 
 const actionSchema = z.object({
@@ -56,17 +56,17 @@ export const ruleInputSchema = z.object({
     .trim()
     .min(3, "Nome muito curto.")
     .max(80, "Nome muito longo."),
-  description: z.string().trim().max(400, "Descricao muito longa."),
+  description: z.string().trim().max(400, "Descrição muito longa."),
   level: z.enum(RULE_LEVELS),
   category: z.enum(RULE_CATEGORIES),
   enabled: z.boolean(),
   priority: z
     .number()
-    .int("Prioridade deve ser um numero inteiro.")
+    .int("Prioridade deve ser um número inteiro.")
     .min(0)
     .max(1000),
   conditions: conditionGroupSchema,
-  actions: z.array(actionSchema).min(1, "Informe ao menos uma acao."),
+  actions: z.array(actionSchema).min(1, "Informe ao menos uma ação."),
   source: z.enum([
     "SYSTEM",
     "PROFESSION_TEMPLATE",
@@ -102,15 +102,15 @@ export function validateRuleInput(input: unknown): ValidationResult {
 
   if (!USER_EDITABLE_RULE_LEVELS.includes(rule.level as RuleLevel)) {
     errors.push(
-      "Somente regras do profissional, contextuais e de preferencia podem ser criadas.",
+      "Somente regras do profissional, contextuais e de preferência podem ser criadas.",
     );
   }
 
   if (rule.actions.some((action) => SYSTEM_ONLY_ACTIONS.has(action.type))) {
-    errors.push("Esta acao e reservada as regras fundamentais do sistema.");
+    errors.push("Esta ação é reservada às regras fundamentais do sistema.");
   }
   if (rule.source === "SYSTEM" || rule.source === "PROFESSION_TEMPLATE") {
-    errors.push("A origem desta regra e reservada ao sistema.");
+    errors.push("A origem desta regra é reservada ao sistema.");
   }
   for (const action of rule.actions) {
     const price = action.payload?.priceInCents;
@@ -119,7 +119,7 @@ export function validateRuleInput(input: unknown): ValidationResult {
       (typeof price !== "number" || !Number.isSafeInteger(price) || price < 0)
     ) {
       errors.push(
-        "O preco deve ser um valor inteiro em centavos, maior ou igual a zero.",
+        "O preço deve ser um valor inteiro em centavos, maior ou igual a zero.",
       );
     }
     const duration = action.payload?.durationMinutes;
@@ -129,14 +129,14 @@ export function validateRuleInput(input: unknown): ValidationResult {
         !Number.isInteger(duration) ||
         duration <= 0)
     ) {
-      errors.push("A duracao deve ser um numero inteiro positivo de minutos.");
+      errors.push("A duração deve ser um número inteiro positivo de minutos.");
     }
   }
 
   // Uma regra contextual sem condicao e, na pratica, uma regra geral disfarcada
   // — e passaria a valer em situacoes que o usuario nao previu.
   if (rule.level === "CONTEXTUAL" && rule.conditions.conditions.length === 0) {
-    errors.push("Uma regra contextual precisa de ao menos uma condicao.");
+    errors.push("Uma regra contextual precisa de ao menos uma condição.");
   }
 
   if (

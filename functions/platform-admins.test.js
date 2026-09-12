@@ -28,7 +28,7 @@ const TOTP = { firebase: { sign_in_provider: "password", sign_in_second_factor: 
 const PASSWORD_ONLY = { firebase: { sign_in_provider: "password" } };
 const request = (data, { uid = "mestra", token = TOTP } = {}) => ({ auth: { uid, token: { auth_time: Date.now() / 1000, ...token } }, data });
 const operator = extra => ({ status: "ACTIVE", platformRole: "PLATFORM_ADMIN", mustChangePassword: false, ...extra });
-const newAdmin = { displayName: "Segunda Programadora", email: "segunda@atendara.test" };
+const newAdmin = { displayName: "Segunda Programadora", email: "segunda@nexo.test" };
 const writesTo = path => mock.writes.filter(write => write.path === path);
 const auditWrites = () => mock.writes.filter(write => write.path.startsWith("platformAuditLogs/"));
 

@@ -1,8 +1,8 @@
-# Atendara
+# Nexo
 
 **Mais tempo para atender.**
 
-Dara é a assistente de IA da Atendara para a rotina administrativa. Ela auxilia
+Dara é a assistente de IA do Nexo para a rotina administrativa. Ela auxilia
 com informações e encaminha ao profissional os assuntos que exigem atenção humana.
 
 **Plataforma multiprofissional de gestao e automacao para quem atende pessoas.**
@@ -56,7 +56,7 @@ canais externos. O produto ainda nao recebe dados reais nem faz cobranca real.
 | Financeiro       | `/financeiro`    | Receitas, pendencias e atrasos do negocio do assinante  |
 | Dara             | `/agente`        | Regras, decisoes auditaveis e simulador                 |
 | Configuracoes    | `/configuracoes` | Profissao, equipe, agenda, privacidade e avisos         |
-| Minha assinatura | `/assinatura`    | Plano, situacao e cobrancas da mensalidade do Atendara  |
+| Minha assinatura | `/assinatura`    | Plano, situacao e cobrancas da mensalidade do Nexo  |
 | Administracao    | `/admin`         | Cadastros, acesso e a cobranca da plataforma            |
 
 `/financeiro` e `/assinatura` nao se misturam: um e o dinheiro que o assinante

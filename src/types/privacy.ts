@@ -109,7 +109,7 @@ export interface ExportedAuditEntry {
 
 /** Arquivo entregue a quem pediu os proprios dados. Datas em ISO-8601. */
 export interface ClientDataExport {
-  format: "atendara.titular";
+  format: "nexo.titular";
   version: 1;
   requestId: ID;
   generatedAt: ISODateString;

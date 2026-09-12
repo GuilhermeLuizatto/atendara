@@ -51,7 +51,7 @@ try {
     password = `At!${randomBytes(24).toString("base64url")}`;
     try {
       user = await getAuth().createUser({ email, password, displayName: "Guilherme Luizatto" });
-      await file.writeFile(`Atendara — conta Firebase\nProjeto: ${projectId}\nEmail: ${email}\nUID: ${user.uid}\nSenha inicial: ${password}\nTroca obrigatoria no primeiro acesso. Nao e a senha do Google.\n`);
+      await file.writeFile(`Nexo — conta Firebase\nProjeto: ${projectId}\nEmail: ${email}\nUID: ${user.uid}\nSenha inicial: ${password}\nTroca obrigatoria no primeiro acesso. Nao e a senha do Google.\n`);
     } finally {
       await file.close();
     }

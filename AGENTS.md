@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ---
 
-# Atendara — convencoes do projeto
+# Nexo — convencoes do projeto
 
 SaaS multiprofissional de gestao e automacao. Leia
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) antes de mudancas estruturais.
@@ -42,7 +42,7 @@ SaaS multiprofissional de gestao e automacao. Leia
 8. **Alterou `src/config/permissions.ts`? Altere `firestore.rules` junto.** Nao
    ha como compartilhar codigo entre TypeScript e CEL.
 9. **Cobranca da plataforma nao e financeiro de tenant.** Mensalidade do
-   Atendara vive em `platform*` na raiz; receita e despesa do assinante vivem em
+   Nexo vive em `platform*` na raiz; receita e despesa do assinante vivem em
    `organizations/{orgId}/transactions`. Nenhuma consulta, agregado ou tela
    mistura as duas.
 10. **Assinatura e validade so mudam pelo webhook ou por concessao registrada.**

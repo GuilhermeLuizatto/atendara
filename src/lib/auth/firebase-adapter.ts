@@ -160,7 +160,7 @@ class FirebaseAuthAdapter implements AuthAdapter {
 
   /**
    * O link aponta para a acao de e-mail do projeto; com o modelo apontado para
-   * `/redefinir-senha/`, abre a tela do Atendara, e sem isso a pagina padrao do
+   * `/redefinir-senha/`, abre a tela do Nexo, e sem isso a pagina padrao do
    * Firebase faz o mesmo. `auth/user-not-found` e tratado como sucesso: a
    * resposta nao pode revelar se o e-mail tem conta.
    */

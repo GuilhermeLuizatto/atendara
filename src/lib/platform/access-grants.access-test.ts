@@ -46,7 +46,7 @@ const WEBHOOK_SECRET = "whsec_apenas_para_o_emulador";
 const WEBHOOK_URL = `http://127.0.0.1:${FUNCTIONS_PORT}/${PROJECT}/${REGION}/stripeWebhook`;
 
 const OPERATOR_UID = "operadora-das-concessoes";
-const TITULAR = { email: "titular-concessao@atendara.test", password: "SenhaDeTeste-Titular-3" };
+const TITULAR = { email: "titular-concessao@nexo.test", password: "SenhaDeTeste-Titular-3" };
 const REASON = "Piloto combinado com a clinica em 10/09.";
 
 let app: FirebaseApp;
@@ -103,7 +103,7 @@ beforeAll(async () => {
   // token de teste, que o emulador de Auth nao sabe emitir.
   await admin.firestore().doc(paths.account(OPERATOR_UID)).set({
     userId: OPERATOR_UID,
-    email: "operadora-concessoes@atendara.test",
+    email: "operadora-concessoes@nexo.test",
     displayName: "Operadora das Concessoes",
     platformRole: "PLATFORM_ADMIN",
     professionId: null,

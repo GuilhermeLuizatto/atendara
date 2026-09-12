@@ -1,5 +1,5 @@
 {
-  "name": "atendara-account-functions",
+  "name": "nexo-account-functions",
   "private": true,
   "type": "module",
   "main": "index.js",

@@ -448,7 +448,7 @@ deploy.
 
 ## 13. Cobranca da plataforma
 
-O Atendara e operado pela Three Devs e vendido por mensalidade. Existem dois
+O Nexo e operado pela Three Devs e vendido por mensalidade. Existem dois
 dinheiros no produto e a arquitetura os mantem separados por construcao, nao por
 disciplina:
 

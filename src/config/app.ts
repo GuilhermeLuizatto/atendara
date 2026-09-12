@@ -1,12 +1,12 @@
 /** Identidade e constantes globais do produto. */
 
-export const APP_NAME = "Atendara";
+export const APP_NAME = "Nexo";
 
 /**
  * Empresa que opera a plataforma.
  *
  * Nao e um tenant: a Three Devs nao tem agenda, clientes nem financeiro no
- * produto. E a identidade de quem publica e responde pelo Atendara, e aparece
+ * produto. E a identidade de quem publica e responde pelo Nexo, e aparece
  * na apresentacao, no login e nos metadados. Organizacoes de clientes vivem em
  * `organizations/{orgId}`; esta nao.
  */

@@ -31,7 +31,7 @@ let plainAdmin: TokenSession;
 function operatorAccount(uid: string, platformMaster: boolean) {
   return {
     userId: uid,
-    email: `${uid}@atendara.test`,
+    email: `${uid}@nexo.test`,
     displayName: platformMaster ? "Chave Mestra de Teste" : "Administrador de Teste",
     platformRole: "PLATFORM_ADMIN",
     platformMaster,
@@ -65,7 +65,7 @@ beforeAll(async () => {
 
   await admin.firestore().doc(paths.account(MASTER_UID)).set(operatorAccount(MASTER_UID, true));
   // O administrador comum existe no Auth: suspender precisa desativar o login dele.
-  await admin.auth().createUser({ uid: ADMIN_UID, email: `${ADMIN_UID}@atendara.test`, password: "SenhaDeTeste-Admin-7" });
+  await admin.auth().createUser({ uid: ADMIN_UID, email: `${ADMIN_UID}@nexo.test`, password: "SenhaDeTeste-Admin-7" });
   await admin.firestore().doc(paths.account(ADMIN_UID)).set(operatorAccount(ADMIN_UID, false));
 
   master = tokenSession(MASTER_UID, "totp");
@@ -79,7 +79,7 @@ afterAll(async () => {
 
 describe("Chave mestra e administradores da plataforma", () => {
   it("so a chave mestra cria administrador, que nasce sem chave mestra e com trilha", async () => {
-    const payload = { displayName: "Terceira Programadora", email: "terceira-programadora@atendara.test" };
+    const payload = { displayName: "Terceira Programadora", email: "terceira-programadora@nexo.test" };
     await expect(plainAdmin.call("createPlatformAdmin", payload)).rejects.toMatchObject({ code: "permission-denied" });
 
     const created = await master.call<{ userId: string; temporaryPassword: string }>("createPlatformAdmin", payload);
@@ -105,7 +105,7 @@ describe("Chave mestra e administradores da plataforma", () => {
     expect(await accountOf(ADMIN_UID)).toMatchObject({ status: "SUSPENDED" });
     await expect(listAccountsAsPlainAdmin()).rejects.toMatchObject({ code: "permission-denied" });
     await expect(
-      plainAdmin.call("createPlatformAdmin", { displayName: "Tentativa Suspensa", email: "tentativa-suspensa@atendara.test" }),
+      plainAdmin.call("createPlatformAdmin", { displayName: "Tentativa Suspensa", email: "tentativa-suspensa@nexo.test" }),
     ).rejects.toMatchObject({ code: "permission-denied" });
 
     await master.call("setPlatformAdminStatus", { userId: ADMIN_UID, status: "ACTIVE" });

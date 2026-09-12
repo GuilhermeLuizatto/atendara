@@ -41,15 +41,15 @@ import { callFunction, tokenSession, type TokenSession } from "@/lib/testing/emu
  */
 
 const require = createRequire(import.meta.url);
-const PROJECT = "demo-nexo";
+const PROJECT = "demo-atendara";
 
 const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9098";
 const [FIRESTORE_HOST, FIRESTORE_PORT] = (
   process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8087"
 ).split(":");
 
-const ADMIN = { email: "administrador@nexo.test", password: "SenhaDeTeste-Admin-1" };
-const PROFESSIONAL = { email: "profissional@nexo.test" };
+const ADMIN = { email: "administrador@atendara.test", password: "SenhaDeTeste-Admin-1" };
+const PROFESSIONAL = { email: "profissional@atendara.test" };
 const NEW_PASSWORD = "SenhaDeTeste-Profissional-2";
 const OTHER_TENANT = "org-de-outro-profissional";
 const MODULES = ["dashboard", "agenda", "clientes"];
@@ -370,7 +370,7 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
     await expect(
       callAsSignedIn("registerProfessional", {
         displayName: "Conta Forjada",
-        email: "forjada@nexo.test",
+        email: "forjada@atendara.test",
         professionId: "PSYCHOLOGIST",
         modules: ["dashboard"],
       }),

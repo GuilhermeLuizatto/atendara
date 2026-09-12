@@ -7,7 +7,7 @@ import { messagePath, messagesPath, paths } from "../functions/generated/paths.j
 const requireTools = createRequire(new URL("../.local/firebase-tools/package.json", import.meta.url));
 const { initializeTestEnvironment, assertSucceeds, assertFails } = requireTools("@firebase/rules-unit-testing");
 const { doc, setDoc, getDoc, updateDoc, deleteDoc, getDocs, collection, collectionGroup, query, where, limit } = requireTools("firebase/firestore");
-const environment = await initializeTestEnvironment({ projectId: "demo-nexo", firestore: { host: "127.0.0.1", port: 8085, rules: readFileSync("firestore.rules", "utf8") } });
+const environment = await initializeTestEnvironment({ projectId: "demo-atendara", firestore: { host: "127.0.0.1", port: 8085, rules: readFileSync("firestore.rules", "utf8") } });
 const account = (org, patch = {}) => ({ platformRole: "PROFESSIONAL", organizationId: org, professionId: "PSYCHOLOGIST", modules: ["clientes", "agenda", "financeiro", "agente", "mensagens"], status: "ACTIVE", mustChangePassword: false, subscriptionStatus: "ACTIVE", accessUntilMs: Date.now() + 86400000, ...patch });
 
 // Tokens de teste com e sem segundo fator. O emulador aceita token nao

@@ -247,7 +247,7 @@ export const exportClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => 
     linked.messages.filter((message) => message.ref.parent.parent.id === conversationId).map(withId);
 
   const result = {
-    format: "nexo.titular",
+    format: "atendara.titular",
     version: 1,
     requestId,
     generatedAt: at.toISOString(),

@@ -43,7 +43,7 @@ const child = spawn(
     "--config",
     "firebase.access-tests.json",
     "--project",
-    "demo-nexo",
+    "demo-atendara",
     "--only",
     "auth,firestore,functions",
     "vitest run --config vitest.access.mts",

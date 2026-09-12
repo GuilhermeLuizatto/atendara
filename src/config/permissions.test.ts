@@ -138,7 +138,7 @@ describe("matriz de permissoes", () => {
   it("reserva os atos de plataforma a operadora ativa", () => {
     const base = {
       userId: "u",
-      email: "u@nexo.test",
+      email: "u@atendara.test",
       displayName: "U",
       organizationId: null,
       professionId: null,

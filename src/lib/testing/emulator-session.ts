@@ -19,7 +19,7 @@ import { connectFirestoreEmulator, getFirestore, terminate, type Firestore } fro
  * cabecalhos. Nunca importado pelo aplicativo.
  */
 
-export const PROJECT = "demo-nexo";
+export const PROJECT = "demo-atendara";
 export const REGION = "southamerica-east1";
 export const FUNCTIONS_PORT = 5002;
 
@@ -59,7 +59,7 @@ export function unsignedIdToken(uid: string, secondFactor: string | null, option
 function appCheckToken(): string {
   const now = Math.floor(Date.now() / 1000);
   return unsignedJwt({
-    sub: "1:000000000000:web:nexo-testes",
+    sub: "1:000000000000:web:atendara-testes",
     iss: "https://firebaseappcheck.googleapis.com/000000000000",
     aud: [`projects/${PROJECT}`],
     iat: now,

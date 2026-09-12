@@ -49,7 +49,7 @@ import { callFunction, tokenSession, type TokenSession } from "@/lib/testing/emu
  */
 
 const require = createRequire(import.meta.url);
-const PROJECT = "demo-nexo";
+const PROJECT = "demo-atendara";
 const REGION = "southamerica-east1";
 const FUNCTIONS_PORT = 5002;
 const OPERATOR_UID = "operadora-da-cobranca";
@@ -61,9 +61,9 @@ const [FIRESTORE_HOST, FIRESTORE_PORT] = (
   process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8087"
 ).split(":");
 
-const OWNER = { email: "assinante@nexo.test", password: "SenhaDeTeste-Assinante-2" };
-const NEIGHBOUR = { email: "vizinho@nexo.test", password: "SenhaDeTeste-Vizinho-2" };
-const EMPLOYEE = { email: "secretaria@nexo.test", password: "SenhaDeTeste-Secretaria-1" };
+const OWNER = { email: "assinante@atendara.test", password: "SenhaDeTeste-Assinante-2" };
+const NEIGHBOUR = { email: "vizinho@atendara.test", password: "SenhaDeTeste-Vizinho-2" };
+const EMPLOYEE = { email: "secretaria@atendara.test", password: "SenhaDeTeste-Secretaria-1" };
 
 const PLAN = "profissional-mensal";
 const CUSTOMER = "cus_assinante";
@@ -240,7 +240,7 @@ beforeAll(async () => {
 
   await admin.firestore().doc(paths.account(OPERATOR_UID)).set({
     userId: OPERATOR_UID,
-    email: "operadora@nexo.test",
+    email: "operadora@atendara.test",
     displayName: "Operadora de Teste",
     platformRole: "PLATFORM_ADMIN",
     professionId: null,

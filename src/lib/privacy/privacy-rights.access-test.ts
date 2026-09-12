@@ -48,8 +48,8 @@ const [FIRESTORE_HOST, FIRESTORE_PORT] = (process.env.FIRESTORE_EMULATOR_HOST ??
 const OPERATOR_UID = "operadora-dos-pedidos-de-titular";
 const COLLEAGUE_UID = "colega-sem-responsabilidade";
 const CLINIC_ADMIN_UID = "administradora-da-clinica";
-const TITULAR_A = { name: "Titular A Privacidade", email: "titular-a-privacidade@nexo.test", password: "SenhaDeTeste-Privacidade-A1" };
-const TITULAR_B = { name: "Titular B Privacidade", email: "titular-b-privacidade@nexo.test", password: "SenhaDeTeste-Privacidade-B1" };
+const TITULAR_A = { name: "Titular A Privacidade", email: "titular-a-privacidade@atendara.test", password: "SenhaDeTeste-Privacidade-A1" };
+const TITULAR_B = { name: "Titular B Privacidade", email: "titular-b-privacidade@atendara.test", password: "SenhaDeTeste-Privacidade-B1" };
 
 const SUBJECT = { name: "Maria Exemplo Titular", prefix: "x" };
 const CONTROL = { name: "Joao Controle Intacto", prefix: "y" };
@@ -158,7 +158,7 @@ async function registerAndSignIn(titular: typeof TITULAR_A): Promise<Person> {
 async function seedMember(uid: string, organizationId: string, role: string): Promise<TokenSession> {
   await fs().doc(paths.account(uid)).set({
     userId: uid,
-    email: `${uid}@nexo.test`,
+    email: `${uid}@atendara.test`,
     displayName: uid,
     platformRole: "PROFESSIONAL",
     organizationId,
@@ -261,7 +261,7 @@ beforeAll(async () => {
   admin.initializeApp({ projectId: PROJECT });
 
   await fs().doc(paths.account(OPERATOR_UID)).set({
-    userId: OPERATOR_UID, email: "operadora-titulares@nexo.test", displayName: "Operadora", platformRole: "PLATFORM_ADMIN",
+    userId: OPERATOR_UID, email: "operadora-titulares@atendara.test", displayName: "Operadora", platformRole: "PLATFORM_ADMIN",
     professionId: null, organizationId: null, modules: [], status: "ACTIVE", mustChangePassword: false, createdAt: new Date().toISOString(),
   });
   operator = tokenSession(OPERATOR_UID, "totp");
@@ -293,7 +293,7 @@ describe("Etapa 5C — direitos do titular dos dados", () => {
     const exported = await titularA.call<ClientDataExport>("exportClientData", { clientId: X.client, receivedVia: "EMAIL" });
 
     expect(exported).toMatchObject({
-      format: "nexo.titular",
+      format: "atendara.titular",
       version: 1,
       organization: { id: orgA },
       subject: { id: X.client, fullName: SUBJECT.name },

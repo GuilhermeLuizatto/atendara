@@ -59,7 +59,7 @@ function nextSnapshot(
 }
 
 beforeAll(async () => {
-  app = initializeApp({ projectId: "demo-nexo" }, "emulator-tests");
+  app = initializeApp({ projectId: "demo-atendara" }, "emulator-tests");
   db = getFirestore(app);
   connectFirestoreEmulator(db, "127.0.0.1", 8086);
 

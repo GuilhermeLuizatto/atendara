@@ -32,8 +32,8 @@ export default function GlobalError({
         }}
       >
         <main role="alert" style={{ maxWidth: "28rem", textAlign: "center" }}>
-          <title>Erro · Nexo</title>
-          <h1 style={{ fontSize: "1.25rem" }}>O Nexo encontrou um erro</h1>
+          <title>Erro · Atendara</title>
+          <h1 style={{ fontSize: "1.25rem" }}>O Atendara encontrou um erro</h1>
           <p style={{ lineHeight: 1.6 }}>
             Nada foi apagado. Tente de novo; se continuar, recarregue a página.
           </p>

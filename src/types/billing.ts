@@ -3,7 +3,7 @@ import type { AppModule } from "./access";
 
 /**
  * Cobranca DA PLATAFORMA — a mensalidade que a Three Devs cobra de clinicas e
- * profissionais assinantes do Nexo.
+ * profissionais assinantes do Atendara.
  *
  * Nao confundir com `./finance.ts`, que modela o financeiro OPERACIONAL do
  * assinante (receita de atendimento, despesas, saldo de paciente). Sao duas

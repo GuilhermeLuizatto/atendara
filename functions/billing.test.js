@@ -81,7 +81,7 @@ const PERIODO_2_FIM = "2026-11-09T12:00:00.000Z";
 function seedAccount(overrides = {}) {
   store.set(paths.account(USER), {
     userId: USER,
-    email: "assinante@nexo.test",
+    email: "assinante@atendara.test",
     platformRole: "PROFESSIONAL",
     organizationId: ORG,
     status: "ACTIVE",
@@ -531,7 +531,7 @@ describe("Revisao de seguranca — quem pode pedir pelas callables", () => {
     // autorizacao termina em `failed-precondition` antes de qualquer rede.
     delete process.env.STRIPE_SECRET_KEY;
     process.env.STRIPE_PRICE_MAP = JSON.stringify({ [PLAN]: "price_teste" });
-    process.env.APP_BASE_URL = "https://app.nexo.test";
+    process.env.APP_BASE_URL = "https://app.atendara.test";
     store.set(paths.account(MEMBRO), {
       userId: MEMBRO,
       platformRole: "PROFESSIONAL",
@@ -697,7 +697,7 @@ describe("Revisao 5B — concessao registrada diante dos eventos do gateway", ()
 describe("Revisao 5B — limite por usuario nas callables do gateway", () => {
   beforeEach(() => {
     delete process.env.STRIPE_SECRET_KEY;
-    process.env.APP_BASE_URL = "https://app.nexo.test";
+    process.env.APP_BASE_URL = "https://app.atendara.test";
     process.env.STRIPE_PRICE_MAP = JSON.stringify({ [PLAN]: "price_teste" });
     store.set(paths.platformSubscription(ORG), {
       organizationId: ORG,
@@ -785,7 +785,7 @@ describe("Revisao 5B — retorno do checkout fora do emulador", () => {
   });
 
   it("recusa endereco de retorno sem https fora do emulador", async () => {
-    process.env.APP_BASE_URL = "http://app.nexo.test";
+    process.env.APP_BASE_URL = "http://app.atendara.test";
 
     const erro = await createSubscriptionCheckout(chamadaDe(USER, { planId: PLAN })).catch((caught) => caught);
 

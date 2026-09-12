@@ -1,5 +1,5 @@
 {
-  "name": "nexo",
+  "name": "atendara",
   "version": "0.1.0",
   "private": true,
   "description": "SaaS multiprofissional de gestao e automacao para profissionais de atendimento.",
@@ -19,8 +19,8 @@
     "format:check": "prettier --check .",
     "verify": "npm run lint && npm run type-check && npm run test && npm run build && npm run check:bundle",
     "check:bundle": "node scripts/check-public-bundle.mjs",
-    "test:rules": "node .local/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js emulators:exec --config firebase.emulator-tests.json --project demo-nexo --only firestore \"node scripts/test-firestore-rules.mjs\"",
-    "test:repository": "node .local/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js emulators:exec --config firebase.repository-tests.json --project demo-nexo --only firestore \"vitest run --config vitest.emulator.mts\"",
+    "test:rules": "node .local/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js emulators:exec --config firebase.emulator-tests.json --project demo-atendara --only firestore \"node scripts/test-firestore-rules.mjs\"",
+    "test:repository": "node .local/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js emulators:exec --config firebase.repository-tests.json --project demo-atendara --only firestore \"vitest run --config vitest.emulator.mts\"",
     "test:emulator": "npm run test:rules && npm run test:repository && npm run test:access",
     "test:access": "node scripts/run-access-tests.mjs"
   },

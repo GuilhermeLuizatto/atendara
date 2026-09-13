@@ -8,6 +8,7 @@
  *
  * Nada aqui envia mensagem real: o unico provedor implementado e o simulado.
  */
+export * from "./consent-record";
 export * from "./consent-text";
 export * from "./contacts";
 export * from "./delivery";

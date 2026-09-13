@@ -151,9 +151,19 @@ export const PERSONAL_DATA_MAP = {
             "phone",
             "administrativeNotes",
             "tags",
+            // Historico do consentimento por canal. Guarda dado de outras pessoas: o
+            // uid de quem da equipe registrou e, para menor de idade, o nome do
+            // responsavel legal.
             "notificationConsent",
+            "notificationConsent.channels.*.granted.recordedBy.userId",
+            "notificationConsent.channels.*.withdrawn.recordedBy.userId",
+            "notificationConsent.channels.*.legalGuardian.fullName",
         ],
         retention: WHILE_ORGANIZATION,
+        // O historico do consentimento sai junto com o cadastro. Fica a trilha de
+        // cada ato (`auditLogs.metadata.consent`: canal, ato, meio e versao do
+        // texto, sem nome de ninguem), pseudonimizada como o resto da trilha.
+        // Guardar a prova por mais tempo depende de D23 e D24.
         onClientErasure: DELETE,
         onOrganizationDeletion: DELETE,
     },

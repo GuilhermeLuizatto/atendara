@@ -4,17 +4,22 @@ import { getProfession } from "@/config/professions";
 import { APPOINTMENT_EVENT_META } from "@/config/notifications";
 import {
   APPOINTMENT_NOTIFICATION_EVENTS,
+  OUTBOUND_CHANNELS,
   type AppointmentNotificationEvent,
+  type ChannelConsentRecord,
   type NotificationRule,
   type Organization,
 } from "@/types";
 
-import { evaluateRule, type EligibilityInput } from "./eligibility";
+import { consentProblemFor, evaluateRule, type EligibilityInput } from "./eligibility";
 import { planAppointmentNotifications } from "./planner";
 import {
   ANCHOR,
   appointment,
   client,
+  consent,
+  consentAct,
+  consentRecord,
   organization,
   reminderRule,
 } from "./fixtures";
@@ -119,32 +124,35 @@ describe("cada trava, isoladamente", () => {
       "MISSING_CONSENT",
     ],
     [
-      "consentimento revogado",
+      "consentimento do canal retirado",
       {
         client: client({
-          notificationConsent: {
-            channels: ["SMS"],
-            grantedAt: ANCHOR,
-            revokedAt: ANCHOR,
-            source: "CLIENT_FORM",
-          },
+          notificationConsent: consent({
+            SMS: [consentRecord({ withdrawn: consentAct({ medium: "MESSAGE" }) })],
+          }),
         }),
       },
       "CONSENT_REVOKED",
     ],
     [
-      "consentimento nao cobre o canal",
+      "nenhum registro para o canal",
+      { client: client({ notificationConsent: consent({ EMAIL: [consentRecord()] }) }) },
+      "CHANNEL_NOT_CONSENTED",
+    ],
+    [
+      "consentimento no formato antigo, com uma data so e sem autor",
       {
         client: client({
           notificationConsent: {
-            channels: ["EMAIL"],
+            channels: ["SMS"],
             grantedAt: ANCHOR,
             revokedAt: null,
             source: "CLIENT_FORM",
+            textVersion: "2026-09-11-rascunho",
           },
         }),
       },
-      "CHANNEL_NOT_CONSENTED",
+      "CONSENT_INCOMPLETE",
     ],
     ["sem contato", { client: client({ phone: null }) }, "MISSING_CONTACT"],
     [
@@ -165,6 +173,137 @@ describe("cada trava, isoladamente", () => {
     const decision = evaluateRule(rule, context);
 
     expect(decision).toEqual({ eligible: false, reason });
+  });
+});
+
+describe("registro completo do consentimento, por canal", () => {
+  const smsWith = (record: unknown) =>
+    client({ notificationConsent: consent({ SMS: [record as ChannelConsentRecord] }) });
+  const decide = (subject: ReturnType<typeof client>) => {
+    const context = input({ client: subject });
+    return evaluateRule(context.organization.settings.notifications.rules[0], context);
+  };
+
+  function without<T extends object>(value: T, key: keyof T): T {
+    const copy = { ...value };
+    delete copy[key];
+    return copy;
+  }
+
+  it.each(["granted", "textVersion", "subjectIsMinor", "legalGuardian", "withdrawn"] as const)(
+    "registro sem %s nao autoriza envio",
+    (key) => {
+      expect(decide(smsWith(without(consentRecord(), key)))).toEqual({
+        eligible: false,
+        reason: "CONSENT_INCOMPLETE",
+      });
+    },
+  );
+
+  it.each(["at", "recordedBy", "medium"] as const)("autorizacao sem %s nao autoriza envio", (key) => {
+    expect(decide(smsWith(consentRecord({ granted: without(consentAct(), key) })))).toEqual({
+      eligible: false,
+      reason: "CONSENT_INCOMPLETE",
+    });
+  });
+
+  const incomplete: Array<[string, Partial<ChannelConsentRecord>]> = [
+    ["data que nao e instante", { granted: consentAct({ at: "11/09/2026" }) }],
+    ["versao do texto vazia", { textVersion: "" }],
+    ["versao do texto como frase livre", { textVersion: "Alex aceitou por telefone" }],
+    ["equipe sem uid de quem registrou", { granted: consentAct({ recordedBy: { kind: "STAFF", userId: null } }) }],
+    [
+      "autor de tipo desconhecido",
+      { granted: consentAct({ recordedBy: { kind: "SYSTEM" as "STAFF", userId: "x" } }) },
+    ],
+    ["meio desconhecido", { granted: consentAct({ medium: "PHONE_CALL" as "FORM" }) }],
+    ["menor de idade sem responsavel legal", { subjectIsMinor: true, legalGuardian: null }],
+    [
+      "responsavel legal sem nome",
+      { subjectIsMinor: true, legalGuardian: { fullName: "  ", relationship: "PARENT" } },
+    ],
+    [
+      "responsavel legal com vinculo desconhecido",
+      { subjectIsMinor: true, legalGuardian: { fullName: "Rui Ficticio", relationship: "AVO" as "PARENT" } },
+    ],
+    [
+      "adulto com responsavel legal",
+      { subjectIsMinor: false, legalGuardian: { fullName: "Rui Ficticio", relationship: "PARENT" } },
+    ],
+  ];
+
+  it.each(incomplete)("%s -> CONSENT_INCOMPLETE", (_label, overrides) => {
+    expect(decide(smsWith(consentRecord(overrides)))).toEqual({
+      eligible: false,
+      reason: "CONSENT_INCOMPLETE",
+    });
+  });
+
+  it("menor de idade com responsavel legal completo recebe", () => {
+    const record = consentRecord({
+      subjectIsMinor: true,
+      legalGuardian: { fullName: "Rui Ficticio", relationship: "LEGAL_GUARDIAN" },
+    });
+    expect(decide(smsWith(record))).toMatchObject({ eligible: true });
+  });
+
+  it("registro feito pela propria pessoa, pelo backend, e completo sem uid de equipe", () => {
+    const record = consentRecord({
+      granted: consentAct({ recordedBy: { kind: "SUBJECT", userId: null }, medium: "MESSAGE" }),
+    });
+    expect(decide(smsWith(record))).toMatchObject({ eligible: true });
+  });
+
+  it("retirar um canal nao mexe nos outros", () => {
+    const subject = client({
+      notificationConsent: consent({
+        SMS: [consentRecord({ withdrawn: consentAct() })],
+        EMAIL: [consentRecord()],
+      }),
+    });
+    expect(consentProblemFor(subject, "SMS")).toBe("CONSENT_REVOKED");
+    expect(consentProblemFor(subject, "EMAIL")).toBeNull();
+  });
+
+  it("autorizar de novo depois de retirar volta a valer; o registro antigo continua la", () => {
+    const withdrawn = consentRecord({ withdrawn: consentAct({ at: "2026-09-10T13:00:00.000Z" }) });
+    const again = consentRecord({ granted: consentAct({ at: "2026-09-10T14:00:00.000Z" }) });
+    expect(decide(smsWith(withdrawn))).toMatchObject({ reason: "CONSENT_REVOKED" });
+    expect(decide(client({ notificationConsent: consent({ SMS: [withdrawn, again] }) }))).toMatchObject({
+      eligible: true,
+    });
+  });
+
+  it("nenhum canal fica elegivel sem o proprio registro completo", () => {
+    // Criterio de conclusao da 13.1: os outros canais completos nao emprestam
+    // nada ao canal que nao tem registro completo.
+    for (const channel of OUTBOUND_CHANNELS) {
+      const others = Object.fromEntries(
+        OUTBOUND_CHANNELS.filter((item) => item !== channel).map((item) => [item, [consentRecord()]]),
+      );
+      const rule = reminderRule({ channel });
+      const org = organization({ verifiedSenderChannels: [channel], rules: [rule] });
+      const variants: Array<[unknown, string]> = [
+        [undefined, "CHANNEL_NOT_CONSENTED"],
+        [[consentRecord({ withdrawn: consentAct() })], "CONSENT_REVOKED"],
+        [[consentRecord({ textVersion: "" })], "CONSENT_INCOMPLETE"],
+        [[consentRecord({ subjectIsMinor: true, legalGuardian: null })], "CONSENT_INCOMPLETE"],
+      ];
+
+      for (const [history, reason] of variants) {
+        const channels = history ? { ...others, [channel]: history } : others;
+        const subject = client({ notificationConsent: consent(channels) });
+        expect(evaluateRule(rule, input({ organization: org, client: subject })), `${channel} ${reason}`).toEqual({
+          eligible: false,
+          reason,
+        });
+      }
+
+      const complete = client({ notificationConsent: consent({ ...others, [channel]: [consentRecord()] }) });
+      expect(evaluateRule(rule, input({ organization: org, client: complete })), channel).toMatchObject({
+        eligible: true,
+      });
+    }
   });
 });
 

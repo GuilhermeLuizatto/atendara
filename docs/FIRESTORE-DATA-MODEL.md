@@ -94,9 +94,12 @@ Security Rules e leitura no console dependem dele.
 **Por que uma tabela e nao inferencia.** Adivinhar por sufixo ("tudo que termina
 em `At`") transformaria qualquer campo de texto futuro em data silenciosamente.
 
-Tres excecoes propositais: `externalCalendar.syncedAt` e `gateway` sao payloads
+Quatro excecoes propositais: `externalCalendar.syncedAt` e `gateway` sao payloads
 espelhados de sistemas externos e ficam como vieram; `privacyRedaction.redactedAt`
-e gravado pelo backend ja em ISO.
+e gravado pelo backend ja em ISO; e as datas do historico de consentimento em
+`clients.notificationConsent` (`granted.at`, `withdrawn.at` de cada registro por
+canal) ficam em ISO porque as Security Rules conferem o formato delas e a
+igualdade do historico inteiro, que nao pode mudar de tipo entre leituras.
 
 **`id` vem do caminho, nunca do corpo.** Um documento com `id` divergente e lido
 pelo id real.
@@ -337,7 +340,27 @@ avisos:
   operadora com TOTP e titular com validade vencida — negados;
 - `ADMIN` continua alterando a agenda: o caminho administrativo nao mudou.
 
-Total: **202 verificacoes**. O numero e conferido por `assert` no proprio
+A decisao de o titular editar o proprio horario acrescentou 3, sobre
+`settings.agenda` (total entao: 205).
+
+A Fase 3 (13.1) acrescentou 31, sobre o consentimento por canal em `clients`:
+
+- criar com registro completo — adulto, menor com responsavel legal nos tres
+  canais de uma vez, e pela recepcao (`ASSISTANT`);
+- criar com menor sem responsavel, responsavel sem vinculo, adulto com
+  responsavel, autor que nao e quem escreve, `SUBJECT` pelo navegador, sem meio,
+  meio desconhecido, data que nao e instante, versao do texto como frase,
+  registro nascido retirado, canal inexistente ou formato antigo — negado;
+- alterar outro campo do cadastro sem tocar no consentimento — permitido;
+- apagar o consentimento ou o historico de um canal, reescrever registro vigente
+  ou retirada, registro novo sobre um vigente, retirar e autorizar na mesma
+  escrita, retirar em nome de outro membro, `VIEWER` retirando — negado;
+- retirar um canal, retirar os tres de uma vez e autorizar de novo depois de
+  retirar — permitido, com o historico intacto;
+- passar do formato antigo ao registro por canal guardando o antigo inteiro —
+  permitido; perdendo ou reescrevendo o antigo — negado.
+
+Total: **236 verificacoes**. O numero e conferido por `assert` no proprio
 script, para que uma verificacao removida por engano quebre o teste.
 
 Do lado do dominio, `src/services/firestore/plans.test.ts` verifica que nenhum

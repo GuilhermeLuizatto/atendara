@@ -439,10 +439,11 @@ em `out/`, que o Firebase Hosting serve no plano gratuito, sem Cloud Functions.
 **Custo aceito nesta fase:** sem Route Handlers, sem proxy/middleware, protecao
 de rota no cliente e `next/image` sem otimizacao no servidor.
 
-**Saida.** Quando a Fase 3 exigir webhooks (n8n, WhatsApp), a saida volta a ser
-server-side e o deploy passa a usar a integracao de frameworks do Firebase ou
-Cloud Run. Nenhum codigo de dominio muda — apenas `next.config.ts` e o alvo de
-deploy.
+**Saida.** Os webhooks da automacao (secao 15) nao exigem abandonar o export:
+sao functions HTTP (`onRequest`), como o webhook da cobranca. Se um dia a
+interface precisar de rota de servidor, o deploy passa a usar a integracao de
+frameworks do Firebase ou Cloud Run. Nenhum codigo de dominio muda — apenas
+`next.config.ts` e o alvo de deploy.
 
 ---
 
@@ -543,3 +544,112 @@ provisorio, TTL desligado para toda colecao com dado de pessoa. So
 (podem passar de 500 escritas): dependentes primeiro, cadastro e registro por
 ultimo, e repetir o pedido retoma. Nao ha tela nesta etapa. Copias fora do
 Firestore — backup, arquivo baixado, gateway, provedores — nao sao alcancadas.
+
+---
+
+## 15. Automacao
+
+> **Estado:** desenho decidido, nada implementado. Os avisos continuam com o
+> provedor simulado e nenhum canal real esta conectado.
+
+WhatsApp, Google Calendar e e-mail sao executados por um n8n em servidor
+proprio. O n8n **executa**; quem **decide** e o Atendara.
+
+```text
+Atendara (painel)
+    |
+    v
+Firestore + Cloud Functions                              <- decide tudo
+    |
+    v
+organizations/{orgId}/automationTasks   (+ Cloud Tasks no horario exato)
+    |
+    +-- confirmar, lembrar, cancelar, oferecer horario --> n8n --> WhatsApp, e-mail
+    +-- criar/editar/apagar evento, ler ocupado ---------> n8n --> Google Calendar
+    +-- processar mensagem recebida   <-- n8n repassa o corpo bruto
+    +-- gerar alerta ------------------- dentro do Atendara
+    +-- registrar auditoria ------------ dentro do Atendara
+```
+
+**Regra de bolso.** Se a pergunta comeca com "pode?", a resposta esta no
+Atendara; se comeca com "como falo com o servico X?", esta no n8n.
+Consentimento, canal permitido pela profissao, contato, antecedencia,
+disponibilidade, tenant e a trava do `ADMINISTRATIVE` sao conferidos no servidor
+imediatamente antes de emitir a tarefa. O n8n nao reconfere nada: executa ou
+falha. Uma trava que morasse num fluxo visual nao teria teste nem diff.
+
+**A fila e do servidor.** `automationTasks` e `notificationDeliveries` fecham
+para escrita pelo navegador (`write: if false`). Hoje a fila de avisos e escrita
+pelo aplicativo porque e ele quem executa o provedor simulado; com provedor real,
+um membro poderia marcar como enviado o que nunca saiu. O despachante adquire a
+tarefa em transacao e reconfere `src/lib/notifications/eligibility.ts` antes de
+cada envio.
+
+**Contrato.**
+
+| Sentido | Rota | Protecao |
+| --- | --- | --- |
+| Tarefa: Atendara -> n8n | webhook HTTPS do n8n | HMAC-SHA256 com o segredo da tarefa |
+| Resultado: n8n -> Atendara | function `automationCallback` | HMAC-SHA256 com o segredo de retorno; organizacao, tentativa, transicao e validade conferidas contra a tarefa |
+| Entrada: Meta -> n8n -> Atendara | function `inboundWebhook` | assinatura da Meta conferida no Atendara **e** HMAC com o segredo de retorno |
+
+As duas assinaturas usam o formato que o webhook da cobranca ja confere:
+`t=<carimbo>,v1=<hex>` sobre `carimbo.corpo bruto`, janela de 5 minutos,
+comparacao em tempo constante e dois `v1` durante a rotacao. Sao dois segredos,
+um por sentido, para que uma tarefa assinada nunca seja aceita como resultado e
+cada sentido rotacione sozinho. Resultado, estado e trilha sao gravados na mesma
+transacao; resultado repetido nao tem efeito.
+
+**A tarefa leva so o minimo:** versao, id deterministico, tipo, organizacao,
+tentativa, emissao e validade, chave de idempotencia, canal, remetente
+comprovado, destino e nome e parametros de um modelo aprovado — so as variaveis
+que o grau de exposicao da profissao permite. O contato completo so aparece no
+envio; o registro continua com `contactHint`. Tarefa vencida e recusada pelo n8n
+e pelo retorno.
+
+**Nunca vai para o n8n:**
+
+- credencial do Firestore, conta de servico ou Admin SDK;
+- o App Secret da Meta — e ele que impede o n8n de inventar mensagem recebida;
+- o token de atualizacao do Google, que fica cifrado com Cloud KMS no backend;
+  a tarefa leva um token de acesso de ate uma hora;
+- qualquer coisa da plataforma (`platform*`, `accounts`, segredos do gateway);
+- decisao: elegibilidade, politica de remarcacao, calculo de disponibilidade,
+  classificacao, responder ou escalar;
+- texto livre, dado clinico, `aiDecisions`, `auditLogs`, `notifications`;
+- mais de uma organizacao na mesma tarefa, ou um `organizationId` aceito como
+  verdade: no retorno ele e conferido contra a tarefa; na entrada, sai do numero
+  de WhatsApp cadastrado.
+
+**Escolhas de produto.**
+
+- **Um numero de WhatsApp por organizacao.** Quem fala com o paciente e a
+  propria organizacao (regra 12).
+- **Google Calendar: enviar e ler so ocupado.** O Atendara escreve numa agenda
+  secundaria criada por ele, com texto limitado pelo grau de exposicao (perfil
+  `HIGH`: sem nome e sem tipo de atendimento), e le da agenda principal so inicio
+  e fim dos blocos ocupados. Nenhum titulo ou convidado de terceiro entra no
+  banco, e nao existem duas fontes da verdade.
+- **E-mail: Amazon SES em `sa-east-1`, com dominio proprio.** Subdominio de
+  envio com SPF, DKIM e DMARC; remetente com o nome da organizacao; descadastro
+  que retira o consentimento com registro. Devolucao chega pelo SNS e tem a
+  assinatura conferida no Atendara, como a da Meta. Sem dominio verificado, o
+  canal e inelegivel.
+- **Remarcacao: oferta de horarios dentro da politica**, desligada por padrao e
+  ligada por organizacao. O horario escolhido e reservado numa transacao que
+  impede dois atendimentos no mesmo horario — so neste caminho; a agenda manual
+  continua como esta. Fora da politica, com leitura de ocupado velha, fora do
+  `ADMINISTRATIVE` ou com risco, o pedido escala para a equipe.
+
+**Sem resposta nao e sucesso.** Tarefa entregue ao n8n sem resultado no prazo
+vira falha, gera alerta e **nao repete sozinha**: repetir sem saber se a
+primeira saiu mandaria a mesma mensagem duas vezes. Aceite relatado pelo n8n e
+entrega confirmada pela Meta sao registros diferentes.
+
+**Custo assumido.** Um n8n comprometido envia mensagem em nome de qualquer
+organizacao, porque o token da Meta e a chave de envio de e-mail ficam nele, e
+le o que passa por ele enquanto executa. Nao le o banco, nao inventa mensagem
+recebida e nao transforma aceite em entrega. Por isso: so as rotas de webhook
+expostas, editor fora da internet publica, administrador com segundo fator,
+execucao bem-sucedida nao guardada e revogacao dos tokens como corte de
+emergencia. A automacao acrescenta duas rotas HTTP publicas ao produto.

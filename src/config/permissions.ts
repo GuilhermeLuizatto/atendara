@@ -35,6 +35,10 @@ const ASSISTANT_PERMISSIONS: Permission[] = [
   ...READ_ONLY_PERMISSIONS,
   "client:create",
   "client:update",
+  // Quem atende o cadastro registra o que a pessoa autorizou ou retirou. Nas
+  // rules, e o `canWriteOperational()` da regra de `clients`, com
+  // `consentWriteOk()` conferindo o historico.
+  "notificationConsent:record",
   "appointment:create",
   "appointment:update",
   "appointment:cancel",

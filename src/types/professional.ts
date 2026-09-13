@@ -35,6 +35,10 @@ export const PERMISSIONS = [
   "client:create",
   "client:update",
   "client:delete",
+  // Registrar e retirar consentimento de aviso. Separada de `client:update`
+  // porque e prova, e nao dado de cadastro: so acrescenta ou retira registro,
+  // nunca apaga o historico.
+  "notificationConsent:record",
   "appointment:read",
   "appointment:create",
   "appointment:update",

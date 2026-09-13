@@ -1,5 +1,5 @@
 import type { ID, ISODateString, TenantScopedEntity } from "./common";
-import type { NotificationConsent } from "./notifications";
+import type { StoredNotificationConsent } from "./notifications";
 import type { ServiceModality } from "./profession";
 
 /**
@@ -23,10 +23,11 @@ export interface Client extends TenantScopedEntity {
    */
   appointmentNotificationsEnabled?: boolean;
   /**
-   * Consentimento por canal. Ausente em cadastro antigo — e ausencia significa
-   * "nao enviar", nunca "enviar pelo canal que a organizacao preferir".
+   * Consentimento por canal, com historico. Ausente em cadastro antigo — e
+   * ausencia significa "nao enviar", nunca "enviar pelo canal que a organizacao
+   * preferir". O formato anterior ainda pode aparecer e nao autoriza envio.
    */
-  notificationConsent?: NotificationConsent | null;
+  notificationConsent?: StoredNotificationConsent | null;
   fullName: string;
   preferredName: string | null;
   email: string | null;

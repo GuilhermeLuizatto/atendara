@@ -15,9 +15,23 @@ const account = (org, patch = {}) => ({ platformRole: "PROFESSIONAL", organizati
 const TOTP = { firebase: { sign_in_provider: "password", sign_in_second_factor: "totp" } };
 const PHONE = { firebase: { sign_in_provider: "password", sign_in_second_factor: "phone" } };
 
+// Consentimento por canal (Fase 3, 13.1), com datas em ISO como o aplicativo grava.
+const consentAct = (userId, extra = {}) => ({ at: "2026-09-12T10:00:00.000Z", recordedBy: { kind: "STAFF", userId }, medium: "FORM", ...extra });
+const consentRecord = (userId, extra = {}) => ({ granted: consentAct(userId), textVersion: "2026-09-11-rascunho", subjectIsMinor: false, legalGuardian: null, withdrawn: null, ...extra });
+const recordConsent = (channels, legacy = null) => ({ formatVersion: 2, channels, legacy });
+const LEGACY_CONSENT = { channels: ["EMAIL"], grantedAt: "2026-09-01T10:00:00.000Z", revokedAt: null, source: "CLIENT_FORM", textVersion: "2026-09-10-rascunho" };
+const SEEDED_EMAIL = consentRecord("a");
+const SEEDED_SMS = consentRecord("a", { withdrawn: consentAct("a", { medium: "MESSAGE" }) });
+
 let checks = 0;
-async function allowed(operation) { await assertSucceeds(operation); checks++; }
+async function allowed(operation) {
+  try { await assertSucceeds(operation); } catch (error) { throw new Error(`verificacao ${checks + 1} deveria passar: ${error.message}`); }
+  checks++;
+}
 async function denied(operation) { await assertFails(operation); checks++; }
+async function deniedBecause(reason, operation) {
+  try { await denied(operation); } catch (error) { throw new Error(`${reason}: ${error.message}`); }
+}
 try {
   await environment.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
@@ -41,7 +55,7 @@ try {
     }
     // Membros promovidos a OWNER ou ADMIN sem serem o titular (`ownerId`). O
     // papel so alcanca a cobranca com o vinculo ativo.
-    for (const [uid, role, status] of [["ownerRole", "OWNER", "ACTIVE"], ["ownerRoleSuspended", "OWNER", "SUSPENDED"], ["adminRole", "ADMIN", "ACTIVE"]]) {
+    for (const [uid, role, status] of [["ownerRole", "OWNER", "ACTIVE"], ["ownerRoleSuspended", "OWNER", "SUSPENDED"], ["adminRole", "ADMIN", "ACTIVE"], ["assistantRole", "ASSISTANT", "ACTIVE"], ["viewerRole", "VIEWER", "ACTIVE"]]) {
       await setDoc(doc(db, paths.account(uid)), account("org-a"));
       await setDoc(doc(db, paths.document("org-a", "members", uid)), { role, status });
     }
@@ -56,6 +70,9 @@ try {
       await setDoc(doc(db, paths.document(org, "privacyRequests", "pedido")), { organizationId: org, type: "CLIENT_EXPORT", subjectId: "example", requestedBy: "a" });
     }
     await setDoc(doc(db, paths.initialPassword("a")), { hash: "test-only" });
+    await setDoc(doc(db, paths.document("org-a", "clients", "consentido")), { organizationId: "org-a", fullName: "Alex Ficticio", notificationConsent: recordConsent({ EMAIL: [SEEDED_EMAIL], SMS: [SEEDED_SMS] }) });
+    await setDoc(doc(db, paths.document("org-a", "clients", "antigo")), { organizationId: "org-a", fullName: "Cadastro Antigo", notificationConsent: LEGACY_CONSENT });
+    await setDoc(doc(db, paths.document("org-a", "clients", "tres-canais")), { organizationId: "org-a", fullName: "Tres Canais", notificationConsent: recordConsent({ EMAIL: [consentRecord("a")], SMS: [consentRecord("a")], WHATSAPP: [consentRecord("a")] }) });
 
     // Cobranca da plataforma: colecoes de raiz, da operadora, fora de qualquer
     // tenant. `org-c` existe so para o caso do dono com mensalidade vencida.
@@ -352,6 +369,65 @@ try {
   // O caminho administrativo nao mudou: ADMIN continua alterando a agenda.
   await allowed(updateDoc(doc(db("adminRole"), orgA()), { "settings.agenda": { workdayStart: "07:00" } }));
 
-  assert.equal(checks, 205);
+  // ------------------------------------------------------- Fase 3, 13.1
+  // Consentimento por canal. So se acrescenta ou retira registro, o navegador
+  // so registra em nome de quem esta nele, e retirar nao apaga o historico.
+  const clientOf = (uid, id) => doc(db(uid), paths.document("org-a", "clients", id));
+  const withConsent = value => ({ organizationId: "org-a", fullName: "Cadastro Novo", notificationConsent: value });
+  const guardian = { fullName: "Rui Ficticio", relationship: "PARENT" };
+
+  await allowed(setDoc(clientOf("a", "novo-adulto"), withConsent(recordConsent({ WHATSAPP: [consentRecord("a")] }))));
+  // O caso mais caro de criar: os tres canais, com responsavel legal, de uma vez.
+  const minorRecord = () => consentRecord("a", { subjectIsMinor: true, legalGuardian: guardian });
+  await allowed(setDoc(clientOf("a", "novo-menor"), withConsent(recordConsent({ EMAIL: [minorRecord()], SMS: [minorRecord()], WHATSAPP: [minorRecord()] }))));
+  // A recepcao registra: `notificationConsent:record` acompanha quem escreve cadastro.
+  await allowed(setDoc(clientOf("assistantRole", "pela-recepcao"), withConsent(recordConsent({ EMAIL: [consentRecord("assistantRole")] }))));
+
+  for (const [reason, value] of [
+    ["menor sem responsavel", recordConsent({ SMS: [consentRecord("a", { subjectIsMinor: true })] })],
+    ["responsavel sem vinculo", recordConsent({ SMS: [consentRecord("a", { subjectIsMinor: true, legalGuardian: { fullName: "Rui Ficticio" } })] })],
+    ["adulto com responsavel", recordConsent({ SMS: [consentRecord("a", { legalGuardian: guardian })] })],
+    ["registrado em nome de outro membro", recordConsent({ SMS: [consentRecord("b")] })],
+    ["a propria pessoa pelo navegador", recordConsent({ SMS: [consentRecord("a", { granted: consentAct("a", { recordedBy: { kind: "SUBJECT", userId: null } }) })] })],
+    ["sem meio", recordConsent({ SMS: [consentRecord("a", { granted: { at: "2026-09-12T10:00:00.000Z", recordedBy: { kind: "STAFF", userId: "a" } } })] })],
+    ["meio desconhecido", recordConsent({ SMS: [consentRecord("a", { granted: consentAct("a", { medium: "PHONE_CALL" }) })] })],
+    ["data que nao e instante", recordConsent({ SMS: [consentRecord("a", { granted: consentAct("a", { at: "12/09/2026" }) })] })],
+    ["versao do texto como frase", recordConsent({ SMS: [consentRecord("a", { textVersion: "Alex aceitou" })] })],
+    ["registro nascido retirado", recordConsent({ SMS: [consentRecord("a", { withdrawn: consentAct("a") })] })],
+    ["canal inexistente", recordConsent({ TELEGRAM: [consentRecord("a")] })],
+    ["formato antigo pelo navegador", LEGACY_CONSENT],
+  ]) await deniedBecause(reason, setDoc(clientOf("a", `negado-${checks}`), withConsent(value)));
+
+  // Mexer em outro campo nao confere nada do consentimento.
+  const consentido = uid => clientOf(uid, "consentido");
+  await allowed(updateDoc(consentido("a"), { fullName: "Alex Ficticio Atualizado" }));
+  // Apagar ou reescrever o historico: nem quem registra.
+  await deniedBecause("apagar o consentimento", updateDoc(consentido("a"), { notificationConsent: null }));
+  await deniedBecause("apagar o historico de um canal", updateDoc(consentido("a"), { notificationConsent: recordConsent({ EMAIL: [SEEDED_EMAIL] }) }));
+  await deniedBecause("reescrever registro vigente", updateDoc(consentido("a"), { notificationConsent: recordConsent({ EMAIL: [{ ...SEEDED_EMAIL, textVersion: "outra-versao" }], SMS: [SEEDED_SMS] }) }));
+  await deniedBecause("reescrever retirada", updateDoc(consentido("a"), { notificationConsent: recordConsent({ EMAIL: [SEEDED_EMAIL], SMS: [{ ...SEEDED_SMS, withdrawn: consentAct("a", { medium: "WRITTEN_DOCUMENT" }) }] }) }));
+  await deniedBecause("registro novo sobre vigente", updateDoc(consentido("a"), { notificationConsent: recordConsent({ EMAIL: [SEEDED_EMAIL, consentRecord("a")], SMS: [SEEDED_SMS] }) }));
+  await deniedBecause("retirar e autorizar na mesma escrita", updateDoc(consentido("a"), { notificationConsent: recordConsent({ EMAIL: [{ ...SEEDED_EMAIL, withdrawn: consentAct("a") }, consentRecord("a")], SMS: [SEEDED_SMS] }) }));
+  await deniedBecause("retirar em nome de outro membro", updateDoc(consentido("a"), { notificationConsent: recordConsent({ EMAIL: [{ ...SEEDED_EMAIL, withdrawn: consentAct("b") }], SMS: [SEEDED_SMS] }) }));
+  await deniedBecause("quem so le nao retira", updateDoc(consentido("viewerRole"), { notificationConsent: recordConsent({ EMAIL: [{ ...SEEDED_EMAIL, withdrawn: consentAct("viewerRole") }], SMS: [SEEDED_SMS] }) }));
+
+  // Retirar preenche so a retirada; autorizar de novo acrescenta um registro.
+  const withdrawnEmail = { ...SEEDED_EMAIL, withdrawn: consentAct("a", { at: "2026-09-12T11:00:00.000Z", medium: "MESSAGE" }) };
+  const regrantedSms = consentRecord("a", { granted: consentAct("a", { at: "2026-09-12T12:00:00.000Z", medium: "WRITTEN_DOCUMENT" }) });
+  await allowed(updateDoc(consentido("a"), { notificationConsent: recordConsent({ EMAIL: [withdrawnEmail], SMS: [SEEDED_SMS] }) }));
+  await allowed(updateDoc(consentido("a"), { notificationConsent: recordConsent({ EMAIL: [withdrawnEmail], SMS: [SEEDED_SMS, regrantedSms] }) }));
+  await deniedBecause("trocar o registro retirado por um novo", updateDoc(consentido("a"), { notificationConsent: recordConsent({ EMAIL: [consentRecord("a")], SMS: [SEEDED_SMS, regrantedSms] }) }));
+  // O caso mais caro de retirar: desmarcar o aceite geral retira os tres canais de uma vez.
+  const withdrawnByMessage = () => ({ ...consentRecord("a"), withdrawn: consentAct("a", { medium: "MESSAGE" }) });
+  await allowed(updateDoc(clientOf("a", "tres-canais"), { notificationConsent: recordConsent({ EMAIL: [withdrawnByMessage()], SMS: [withdrawnByMessage()], WHATSAPP: [withdrawnByMessage()] }) }));
+
+  // Formato antigo: passar ao registro por canal guarda o antigo inteiro.
+  const antigo = () => clientOf("a", "antigo");
+  const threeGrants = () => ({ EMAIL: [consentRecord("a")], SMS: [consentRecord("a")], WHATSAPP: [consentRecord("a")] });
+  await deniedBecause("perder o formato antigo", updateDoc(antigo(), { notificationConsent: recordConsent(threeGrants()) }));
+  await allowed(updateDoc(antigo(), { notificationConsent: recordConsent(threeGrants(), LEGACY_CONSENT) }));
+  await deniedBecause("reescrever o formato antigo guardado", updateDoc(antigo(), { notificationConsent: recordConsent(threeGrants(), { ...LEGACY_CONSENT, channels: ["EMAIL", "SMS"] }) }));
+
+  assert.equal(checks, 236);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

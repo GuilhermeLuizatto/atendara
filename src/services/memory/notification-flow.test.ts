@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { RETRY_POLICY } from "@/config/notifications";
-import { SIMULATED_DESTINATIONS } from "@/lib/notifications";
-import type { NotificationRule, OutboundChannel } from "@/types";
+import { NOTIFICATION_CONSENT_TEXT_VERSION, RETRY_POLICY } from "@/config/notifications";
+import {
+  SIMULATED_DESTINATIONS,
+  applyConsentChanges,
+  channelHistory,
+  plannedConsentChanges,
+} from "@/lib/notifications";
+import type { ConsentMedium, NotificationRule, OutboundChannel, StoredNotificationConsent } from "@/types";
 
-import type { AppointmentInput } from "../types";
+import { RepositoryError, type AppointmentInput } from "../types";
 import { MemoryWorkspaceRepository } from "./memory-repository";
 
 /**
@@ -55,11 +60,25 @@ async function enable(
   });
 }
 
+/** O que o formulario grava: os canais vigentes passam a ser `channels`. */
+function consentFor(
+  saved: StoredNotificationConsent | null | undefined,
+  channels: OutboundChannel[],
+  medium: ConsentMedium = "FORM",
+): StoredNotificationConsent | null {
+  return applyConsentChanges(
+    saved,
+    plannedConsentChanges(saved, channels),
+    { at: new Date().toISOString(), recordedBy: { kind: "STAFF", userId: "owner" }, medium },
+    { textVersion: NOTIFICATION_CONSENT_TEXT_VERSION, subjectIsMinor: false, legalGuardian: null },
+  );
+}
+
 async function createClientWithConsent(
   phone = "+5500900000000",
   channels: OutboundChannel[] = ["SMS"],
 ): Promise<string> {
-  const id = await repo.createClient({
+  return repo.createClient({
     fullName: "Alex Ficticio",
     preferredName: "Alex",
     email: "destino@exemplo.test",
@@ -71,21 +90,11 @@ async function createClientWithConsent(
     tags: [],
     administrativeNotes: null,
     appointmentNotificationsEnabled: true,
+    notificationConsent: consentFor(null, channels),
   });
-
-  // O aceite geral entra pelo formulario; o consentimento por canal e um campo
-  // proprio, e sem ele nada sai.
-  const snapshot = repo.getSnapshot();
-  const client = snapshot.clients.find((item) => item.id === id)!;
-  client.notificationConsent = {
-    channels,
-    grantedAt: NOW,
-    revokedAt: null,
-    source: "CLIENT_FORM",
-  };
-
-  return id;
 }
+
+const clientById = (id: string) => repo.getSnapshot().clients.find((item) => item.id === id)!;
 
 async function schedule(clientId: string): Promise<string> {
   const professionalId = repo.getSnapshot().professionals[0].id;
@@ -329,6 +338,45 @@ describe("disparo com o provedor simulado", () => {
 
     expect(summary).toMatchObject({ sent: 0, cancelled: 1 });
     expect(deliveries()[0].status).toBe("CANCELLED");
+  });
+
+  it("retirar o canal no cadastro interrompe o aviso planejado e mantem o historico", async () => {
+    await enable([rule()]);
+    const clientId = await createClientWithConsent();
+    await schedule(clientId);
+    const granted = channelHistory(clientById(clientId).notificationConsent, "SMS")[0];
+
+    await repo.updateClient(clientId, {
+      notificationConsent: consentFor(clientById(clientId).notificationConsent, [], "MESSAGE"),
+    });
+
+    const summary = await repo.dispatchDueNotifications("2026-09-10T14:00:00.000Z");
+    expect(summary).toMatchObject({ sent: 0, cancelled: 1 });
+
+    const history = channelHistory(clientById(clientId).notificationConsent, "SMS");
+    expect(history).toEqual([{ ...granted, withdrawn: expect.objectContaining({ medium: "MESSAGE" }) }]);
+    const consentTrail = repo.getSnapshot().auditLogs.filter((entry) => "consent" in entry.metadata);
+    expect(consentTrail.map((entry) => entry.metadata.consent)).toEqual([
+      "SMS:WITHDRAWN:MESSAGE",
+      `SMS:GRANTED:FORM:${NOTIFICATION_CONSENT_TEXT_VERSION}`,
+    ]);
+  });
+
+  it("o repositorio recusa apagar ou reescrever o historico do consentimento", async () => {
+    const clientId = await createClientWithConsent();
+    const saved = clientById(clientId).notificationConsent;
+
+    await expect(repo.updateClient(clientId, { notificationConsent: null })).rejects.toBeInstanceOf(RepositoryError);
+    await expect(
+      repo.updateClient(clientId, { notificationConsent: { formatVersion: 2, channels: {}, legacy: null } }),
+    ).rejects.toBeInstanceOf(RepositoryError);
+    expect(clientById(clientId).notificationConsent).toEqual(saved);
+
+    // Quem so le nao registra nem retira.
+    repo.setActor({ userId: "leitura", name: "Visualizador", role: "VIEWER" });
+    await expect(
+      repo.updateClient(clientId, { notificationConsent: consentFor(saved, []) }),
+    ).rejects.toBeInstanceOf(RepositoryError);
   });
 
   it("lembrete muito atrasado e cancelado em vez de enviado", async () => {

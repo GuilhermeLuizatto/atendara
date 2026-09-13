@@ -1,8 +1,12 @@
+import { NOTIFICATION_CONSENT_TEXT_VERSION } from "@/config/notifications";
 import { defaultOrganizationSettings } from "@/config/organization";
 import { getProfession } from "@/config/professions";
 import type {
   Appointment,
+  ChannelConsentRecord,
   Client,
+  ConsentAct,
+  NotificationConsent,
   NotificationDelivery,
   NotificationRule,
   Organization,
@@ -81,6 +85,39 @@ export function reminderRule(
   };
 }
 
+/** uid ficticio de quem da equipe registra o consentimento nos testes. */
+export const STAFF_MEMBER = "membro-da-equipe";
+
+export function consentAct(overrides: Partial<ConsentAct> = {}): ConsentAct {
+  return {
+    at: ANCHOR,
+    recordedBy: { kind: "STAFF", userId: STAFF_MEMBER },
+    medium: "FORM",
+    ...overrides,
+  };
+}
+
+/** Registro completo e vigente de um canal, de pessoa adulta. */
+export function consentRecord(
+  overrides: Partial<ChannelConsentRecord> = {},
+): ChannelConsentRecord {
+  return {
+    granted: consentAct(),
+    textVersion: NOTIFICATION_CONSENT_TEXT_VERSION,
+    subjectIsMinor: false,
+    legalGuardian: null,
+    withdrawn: null,
+    ...overrides,
+  };
+}
+
+export function consent(
+  channels: NotificationConsent["channels"],
+  legacy: NotificationConsent["legacy"] = null,
+): NotificationConsent {
+  return { formatVersion: 2, channels, legacy };
+}
+
 export function client(overrides: Partial<Client> = {}): Client {
   return {
     id: "cliente-1",
@@ -104,12 +141,11 @@ export function client(overrides: Partial<Client> = {}): Client {
     totalAppointments: 0,
     outstandingBalanceInCents: 0,
     appointmentNotificationsEnabled: true,
-    notificationConsent: {
-      channels: ["SMS", "EMAIL", "WHATSAPP"],
-      grantedAt: ANCHOR,
-      revokedAt: null,
-      source: "CLIENT_FORM",
-    },
+    notificationConsent: consent({
+      SMS: [consentRecord()],
+      EMAIL: [consentRecord()],
+      WHATSAPP: [consentRecord()],
+    }),
     ...overrides,
   };
 }

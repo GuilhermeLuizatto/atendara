@@ -201,7 +201,16 @@ async function seedClient(organizationId: string, by: string, person: { name: st
       acquisitionChannel: "REFERRAL", tags: [], lastAppointmentAt: null, nextAppointmentAt: null,
       administrativeNotes: `Prefere manha. ${person.name}.`, totalAppointments: 1, outstandingBalanceInCents: 0,
       appointmentNotificationsEnabled: true,
-      notificationConsent: { channels: ["EMAIL"], grantedAt: "2026-09-01T10:00:00.000Z", revokedAt: null, source: "CLIENT_FORM", textVersion: "teste" },
+      notificationConsent: {
+        formatVersion: 2,
+        channels: {
+          EMAIL: [{
+            granted: { at: "2026-09-01T10:00:00.000Z", recordedBy: { kind: "STAFF", userId: by }, medium: "FORM" },
+            textVersion: "teste", subjectIsMinor: false, legalGuardian: null, withdrawn: null,
+          }],
+        },
+        legacy: null,
+      },
     }),
     set(paths.document(organizationId, "appointments", id.appointment), {
       id: id.appointment, ...stamp, clientId: id.client, clientName: person.name, professionalId: by, professionalName: "Profissional de testes",

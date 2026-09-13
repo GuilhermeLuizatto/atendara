@@ -59,6 +59,15 @@ describe("matriz de permissoes", () => {
     expect(hasPermission("ASSISTANT", "conversation:reply")).toBe(true);
   });
 
+  it("da o registro de consentimento exatamente a quem escreve cadastro", () => {
+    // Nas rules, a regra de `clients` responde pelos dois com `canWriteOperational()`.
+    for (const role of ROLES) {
+      expect(hasPermission(role, "notificationConsent:record")).toBe(hasPermission(role, "client:update"));
+    }
+    expect(hasPermission("ASSISTANT", "notificationConsent:record")).toBe(true);
+    expect(hasPermission("VIEWER", "notificationConsent:record")).toBe(false);
+  });
+
   it("reserva pedidos de titulares aos papeis que o backend e as rules aceitam", () => {
     for (const permission of ["privacy:export", "privacy:erase"] as const) {
       const roles = ROLES.filter((role) => hasPermission(role, permission));

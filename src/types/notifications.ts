@@ -74,26 +74,92 @@ export interface OrganizationNotificationSettings {
 }
 
 /**
- * Consentimento do titular, por canal.
+ * Quem pos o registro no sistema. `STAFF` e alguem da equipe anotando o que a
+ * pessoa autorizou; `SUBJECT` e a propria pessoa, por um caminho do backend
+ * (link ou resposta pelo canal). As Security Rules so aceitam `STAFF` com o
+ * uid de quem escreve: o navegador nao afirma que a pessoa registrou sozinha.
+ */
+export const CONSENT_RECORDER_KINDS = ["STAFF", "SUBJECT"] as const;
+
+export type ConsentRecorderKind = (typeof CONSENT_RECORDER_KINDS)[number];
+
+/** Por onde a pessoa se manifestou, ao autorizar ou ao retirar. */
+export const CONSENT_MEDIA = ["FORM", "WRITTEN_DOCUMENT", "MESSAGE"] as const;
+
+export type ConsentMedium = (typeof CONSENT_MEDIA)[number];
+
+/** LGPD, art. 14: um dos pais ou o responsavel legal. */
+export const LEGAL_GUARDIAN_RELATIONSHIPS = ["PARENT", "LEGAL_GUARDIAN"] as const;
+
+export type LegalGuardianRelationship = (typeof LEGAL_GUARDIAN_RELATIONSHIPS)[number];
+
+export interface ConsentRecorder {
+  kind: ConsentRecorderKind;
+  /** uid de quem da equipe registrou. `null` quando foi a propria pessoa. */
+  userId: ID | null;
+}
+
+/** Um ato sobre o consentimento: autorizar ou retirar. */
+export interface ConsentAct {
+  at: ISODateString;
+  recordedBy: ConsentRecorder;
+  medium: ConsentMedium;
+}
+
+export interface LegalGuardian {
+  fullName: string;
+  relationship: LegalGuardianRelationship;
+}
+
+/**
+ * Um consentimento dado para UM canal, do inicio ao fim.
+ *
+ * Retirar preenche `withdrawn` e nao apaga nada; autorizar de novo acrescenta
+ * outro registro. Cada registro guarda a versao do texto que valia quando foi
+ * dado — a de agora pode ser outra.
+ */
+export interface ChannelConsentRecord {
+  granted: ConsentAct;
+  /** `NOTIFICATION_CONSENT_TEXT_VERSION` mostrada a pessoa ao autorizar. */
+  textVersion: string;
+  /** Menor de idade: quem autoriza e o responsavel legal, e ele e obrigatorio. */
+  subjectIsMinor: boolean;
+  legalGuardian: LegalGuardian | null;
+  withdrawn: ConsentAct | null;
+}
+
+/**
+ * Consentimento do titular, por canal, com historico.
  *
  * `Client.appointmentNotificationsEnabled` continua sendo o "aceito receber
- * avisos" geral; este objeto diz PARA QUAL CANAL. Os dois sao exigidos: um
- * cadastro antigo, que so tem o booleano, nao passa a receber nada quando a
- * organizacao liga um canal novo.
+ * avisos" geral; este objeto diz PARA QUAL CANAL, quando, com qual texto, quem
+ * registrou, por qual meio e, para menor, com qual responsavel. O aceite geral e
+ * o registro completo do canal sao exigidos juntos.
+ *
+ * `channels[canal]` vai do registro mais antigo ao atual; o ultimo e o que vale.
  */
 export interface NotificationConsent {
+  formatVersion: 2;
+  channels: Partial<Record<OutboundChannel, ChannelConsentRecord[]>>;
+  /**
+   * O consentimento anterior a este formato, guardado como estava quando o
+   * cadastro passou a usar o registro por canal. Nao autoriza envio: nao diz
+   * quem registrou, nem por qual meio, nem a data de cada canal.
+   */
+  legacy: LegacyNotificationConsent | null;
+}
+
+/** Formato anterior ao registro por canal. So existe em cadastro antigo. */
+export interface LegacyNotificationConsent {
   channels: OutboundChannel[];
   grantedAt: ISODateString;
-  /** Preenchido revoga tudo, independentemente de `channels`. */
   revokedAt: ISODateString | null;
   source: "CLIENT_FORM" | "WRITTEN" | "IMPORTED";
-  /**
-   * Versao do texto apresentado a pessoa quando autorizou
-   * (`NOTIFICATION_CONSENT_TEXT_VERSION`). Sem ela, nao ha como saber depois o
-   * que exatamente foi aceito. Ausente em cadastro anterior ao campo.
-   */
   textVersion?: string | null;
 }
+
+/** O que um documento de cadastro pode trazer no campo de consentimento. */
+export type StoredNotificationConsent = NotificationConsent | LegacyNotificationConsent;
 
 /**
  * Estados de entrega.
@@ -175,6 +241,7 @@ export const NOTIFICATION_SKIP_REASONS = [
   "MISSING_CONSENT",
   "CONSENT_REVOKED",
   "CHANNEL_NOT_CONSENTED",
+  "CONSENT_INCOMPLETE",
   "SCHEDULE_IN_THE_PAST",
   "ALREADY_PLANNED",
   "TEMPLATE_REJECTED",

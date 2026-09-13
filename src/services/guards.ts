@@ -1,6 +1,16 @@
 import { AGENDA_SLOT_INTERVALS } from "@/config/organization";
 import { hasPermission } from "@/config/permissions";
-import type { AgendaSettings, Permission, ServiceModality } from "@/types";
+import {
+  consentAuditMetadata,
+  isAllowedConsentTransition,
+  sameConsent,
+} from "@/lib/notifications/consent-record";
+import type {
+  AgendaSettings,
+  Permission,
+  ServiceModality,
+  StoredNotificationConsent,
+} from "@/types";
 
 import { RepositoryError, type RepositoryActor } from "./types";
 
@@ -21,6 +31,26 @@ export function assertPermission(
     : hasPermission(actor.role ?? "VIEWER", permission);
 
   if (!allowed) throw new RepositoryError("Sem permissão para esta ação.");
+}
+
+/**
+ * Escrita do consentimento de um cadastro: a mesma trava de `consentWriteOk()`
+ * nas rules. Devolve o resumo para a trilha, ou `null` quando nada mudou.
+ */
+export function assertConsentWrite(
+  actor: RepositoryActor,
+  before: StoredNotificationConsent | null | undefined,
+  after: StoredNotificationConsent | null | undefined,
+): string | null {
+  if (after === undefined || sameConsent(before, after)) return null;
+
+  assertPermission(actor, "notificationConsent:record");
+  if (!isAllowedConsentTransition(before, after, actor.userId)) {
+    throw new RepositoryError(
+      "O consentimento só aceita registrar ou retirar um canal, por quem está usando o painel. O histórico não pode ser apagado nem reescrito.",
+    );
+  }
+  return consentAuditMetadata(before, after);
 }
 
 const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;

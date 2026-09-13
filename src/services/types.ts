@@ -14,11 +14,11 @@ import type {
   Membership,
   Message,
   Notification,
-  NotificationConsent,
   NotificationDelivery,
   Organization,
   OrganizationNotificationSettings,
   Professional,
+  StoredNotificationConsent,
   Transaction,
 } from "@/types";
 
@@ -107,8 +107,11 @@ export interface RepositoryActor {
 export interface ClientInput {
   /** Aceite geral. Sozinho nao autoriza envio: falta nomear o canal. */
   appointmentNotificationsEnabled?: boolean;
-  /** Consentimento por canal, com data e origem. */
-  notificationConsent?: NotificationConsent | null;
+  /**
+   * Consentimento por canal, com historico. Mudar exige
+   * `notificationConsent:record` e so pode acrescentar ou retirar registro.
+   */
+  notificationConsent?: StoredNotificationConsent | null;
   fullName: string;
   preferredName: string | null;
   email: string | null;

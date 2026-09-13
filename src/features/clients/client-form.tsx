@@ -13,20 +13,21 @@ import {
 import type { ClientInput } from "@/services";
 import { useWorkspaceActions } from "@/providers/use-workspace-actions";
 import { useWorkspace } from "@/providers/workspace-provider";
-import {
-  CHANNEL_META,
-  CONSENT_STAFF_INSTRUCTION,
-  NOTIFICATION_CONSENT_TEXT_VERSION,
-} from "@/config/notifications";
-import { consentStatement } from "@/lib/notifications/consent-text";
 import { newTerm } from "@/lib/utils/terms";
 import type {
   AcquisitionChannel,
   Client,
   ClientStatus,
-  OutboundChannel,
   ServiceModality,
 } from "@/types";
+
+import {
+  ConsentFields,
+  consentFromDraft,
+  initialConsentDraft,
+  type ConsentDraft,
+  type ConsentErrors,
+} from "./consent-fields";
 
 type Errors = Partial<Record<keyof ClientInput, string>>;
 
@@ -45,8 +46,6 @@ function emptyDraft(
     acquisitionChannel: "REFERRAL",
     tags: [],
     administrativeNotes: null,
-    appointmentNotificationsEnabled: false,
-    notificationConsent: null,
   };
 }
 
@@ -62,75 +61,6 @@ function toDraft(client: Client): ClientInput {
     acquisitionChannel: client.acquisitionChannel,
     tags: client.tags,
     administrativeNotes: client.administrativeNotes,
-    appointmentNotificationsEnabled: client.appointmentNotificationsEnabled ?? false,
-    notificationConsent: client.notificationConsent ?? null,
-  };
-}
-
-/**
- * Retirar o aceite nao apaga o consentimento: carimba a revogacao. Apagar
- * perderia a prova de que houve consentimento — e de quando ele acabou.
- *
- * Autorizar de novo depois de retirar e um aceite novo: ganha data nova e a
- * versao do texto mostrado agora, e nao herda as do aceite anterior.
- */
-function toggleConsent(draft: ClientInput, enabled: boolean): Partial<ClientInput> {
-  const now = new Date().toISOString();
-  const current = draft.notificationConsent ?? null;
-
-  if (!enabled) {
-    return {
-      appointmentNotificationsEnabled: false,
-      notificationConsent: current
-        ? { ...current, revokedAt: current.revokedAt ?? now }
-        : null,
-    };
-  }
-
-  return {
-    appointmentNotificationsEnabled: true,
-    notificationConsent: current
-      ? {
-          ...current,
-          grantedAt: current.revokedAt ? now : current.grantedAt,
-          revokedAt: null,
-          textVersion: NOTIFICATION_CONSENT_TEXT_VERSION,
-        }
-      : {
-          channels: [],
-          grantedAt: now,
-          revokedAt: null,
-          source: "CLIENT_FORM",
-          textVersion: NOTIFICATION_CONSENT_TEXT_VERSION,
-        },
-  };
-}
-
-function toggleChannel(
-  draft: ClientInput,
-  channel: OutboundChannel,
-  consented: boolean,
-): Partial<ClientInput> {
-  const now = new Date().toISOString();
-  const current = draft.notificationConsent ?? {
-    channels: [],
-    grantedAt: now,
-    revokedAt: null,
-    source: "CLIENT_FORM" as const,
-    textVersion: NOTIFICATION_CONSENT_TEXT_VERSION,
-  };
-  const channels = consented
-    ? [...current.channels.filter((item) => item !== channel), channel]
-    : current.channels.filter((item) => item !== channel);
-
-  return {
-    notificationConsent: {
-      ...current,
-      channels,
-      revokedAt: null,
-      // Incluir um canal e aceitar o texto de agora; retirar um nao muda o aceite.
-      textVersion: consented ? NOTIFICATION_CONSENT_TEXT_VERSION : current.textVersion,
-    },
   };
 }
 
@@ -165,7 +95,7 @@ export function ClientForm({
   onClose: () => void;
   client?: Client | null;
 }) {
-  const { profession, terminology, data } = useWorkspace();
+  const { profession, terminology, data, session } = useWorkspace();
   const { createClient, updateClient } = useWorkspaceActions();
 
   const professionals = data?.professionals ?? [];
@@ -174,8 +104,13 @@ export function ClientForm({
       ? toDraft(client)
       : emptyDraft(profession.modalities[0], professionals[0]?.id ?? null),
   );
+  const [consent, setConsent] = useState<ConsentDraft>(() => initialConsentDraft(client));
   const [errors, setErrors] = useState<Errors>({});
+  const [consentErrors, setConsentErrors] = useState<ConsentErrors>({});
   const [saving, setSaving] = useState(false);
+
+  const savedConsent = client?.notificationConsent ?? null;
+  const canRecordConsent = session?.permissions.includes("notificationConsent:record") ?? false;
 
   const patch = (changes: Partial<ClientInput>) =>
     setDraft((current) => ({ ...current, ...changes }));
@@ -184,13 +119,26 @@ export function ClientForm({
     event.preventDefault();
 
     const found = validate(draft);
+    const built = consentFromDraft(
+      savedConsent,
+      consent,
+      session?.user.userId ?? null,
+      new Date().toISOString(),
+    );
     setErrors(found);
-    if (Object.keys(found).length > 0) return;
+    setConsentErrors(built.errors);
+    if (Object.keys(found).length > 0 || Object.keys(built.errors).length > 0) return;
+
+    const input: ClientInput = {
+      ...draft,
+      appointmentNotificationsEnabled: consent.enabled,
+      notificationConsent: built.consent,
+    };
 
     setSaving(true);
     const result = client
-      ? await updateClient(client.id, draft)
-      : await createClient(draft);
+      ? await updateClient(client.id, input)
+      : await createClient(input);
     setSaving(false);
 
     // `null` significa que o repositorio recusou; mantemos o formulario aberto
@@ -199,17 +147,6 @@ export function ClientForm({
   }
 
   const term = terminology.client.singularLower;
-
-  // Os canais oferecidos vem da profissao: o grau de sensibilidade dos dados
-  // decide o que pode circular por canal aberto.
-  const allowedChannels = profession.notifications.allowedChannels;
-  const consentedChannels = draft.notificationConsent?.channels ?? [];
-  const statement = consentStatement({
-    organizationName: data?.organization.name ?? "",
-    channels: allowedChannels,
-    events: profession.notifications.allowedEvents,
-    disclosure: profession.notifications.disclosure,
-  });
 
   return (
     <Modal
@@ -224,62 +161,17 @@ export function ClientForm({
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="bg-surface-muted space-y-2 rounded-lg p-3">
-          <div className="border-border space-y-1 rounded-md border p-2">
-            {statement.paragraphs.map((paragraph) => (
-              <p key={paragraph} className="text-foreground text-xs">
-                {paragraph}
-              </p>
-            ))}
-            <p className="text-muted-foreground text-xs">
-              Texto versão {statement.version}
-            </p>
-          </div>
-          <p className="text-muted-foreground text-xs">{CONSENT_STAFF_INSTRUCTION}</p>
-          <label className="text-foreground flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.appointmentNotificationsEnabled ?? false}
-              onChange={(event) => patch(toggleConsent(draft, event.target.checked))}
-            />
-            A pessoa autorizou receber avisos sobre atendimentos
-          </label>
-
-          {draft.appointmentNotificationsEnabled ? (
-            <div className="space-y-1 pl-6">
-              <p className="text-muted-foreground text-xs">
-                Por quais canais. O consentimento vale por canal: marcar aqui não
-                autoriza os demais.
-              </p>
-              {allowedChannels.map((channel) => (
-                <label
-                  key={channel}
-                  className="text-foreground flex items-center gap-2 text-sm"
-                >
-                  <input
-                    type="checkbox"
-                    checked={consentedChannels.includes(channel)}
-                    onChange={(event) =>
-                      patch(toggleChannel(draft, channel, event.target.checked))
-                    }
-                  />
-                  {CHANNEL_META[channel].label}
-                  <span className="text-muted-foreground text-xs">
-                    {CHANNEL_META[channel].contactField === "email"
-                      ? "exige e-mail no cadastro"
-                      : "exige telefone no cadastro"}
-                  </span>
-                </label>
-              ))}
-            </div>
-          ) : null}
-
-          <p className="text-muted-foreground text-xs">
-            Nenhuma mensagem sai enquanto a organização não configurar canal,
-            evento, antecedência e modelo em Configurações. Confirmar na agenda,
-            por si só, não envia nada.
-          </p>
-        </div>
+        {/* Os canais oferecidos vem da profissao: o grau de sensibilidade dos
+            dados decide o que pode circular por canal aberto. */}
+        <ConsentFields
+          organizationName={data?.organization.name ?? ""}
+          profession={profession}
+          saved={savedConsent}
+          draft={consent}
+          errors={consentErrors}
+          disabled={!canRecordConsent}
+          onChange={(changes) => setConsent((current) => ({ ...current, ...changes }))}
+        />
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <Field label="Nome completo" required error={errors.fullName}>

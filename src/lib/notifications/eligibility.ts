@@ -14,6 +14,11 @@ import type {
   ProfessionConfig,
 } from "@/types";
 
+import {
+  currentConsentRecord,
+  isCompleteConsentRecord,
+  isRecordFormat,
+} from "./consent-record";
 import { contactFor, hasRawContact } from "./contacts";
 import { deliveryKey } from "./delivery";
 import { scheduledTimeFor } from "./schedule";
@@ -118,12 +123,13 @@ function deny(
 
 /**
  * O consentimento, isolado, porque e conferido duas vezes: ao planejar e de novo
- * na hora de enviar. Revogar entre uma coisa e outra tem de impedir o envio —
+ * na hora de enviar. Retirar entre uma coisa e outra tem de impedir o envio —
  * se a conferencia so existisse no planejamento, o aviso ja planejado sairia.
  *
- * O aceite geral e o consentimento por canal sao exigidos juntos: um cadastro
- * antigo, que so tem o aceite geral, nao passa a receber nada quando a
- * organizacao liga um canal novo.
+ * O aceite geral e o registro do canal sao exigidos juntos, e o registro precisa
+ * estar completo: data, versao do texto, quem registrou, meio e, para menor de
+ * idade, o responsavel legal. O consentimento do formato antigo, com uma data
+ * so e sem autor, nao autoriza canal nenhum.
  */
 export function consentProblemFor(
   client: Pick<Client, "appointmentNotificationsEnabled" | "notificationConsent">,
@@ -133,8 +139,12 @@ export function consentProblemFor(
   if (client.appointmentNotificationsEnabled !== true || !consent) {
     return "MISSING_CONSENT";
   }
-  if (consent.revokedAt) return "CONSENT_REVOKED";
-  if (!consent.channels.includes(channel)) return "CHANNEL_NOT_CONSENTED";
+  if (!isRecordFormat(consent)) return "CONSENT_INCOMPLETE";
+
+  const record = currentConsentRecord(consent, channel);
+  if (!record) return "CHANNEL_NOT_CONSENTED";
+  if (record.withdrawn) return "CONSENT_REVOKED";
+  if (!isCompleteConsentRecord(record)) return "CONSENT_INCOMPLETE";
   return null;
 }
 

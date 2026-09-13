@@ -1,7 +1,10 @@
 import type {
   AppointmentDisclosureLevel,
   AppointmentNotificationEvent,
+  ConsentMedium,
+  ConsentRecorderKind,
   DeliveryFailureCode,
+  LegalGuardianRelationship,
   NotificationSkipReason,
   OrganizationNotificationSettings,
   OutboundChannel,
@@ -169,6 +172,32 @@ export const CONSENT_DISCLOSURE_PHRASES: Record<AppointmentDisclosureLevel, stri
 export const CONSENT_STAFF_INSTRUCTION =
   "Leia ou mostre o texto acima à pessoa. Marque somente se ela autorizou, e só os canais que ela escolheu.";
 
+export const CONSENT_MEDIUM_LABELS: Record<ConsentMedium, string> = {
+  FORM: "Formulário",
+  WRITTEN_DOCUMENT: "Documento escrito",
+  MESSAGE: "Mensagem",
+};
+
+/** Exemplo de cada meio, para a equipe escolher sem adivinhar. */
+export const CONSENT_MEDIUM_HINTS: Record<ConsentMedium, string> = {
+  FORM: "a pessoa respondeu na hora e a equipe marcou neste cadastro",
+  WRITTEN_DOCUMENT: "termo ou ficha assinada pela pessoa",
+  MESSAGE: "e-mail, WhatsApp ou SMS enviado pela pessoa",
+};
+
+export const CONSENT_RECORDER_LABELS: Record<ConsentRecorderKind, string> = {
+  STAFF: "registrado pela equipe",
+  SUBJECT: "registrado pela própria pessoa",
+};
+
+export const LEGAL_GUARDIAN_RELATIONSHIP_LABELS: Record<LegalGuardianRelationship, string> = {
+  PARENT: "Mãe ou pai",
+  LEGAL_GUARDIAN: "Tutor ou outro responsável legal",
+};
+
+/** Nome do responsavel legal: o mesmo minimo do nome do cadastro. */
+export const LEGAL_GUARDIAN_NAME_MIN_LENGTH = 3;
+
 // ------------------------------------------------------------- modelos
 
 /**
@@ -270,8 +299,10 @@ export const SKIP_REASON_LABELS: Record<NotificationSkipReason, string> = {
   MISSING_CONTACT: "O cadastro não tem contato para este canal.",
   INVALID_CONTACT: "O contato do cadastro não passa na validação do canal.",
   MISSING_CONSENT: "O cadastro não registrou consentimento.",
-  CONSENT_REVOKED: "O consentimento foi revogado.",
-  CHANNEL_NOT_CONSENTED: "O consentimento não inclui este canal.",
+  CONSENT_REVOKED: "O consentimento deste canal foi retirado.",
+  CHANNEL_NOT_CONSENTED: "Não há consentimento registrado para este canal.",
+  CONSENT_INCOMPLETE:
+    "O registro do consentimento deste canal está incompleto: faltam data, versão do texto, quem registrou, meio ou responsável legal.",
   SCHEDULE_IN_THE_PAST: "O horário de envio já passou.",
   ALREADY_PLANNED: "Já existe um envio planejado igual a este.",
   TEMPLATE_REJECTED: "O modelo foi recusado pela política de conteúdo.",

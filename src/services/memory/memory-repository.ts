@@ -53,6 +53,7 @@ import {
   type WorkspaceSnapshot,
 } from "../types";
 import {
+  assertConsentWrite,
   assertPermission,
   validateAgendaSettings,
   validateMessageBody,
@@ -221,6 +222,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
 
   async createClient(input: ClientInput): Promise<ID> {
     this.assertPermission("client:create");
+    const consent = assertConsentWrite(this.actor, null, input.notificationConsent);
     const now = this.now();
     const id = this.nextId("client");
 
@@ -260,7 +262,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
             actorType: "USER",
             resource: { type: "client", id },
             summary: `Cadastro de ${client.fullName} criado.`,
-            metadata: { status: client.status },
+            metadata: { status: client.status, ...(consent ? { consent } : {}) },
           },
           now,
         ),
@@ -276,6 +278,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     const now = this.now();
     const existing = this.snapshot.clients.find((client) => client.id === id);
     if (!existing) throw new RepositoryError("Cadastro não encontrado.");
+    const consent = assertConsentWrite(this.actor, existing.notificationConsent, input.notificationConsent);
 
     const updated: Client = {
       ...existing,
@@ -308,7 +311,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
             actorType: "USER",
             resource: { type: "client", id },
             summary: `Cadastro de ${updated.fullName} atualizado.`,
-            metadata: { fields: Object.keys(input).join(", ") },
+            metadata: { fields: Object.keys(input).join(", "), ...(consent ? { consent } : {}) },
           },
           now,
         ),

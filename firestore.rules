@@ -179,6 +179,104 @@ service cloud.firestore {
         .hasOnly(fields);
     }
 
+    // ------------------------------------------ consentimento dos avisos
+    //
+    // Espelho de `isAllowedConsentTransition`
+    // (`src/lib/notifications/consent-record.ts`). O consentimento e prova: por
+    // canal, do registro mais antigo ao atual, com data, versao do texto, quem
+    // registrou, meio e, para menor de idade, o responsavel legal.
+    //
+    // Quem registra ja vem da regra de `clients`: `canWriteOperational()` e ali
+    // o espelho de `notificationConsent:record`, que `permissions.test.ts`
+    // mantem igual a `client:update`.
+    //
+    // Custo: cada requisicao avalia no maximo 1000 expressoes, e chamada de
+    // funcao e recalculada a cada uso (argumento e `let`, uma vez so). Por isso
+    // o papel nao e chamado de novo aqui. Medido no emulador em 12/09/2026.
+    //
+    // Fatia com fim zero (`lista[0:0]`) da erro de indice em vez de lista
+    // vazia; toda fatia abaixo e protegida por `?:`. Tipo nao e conferido com
+    // `is`: operacao sobre tipo errado e erro, e erro nega.
+
+    // O navegador so registra em nome de quem esta nele. "A propria pessoa
+    // registrou" (`SUBJECT`) e afirmacao do backend, nunca do cliente.
+    function consentActOk(act) {
+      return act.keys().toSet() == ['at', 'medium', 'recordedBy'].toSet()
+        && act.at.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{3})?Z$')
+        && act.medium in ['FORM', 'WRITTEN_DOCUMENT', 'MESSAGE']
+        && act.recordedBy == {'kind': 'STAFF', 'userId': request.auth.uid};
+    }
+
+    function consentGuardianOk(guardian) {
+      return guardian.keys().toSet() == ['fullName', 'relationship'].toSet()
+        && guardian.fullName.trim().size() >= 3
+        && guardian.relationship in ['PARENT', 'LEGAL_GUARDIAN'];
+    }
+
+    // Nasce vigente. A versao do texto e identificador fechado, nao frase: vai
+    // para a trilha, que nunca e pseudonimizada nesse campo. Menor de idade
+    // autoriza pelo responsavel legal, obrigatorio; adulto nao carrega um.
+    function newConsentRecordOk(record) {
+      return record.keys().toSet() == ['granted', 'legalGuardian', 'subjectIsMinor', 'textVersion', 'withdrawn'].toSet()
+        && record.withdrawn == null
+        && record.textVersion.matches('^[0-9A-Za-z._-]{1,64}$')
+        && consentActOk(record.granted)
+        && (record.subjectIsMinor == false
+          ? record.legalGuardian == null
+          : (record.subjectIsMinor == true ? consentGuardianOk(record.legalGuardian) : false));
+    }
+
+    // Acrescentar: o que havia fica igual, o ultimo registro anterior ja estava
+    // retirado, e o novo e valido.
+    function consentGrantOk(before, after, kept) {
+      return (kept == 0 ? true : (after[0:kept] == before && before[kept - 1].withdrawn != null))
+        ? newConsentRecordOk(after[kept])
+        : false;
+    }
+
+    // Retirar: so o registro vigente muda, e so no campo `withdrawn`.
+    function consentWithdrawOk(before, after, last) {
+      return (before[last].withdrawn == null
+          && (last == 0 ? true : after[0:last] == before[0:last])
+          && after[last].diff(before[last]).affectedKeys().hasOnly(['withdrawn']))
+        ? consentActOk(after[last].withdrawn)
+        : false;
+    }
+
+    // Historico de UM canal. Uma escrita faz no maximo uma coisa por canal:
+    // nada, acrescentar um registro ou retirar o vigente. Nada sai da lista —
+    // retirar um canal nao apaga o historico dele.
+    function consentHistoryOk(before, after) {
+      return after == before
+        ? true
+        : (after.size() == before.size() + 1
+          ? consentGrantOk(before, after, before.size())
+          : ((after.size() == before.size() && before.size() > 0)
+            ? consentWithdrawOk(before, after, before.size() - 1)
+            : false));
+    }
+
+    // O formato antigo (uma data so, sem autor) nao nasce mais pelo navegador.
+    // Ao passar para o registro por canal, ele fica inteiro em `legacy`.
+    function consentOk(before, after) {
+      let recordFormat = before != null ? (before.get('formatVersion', 0) == 2) : false;
+      let old = recordFormat ? before.channels : {};
+      return (after.keys().toSet() == ['channels', 'formatVersion', 'legacy'].toSet()
+          && after.formatVersion == 2
+          && after.legacy == (recordFormat ? before.get('legacy', null) : before)
+          && after.channels.keys().hasOnly(['EMAIL', 'SMS', 'WHATSAPP']))
+        ? (consentHistoryOk(old.get('EMAIL', []), after.channels.get('EMAIL', []))
+          && consentHistoryOk(old.get('SMS', []), after.channels.get('SMS', []))
+          && consentHistoryOk(old.get('WHATSAPP', []), after.channels.get('WHATSAPP', [])))
+        : false;
+    }
+
+    // Sem mudanca no consentimento, nada a conferir.
+    function consentWriteOk(before) {
+      let after = request.resource.data.get('notificationConsent', null);
+      return after == before ? true : consentOk(before, after);
+    }
+
     // ------------------------------------------------- indice de organizacoes
 
     // Responde "de quais organizacoes este usuario participa?" sem exigir uma
@@ -244,7 +342,14 @@ service cloud.firestore {
 
       match /clients/{clientId} {
         allow read: if moduleAccess(orgId, 'clientes');
-        allow create, update: if moduleAccess(orgId, 'clientes') && canWriteOperational(orgId) && belongsToOrg(orgId);
+        // O consentimento de aviso so ganha ou retira registro (`consentWriteOk`),
+        // e `canWriteOperational()` responde tambem por `notificationConsent:record`.
+        // Uma instrucao so para criar e alterar: o motor avalia cada instrucao
+        // que casa com a escrita, e duas refariam a cadeia de vinculo.
+        // Excluir o cadastro inteiro continua sendo `client:delete`, e a
+        // eliminacao a pedido do titular e ato do backend.
+        allow create, update: if moduleAccess(orgId, 'clientes') && canWriteOperational(orgId) && belongsToOrg(orgId)
+          && consentWriteOk(resource == null ? null : resource.data.get('notificationConsent', null));
         allow delete: if moduleAccess(orgId, 'clientes') && canManage(orgId);
       }
 

@@ -1,6 +1,6 @@
 import type { Client, ID } from "@/types";
 
-import { assertPermission } from "../../guards";
+import { assertConsentWrite, assertPermission } from "../../guards";
 import { RepositoryError, type ClientInput } from "../../types";
 import {
   auditWrite,
@@ -20,6 +20,7 @@ export function planCreateClient(
   input: ClientInput,
 ): Plan<ID> {
   assertPermission(ctx.actor, "client:create");
+  const consent = assertConsentWrite(ctx.actor, null, input.notificationConsent);
   const id = ctx.newId("clients");
 
   const client: Client = {
@@ -58,7 +59,7 @@ export function planCreateClient(
         actorType: "USER",
         resource: { type: "client", id },
         summary: `Cadastro de ${client.fullName} criado.`,
-        metadata: { status: client.status },
+        metadata: { status: client.status, ...(consent ? { consent } : {}) },
       }),
     ],
   };
@@ -71,6 +72,7 @@ export function planUpdateClient(
 ): Plan {
   assertPermission(ctx.actor, "client:update");
   const existing = requireClient(ctx, id);
+  const consent = assertConsentWrite(ctx.actor, existing.notificationConsent, input.notificationConsent);
   const fullName = input.fullName ?? existing.fullName;
 
   const writes: WriteOperation[] = [
@@ -111,7 +113,7 @@ export function planUpdateClient(
       actorType: "USER",
       resource: { type: "client", id },
       summary: `Cadastro de ${fullName} atualizado.`,
-      metadata: { fields: Object.keys(input).join(", ") },
+      metadata: { fields: Object.keys(input).join(", "), ...(consent ? { consent } : {}) },
     }),
   );
 

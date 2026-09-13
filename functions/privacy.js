@@ -197,11 +197,12 @@ async function linkedToClient(organizationId, clientId) {
   const tenant = (name) => db().collection(paths.collection(organizationId, name));
   const byClient = (name) => tenant(name).where("clientId", "==", clientId).get().then((snapshot) => snapshot.docs);
 
-  const [appointments, conversations, transactions, notificationDeliveries, aiDecisions, privacyRequests] = await Promise.all([
+  const [appointments, conversations, transactions, notificationDeliveries, automationTasks, aiDecisions, privacyRequests] = await Promise.all([
     byClient("appointments"),
     byClient("conversations"),
     byClient("transactions"),
     byClient("notificationDeliveries"),
+    byClient("automationTasks"),
     byClient("aiDecisions"),
     tenant("privacyRequests").where("subjectId", "==", clientId).get().then((snapshot) => snapshot.docs),
   ]);
@@ -217,7 +218,7 @@ async function linkedToClient(organizationId, clientId) {
   ]);
   const notifications = [...new Map([...byTarget, ...byDecision].map((document) => [document.ref.path, document])).values()];
 
-  return { appointments, conversations, messages, transactions, notificationDeliveries, aiDecisions, auditLogs, notifications, privacyRequests };
+  return { appointments, conversations, messages, transactions, notificationDeliveries, automationTasks, aiDecisions, auditLogs, notifications, privacyRequests };
 }
 
 // ---------------------------------------------------------------- cliente
@@ -257,6 +258,7 @@ export const exportClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => 
     conversations: linked.conversations.map((conversation) => ({ ...withId(conversation), messages: messagesOf(conversation.id) })),
     transactions: linked.transactions.map(withId),
     notificationDeliveries: linked.notificationDeliveries.map(withId),
+    automationTasks: linked.automationTasks.map(withId),
     aiDecisions: linked.aiDecisions.map(withId),
     // Sem o nome de quem registrou: e dado da equipe, nao do titular.
     auditTrail: linked.auditLogs.map((entry) => {
@@ -273,7 +275,7 @@ export const exportClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => 
 
   const { counts, add } = counter();
   add("clients", "exported");
-  for (const name of ["appointments", "conversations", "messages", "transactions", "notificationDeliveries", "aiDecisions", "auditLogs"]) {
+  for (const name of ["appointments", "conversations", "messages", "transactions", "notificationDeliveries", "automationTasks", "aiDecisions", "auditLogs"]) {
     add(name, "exported", linked[name].length);
   }
 
@@ -321,7 +323,7 @@ export const eraseClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
   const { counts, add } = counter();
   const writer = db().bulkWriter();
   const results = [];
-  for (const collection of ["messages", "conversations", "appointments", "transactions", "notificationDeliveries", "notifications", "aiDecisions", "auditLogs", "privacyRequests"]) {
+  for (const collection of ["messages", "conversations", "appointments", "transactions", "notificationDeliveries", "automationTasks", "notifications", "aiDecisions", "auditLogs", "privacyRequests"]) {
     const treatment = PERSONAL_DATA_MAP[collection].onClientErasure;
     for (const document of linked[collection]) {
       if (treatment.action === "DELETE") {

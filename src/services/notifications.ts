@@ -1,14 +1,10 @@
-import { CHANNEL_META } from "@/config/notifications";
 import { getProfession } from "@/config/professions";
 import {
-  consentProblemFor,
-  contactFor,
+  composeForSend,
   isDue,
   isExpired,
   isPending,
   planAppointmentNotifications,
-  renderTemplate,
-  templateContext,
   type DispatchTarget,
   type EligibilityInput,
   type NotificationPlan,
@@ -26,9 +22,10 @@ import type { WorkspaceSnapshot } from "./types";
 /**
  * Ponte entre a fotografia do tenant e o nucleo de avisos.
  *
- * Compartilhado pelos dois repositorios de proposito: se cada um decidisse
- * sozinho quando planejar e o que reenviar, "desligado por padrao" viraria duas
- * promessas diferentes — e a demonstracao poderia divergir do produto.
+ * Usada pela demonstracao em memoria, que planeja e simula a fila no proprio
+ * navegador. No Firestore quem planeja e dispara e o backend
+ * (`functions/automation.js`), com as mesmas funcoes de `src/lib`: se cada lado
+ * decidisse sozinho, "desligado por padrao" viraria duas promessas diferentes.
  *
  * Nada aqui grava. As funcoes recebem o snapshot e devolvem intencao.
  */
@@ -92,51 +89,36 @@ export function pendingDeliveriesFor(
 }
 
 /**
- * Recompoe destino e texto no momento do envio.
- *
- * O registro de entrega nao guarda nenhum dos dois. Recompor a partir do estado
- * atual e o que faz uma revogacao de consentimento, uma alteracao de contato ou
- * o desligamento do canal interromperem um envio JA planejado — e nao apenas os
- * proximos.
+ * Destino e texto recompostos do estado atual, pelas travas de
+ * `composeForSend` — as mesmas que o despachante do backend confere. A
+ * comparacao do texto com o planejado fica em `dispatchDelivery`.
  */
 export function dispatchTargetFor(
   snapshot: WorkspaceSnapshot,
   delivery: NotificationDelivery,
-  now: ISODateString,
 ): DispatchTarget {
-  const empty: DispatchTarget = { delivery, destination: null, body: null };
+  const appointment =
+    snapshot.appointments.find((item) => item.id === delivery.appointmentId) ?? null;
+  const client = appointment
+    ? (snapshot.clients.find((item) => item.id === appointment.clientId) ?? null)
+    : null;
+  const professional = appointment
+    ? snapshot.professionals.find((item) => item.id === appointment.professionalId)
+    : undefined;
 
-  const settings = snapshot.organization.settings.notifications;
-  if (!settings.enabled) return empty;
-  if (!settings.verifiedSenderChannels.includes(delivery.channel)) return empty;
+  const check = composeForSend({
+    organization: snapshot.organization,
+    profession: getProfession(snapshot.organization.primaryProfession),
+    appointment,
+    client,
+    professionalName: professional?.displayName ?? appointment?.professionalName ?? null,
+    delivery,
+    plannedForStartsAt: null,
+  });
 
-  const rule = settings.rules.find((item) => item.id === delivery.ruleId);
-  if (!rule?.enabled) return empty;
-
-  const appointment = snapshot.appointments.find(
-    (item) => item.id === delivery.appointmentId,
-  );
-  if (!appointment || appointment.status === "CANCELLED") return empty;
-
-  const input = eligibilityInput(snapshot, appointment, delivery.event, now);
-  if (!input) return empty;
-  if (consentProblemFor(input.client, delivery.channel)) return empty;
-
-  const contact = contactFor(input.client, delivery.channel);
-  if (!contact) return empty;
-
-  const profession = input.profession.notifications;
-  const rendered = renderTemplate(
-    rule.customTemplate ?? profession.templates[delivery.event],
-    templateContext(input),
-    {
-      disclosure: profession.disclosure,
-      maxBodyLength: CHANNEL_META[delivery.channel].maxBodyLength,
-    },
-  );
-  if (!rendered.ok) return empty;
-
-  return { delivery, destination: contact.destination, body: rendered.value };
+  return check.ok
+    ? { delivery, destination: check.destination, body: check.body }
+    : { delivery, destination: null, body: null };
 }
 
 /** Entregas que o disparo deve considerar: vencidas ou ja passadas da janela. */

@@ -326,6 +326,20 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     },
     onOrganizationDeletion: DELETE,
   },
+  automationTasks: {
+    // Ids e estado da execucao. Texto, contato e nome nunca sao gravados: o
+    // despachante recompoe os dois primeiros no envio e os descarta.
+    personalFields: ["clientId"],
+    // `expiresAt` e a validade da execucao, nao prazo de retencao: nenhuma
+    // politica de TTL pode ser ligada nele. Retencao pendente, como a da fila de
+    // avisos.
+    retention: { kind: "UNDEFINED" },
+    onClientErasure: {
+      action: "PSEUDONYMIZE",
+      fields: { clientId: "CLIENT_ID" },
+    },
+    onOrganizationDeletion: DELETE,
+  },
   auditLogs: {
     personalFields: ["actorName", "summary", "resource.id"],
     retention: { kind: "CONFIGURED_NOT_ENFORCED", setting: "auditRetentionDays" },

@@ -1,0 +1,12 @@
+// Gerado por scripts/build-functions.mjs.
+export const NOTIFICATION_TYPES = [
+    "POSSIBLE_RISK_DETECTED",
+    "NEW_MESSAGE",
+    "CLIENT_WAITING",
+    "APPOINTMENT_CANCELLED",
+    "APPOINTMENT_CONFIRMED",
+    "NEW_CLIENT",
+    "PAYMENT_OVERDUE",
+    "AUTOMATION_FAILURE",
+    "RULE_CHANGED",
+];

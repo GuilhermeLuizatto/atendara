@@ -53,6 +53,7 @@ export const ORGANIZATION_EXPORT_SECTIONS = [
   "aiDecisions",
   "notifications",
   "notificationDeliveries",
+  "automationTasks",
   "auditLogs",
   "privacyRequests",
 ] as const;
@@ -119,6 +120,8 @@ export interface ClientDataExport {
   conversations: Array<Record<string, unknown> & { messages: Record<string, unknown>[] }>;
   transactions: Record<string, unknown>[];
   notificationDeliveries: Record<string, unknown>[];
+  /** Execucoes da fila de automacao ligadas a esta pessoa: ids e estado, sem texto. */
+  automationTasks: Record<string, unknown>[];
   /** Decisoes automatizadas tomadas sobre mensagens desta pessoa. */
   aiDecisions: Record<string, unknown>[];
   auditTrail: ExportedAuditEntry[];

@@ -5,10 +5,6 @@ import { assertPermission } from "../../guards";
 import { findConflict } from "../../aggregates";
 import { RepositoryError, type AppointmentInput } from "../../types";
 import {
-  cancelPendingDeliveryWrites,
-  notificationWrites,
-} from "./outbound";
-import {
   auditWrite,
   docPath,
   notificationWrite,
@@ -28,6 +24,11 @@ import {
  * o SDK cliente nao consulta por query dentro de uma transacao, entao duas
  * marcacoes simultaneas no mesmo minuto ainda passam. Enquanto isso nao vira
  * Cloud Function, `allowDoubleBooking` continua sendo a valvula do usuario.
+ *
+ * Avisos ao cliente nao saem destes planos. O gatilho `planAppointmentNotices`
+ * do backend le cada escrita de atendimento e planeja, cancela ou replaneja a
+ * fila — o navegador nao escreve em `notificationDeliveries` nem em
+ * `automationTasks`.
  */
 function assertNoConflict(
   ctx: PlanContext,
@@ -121,20 +122,6 @@ export function planCreateAppointment(
     });
   }
 
-  // Avisos ao cliente. Lista vazia enquanto a organizacao nao tiver ligado
-  // canal, evento, antecedencia e modelo — que e o padrao.
-  const withAppointment = {
-    ...ctx,
-    snapshot: {
-      ...ctx.snapshot,
-      appointments: [...ctx.snapshot.appointments, appointment],
-    },
-  };
-  writes.push(
-    ...notificationWrites(withAppointment, appointment, "APPOINTMENT_SCHEDULED"),
-    ...notificationWrites(withAppointment, appointment, "APPOINTMENT_REMINDER"),
-  );
-
   writes.push(
     auditWrite(ctx, {
       action: "CREATE",
@@ -208,28 +195,6 @@ export function planUpdateAppointment(
     });
   }
 
-  // Remarcar muda o instante do lembrete, e a chave do envio deriva dele: o
-  // que estava planejado para o horario antigo e cancelado, e o novo entra.
-  if (startsAt !== existing.startsAt) {
-    const updated = { ...existing, startsAt, endsAt, professionalId };
-    writes.push(
-      ...cancelPendingDeliveryWrites(ctx, id),
-      ...notificationWrites(
-        {
-          ...ctx,
-          snapshot: {
-            ...ctx.snapshot,
-            appointments: ctx.snapshot.appointments.map((item) =>
-              item.id === id ? updated : item,
-            ),
-          },
-        },
-        updated,
-        "APPOINTMENT_REMINDER",
-      ),
-    );
-  }
-
   writes.push(
     auditWrite(ctx, {
       action: "UPDATE",
@@ -300,21 +265,6 @@ export function planSetAppointmentStatus(
         aiDecisionId: null,
       }).write,
     );
-  }
-
-  // Confirmar e cancelar passam pelo portao como qualquer outro evento. Sem
-  // regra habilitada para o evento, `notificationWrites` devolve lista vazia —
-  // e a mudanca de estado continua sendo so uma mudanca de estado.
-  if (status === "CONFIRMED") {
-    writes.push(...notificationWrites(ctx, existing, "APPOINTMENT_CONFIRMED"));
-  }
-
-  if (status === "CANCELLED" || status === "NO_SHOW") {
-    // O atendimento deixou de valer: o que ainda nao saiu nao deve sair.
-    writes.push(...cancelPendingDeliveryWrites(ctx, id));
-    if (status === "CANCELLED") {
-      writes.push(...notificationWrites(ctx, existing, "APPOINTMENT_CANCELLED"));
-    }
   }
 
   writes.push(

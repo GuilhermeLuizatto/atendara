@@ -6,6 +6,7 @@
 export * from "./ai";
 export * from "./appointment";
 export * from "./audit";
+export * from "./automation";
 export * from "./billing";
 export * from "./classification";
 export * from "./client";

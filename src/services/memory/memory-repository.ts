@@ -1320,9 +1320,10 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
   /**
    * Disparo das entregas vencidas com o provedor simulado.
    *
-   * Igual ao do Firestore de proposito: a demonstracao precisa mostrar o mesmo
-   * comportamento do produto, inclusive o de nao enviar nada quando falta
-   * configuracao. Nenhuma mensagem real sai daqui.
+   * A demonstracao nao tem servidor, entao simula aqui o que o despachante do
+   * backend faz no produto, com as mesmas travas (`composeForSend`) — inclusive
+   * a de nao enviar nada quando falta configuracao. Nenhuma mensagem real sai
+   * daqui.
    */
   async dispatchDueNotifications(now?: ISODateString): Promise<DispatchSummary> {
     const at = now ?? this.now();
@@ -1331,7 +1332,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
 
     for (const delivery of dueDeliveries(this.snapshot, at)) {
       const decision = await dispatchDelivery(
-        dispatchTargetFor({ ...this.snapshot, notificationDeliveries: deliveries }, delivery, at),
+        dispatchTargetFor({ ...this.snapshot, notificationDeliveries: deliveries }, delivery),
         at,
       );
       summary = tally(summary, delivery.id, decision);

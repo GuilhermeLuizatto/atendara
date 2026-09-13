@@ -440,39 +440,27 @@ service cloud.firestore {
       // Fila de saida dos avisos que a organizacao envia a quem ela atende.
       //
       // Nao confundir com `notifications` acima: aquela e o alerta dentro do
-      // painel, esta e a mensagem que sai. Por isso o modulo exigido e a
-      // `agenda` — todo evento que a alimenta vem de la — e a criacao exige
-      // papel com autonomia sobre a operacao.
+      // painel, esta e a mensagem que sai. Por isso o modulo exigido para ler e
+      // a `agenda` — todo evento que a alimenta vem de la.
       //
-      // Um documento so nasce `PLANNED` e com zero tentativas. Sem isso, um
-      // cliente poderia gravar uma entrega ja `SENT` e a trilha passaria a
-      // afirmar que uma mensagem foi enviada sem que nada tenha sido tentado.
-      //
-      // ATENCAO: enquanto o unico provedor for o simulado, quem executa a
-      // entrega e o proprio aplicativo, e por isso `update` existe aqui. Com um
-      // provedor real, o disparo passa para o backend e estas regras devem
-      // fechar para `write: if false`, como as colecoes `platform*`.
+      // Ninguem escreve pelo cliente, em papel nenhum (S-05, Fase 3, 13.2).
+      // Planejar e disparar sao atos do backend: o gatilho da agenda planeja, a
+      // Cloud Tasks agenda o horario e o despachante envia depois de conferir as
+      // travas de novo. Se o navegador escrevesse aqui, um membro marcaria como
+      // enviado o que nunca saiu, ou zeraria tentativas e reenviaria sem limite.
       match /notificationDeliveries/{deliveryId} {
         allow read: if moduleAccess(orgId, 'agenda');
+        allow write: if false;
+      }
 
-        allow create: if moduleAccess(orgId, 'agenda') && canManage(orgId)
-          && belongsToOrg(orgId)
-          && request.resource.data.status == 'PLANNED'
-          && request.resource.data.attempts == 0
-          && request.resource.data.sentAt == null;
+      // ------------------------------------------- fila de automacao
 
-        // O que muda depois do planejamento e so o resultado da tentativa.
-        // Destinatario, evento, canal, horario e hash do texto sao fixos: se
-        // pudessem mudar, o registro deixaria de provar o que foi enviado.
-        allow update: if moduleAccess(orgId, 'agenda') && canManage(orgId)
-          && onlyChanges([
-            'status', 'attempts', 'lastAttemptAt', 'nextAttemptAt',
-            'providerMessageId', 'failureCode', 'sentAt', 'cancelledAt',
-            'updatedAt', 'updatedBy'
-          ]);
-
-        // Registro de envio nao se apaga, como a trilha de auditoria.
-        allow delete: if false;
+      // Cada execucao da automacao — aviso, alerta, registro na trilha —, com
+      // estado, tentativa e validade. Mecanismo do backend: ninguem le nem
+      // escreve pelo cliente. O painel da fila abre a leitura junto de uma
+      // permissao em `src/config/permissions.ts`, quando existir.
+      match /automationTasks/{taskId} {
+        allow read, write: if false;
       }
 
       // ------------------------------------------------ trilha de auditoria

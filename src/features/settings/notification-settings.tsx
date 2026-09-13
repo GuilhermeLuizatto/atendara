@@ -3,6 +3,7 @@
 import { useId, useMemo, useState } from "react";
 
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
+import { NOTICE_TASK_TYPES } from "@/config/automation";
 import {
   APPOINTMENT_EVENT_META,
   CHANNEL_META,
@@ -25,7 +26,7 @@ const CHECKBOX = "accent-primary size-4 shrink-0";
  *
  * A tela nao decide nada: ela edita a configuracao e mostra o que o nucleo
  * responderia. A pre-visualizacao roda o mesmo `planAppointmentNotifications`
- * que a agenda usa, contra o proximo atendimento real da organizacao — entao o
+ * que o servidor usa, contra o proximo atendimento real da organizacao — entao o
  * que aparece aqui e o que aconteceria, e nao uma explicacao paralela do que
  * deveria acontecer.
  *
@@ -33,10 +34,11 @@ const CHECKBOX = "accent-primary size-4 shrink-0";
  * titular da organizacao. Os demais veem a configuracao sem os controles
  * ligados — as rules recusariam a gravacao de qualquer jeito.
  *
- * Nada e enviado por esta tela. O unico provedor implementado e o simulado.
+ * Nada e enviado por esta tela. Numa organizacao real a fila e do servidor, e o
+ * navegador so a le; o botao de simulacao existe apenas na demonstracao.
  */
 export function NotificationSettings() {
-  const { data, profession, session } = useWorkspace();
+  const { data, profession, session, repository } = useWorkspace();
   const { updateNotificationSettings, dispatchDueNotifications } =
     useWorkspaceActions();
   const readOnlyNoteId = useId();
@@ -86,6 +88,7 @@ export function NotificationSettings() {
   const disabled = saving || !canEdit;
   const describedBy = canEdit ? undefined : readOnlyNoteId;
   const deliveries = data.notificationDeliveries;
+  const serverQueue = repository?.mode === "firestore";
 
   async function persist(next: Parameters<typeof updateNotificationSettings>[0]) {
     setSaving(true);
@@ -234,6 +237,12 @@ export function NotificationSettings() {
               <fieldset key={event} className="border-border space-y-2 rounded-lg border p-3">
                 <legend className="text-foreground px-1 text-sm font-medium">{meta.label}</legend>
                 <p className="text-muted-foreground text-xs">{meta.description}</p>
+                {NOTICE_TASK_TYPES[event] === null ? (
+                  <p className="text-warning-soft-foreground text-xs">
+                    {SKIP_REASON_LABELS.EVENT_WITHOUT_AUTOMATION} A regra fica
+                    gravada para quando o envio deste evento existir.
+                  </p>
+                ) : null}
 
                 {profession.notifications.allowedChannels.map((channel) => {
                   const rule = settings.rules.find(
@@ -302,7 +311,7 @@ export function NotificationSettings() {
               <p className="text-muted-foreground text-sm">
                 Simulado contra o próximo atendimento marcado —{" "}
                 {formatDateTime(preview.appointment.startsAt)}. Este é o mesmo
-                cálculo que a agenda faz.
+                cálculo que o servidor faz quando a agenda muda.
               </p>
               {preview.results.map(({ event, plan }) => (
                 <div key={event} className="border-border rounded-lg border p-3">
@@ -353,13 +362,15 @@ export function NotificationSettings() {
         <CardHeader>
           <CardTitle
             action={
-              <Button
-                variant="secondary"
-                disabled={deliveries.length === 0}
-                onClick={() => void dispatchDueNotifications()}
-              >
-                Executar simulação
-              </Button>
+              serverQueue ? null : (
+                <Button
+                  variant="secondary"
+                  disabled={deliveries.length === 0}
+                  onClick={() => void dispatchDueNotifications()}
+                >
+                  Executar simulação
+                </Button>
+              )
             }
           >
             Fila de saída
@@ -367,10 +378,15 @@ export function NotificationSettings() {
         </CardHeader>
         <CardBody className="space-y-2">
           <p className="text-muted-foreground text-sm">
-            {deliveries.length === 0
-              ? "Nenhum envio planejado."
-              : "Executar processa os envios já vencidos com o provedor simulado. Nada sai do produto."}
+            {serverQueue
+              ? "O servidor planeja cada aviso quando a agenda muda e o executa no horário, conferindo de novo consentimento, canal e atendimento antes de enviar. Esta lista só mostra o resultado."
+              : deliveries.length === 0
+                ? "Nenhum envio planejado."
+                : "Executar processa os envios já vencidos com o provedor simulado. Nada sai do produto."}
           </p>
+          {serverQueue && deliveries.length === 0 ? (
+            <p className="text-muted-foreground text-sm">Nenhum envio planejado.</p>
+          ) : null}
           <ul className="space-y-2">
             {deliveries.slice(0, 10).map((delivery) => (
               <li

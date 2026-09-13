@@ -297,8 +297,11 @@ export interface WorkspaceRepository {
   updateAgendaSettings(settings: AgendaSettings): Promise<void>;
   /**
    * Executa as entregas vencidas com o provedor simulado e grava o resultado.
-   * Nao existe gatilho automatico: e chamada por acao explicita, e nenhuma
-   * mensagem real sai daqui.
+   *
+   * So a demonstracao (`mode: "memory"`) executa: la nao ha servidor. No
+   * Firestore planejar e disparar sao atos do backend — gatilho da agenda, Cloud
+   * Tasks e despachante — e este metodo recusa com `RepositoryError`, porque as
+   * Security Rules recusariam a escrita de qualquer jeito.
    */
   dispatchDueNotifications(now?: ISODateString): Promise<DispatchSummary>;
 

@@ -167,7 +167,8 @@ export type StoredNotificationConsent = NotificationConsent | LegacyNotification
  * `PLANNED` -> `SENDING` -> `SENT` | `FAILED`; `CANCELLED` fecha o registro
  * quando o atendimento deixa de existir antes da hora do envio. `FAILED` so e
  * terminal depois de esgotadas as tentativas; ate la volta para `PLANNED` com
- * `nextAttemptAt` no futuro.
+ * `nextAttemptAt` no futuro. `SENDING` e o intervalo em que o despachante do
+ * backend adquiriu a tarefa e ainda nao gravou o resultado.
  */
 export type DeliveryStatus =
   | "PLANNED"
@@ -185,6 +186,9 @@ export const DELIVERY_FAILURE_CODES = [
   "RATE_LIMITED",
   "SENDER_NOT_ALLOWED",
   "ATTEMPTS_EXHAUSTED",
+  // A execucao morreu depois de adquirir a tarefa e antes de gravar o
+  // resultado. Nao ganha nova tentativa: o envio pode ter saido.
+  "DISPATCH_INTERRUPTED",
 ] as const;
 
 export type DeliveryFailureCode = (typeof DELIVERY_FAILURE_CODES)[number];
@@ -236,6 +240,7 @@ export const NOTIFICATION_SKIP_REASONS = [
   "RULE_DISABLED",
   "EVENT_NOT_ALLOWED_FOR_PROFESSION",
   "CHANNEL_NOT_ALLOWED_FOR_PROFESSION",
+  "EVENT_WITHOUT_AUTOMATION",
   "MISSING_CONTACT",
   "INVALID_CONTACT",
   "MISSING_CONSENT",
@@ -254,6 +259,28 @@ export type NotificationSkipReason =
 export type NotificationEligibility =
   | { eligible: true; scheduledFor: ISODateString; body: string }
   | { eligible: false; reason: NotificationSkipReason };
+
+/**
+ * Por que um aviso ja planejado nao foi enviado. Alem das travas do
+ * planejamento, o que so da para saber na hora: a regra sumiu, o atendimento
+ * foi cancelado, remarcado ou passou para outro cadastro, ou o texto mudou.
+ */
+export const NOTIFICATION_DISPATCH_ONLY_STOP_REASONS = [
+  "RULE_NOT_FOUND",
+  "APPOINTMENT_NOT_FOUND",
+  "APPOINTMENT_CANCELLED",
+  "APPOINTMENT_RESCHEDULED",
+  "APPOINTMENT_CLIENT_CHANGED",
+  "CLIENT_NOT_FOUND",
+  "BODY_CHANGED",
+] as const;
+
+export type NotificationDispatchOnlyStopReason =
+  (typeof NOTIFICATION_DISPATCH_ONLY_STOP_REASONS)[number];
+
+export type NotificationDispatchStopReason =
+  | NotificationSkipReason
+  | NotificationDispatchOnlyStopReason;
 
 // ------------------------------------------------ avisos da plataforma
 

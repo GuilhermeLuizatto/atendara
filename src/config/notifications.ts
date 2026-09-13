@@ -5,6 +5,7 @@ import type {
   ConsentRecorderKind,
   DeliveryFailureCode,
   LegalGuardianRelationship,
+  NotificationDispatchOnlyStopReason,
   NotificationSkipReason,
   OrganizationNotificationSettings,
   OutboundChannel,
@@ -296,6 +297,8 @@ export const SKIP_REASON_LABELS: Record<NotificationSkipReason, string> = {
     "A profissão não permite aviso para este evento.",
   CHANNEL_NOT_ALLOWED_FOR_PROFESSION:
     "A profissão não permite este canal pelo grau de sensibilidade dos dados.",
+  EVENT_WITHOUT_AUTOMATION:
+    "O servidor ainda não executa avisos deste evento; nenhuma mensagem sai por ele.",
   MISSING_CONTACT: "O cadastro não tem contato para este canal.",
   INVALID_CONTACT: "O contato do cadastro não passa na validação do canal.",
   MISSING_CONSENT: "O cadastro não registrou consentimento.",
@@ -314,6 +317,17 @@ export const DELIVERY_FAILURE_LABELS: Record<DeliveryFailureCode, string> = {
   RATE_LIMITED: "Limite de envio atingido",
   SENDER_NOT_ALLOWED: "Remetente não autorizado",
   ATTEMPTS_EXHAUSTED: "Tentativas esgotadas",
+  DISPATCH_INTERRUPTED: "Envio interrompido sem confirmação",
+};
+
+export const NOTIFICATION_DISPATCH_STOP_LABELS: Record<NotificationDispatchOnlyStopReason, string> = {
+  RULE_NOT_FOUND: "A regra que planejou o aviso não existe mais.",
+  APPOINTMENT_NOT_FOUND: "O atendimento não foi encontrado.",
+  APPOINTMENT_CANCELLED: "O atendimento foi cancelado ou marcado como falta.",
+  APPOINTMENT_RESCHEDULED: "O atendimento foi remarcado.",
+  APPOINTMENT_CLIENT_CHANGED: "O atendimento passou para outro cadastro.",
+  CLIENT_NOT_FOUND: "O cadastro de quem recebe o aviso não foi encontrado.",
+  BODY_CHANGED: "O texto mudou entre o planejamento e o envio.",
 };
 
 export const PLATFORM_NOTICE_LABELS: Record<PlatformNoticeEvent, string> = {

@@ -1,0 +1,12 @@
+// Gerado por scripts/build-functions.mjs.
+/**
+ * Fila de automacao (Fase 3, 13.2).
+ *
+ * `config/automation.ts` guarda a politica; este diretorio guarda o mecanismo.
+ * Funcoes puras: `functions/automation.js` le e grava, e tudo o que decide o que
+ * gravar esta aqui, testavel sem emulador. Nenhum arquivo importa `firebase/*`.
+ */
+export * from "./automation-appointment-changes.js";
+export * from "./automation-dispatch.js";
+export * from "./automation-effects.js";
+export * from "./automation-tasks.js";

@@ -61,7 +61,7 @@ try {
     }
     for (const org of ["org-a", "org-b"]) {
       await setDoc(doc(db, paths.organization(org)), { primaryProfession: "PSYCHOLOGIST", ownerId: "a" });
-      for (const collection of ["professionals", "clients", "appointments", "transactions", "aiDecisions", "auditLogs"]) await setDoc(doc(db, paths.document(org, collection, "example")), { organizationId: org });
+      for (const collection of ["professionals", "clients", "appointments", "transactions", "aiDecisions", "automationTasks", "auditLogs"]) await setDoc(doc(db, paths.document(org, collection, "example")), { organizationId: org });
       await setDoc(doc(db, paths.document(org, "aiRules", "immutable")), { organizationId: org, immutable: true, level: "SYSTEM", enabled: true });
       await setDoc(doc(db, paths.document(org, "conversations", "conv")), { organizationId: org, clientId: "example", status: "OPEN" });
       await setDoc(doc(db, messagePath(org, "conv", "m1")), { organizationId: org, conversationId: "conv", body: "Bom dia", sentAt: new Date() });
@@ -143,12 +143,12 @@ try {
   await denied(getDocs(query(collectionGroup(db("restricted"), "messages"), where("organizationId", "==", "org-a"))));
 
   // Listagem cruzada de cada colecao operacional.
-  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "auditLogs"]) {
+  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "automationTasks", "auditLogs"]) {
     await denied(getDocs(query(collection(db("a"), paths.collection("org-b", name)), limit(5))));
   }
 
   // Escrita cruzada, documento a documento.
-  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "auditLogs"]) {
+  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "automationTasks", "auditLogs"]) {
     await denied(setDoc(doc(db("a"), paths.document("org-b", name, "intruso")), { organizationId: "org-b" }));
     await denied(updateDoc(doc(db("a"), paths.document("org-b", name, "example")), { alterado: true }));
   }
@@ -168,21 +168,41 @@ try {
   await allowed(updateDoc(doc(db("a"), paths.document("org-a", "notifications", "alert")), { status: "READ", updatedAt: new Date().toISOString() }));
   await denied(updateDoc(doc(db("a"), paths.document("org-a", "notifications", "alert")), { title: "Outro texto" }));
 
-  // Fila de saida dos avisos ao cliente. Um registro nasce planejado e sem
-  // tentativa: gravar uma entrega ja "enviada" faria a trilha afirmar que uma
-  // mensagem saiu sem que nada tenha sido tentado.
+  // Fila de saida dos avisos ao cliente (S-05, Fase 3, 13.2). O navegador so
+  // le: planejar e disparar sao atos do backend. Nem uma entrega "PLANNED" nasce
+  // pelo cliente, e nenhum papel marca envio, zera tentativa, cancela ou troca o
+  // registro. Antes da 13.2 as duas primeiras escritas abaixo passavam.
   const delivery = extra => ({ organizationId: "org-a", status: "PLANNED", attempts: 0, sentAt: null, channel: "SMS", event: "APPOINTMENT_REMINDER", bodyHash: "abcdef12", contactHint: "***0000", ...extra });
-  await allowed(setDoc(doc(db("a"), paths.document("org-a", "notificationDeliveries", "novo")), delivery()));
-  await denied(setDoc(doc(db("a"), paths.document("org-a", "notificationDeliveries", "forjado")), delivery({ status: "SENT", attempts: 1, sentAt: new Date().toISOString() })));
-  await denied(setDoc(doc(db("a"), paths.document("org-a", "notificationDeliveries", "forjado")), delivery({ attempts: 3 })));
+  const deliveryOf = (uid, id) => doc(db(uid), paths.document("org-a", "notificationDeliveries", id));
+  await allowed(getDoc(deliveryOf("a", "envio")));
+  await allowed(getDocs(query(collection(db("a"), paths.collection("org-a", "notificationDeliveries")), limit(5))));
+  for (const uid of ["a", "ownerRole", "adminRole", "assistantRole"]) {
+    await deniedBecause(`${uid} planejando entrega pelo navegador`, setDoc(deliveryOf(uid, `planejada-${uid}`), delivery()));
+    await deniedBecause(`${uid} marcando envio que nao saiu`, updateDoc(deliveryOf(uid, "envio"), { status: "SENT", attempts: 1, sentAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
+    await deniedBecause(`${uid} zerando tentativas`, updateDoc(deliveryOf(uid, "envio"), { attempts: 0, nextAttemptAt: null }));
+    await deniedBecause(`${uid} cancelando pelo navegador`, updateDoc(deliveryOf(uid, "envio"), { status: "CANCELLED", cancelledAt: new Date().toISOString() }));
+  }
+  await denied(setDoc(deliveryOf("a", "forjado"), delivery({ status: "SENT", attempts: 1, sentAt: new Date().toISOString() })));
+  await denied(setDoc(deliveryOf("a", "forjado"), delivery({ attempts: 3 })));
+  await denied(updateDoc(deliveryOf("a", "envio"), { bodyHash: "00000000" }));
+  await denied(updateDoc(deliveryOf("a", "envio"), { channel: "WHATSAPP" }));
+  await denied(deleteDoc(deliveryOf("ownerRole", "envio")));
 
-  // Depois do planejamento so o resultado da tentativa muda. Destinatario,
-  // canal, evento e hash do texto sao fixos — sem isso o registro deixaria de
-  // provar o que foi enviado.
-  await allowed(updateDoc(doc(db("a"), paths.document("org-a", "notificationDeliveries", "envio")), { status: "SENT", attempts: 1, sentAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
-  await denied(updateDoc(doc(db("a"), paths.document("org-a", "notificationDeliveries", "envio")), { bodyHash: "00000000" }));
-  await denied(updateDoc(doc(db("a"), paths.document("org-a", "notificationDeliveries", "envio")), { channel: "WHATSAPP" }));
-  await denied(deleteDoc(doc(db("a"), paths.document("org-a", "notificationDeliveries", "envio"))));
+  // Fila de automacao: mecanismo do backend. Ninguem le nem escreve pelo
+  // cliente — nem o OWNER, nem para forjar alerta ou trilha como se viessem da
+  // automacao.
+  const task = extra => ({ organizationId: "org-a", type: "SEND_REMINDER", status: "PLANNED", attempt: 1, ...extra });
+  const taskOf = (uid, id) => doc(db(uid), paths.document("org-a", "automationTasks", id));
+  for (const uid of ["a", "ownerRole", "adminRole"]) {
+    await deniedBecause(`${uid} lendo a fila`, getDoc(taskOf(uid, "example")));
+    await deniedBecause(`${uid} listando a fila`, getDocs(query(collection(db(uid), paths.collection("org-a", "automationTasks")), limit(5))));
+    await deniedBecause(`${uid} criando tarefa`, setDoc(taskOf(uid, `nova-${uid}`), task()));
+    await deniedBecause(`${uid} concluindo tarefa`, updateDoc(taskOf(uid, "example"), { status: "SUCCEEDED" }));
+    await deniedBecause(`${uid} apagando tarefa`, deleteDoc(taskOf(uid, "example")));
+  }
+  await deniedBecause("alerta forjado pelo navegador", setDoc(taskOf("ownerRole", "alerta-forjado"), task({ type: "RAISE_ALERT", status: "SUCCEEDED" })));
+  await deniedBecause("trilha forjada pelo navegador", setDoc(taskOf("adminRole", "trilha-forjada"), task({ type: "WRITE_AUDIT", status: "SUCCEEDED" })));
+  await deniedBecause("fila sem o modulo de agenda", getDoc(taskOf("restricted", "example")));
 
   // Sem o modulo de agenda a fila de saida nao abre: todo evento que a alimenta
   // vem de la.
@@ -215,7 +235,7 @@ try {
   await denied(getDoc(doc(operator, paths.document("org-a", "members", "a"))));
   await denied(updateDoc(doc(operator, paths.document("org-a", "members", "a")), { role: "OWNER" }));
   await denied(deleteDoc(doc(operator, paths.document("org-a", "members", "restricted"))));
-  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "auditLogs"]) {
+  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "auditLogs"]) {
     await denied(getDoc(doc(operator, own(name))));
     await denied(setDoc(doc(operator, paths.document("org-a", name, "da-operadora")), { organizationId: "org-a" }));
   }
@@ -428,6 +448,6 @@ try {
   await allowed(updateDoc(antigo(), { notificationConsent: recordConsent(threeGrants(), LEGACY_CONSENT) }));
   await deniedBecause("reescrever o formato antigo guardado", updateDoc(antigo(), { notificationConsent: recordConsent(threeGrants(), { ...LEGACY_CONSENT, channels: ["EMAIL", "SMS"] }) }));
 
-  assert.equal(checks, 236);
+  assert.equal(checks, 275);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

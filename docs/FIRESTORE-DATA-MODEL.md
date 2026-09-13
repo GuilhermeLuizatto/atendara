@@ -29,7 +29,8 @@ organizations/{orgId}
 ├── aiRules/{ruleId}                     apenas os niveis editaveis
 ├── aiDecisions/{decisionId}             append-only
 ├── notifications/{notificationId}       alertas DENTRO do painel
-├── notificationDeliveries/{deliveryId}  fila de saida dos avisos ao cliente
+├── notificationDeliveries/{deliveryId}  fila de saida dos avisos ao cliente (so backend escreve)
+├── automationTasks/{taskId}             fila de automacao (so backend le e escreve)
 ├── auditLogs/{logId}                    append-only (so o backend pseudonimiza)
 └── privacyRequests/{requestId}          pedidos de titulares atendidos (so backend)
 
@@ -67,10 +68,14 @@ eventos e provisorio e nao tem politica ligada.
 
 ## 2. Datas: `Timestamp` no banco, ISO no dominio
 
-O dominio trabalha com string ISO-8601. O banco grava `Timestamp`. A conversao
-acontece exclusivamente em
-[`src/lib/firebase/converters.ts`](../src/lib/firebase/converters.ts), que
-mantem a tabela de quais campos sao data:
+O dominio trabalha com string ISO-8601. O banco grava `Timestamp`. A tabela de
+quais campos sao data e uma so,
+[`src/lib/firebase/date-fields.ts`](../src/lib/firebase/date-fields.ts), sem SDK.
+O navegador converte em
+[`src/lib/firebase/converters.ts`](../src/lib/firebase/converters.ts); as
+functions, que tem outro `Timestamp`, em
+[`functions/firestore-dates.js`](../functions/firestore-dates.js) — o que o
+backend grava na fila e o que a tela le.
 
 | Colecao         | Campos gravados como `Timestamp`                          |
 | --------------- | --------------------------------------------------------- |
@@ -84,6 +89,7 @@ mantem a tabela de quais campos sao data:
 | `aiDecisions`   | + `decidedAt`, `evaluatedAt`                               |
 | `notifications` | + `acknowledgedAt`                                         |
 | `notificationDeliveries` | + `scheduledFor`, `lastAttemptAt`, `nextAttemptAt`, `sentAt`, `cancelledAt` |
+| `automationTasks` | + `scheduledFor`, `expiresAt`, `appointmentStartsAt`, `dispatchingSince`, `completedAt` |
 | `auditLogs`     | + `occurredAt`                                             |
 | `privacyRequests` | + `executedAt`, `expiresAt`                              |
 
@@ -94,12 +100,17 @@ Security Rules e leitura no console dependem dele.
 **Por que uma tabela e nao inferencia.** Adivinhar por sufixo ("tudo que termina
 em `At`") transformaria qualquer campo de texto futuro em data silenciosamente.
 
-Quatro excecoes propositais: `externalCalendar.syncedAt` e `gateway` sao payloads
+Cinco excecoes propositais: `externalCalendar.syncedAt` e `gateway` sao payloads
 espelhados de sistemas externos e ficam como vieram; `privacyRedaction.redactedAt`
-e gravado pelo backend ja em ISO; e as datas do historico de consentimento em
+e gravado pelo backend ja em ISO; as datas do historico de consentimento em
 `clients.notificationConsent` (`granted.at`, `withdrawn.at` de cada registro por
 canal) ficam em ISO porque as Security Rules conferem o formato delas e a
-igualdade do historico inteiro, que nao pode mudar de tipo entre leituras.
+igualdade do historico inteiro, que nao pode mudar de tipo entre leituras; e o
+`history[].at` de `automationTasks`, historico dentro do documento.
+
+`expiresAt` de `automationTasks` e a validade da **execucao** — passado dele a
+tarefa nao executa —, e nao prazo de retencao. Nenhuma politica de TTL pode ser
+ligada nesse campo: apagaria a tarefa duas horas depois do horario.
 
 **`id` vem do caminho, nunca do corpo.** Um documento com `id` divergente e lido
 pelo id real.
@@ -360,7 +371,19 @@ A Fase 3 (13.1) acrescentou 31, sobre o consentimento por canal em `clients`:
 - passar do formato antigo ao registro por canal guardando o antigo inteiro —
   permitido; perdendo ou reescrevendo o antigo — negado.
 
-Total: **236 verificacoes**. O numero e conferido por `assert` no proprio
+A Fase 3 (13.2) acrescentou 39, sobre a fila no servidor:
+
+- `notificationDeliveries`: o membro com o modulo `agenda` le e lista; o titular
+  `PROFESSIONAL`, `OWNER`, `ADMIN` e `ASSISTANT` criando entrega planejada,
+  marcando envio, zerando tentativas ou cancelando — negado. Antes, os tres
+  primeiros criavam e alteravam o resultado pelo navegador;
+- `automationTasks`: titular, `OWNER` e `ADMIN` lendo, listando, criando,
+  concluindo ou apagando tarefa, alerta ou trilha forjados como da automacao,
+  membro sem o modulo — negado;
+- listagem e escrita cruzadas entre tenants e a operadora com TOTP, tambem na
+  fila de automacao — negadas.
+
+Total: **275 verificacoes**. O numero e conferido por `assert` no proprio
 script, para que uma verificacao removida por engano quebre o teste.
 
 Do lado do dominio, `src/services/firestore/plans.test.ts` verifica que nenhum
@@ -382,7 +405,15 @@ A suite de repositorio existe porque planos corretos e regras corretas ainda
 deixam um vao: conversao `Timestamp` <-> ISO, lote atomico, transacao e
 listeners so falham contra um banco de verdade. Ela sobe o emulador com regras
 abertas (`scripts/emulator-open.rules`, nunca publicadas) — autorizacao nao e o
-assunto dela.
+assunto dela. Tambem roda `functions/automation.emulator-test.js`: gatilho e
+despachante contra o banco, com a Cloud Tasks e o provedor substituidos por
+dubles que contam cada pedido (reentrega, tarefa vencida, consentimento retirado
+entre planejar e enviar, remarcacao, nova tentativa, execucao interrompida).
+
+A suite de acesso sobe tambem a Cloud Tasks emulada, para a fila ir do gatilho
+ao despachante. Limite dela: executa a tarefa na hora, sem esperar
+`scheduleTime` — por isso o caminho completo ali e o da confirmacao, que sai no
+instante da escrita.
 
 ---
 
@@ -394,8 +425,9 @@ O destino de cada colecao esta em `PERSONAL_DATA_MAP`
 
 - **Pedido de eliminacao de um cliente.** `clients`, `conversations` e
   `messages` do cliente sao apagados. `appointments`, `transactions`,
-  `notifications`, `notificationDeliveries`, `aiDecisions`, `auditLogs` e
-  `privacyRequests` ligados a ele continuam, com os campos pessoais trocados e
+  `notifications`, `notificationDeliveries`, `automationTasks`, `aiDecisions`,
+  `auditLogs` e `privacyRequests` ligados a ele continuam, com os campos pessoais
+  trocados e
   a marca `privacyRedaction: { scope, requestId, redactedAt }`. Onde havia o
   `clientId`, fica o mesmo pseudonimo `titular-removido-{aleatorio}` em todos os
   documentos. A busca parte do `clientId` e segue os ids derivados

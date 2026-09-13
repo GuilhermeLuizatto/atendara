@@ -12,7 +12,9 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["src/**/*.emulator-test.ts"],
+    // O backend da fila de automacao usa o mesmo banco: transacao e consulta
+    // dentro de transacao so falham contra um Firestore de verdade.
+    include: ["src/**/*.emulator-test.ts", "functions/**/*.emulator-test.js"],
     testTimeout: 20_000,
     hookTimeout: 20_000,
     // Um unico banco compartilhado; suites em paralelo disputariam os mesmos

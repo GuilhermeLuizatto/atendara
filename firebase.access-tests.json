@@ -5,6 +5,7 @@
     "auth": { "port": 9098 },
     "firestore": { "port": 8087 },
     "functions": { "port": 5002 },
+    "tasks": { "port": 9498 },
     "ui": { "enabled": false },
     "singleProjectMode": true
   }

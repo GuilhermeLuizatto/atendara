@@ -120,7 +120,8 @@ Colecoes sob `organizations/{organizationId}`:
 | `aiRules`       | Regras do agente, dos quatro niveis      |
 | `aiDecisions`   | Registro imutavel de cada decisao        |
 | `notifications` | Alertas DENTRO do painel                 |
-| `notificationDeliveries` | Fila de saida dos avisos ao cliente |
+| `notificationDeliveries` | Fila de saida dos avisos ao cliente (escrita so pelo backend) |
+| `automationTasks` | Fila de automacao: cada execucao, com estado, tentativa e validade (so backend) |
 | `auditLogs`     | Trilha append-only                       |
 | `privacyRequests` | Registro dos pedidos de titulares atendidos |
 
@@ -549,8 +550,9 @@ Firestore — backup, arquivo baixado, gateway, provedores — nao sao alcancada
 
 ## 15. Automacao
 
-> **Estado:** desenho decidido, nada implementado. Os avisos continuam com o
-> provedor simulado e nenhum canal real esta conectado.
+> **Estado:** a fila de tarefas no servidor esta implementada (gatilho, Cloud
+> Tasks e despachante), nao publicada. A ponte com o n8n e os canais reais nao
+> existem: o despachante executa com o provedor simulado.
 
 WhatsApp, Google Calendar e e-mail sao executados por um n8n em servidor
 proprio. O n8n **executa**; quem **decide** e o Atendara.
@@ -578,12 +580,46 @@ disponibilidade, tenant e a trava do `ADMINISTRATIVE` sao conferidos no servidor
 imediatamente antes de emitir a tarefa. O n8n nao reconfere nada: executa ou
 falha. Uma trava que morasse num fluxo visual nao teria teste nem diff.
 
-**A fila e do servidor.** `automationTasks` e `notificationDeliveries` fecham
-para escrita pelo navegador (`write: if false`). Hoje a fila de avisos e escrita
-pelo aplicativo porque e ele quem executa o provedor simulado; com provedor real,
-um membro poderia marcar como enviado o que nunca saiu. O despachante adquire a
-tarefa em transacao e reconfere `src/lib/notifications/eligibility.ts` antes de
-cada envio.
+**A fila e do servidor.** `notificationDeliveries` e `automationTasks` recusam
+escrita do navegador (`write: if false`); `automationTasks` tambem nao e lida por
+ele. Se o aplicativo escrevesse na fila, um membro marcaria como enviado o que
+nunca saiu, ou zeraria tentativas. O caminho (`functions/automation.js`):
+
+1. **Gatilho** `planAppointmentNotices` (`onDocumentWritten` em
+   `appointments`, `southamerica-east1`, com repeticao). Compara antes e depois
+   para saber o evento; confere o que ja esta na fila contra o atendimento lido
+   na transacao — gatilho nao chega em ordem, e evento velho nao cancela o que um
+   evento novo planejou. Grava tarefa, entrega, trilha e alerta na mesma
+   transacao. O instante da escrita e o `updateTime` do servidor, igual em toda
+   reentrega.
+2. **Cloud Tasks** agenda o horario exato. O nome da tarefa na fila deriva da
+   organizacao, da tarefa, da tentativa e do horario, e nome repetido e recusado:
+   reentregar o planejamento nao duplica. Alem de 29 dias, a fila desperta o
+   despachante, que pede de novo.
+3. **Despachante** `dispatchAutomationTask` (`onTaskDispatched`). Na mesma
+   transacao le a tarefa e o estado atual, confere de novo as travas de
+   `src/lib/notifications/eligibility.ts` (`recheckBeforeSend`: consentimento,
+   canal, profissao, contato, atendimento cancelado ou remarcado, texto igual ao
+   planejado) e adquire a tarefa. Envia fora da transacao e grava o resultado
+   numa segunda, que confere se a tarefa ainda e desta execucao.
+
+**Tarefa.** Tipos `CONFIRM_APPOINTMENT` e `SEND_REMINDER` (externos) e
+`PROCESS_INBOUND_MESSAGE`, `RAISE_ALERT` e `WRITE_AUDIT` (internos). Estados
+`PLANNED -> SCHEDULED -> DISPATCHING -> DISPATCHED -> SUCCEEDED | FAILED`, mais
+`CANCELLED` e `EXPIRED`, com as transicoes validas numa tabela
+(`src/config/automation.ts`) e cada passo no historico da propria tarefa.
+Terminal nao volta; falha retentavel volta a `SCHEDULED` com a tentativa
+seguinte. Id do aviso = chave do envio; validade = horario planejado mais a
+janela de atraso, nunca depois do inicio do atendimento. Tarefa interna nasce e
+termina na transacao da mudanca de estado que a originou e nunca passa pela
+fila. Execucao interrompida no meio vira falha com alerta, sem repetir: nao da
+para saber se a mensagem saiu. Agendamento e cancelamento ainda nao tem tipo de
+tarefa e, por isso, nao planejam envio (`EVENT_WITHOUT_AUTOMATION`).
+
+Toda decisao esta em `src/lib/automation`, em funcoes puras; as functions recebem
+a mesma politica e o mesmo portao por `scripts/build-functions.mjs`. A
+demonstracao em memoria, sem servidor, continua simulando a fila no navegador
+com as mesmas travas.
 
 **Contrato.**
 

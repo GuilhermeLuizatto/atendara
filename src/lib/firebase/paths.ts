@@ -53,6 +53,9 @@ export const TENANT_COLLECTIONS = {
   // `notifications` de proposito: aquela e o alerta dentro do painel, esta e a
   // fila de saida, com estado de entrega e tentativas.
   notificationDeliveries: "notificationDeliveries",
+  // Fila de automacao: cada execucao (aviso, alerta, registro na trilha), com
+  // estado, tentativa e validade. So o backend le e escreve.
+  automationTasks: "automationTasks",
   auditLogs: "auditLogs",
   // Registro de cada pedido de titular de dados atendido pela organizacao.
   // Escrito so pelo backend, junto da exportacao ou da eliminacao.

@@ -45,7 +45,9 @@ const child = spawn(
     "--project",
     "demo-atendara",
     "--only",
-    "auth,firestore,functions",
+    // `tasks`: a fila de automacao pede a Cloud Tasks emulada. O emulador
+    // executa na hora, sem esperar `scheduleTime`.
+    "auth,firestore,functions,tasks",
     "vitest run --config vitest.access.mts",
   ],
   {

@@ -2,6 +2,8 @@ import { Timestamp } from "firebase/firestore";
 
 import type { ISODateString } from "@/types";
 
+import { COLLECTION_DATE_FIELDS, type ConvertedCollection } from "./date-fields";
+
 /**
  * Fronteira entre o dominio (strings ISO) e o Firestore (`Timestamp`).
  *
@@ -40,49 +42,8 @@ export function mapTimestamps<T extends Record<string, unknown>>(
 
 // ------------------------------------------------- registro por colecao
 
-const STAMP_FIELDS = ["createdAt", "updatedAt"] as const;
-
-/**
- * Quais campos de cada colecao sao datas.
- *
- * E uma tabela e nao inferencia: adivinhar por nome ("tudo que termina em At")
- * transformaria qualquer campo de texto futuro em data silenciosamente.
- *
- * `externalCalendar.syncedAt` e `gateway` ficam de fora de proposito — sao
- * payloads espelhados de sistemas externos, gravados como vieram. O mesmo vale
- * para `privacyRedaction.redactedAt`, que o backend grava ja em ISO.
- */
-export const COLLECTION_DATE_FIELDS = {
-  organizations: STAMP_FIELDS,
-  professionals: STAMP_FIELDS,
-  members: STAMP_FIELDS,
-  clients: [...STAMP_FIELDS, "lastAppointmentAt", "nextAppointmentAt"],
-  appointments: [
-    ...STAMP_FIELDS,
-    "startsAt",
-    "endsAt",
-    "confirmedAt",
-    "cancelledAt",
-  ],
-  conversations: [...STAMP_FIELDS, "lastMessageAt"],
-  messages: [...STAMP_FIELDS, "sentAt", "readAt"],
-  transactions: [...STAMP_FIELDS, "dueDate", "paidAt"],
-  aiRules: [...STAMP_FIELDS, "lastAppliedAt"],
-  aiDecisions: [...STAMP_FIELDS, "decidedAt", "evaluatedAt"],
-  notifications: [...STAMP_FIELDS, "acknowledgedAt"],
-  notificationDeliveries: [
-    ...STAMP_FIELDS,
-    "scheduledFor",
-    "lastAttemptAt",
-    "nextAttemptAt",
-    "sentAt",
-    "cancelledAt",
-  ],
-  auditLogs: [...STAMP_FIELDS, "occurredAt"],
-  privacyRequests: [...STAMP_FIELDS, "executedAt"],
-} as const;
-
-export type ConvertedCollection = keyof typeof COLLECTION_DATE_FIELDS;
+// A tabela mora sem SDK em `date-fields.ts`: as functions convertem com ela.
+export { COLLECTION_DATE_FIELDS, type ConvertedCollection };
 
 /**
  * Dominio -> Firestore. Datas viram `Timestamp`; `undefined` e removido porque

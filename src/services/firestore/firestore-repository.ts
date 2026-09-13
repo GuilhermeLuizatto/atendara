@@ -28,21 +28,8 @@ import type {
   ProfessionId,
 } from "@/types";
 
-import {
-  dispatchDelivery,
-  emptySummary,
-  tally,
-  type DispatchSummary,
-} from "@/lib/notifications";
-import {
-  dispatchTargetFor,
-  dueDeliveries,
-} from "../notifications";
-import {
-  deliveryCancelWrite,
-  deliveryTransitionWrite,
-  planUpdateNotificationSettings,
-} from "./plans/outbound";
+import type { DispatchSummary } from "@/lib/notifications";
+import { planUpdateNotificationSettings } from "./plans/outbound";
 import {
   RepositoryError,
   type AppointmentInput,
@@ -773,35 +760,15 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
   }
 
   /**
-   * Disparo das entregas vencidas.
-   *
-   * Sequencial, e nao em paralelo, de proposito: cada envio consulta o estado
-   * que o anterior deixou, e o provedor simulado responde na hora. Uma fila real
-   * pertence ao servidor — este metodo existe para exercitar o ciclo completo
-   * sem que nada saia para uma pessoa de verdade.
+   * Nao ha disparo pelo navegador numa organizacao real. O gatilho da agenda
+   * planeja, a Cloud Tasks agenda e o despachante envia depois de conferir as
+   * travas de novo (`functions/automation.js`); as Security Rules recusam
+   * escrita do cliente na fila (S-05).
    */
-  async dispatchDueNotifications(now?: ISODateString): Promise<DispatchSummary> {
-    const ctx = this.context();
-    const at = now ?? ctx.now;
-    let summary = emptySummary();
-    const writes: WriteOperation[] = [];
-
-    for (const delivery of dueDeliveries(ctx.snapshot, at)) {
-      const decision = await dispatchDelivery(
-        dispatchTargetFor(ctx.snapshot, delivery, at),
-        at,
-      );
-      summary = tally(summary, delivery.id, decision);
-
-      if (decision.action === "CANCELLED") {
-        writes.push(deliveryCancelWrite(ctx, delivery));
-      } else if (decision.action !== "SKIPPED") {
-        writes.push(deliveryTransitionWrite(ctx, delivery, decision.transition));
-      }
-    }
-
-    await this.commit(writes);
-    return summary;
+  async dispatchDueNotifications(): Promise<DispatchSummary> {
+    throw new RepositoryError(
+      "Os avisos são enviados pelo servidor no horário planejado. Não há disparo manual.",
+    );
   }
 
   // -------------------------------------------------------- notificacoes

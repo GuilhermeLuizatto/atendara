@@ -93,6 +93,10 @@ export { grantAccess, revokeAccess } from "./platform.js";
 // quando ela confirma o e-mail. Concessao registrada, como as da operadora.
 export { registerSelfService, activateTrial } from "./self-service.js";
 
+// Fim do teste: rotina diaria que registra o vencimento e abre o prazo de
+// retencao. Nao fecha o painel — quem fecha e a data, nas regras e na interface.
+export { closeExpiredTrialsDaily } from "./trial.js";
+
 // Administradores da plataforma: so a chave mestra cria, suspende e reativa.
 export { createPlatformAdmin, setPlatformAdminStatus } from "./platform-admins.js";
 

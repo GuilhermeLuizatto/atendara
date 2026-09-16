@@ -168,6 +168,9 @@ export const registerSelfService = onCall(SIGNUP_CALL_OPTIONS, async (request) =
     // Senha escolhida pela propria pessoa: nao ha senha inicial a trocar.
     mustChangePassword: false,
     origin: "SELF_SERVICE",
+    // A rotina diaria procura por este campo. Ausente, o documento nao apareceria
+    // na consulta e o teste nunca seria dado por encerrado.
+    blockedSince: null,
     legal: { version: LEGAL_VERSION, acceptedAt: createdAt },
     createdAt,
   };

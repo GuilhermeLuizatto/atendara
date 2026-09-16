@@ -41,6 +41,14 @@ export interface AccountAccess {
   mustChangePassword: boolean;
   origin?: AccountOrigin;
   /**
+   * Quando o teste venceu e a conta passou a so pagar, exportar e apagar.
+   *
+   * Escrito pela rotina diaria, nunca pelo cliente. Nao e um portao — quem
+   * fecha o painel e `accessUntil`, pela data — e sim o inicio do prazo de
+   * retencao que a A.5 usa.
+   */
+  blockedSince?: string | null;
+  /**
    * So existe em cadastro aberto: o aceite acontece na tela de cadastro. Quem a
    * operadora cadastrou aceitou fora do produto, e inventar um registro aqui
    * seria afirmar um consentimento que ninguem deu.

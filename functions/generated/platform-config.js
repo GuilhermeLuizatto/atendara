@@ -81,6 +81,7 @@ export const PLATFORM_AUDIT_ACTION_LABELS = {
     SELF_SERVICE_REGISTERED: "Cadastro aberto pelo profissional",
     TRIAL_STARTED: "Início do teste de 14 dias",
     TRIAL_ENDED: "Fim do teste de 14 dias",
+    ABANDONED_ORGANIZATION_ERASED: "Exclusão automática do cadastro abandonado",
     PLATFORM_ADMIN_CREATED: "Cadastro de administrador",
     PLATFORM_ADMIN_SUSPENDED: "Suspensão de administrador",
     PLATFORM_ADMIN_REACTIVATED: "Reativação de administrador",

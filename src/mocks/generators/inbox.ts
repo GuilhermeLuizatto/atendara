@@ -97,10 +97,15 @@ export function buildInbox(
         "{profissional}",
         profession.terminology.professional.singularLower,
       )
-      .replaceAll("{preco}", formatCurrency(profession.defaultPriceInCents))
+      .replaceAll(
+        "{preco}",
+        profession.defaultPriceInCents === null
+          ? ""
+          : formatCurrency(profession.defaultPriceInCents),
+      )
       .replaceAll(
         "{duracao}",
-        String(profession.defaultAppointmentDurationMinutes),
+        String(profession.defaultAppointmentDurationMinutes ?? ""),
       );
 
   plan.forEach((classification, index) => {
@@ -151,8 +156,14 @@ export function buildInbox(
 
     // Guardamos a troca autorizada em vez de um booleano: o tipo carrega a
     // informacao de que existe categoria e resposta, sem assercao de tipo.
+    // Sem preco cadastrado o motor real escala a pergunta de valor; a
+    // demonstracao faz o mesmo em vez de responder com valor vazio.
+    const replyHasData =
+      exchange?.category !== "PRICING" || profession.defaultPriceInCents !== null;
     const answeredExchange =
-      exchange && meta.autoResponseEligible && ruleAllows ? exchange : null;
+      exchange && meta.autoResponseEligible && ruleAllows && replyHasData
+        ? exchange
+        : null;
     const answered = answeredExchange !== null;
 
     const confidence = answered
@@ -182,7 +193,9 @@ export function buildInbox(
         : null,
       reason: answered
         ? `Pergunta exclusivamente administrativa coberta pela regra "${appliedRule?.name}".`
-        : ESCALATION_REASONS[classification],
+        : replyHasData
+          ? ESCALATION_REASONS[classification]
+          : "Não há informação cadastrada para responder com segurança.",
       attention: attentionFor(classification),
       escalated: !answered,
       engineVersion: AI_ENGINE_VERSION,

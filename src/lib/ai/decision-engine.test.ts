@@ -47,6 +47,7 @@ describe("motor de decisao", () => {
     "PHYSIOTHERAPIST",
     "THERAPIST",
     "PERSONAL_TRAINER",
+    "AESTHETICS",
   ] as ProfessionId[])(
     "escala risco e conteudo sensivel em %s",
     (professionId) => {
@@ -71,6 +72,32 @@ describe("motor de decisao", () => {
       ).toBe("ESCALATE_TO_PROFESSIONAL");
     },
   );
+  describe("estetica", () => {
+    const data = buildMockDataset("AESTHETICS", now);
+    const base = request({
+      profession: getProfession("AESTHETICS"),
+      organization: data.organization,
+      rules: data.rules,
+    });
+
+    it("escala pergunta de valor, porque o preco e da profissional", () => {
+      const result = decide({ ...base, text: "Qual o valor do atendimento?" });
+      expect(result.escalated).toBe(true);
+      expect(result.responseText).toBeNull();
+    });
+
+    it.each([
+      "Fiquei com alergia depois da depilação.",
+      "A cutícula inflamou depois da manicure.",
+      "Minha unha encravada está sangrando, quanto custa para ver?",
+      "Queimou minha pele com a cera.",
+    ])("encaminha relato de reacao: %s", (text) => {
+      const result = decide({ ...base, text });
+      expect(result.classification).toBe("HEALTH_RELATED");
+      expect(result.action).toBe("ESCALATE_TO_PROFESSIONAL");
+    });
+  });
+
   it("escala texto desconhecido", () => {
     const result = decide(request({ text: "Quero falar de outro assunto." }));
     expect(result.classification).toBe("UNKNOWN");

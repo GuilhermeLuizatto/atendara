@@ -18,7 +18,9 @@ resto para o humano.
 Nao e um sistema para psicologos com outros nomes. O nucleo nao conhece
 profissao: terminologia, taxonomia de mensagens, regras e comportamento da
 interface vem de configuracao. A mesma base atende psicologo, psiquiatra, medico,
-dentista, nutricionista, fisioterapeuta, terapeuta e personal trainer.
+dentista, nutricionista, fisioterapeuta, terapeuta, personal trainer e
+profissionais de estetica (manicure e pedicure, sobrancelha, cilios, depilacao e
+maquiagem).
 
 **Status:** em desenvolvimento. Agenda, clientes, mensagens e financeiro
 persistem no Firestore com isolamento por organizacao. A assinatura da

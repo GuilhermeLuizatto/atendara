@@ -157,6 +157,10 @@
   --accent: oklch(0.545 0.192 15);
   --accent-soft: oklch(0.955 0.032 15);
 }
+[data-accent="fuchsia"] {
+  --accent: oklch(0.54 0.19 330);
+  --accent-soft: oklch(0.955 0.032 330);
+}
 
 .dark [data-accent="violet"] {
   --accent: oklch(0.712 0.168 296);
@@ -189,6 +193,10 @@
 .dark [data-accent="rose"] {
   --accent: oklch(0.715 0.162 15);
   --accent-soft: oklch(0.302 0.075 15);
+}
+.dark [data-accent="fuchsia"] {
+  --accent: oklch(0.715 0.16 330);
+  --accent-soft: oklch(0.3 0.075 330);
 }
 
 @theme inline {

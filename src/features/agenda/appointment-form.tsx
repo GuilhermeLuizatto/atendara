@@ -25,7 +25,9 @@ interface Draft {
   professionalId: string;
   date: string;
   time: string;
-  durationMinutes: number;
+  // Texto, como o valor: a profissao pode nao ter duracao padrao, e o campo
+  // precisa abrir vazio em vez de mostrar zero.
+  durationMinutes: string;
   modality: ServiceModality;
   status: AppointmentStatus;
   priceInReais: string;
@@ -52,7 +54,8 @@ function validate(draft: Draft): Errors {
   if (!draft.professionalId) errors.professionalId = "Selecione o profissional.";
   if (!draft.date) errors.date = "Informe a data.";
   if (!draft.time) errors.time = "Informe o horário.";
-  if (!Number.isFinite(draft.durationMinutes) || draft.durationMinutes < 5) {
+  const duration = Number(draft.durationMinutes);
+  if (!draft.durationMinutes.trim() || !Number.isFinite(duration) || duration < 5) {
     errors.durationMinutes = "Duração mínima de 5 minutos.";
   }
 
@@ -99,7 +102,7 @@ export function AppointmentForm({
           professionalId: appointment.professionalId,
           date: toDateKey(new Date(appointment.startsAt)),
           time: toTimeValue(appointment.startsAt),
-          durationMinutes: appointment.durationMinutes,
+          durationMinutes: String(appointment.durationMinutes),
           modality: appointment.modality,
           status: appointment.status,
           priceInReais: centsToInput(appointment.priceInCents),
@@ -110,10 +113,16 @@ export function AppointmentForm({
           professionalId: professionals[0]?.id ?? "",
           date: defaultDate ?? toDateKey(new Date()),
           time: defaultTime ?? "09:00",
-          durationMinutes: profession.defaultAppointmentDurationMinutes,
+          durationMinutes:
+            profession.defaultAppointmentDurationMinutes === null
+              ? ""
+              : String(profession.defaultAppointmentDurationMinutes),
           modality: profession.modalities[0],
           status: "SCHEDULED",
-          priceInReais: centsToInput(profession.defaultPriceInCents),
+          priceInReais:
+            profession.defaultPriceInCents === null
+              ? ""
+              : centsToInput(profession.defaultPriceInCents),
           administrativeNotes: "",
         },
   );
@@ -134,7 +143,7 @@ export function AppointmentForm({
       clientId: draft.clientId,
       professionalId: draft.professionalId,
       startsAt: fromDateAndTime(draft.date, draft.time),
-      durationMinutes: draft.durationMinutes,
+      durationMinutes: Number(draft.durationMinutes),
       modality: draft.modality,
       status: draft.status,
       priceInCents: Math.round(
@@ -241,7 +250,7 @@ export function AppointmentForm({
                 step={5}
                 value={draft.durationMinutes}
                 onChange={(event) =>
-                  patch({ durationMinutes: Number(event.target.value) })
+                  patch({ durationMinutes: event.target.value })
                 }
                 invalid={Boolean(errors.durationMinutes)}
               />

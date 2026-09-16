@@ -42,7 +42,8 @@ export function buildTransactions(
       appointment.status === "COMPLETED" ||
       appointment.status === "CONFIRMED" ||
       appointment.status === "SCHEDULED";
-    if (!isBillable) continue;
+    // Sem valor nao ha o que receber — os repositorios fazem o mesmo.
+    if (!isBillable || appointment.priceInCents === 0) continue;
 
     const isPast = appointment.status === "COMPLETED";
     let status: TransactionStatus;

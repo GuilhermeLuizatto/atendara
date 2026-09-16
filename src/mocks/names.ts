@@ -62,6 +62,7 @@ export const ORGANIZATION_NAMES: Record<ProfessionId, string> = {
   PHYSIOTHERAPIST: "Movimento Fisioterapia",
   THERAPIST: "Casa Serena",
   PERSONAL_TRAINER: "Studio Impulso",
+  AESTHETICS: "Espaço Lume Estética",
 };
 
 /** Titular ficticio da organizacao por profissao. */
@@ -74,10 +75,14 @@ export const OWNER_NAMES: Record<ProfessionId, string> = {
   PHYSIOTHERAPIST: "Andre Salgado",
   THERAPIST: "Clarice Monteiro",
   PERSONAL_TRAINER: "Diego Fontes",
+  AESTHETICS: "Bianca Ferraz",
 };
 
-/** Registro profissional ficticio, no formato do conselho de cada profissao. */
-export const LICENSE_PREFIX: Record<ProfessionId, string> = {
+/**
+ * Registro profissional ficticio, no formato do conselho de cada profissao.
+ * `null` quando a profissao nao tem conselho de classe.
+ */
+export const LICENSE_PREFIX: Record<ProfessionId, string | null> = {
   PSYCHOLOGIST: "CRP",
   PSYCHIATRIST: "CRM",
   DOCTOR: "CRM",
@@ -86,6 +91,7 @@ export const LICENSE_PREFIX: Record<ProfessionId, string> = {
   PHYSIOTHERAPIST: "CREFITO",
   THERAPIST: "REG",
   PERSONAL_TRAINER: "CREF",
+  AESTHETICS: null,
 };
 
 export const SPECIALTIES: Record<ProfessionId, string[]> = {
@@ -97,4 +103,5 @@ export const SPECIALTIES: Record<ProfessionId, string[]> = {
   PHYSIOTHERAPIST: ["Ortopédica", "Pós-operatório", "RPG"],
   THERAPIST: ["Integrativa", "Mindfulness", "Florais"],
   PERSONAL_TRAINER: ["Hipertrofia", "Emagrecimento", "Condicionamento"],
+  AESTHETICS: ["Manicure e pedicure", "Design de sobrancelha", "Maquiagem"],
 };

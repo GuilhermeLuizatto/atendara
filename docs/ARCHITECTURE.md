@@ -314,6 +314,11 @@ profissao: terminologia, duracao e preco padrao, modalidades, taxonomia de
 classificacao habilitada, perfil de sensibilidade de dados, regras sugeridas,
 flags de funcionalidade e cor de destaque.
 
+Duracao e preco padrao podem ser `null`: na estetica os dois dependem do
+servico e sao sempre definidos pela profissional. Sem valor, o formulario abre
+vazio e a Dara escala a pergunta de preco em vez de responder um numero que
+ninguem cadastrou.
+
 Adicionar uma profissao = acrescentar uma entrada nessa tabela. Nenhum
 componente, servico ou motor muda.
 

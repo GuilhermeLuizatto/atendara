@@ -38,15 +38,22 @@ export function AgendaSettingsForm({
   if (!current || !draft) return null;
   const canEdit = session?.permissions.includes("agendaSettings:update") ?? false;
 
-  const defaults = (
-    <p className="text-muted-foreground text-sm">
-      Cada {terminology.appointment.singularLower}{" "}
-      {byGender(terminology.appointment, "novo", "nova")} começa com{" "}
-      {profession.defaultAppointmentDurationMinutes} minutos e{" "}
-      {formatCurrency(profession.defaultPriceInCents)}. Da para mudar os dois em
-      cada agendamento.
-    </p>
-  );
+  const defaultDuration = profession.defaultAppointmentDurationMinutes;
+  const defaultPrice = profession.defaultPriceInCents;
+  const defaults =
+    defaultDuration === null || defaultPrice === null ? (
+      <p className="text-muted-foreground text-sm">
+        A duração e o valor de cada {terminology.appointment.singularLower} são
+        definidos a cada agendamento.
+      </p>
+    ) : (
+      <p className="text-muted-foreground text-sm">
+        Cada {terminology.appointment.singularLower}{" "}
+        {byGender(terminology.appointment, "novo", "nova")} começa com{" "}
+        {defaultDuration} minutos e {formatCurrency(defaultPrice)}. Da para mudar
+        os dois em cada agendamento.
+      </p>
+    );
 
   if (!canEdit) {
     return (

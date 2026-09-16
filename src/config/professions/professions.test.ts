@@ -73,11 +73,20 @@ describe("registry de profissoes", () => {
   it("define ao menos uma modalidade e valores plausiveis", () => {
     for (const profession of listProfessions()) {
       expect(profession.modalities.length).toBeGreaterThan(0);
-      expect(profession.defaultAppointmentDurationMinutes).toBeGreaterThan(0);
-      expect(profession.defaultPriceInCents).toBeGreaterThan(0);
+      // `null` significa "a profissional define"; zero nunca e padrao.
+      const duration = profession.defaultAppointmentDurationMinutes ?? 1;
+      const price = profession.defaultPriceInCents ?? 1;
+      expect(duration).toBeGreaterThan(0);
+      expect(price).toBeGreaterThan(0);
       // Valores em centavos: um preco inteiro nunca teria fracao.
-      expect(Number.isInteger(profession.defaultPriceInCents)).toBe(true);
+      expect(Number.isInteger(price)).toBe(true);
     }
+  });
+
+  it("deixa preco e duracao da estetica com a profissional", () => {
+    const aesthetics = getProfession("AESTHETICS");
+    expect(aesthetics.defaultPriceInCents).toBeNull();
+    expect(aesthetics.defaultAppointmentDurationMinutes).toBeNull();
   });
 
   it("traz regras sugeridas com pelo menos uma trava de seguranca", () => {

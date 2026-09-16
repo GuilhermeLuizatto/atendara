@@ -159,6 +159,16 @@ const PROFESSION_FLAVOR: Partial<
       "Estou com dor lombar desde ontem. Posso treinar hoje?",
     ],
   },
+  AESTHETICS: {
+    PROFESSIONAL: [
+      "Qual formato de sobrancelha combina mais com o meu rosto?",
+      "Alongamento em gel fica bom em unha curta?",
+    ],
+    HEALTH_RELATED: [
+      "Fiquei com uma irritação na pele depois da depilação. É normal?",
+      "A cutícula inflamou depois da manicure. O que eu faço?",
+    ],
+  },
 };
 
 export function templatesFor(

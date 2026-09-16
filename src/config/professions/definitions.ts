@@ -596,4 +596,79 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       sessionPackages: true,
     },
   },
+
+  AESTHETICS: {
+    id: "AESTHETICS",
+    label: "Estética",
+    labelPlural: "Estética",
+    description:
+      "Manicure e pedicure, sobrancelha, cílios, depilação e maquiagem.",
+    accent: "fuchsia",
+    terminology: {
+      client: term("Cliente", "Clientes"),
+      appointment: term("Atendimento", "Atendimentos"),
+      professional: term("Esteticista", "Esteticistas"),
+    },
+    // Preco e duracao dependem do servico, e quem define e a profissional.
+    defaultAppointmentDurationMinutes: null,
+    defaultPriceInCents: null,
+    modalities: ["IN_PERSON", "HOME_VISIT"],
+    messageClassifications: [
+      "ADMINISTRATIVE",
+      "PROFESSIONAL",
+      "HEALTH_RELATED",
+      "POSSIBLE_RISK",
+      "UNKNOWN",
+    ],
+    // Depilacao, pele e unha encostam em saude: reacao e machucado aparecem na
+    // conversa, entao o perfil acompanha o das profissoes de dado elevado.
+    sensitiveDataProfile: "ELEVATED",
+    complianceNotice: WELLNESS_COMPLIANCE_NOTICE,
+    suggestedRules: [
+      {
+        name: "Encaminhar relato de reação ou machucado",
+        description:
+          "Alergia, irritação, inflamação ou corte depois do atendimento vira alerta para a profissional.",
+        category: "ESCALATION",
+        action: "ESCALATE",
+        enabled: true,
+      },
+      {
+        name: "Informar horários disponíveis",
+        description: "Responder janelas livres da agenda quando solicitado.",
+        category: "SCHEDULING",
+        action: "ALLOW_TOPIC",
+        enabled: true,
+      },
+    ],
+    notifications: {
+      allowedEvents: [
+        "APPOINTMENT_SCHEDULED",
+        "APPOINTMENT_REMINDER",
+        "APPOINTMENT_CONFIRMED",
+        "APPOINTMENT_CANCELLED",
+      ],
+      allowedChannels: ["EMAIL", "SMS", "WHATSAPP"],
+      // Sem o nome do servico: "sua depilacao" na tela bloqueada diz mais do
+      // que o horario precisa dizer.
+      disclosure: "TIME_AND_PROFESSIONAL",
+      defaultLeadMinutes: 1440,
+      templates: {
+        APPOINTMENT_SCHEDULED:
+          "Olá, {{clientName}}. Seu horário com {{professionalName}} ficou marcado para {{date}} às {{time}}.",
+        APPOINTMENT_REMINDER:
+          "Olá, {{clientName}}. Lembrete do seu horário com {{professionalName}} em {{date}} às {{time}}.",
+        APPOINTMENT_CONFIRMED:
+          "Olá, {{clientName}}. Seu horário com {{professionalName}} em {{date}} às {{time}} está confirmado.",
+        APPOINTMENT_CANCELLED:
+          "Olá, {{clientName}}. Seu horário com {{professionalName}} em {{date}} às {{time}} foi cancelado. Responda para remarcar.",
+      },
+    },
+    features: {
+      clinicalRecords: false,
+      insurancePlans: false,
+      recurringByDefault: false,
+      sessionPackages: false,
+    },
+  },
 };

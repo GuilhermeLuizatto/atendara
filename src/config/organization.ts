@@ -41,6 +41,7 @@ const DEFAULT_KIND: Record<ProfessionId, OrganizationKind> = {
   PHYSIOTHERAPIST: "STUDIO",
   THERAPIST: "SOLO_PRACTITIONER",
   PERSONAL_TRAINER: "GYM",
+  AESTHETICS: "SOLO_PRACTITIONER",
 };
 
 export function defaultOrganizationKind(id: ProfessionId): OrganizationKind {

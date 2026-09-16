@@ -455,7 +455,7 @@ frameworks do Firebase ou Cloud Run. Nenhum codigo de dominio muda — apenas
 
 ## 13. Cobranca da plataforma
 
-O Atendara e operado pela Three Devs e vendido por mensalidade. Existem dois
+O Atendara e vendido por mensalidade pela operadora. Existem dois
 dinheiros no produto e a arquitetura os mantem separados por construcao, nao por
 disciplina:
 

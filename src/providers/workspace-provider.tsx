@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { accountPermissions, hasActiveAccess, isPlatformAdmin } from "@/config/access";
+import { ACCESS_RECHECK_INTERVAL_MS, accountPermissions, hasActiveAccess, isPlatformAdmin } from "@/config/access";
 import {
   DEFAULT_PROFESSION,
   getProfession,
@@ -34,6 +34,8 @@ import type {
   ProfessionTerminology,
   Role,
 } from "@/types";
+
+import { useNow } from "@/lib/utils/use-now";
 
 import { useAuth } from "./auth-provider";
 
@@ -102,9 +104,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     ? null
     : (user?.access?.organizationId ?? null);
 
+  // S-13: o acesso vence pela hora, e nenhuma escrita avisa o navegador. No
+  // emulador, uma leitura aberta antes do vencimento continuou recebendo dado
+  // depois dele — as regras so barram quem abre uma leitura nova. Por isso a
+  // validade entra aqui como valor reavaliado no relogio: ao vencer, o
+  // repositorio vira `null`, o efeito abaixo chama `dispose` e os listeners do
+  // Firestore fecham. Quem fecha o dado de verdade continuam sendo as regras,
+  // na proxima leitura; isto encurta a janela de "ate reconectar" para segundos.
+  const now = useNow(ACCESS_RECHECK_INTERVAL_MS);
+  const accessOpen = hasActiveAccess(user?.access, now);
+
   const repository = useMemo(
     () =>
-      hydrated && hasActiveAccess(user?.access)
+      hydrated && accessOpen
         ? createWorkspaceRepository({
             professionId,
             organizationId,
@@ -112,7 +124,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             scope,
           })
         : null,
-    [hydrated, professionId, organizationId, userId, scope, user?.access],
+    // `user?.access` fica de proposito, mesmo sem ser lido aqui dentro: retirar
+    // um modulo ou suspender a conta muda o que as regras permitem, e as leituras
+    // abertas com a permissao antiga precisam fechar — o mesmo problema da S-13,
+    // por outro caminho.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hydrated, accessOpen, professionId, organizationId, userId, scope, user?.access],
   );
 
   // Trocar de conta, de organizacao ou de profissao cria um repositorio novo;

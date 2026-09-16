@@ -1,0 +1,34 @@
+version: 2
+
+# Atualizacao de dependencia e de acao vira pull request, nao tarefa de
+# memoria. O limite baixo e proposital: uma pilha de PRs abertos vira ruido e
+# ninguem revisa.
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # Atualizacao de rotina junta num PR so; o que muda versao maior vem
+      # separado, porque exige leitura.
+      minor-e-correcao:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: npm
+    directory: "/functions"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      minor-e-correcao:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5

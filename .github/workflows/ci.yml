@@ -11,6 +11,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Menos do que o padrao do repositorio: nenhum job aqui escreve nada.
+permissions:
+  contents: read
+
 env:
   NODE_VERSION: "22"
 
@@ -18,12 +22,16 @@ jobs:
   verify:
     name: Lint, tipos, testes e build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
+      # Acoes fixadas por hash: uma tag pode ser movida para outro commit, e
+      # quem move a tag passa a rodar codigo dentro deste pipeline.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Configurar Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -34,6 +42,11 @@ jobs:
       - name: Instalar dependencias do backend
         run: npm ci --prefix functions
 
+      # Antes de qualquer outra coisa: segredo que entrou no commit tem de
+      # parar aqui, nao depois do build.
+      - name: Varredura de segredos
+        run: npm run scan:secrets
+
       - name: Lint
         run: npm run lint
 
@@ -42,6 +55,13 @@ jobs:
 
       - name: Testes
         run: npm run test
+
+      # Vulnerabilidade alta ou critica em dependencia de producao quebra o
+      # pipeline. As moderadas aparecem no relatorio sem travar.
+      - name: Auditoria das dependencias
+        run: |
+          npm audit --omit=dev --audit-level=high
+          npm audit --omit=dev --audit-level=high --prefix functions
 
       # As variaveis NEXT_PUBLIC_* sao identificadores publicos do projeto
       # Firebase, nao credenciais. Quando ausentes, o build sai em modo
@@ -58,8 +78,29 @@ jobs:
         run: npm run build
 
       - name: Guardar o build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: static-export
           path: out/
           retention-days: 7
+
+  codeql:
+    name: Analise estatica de seguranca
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Preparar CodeQL
+        uses: github/codeql-action/init@977e6ceaea7361825998245d787fa3b4d6b9e5df # codeql-bundle-v2.27.0
+        with:
+          languages: javascript-typescript
+
+      # Projeto em TypeScript e JavaScript: o CodeQL le o codigo sem precisar
+      # compilar.
+      - name: Analisar
+        uses: github/codeql-action/analyze@977e6ceaea7361825998245d787fa3b4d6b9e5df # codeql-bundle-v2.27.0

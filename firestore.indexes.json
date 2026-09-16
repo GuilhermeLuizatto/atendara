@@ -1,6 +1,15 @@
 {
   "indexes": [
     {
+      "collectionGroup": "accounts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "origin", "order": "ASCENDING" },
+        { "fieldPath": "blockedSince", "order": "ASCENDING" },
+        { "fieldPath": "accessUntilMs", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "appointments",
       "queryScope": "COLLECTION",
       "fields": [

@@ -36,6 +36,9 @@ export const PLATFORM_AUDIT_ACTIONS = [
     // diferentes, e o segundo e o que abre o painel.
     "SELF_SERVICE_REGISTERED",
     "TRIAL_STARTED",
+    // O fim do teste, aplicado pela rotina diaria. Nao e ato de ninguem: e a
+    // validade que a concessao ja trazia, chegando.
+    "TRIAL_ENDED",
     // Atos da chave mestra sobre contas de administrador.
     "PLATFORM_ADMIN_CREATED",
     "PLATFORM_ADMIN_SUSPENDED",

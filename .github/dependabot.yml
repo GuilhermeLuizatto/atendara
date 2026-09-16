@@ -16,6 +16,16 @@ updates:
       minor-e-correcao:
         update-types: ["minor", "patch"]
 
+    # Testado em 16/09/2026: os dois quebram por causa de terceiros, nao nosso.
+    # O eslint-config-next traz um plugin do React que nao roda no ESLint 10, e
+    # o typescript-eslint ainda recusa o TypeScript 7. Voltam quando essas duas
+    # pecas acompanharem.
+    ignore:
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: npm
     directory: "/functions"
     schedule:

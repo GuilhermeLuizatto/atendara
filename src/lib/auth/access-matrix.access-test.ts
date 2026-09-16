@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 
 import { deleteApp, initializeApp, type FirebaseApp } from "firebase/app";
 import {
@@ -40,7 +39,6 @@ import { callFunction, tokenSession, type TokenSession } from "@/lib/testing/emu
  * Rodar com: npm run test:access
  */
 
-const require = createRequire(import.meta.url);
 const PROJECT = "demo-atendara";
 
 const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9098";
@@ -54,8 +52,7 @@ const NEW_PASSWORD = "SenhaDeTeste-Profissional-2";
 const OTHER_TENANT = "org-de-outro-profissional";
 const MODULES = ["dashboard", "agenda", "clientes"];
 
-/** SDK administrativo: semeia e inspeciona sem passar pelas regras. */
-const admin = require("../../../functions/node_modules/firebase-admin/lib/index.js");
+import { adminAuth, adminDb, deleteAdminApps, initializeAdminSdk } from "../testing/admin-sdk";
 
 let app: FirebaseApp;
 let auth: Auth;
@@ -87,7 +84,7 @@ async function callAsSignedIn<Result = unknown>(name: string, data: unknown): Pr
 
 /** Le a conta pelo SDK administrativo, sem depender das regras. */
 async function accountOf(uid: string): Promise<Record<string, unknown>> {
-  const snapshot = await admin.firestore().doc(paths.account(uid)).get();
+  const snapshot = await adminDb().doc(paths.account(uid)).get();
   return snapshot.data() as Record<string, unknown>;
 }
 
@@ -98,17 +95,17 @@ async function expectDenied(operation: Promise<unknown>): Promise<void> {
 beforeAll(async () => {
   process.env.FIREBASE_AUTH_EMULATOR_HOST = AUTH_HOST;
   process.env.FIRESTORE_EMULATOR_HOST = `${FIRESTORE_HOST}:${FIRESTORE_PORT}`;
-  admin.initializeApp({ projectId: PROJECT });
+  initializeAdminSdk(PROJECT);
 
   // Operadora, do mesmo jeito que `bootstrap-admin.js` cria em producao: conta
   // no Auth e documento de autoridade no Firestore, sem validade.
-  const adminUser = await admin.auth().createUser({
+  const adminUser = await adminAuth().createUser({
     email: ADMIN.email,
     password: ADMIN.password,
     displayName: "Administrador de Teste",
   });
   adminUid = adminUser.uid;
-  await admin.firestore().doc(paths.account(adminUid)).set({
+  await adminDb().doc(paths.account(adminUid)).set({
     userId: adminUid,
     email: ADMIN.email,
     displayName: "Administrador de Teste",
@@ -122,14 +119,13 @@ beforeAll(async () => {
   });
 
   // Organizacao de outro profissional, para as tentativas de acesso cruzado.
-  await admin.firestore().doc(paths.organization(OTHER_TENANT)).set({
+  await adminDb().doc(paths.organization(OTHER_TENANT)).set({
     id: OTHER_TENANT,
     name: "Consultorio Alheio",
     primaryProfession: "DENTIST",
     ownerId: "outro-usuario",
   });
-  await admin
-    .firestore()
+  await adminDb()
     .doc(paths.document(OTHER_TENANT, "clients", "cadastro-alheio"))
     .set({ organizationId: OTHER_TENANT, fullName: "Cadastro Alheio" });
 
@@ -146,7 +142,7 @@ afterAll(async () => {
   await operator.dispose();
   await terminate(db);
   await deleteApp(app);
-  await Promise.all(admin.apps.map((instance: { delete(): Promise<void> }) => instance.delete()));
+  await deleteAdminApps();
 });
 
 describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () => {
@@ -199,7 +195,7 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
   });
 
   it("o cadastro provisiona organizacao, vinculo e perfil profissional", async () => {
-    const database = admin.firestore();
+    const database = adminDb();
 
     const [organization, member, professional] = await Promise.all([
       database.doc(paths.organization(organizationId)).get(),
@@ -252,8 +248,7 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
     expect(await accountOf(professionalUid)).toMatchObject({
       mustChangePassword: false,
     });
-    const verifier = await admin
-      .firestore()
+    const verifier = await adminDb()
       .doc(paths.initialPassword(professionalUid))
       .get();
     expect(verifier.exists).toBe(false);
@@ -281,8 +276,7 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
   it("mudar a profissao da conta fecha a propria organizacao", async () => {
     // A regra exige que a profissao da conta bata com a da organizacao. Uma
     // conta de dentista nao le o consultorio de psicologia nem sendo o dono.
-    await admin
-      .firestore()
+    await adminDb()
       .doc(paths.account(professionalUid))
       .update({ professionId: "DENTIST" });
 
@@ -290,8 +284,7 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
       getDoc(doc(db, paths.document(organizationId, "clients", "qualquer"))),
     );
 
-    await admin
-      .firestore()
+    await adminDb()
       .doc(paths.account(professionalUid))
       .update({ professionId: "PSYCHOLOGIST" });
   });
@@ -311,7 +304,7 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
   });
 
   it("suspensao e vencimento fecham o acesso pelo servidor", async () => {
-    const database = admin.firestore();
+    const database = adminDb();
     const original = await accountOf(professionalUid);
 
     // Suspender continua sendo ato da operadora, pela callable e com registro.

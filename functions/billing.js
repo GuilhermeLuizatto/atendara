@@ -149,6 +149,9 @@ function gatewayFailure(error) {
 // ------------------------------------------------------------------ callables
 
 const checkoutInput = z.object({ planId: z.string().trim().min(1).max(80) }).strict();
+// Portal e cancelamento nao recebem nada: a organizacao sai da conta, no
+// servidor. Campo inesperado e sinal de chamada montada a mao, e e recusado.
+const noInput = z.object({}).strict();
 
 /**
  * Abre o checkout HOSPEDADO do gateway.
@@ -242,6 +245,7 @@ export const openBillingPortal = onCall(callOptions, async (request) => {
   const { organizationId } = await subscriptionOwner(request);
   const baseUrl = appBaseUrl();
   await consumeRateLimit(request.auth.uid, "openBillingPortal");
+  if (!noInput.safeParse(request.data ?? {}).success) throw new HttpsError("invalid-argument", "Confira os dados informados.");
   const subscription = (await db().doc(paths.platformSubscription(organizationId)).get()).data();
   const customerId = subscription?.gateway?.customerId;
   if (!customerId) throw new HttpsError("failed-precondition", "Esta organização ainda não tem assinatura.");
@@ -266,6 +270,7 @@ export const openBillingPortal = onCall(callOptions, async (request) => {
 export const cancelPlatformSubscription = onCall(callOptions, async (request) => {
   const { organizationId } = await subscriptionOwner(request);
   await consumeRateLimit(request.auth.uid, "cancelPlatformSubscription");
+  if (!noInput.safeParse(request.data ?? {}).success) throw new HttpsError("invalid-argument", "Confira os dados informados.");
   const subscription = (await db().doc(paths.platformSubscription(organizationId)).get()).data();
   const subscriptionId = subscription?.gateway?.subscriptionId;
   if (!subscriptionId) throw new HttpsError("failed-precondition", "Não há assinatura para cancelar.");

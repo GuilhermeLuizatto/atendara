@@ -1,0 +1,10 @@
+#!/bin/sh
+# Varre o que esta no indice antes de cada commit. Instale com:
+#   git config core.hooksPath scripts/hooks
+# Para desligar: git config --unset core.hooksPath
+node scripts/scan-secrets.mjs --staged || {
+  echo ""
+  echo "Commit interrompido: possivel segredo no indice."
+  echo "Se for falso positivo, ajuste ALLOWED em scripts/scan-secrets.mjs."
+  exit 1
+}

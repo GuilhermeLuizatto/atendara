@@ -177,6 +177,7 @@ apontam para os emuladores.
 | `npm run type-check`   | Gera tipos de rota e roda `tsc --noEmit`                   |
 | `npm run test`         | Suite de testes                                            |
 | `npm run check:bundle` | Confere que nenhum segredo foi parar em `out/`             |
+| `npm run scan:secrets` | Varre a arvore versionada atras de credencial               |
 | `npm run format`       | Prettier                                                   |
 | `npm run verify`       | lint + type-check + testes + build + conferencia do bundle |
 
@@ -277,3 +278,14 @@ producao exige validacao tecnica e juridica fora do escopo deste estagio.
 ## Licenca
 
 Projeto de portfolio e estudo. Sem licenca de uso definida.
+
+### Varredura de segredos
+
+```bash
+npm run scan:secrets              # arvore versionada
+npm run scan:secrets:historico    # + todos os commits
+git config core.hooksPath scripts/hooks   # varre o indice a cada commit
+```
+
+O relatorio mostra caminho e linha, nunca o valor. Falso positivo se resolve em
+`ALLOWED`, dentro de `scripts/scan-secrets.mjs`, com o motivo escrito.

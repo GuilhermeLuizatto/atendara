@@ -5,6 +5,7 @@ import { randomBytes, scryptSync } from "node:crypto";
 import { mkdir, open, readFile, unlink, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
+import { adcFileName, installCleanup, removeLeftovers } from "./adc-credential.js";
 import { paths } from "./generated/paths.js";
 import { APP_MODULES } from "./generated/access.js";
 
@@ -16,7 +17,11 @@ const firebaseCliApi = require("../.local/firebase-tools/node_modules/firebase-t
 const cliAccount = firebaseCliAuth.getGlobalDefaultAccount();
 if (!cliAccount?.tokens?.refresh_token) throw new Error("Execute firebase login antes do bootstrap.");
 await mkdir(".local", { recursive: true });
-const adcPath = resolve(".local", `.firebase-cli-adc-${process.pid}.json`);
+// Sobra de uma execucao que morreu antes do `finally` — cada uma carrega um
+// token de atualizacao.
+const leftovers = removeLeftovers(resolve(".local"));
+if (leftovers.length > 0) console.warn(`Credencial de execucao anterior apagada: ${leftovers.join(", ")}`);
+const adcPath = resolve(".local", adcFileName());
 await writeFile(adcPath, JSON.stringify({
   type: "authorized_user",
   client_id: firebaseCliApi.clientId(),
@@ -24,6 +29,9 @@ await writeFile(adcPath, JSON.stringify({
   refresh_token: cliAccount.tokens.refresh_token,
   quota_project_id: projectId,
 }), { flag: "wx" });
+// Ctrl+C e SIGTERM nao passam pelo `finally` abaixo. SIGKILL nao passa por
+// lugar nenhum: para esse caso vale a varredura da proxima execucao.
+installCleanup(adcPath);
 process.env.GOOGLE_APPLICATION_CREDENTIALS = adcPath;
 initializeApp({ credential: applicationDefault(), projectId });
 const email = "guilhermeluizatto@gmail.com";

@@ -34,7 +34,20 @@ export function resolveProfession(value: unknown): ProfessionConfig {
   ];
 }
 
+/**
+ * As profissoes oferecidas hoje, na ordem da tabela. E esta a lista que vai a
+ * tela — cadastro, administracao e demonstracao.
+ */
 export function listProfessions(): ProfessionConfig[] {
+  return listAllProfessions().filter((profession) => profession.listed);
+}
+
+/**
+ * Todas, inclusive as escondidas. Serve a quem precisa da tabela inteira:
+ * os testes que conferem invariantes de todas as profissoes e qualquer leitura
+ * de conta que ja tenha uma profissao fora da vitrine.
+ */
+export function listAllProfessions(): ProfessionConfig[] {
   return PROFESSION_IDS.map((id) => PROFESSION_DEFINITIONS[id]);
 }
 

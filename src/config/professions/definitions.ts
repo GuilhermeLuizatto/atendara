@@ -30,6 +30,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     id: "PSYCHOLOGIST",
     label: "Psicólogo",
     labelPlural: "Psicólogos",
+    listed: true,
     council: { acronym: "CRP", name: "Conselho Regional de Psicologia" },
     description: "Atendimento psicológico individual, casal ou grupo.",
     accent: "violet",
@@ -103,6 +104,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     id: "PSYCHIATRIST",
     label: "Psiquiatra",
     labelPlural: "Psiquiatras",
+    listed: true,
     council: { acronym: "CRM", name: "Conselho Regional de Medicina" },
     description: "Consulta psiquiátrica, acompanhamento e prescrição.",
     accent: "indigo",
@@ -178,6 +180,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     id: "DOCTOR",
     label: "Médico",
     labelPlural: "Médicos",
+    listed: true,
     council: { acronym: "CRM", name: "Conselho Regional de Medicina" },
     description: "Consulta médica, retorno e acompanhamento clínico.",
     accent: "blue",
@@ -252,6 +255,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     id: "DENTIST",
     label: "Dentista",
     labelPlural: "Dentistas",
+    listed: true,
     council: { acronym: "CRO", name: "Conselho Regional de Odontologia" },
     description: "Consulta odontológica, procedimentos e manutenção.",
     accent: "cyan",
@@ -323,6 +327,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     id: "NUTRITIONIST",
     label: "Nutricionista",
     labelPlural: "Nutricionistas",
+    listed: true,
     council: { acronym: "CRN", name: "Conselho Regional de Nutricionistas" },
     description: "Consulta nutricional, plano alimentar e retorno.",
     accent: "emerald",
@@ -394,6 +399,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     id: "PHYSIOTHERAPIST",
     label: "Fisioterapeuta",
     labelPlural: "Fisioterapeutas",
+    listed: true,
     council: { acronym: "CREFITO", name: "Conselho Regional de Fisioterapia e Terapia Ocupacional" },
     description: "Sessão de fisioterapia, reabilitação e acompanhamento.",
     accent: "teal",
@@ -464,6 +470,10 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     id: "THERAPIST",
     label: "Terapeuta",
     labelPlural: "Terapeutas",
+    // Escondida das listas por decisao do titular em 16/09/2026: nao ha
+    // publico para ela agora. A entrada continua aqui para as contas que ja
+    // existam e para os testes continuarem cobrindo a profissao.
+    listed: false,
     // Profissao sem conselho de classe: o cadastro nao pede registro.
     council: null,
     description: "Sessões de terapia integrativa e acompanhamento.",
@@ -538,6 +548,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     id: "PERSONAL_TRAINER",
     label: "Personal trainer",
     labelPlural: "Personal trainers",
+    listed: true,
     council: { acronym: "CREF", name: "Conselho Regional de Educação Física" },
     description: "Treino individual, avaliação física e acompanhamento.",
     accent: "amber",
@@ -610,6 +621,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     id: "AESTHETICS",
     label: "Estética",
     labelPlural: "Estética",
+    listed: true,
     // Profissao sem conselho de classe: o cadastro nao pede registro.
     council: null,
     description:

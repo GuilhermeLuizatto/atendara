@@ -12,7 +12,7 @@ import { isGrantInForce } from "@/lib/platform/access-gate";
 import { formatDate, formatDateTime } from "@/lib/utils/format";
 import { useNow } from "@/lib/utils/use-now";
 import { platformAccessReader } from "@/services/platform-access";
-import { ACCESS_GRANT_KINDS, type AccessGrantKind, type PageRequest } from "@/types";
+import { MANUAL_ACCESS_GRANT_KINDS, type ManualAccessGrantKind, type PageRequest } from "@/types";
 import type { AccountAccess } from "@/types/access";
 
 import { LATEST_GRANT_OFFSET_DAYS, dateInputValue, untilFromDateInput } from "./grant-dates";
@@ -77,7 +77,7 @@ export function AccessGrantsPanel() {
     void run(async () => {
       await authAdapter.grantAccess({
         organizationId: String(values.get("organizationId")),
-        kind: String(values.get("kind")) as AccessGrantKind,
+        kind: String(values.get("kind")) as ManualAccessGrantKind,
         until: untilFromDateInput(String(values.get("until"))),
         reason: String(values.get("reason")),
       });
@@ -121,7 +121,7 @@ export function AccessGrantsPanel() {
           <Field label="Tipo">
             {(props) => (
               <Select {...props} name="kind">
-                {ACCESS_GRANT_KINDS.map((kind) => (
+                {MANUAL_ACCESS_GRANT_KINDS.map((kind) => (
                   <option key={kind} value={kind}>{ACCESS_GRANT_KIND_LABELS[kind]}</option>
                 ))}
               </Select>

@@ -124,6 +124,13 @@ export interface ProfessionConfig {
   label: string;
   labelPlural: string;
   description: string;
+  /**
+   * Se a profissao aparece nas listas de escolha — autocadastro, administracao
+   * e demonstracao. Uma entrada com `false` continua valendo por inteiro para
+   * quem ja a usa: some da vitrine, nao do produto. E um campo da tabela, e nao
+   * uma lista de excecoes na tela, pela regra 1.
+   */
+  listed: boolean;
   /** Chave de cor do design system usada para diferenciar a profissao na UI. */
   accent:
     | "violet"

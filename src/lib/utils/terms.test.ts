@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getProfession, listProfessions } from "@/config/professions";
+import { getProfession, listAllProfessions } from "@/config/professions";
 
 import { allTerm, firstTerm, newTerm, nextPluralTerm, noTerm } from "./terms";
 
@@ -19,7 +19,7 @@ describe("concordancia com o termo da profissao", () => {
   });
 
   it("toda profissao declara o genero dos tres termos", () => {
-    for (const profession of listProfessions()) {
+    for (const profession of listAllProfessions()) {
       for (const pair of Object.values(profession.terminology)) {
         expect(typeof pair.feminine).toBe("boolean");
       }

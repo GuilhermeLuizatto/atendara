@@ -7,6 +7,7 @@ import {
   APP_TAGLINE,
   OPERATOR_NAME,
 } from "@/config/app";
+import { CookieNotice } from "@/components/layout/cookie-notice";
 import { AppProviders } from "@/providers";
 import { themeInitScript } from "@/providers/theme-provider";
 
@@ -55,7 +56,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="min-h-full font-sans">
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          {children}
+          <CookieNotice />
+        </AppProviders>
       </body>
     </html>
   );

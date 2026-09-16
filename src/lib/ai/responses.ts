@@ -60,9 +60,12 @@ export function composeResponse(
 
   switch (intent) {
     case "PRICING":
+      // Sem valor cadastrado nao ha resposta: o motor escala em vez de inventar.
+      if (price === null) return null;
       return [
-        `O valor do ${appointment} é ${formatCurrency(price)}`,
-        `e a duração é de ${duration} minutos.`,
+        duration === null
+          ? `O valor do ${appointment} é ${formatCurrency(price)}.`
+          : `O valor do ${appointment} é ${formatCurrency(price)} e a duração é de ${duration} minutos.`,
         signature,
       ].join(" ");
 

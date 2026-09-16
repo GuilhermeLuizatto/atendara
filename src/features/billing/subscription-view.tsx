@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, PageHeader } from "@/components/ui";
-import { APP_NAME, OPERATOR_NAME } from "@/config/app";
+import { APP_NAME } from "@/config/app";
 import {
   BILLING_INTERVAL_LABELS,
   INVOICE_STATUS_LABELS,
@@ -44,7 +44,7 @@ const STATUS_TONE: Record<PlatformSubscriptionStatus, BadgeTone> = {
  *
  * Separada de `/financeiro` de proposito e sem nenhum ponto de contato: la
  * estao as receitas e despesas do negocio do assinante; aqui esta o que ele
- * paga a {OPERATOR_NAME}. Nenhum valor desta tela entra naquele fluxo de caixa,
+ * paga a operadora. Nenhum valor desta tela entra naquele fluxo de caixa,
  * e nenhum numero de la aparece aqui.
  *
  * Tudo nesta tela e leitura, com uma excecao que tambem nao decide nada: os
@@ -127,7 +127,7 @@ export function SubscriptionView() {
     <div className="space-y-6">
       <PageHeader
         title="Minha assinatura"
-        description={`O que você paga à ${OPERATOR_NAME} pelo uso do ${APP_NAME}. Esta área não se mistura com o financeiro do seu negócio.`}
+        description={`O que você paga pelo uso do ${APP_NAME}. Esta área não se mistura com o financeiro do seu negócio.`}
         actions={
           subscription ? (
             <Badge tone={STATUS_TONE[subscription.status]} dot>
@@ -169,7 +169,7 @@ export function SubscriptionView() {
           </CardHeader>
           <CardBody className="space-y-2">
             <p className="text-foreground text-sm">
-              {`A ${OPERATOR_NAME} liberou seu acesso até ${formatDate(grant.until)} (${ACCESS_GRANT_KIND_LABELS[grant.kind].toLowerCase()}).`}
+              {`A operadora liberou seu acesso até ${formatDate(grant.until)} (${ACCESS_GRANT_KIND_LABELS[grant.kind].toLowerCase()}).`}
             </p>
             <p className="text-muted-foreground text-sm">
               Não é cobrança: nenhuma fatura corresponde a este período. Se você assinar, o acesso segue até a data

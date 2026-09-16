@@ -60,7 +60,10 @@ export function buildProfessionals(ctx: GeneratorContext): Professional[] {
     email: `${slugifyEmail(ownerName)}@exemplo.com.br`,
     phone: "11987650001",
     profession: profession.id,
-    licenseNumber: `${license} ${rng.int(10, 99)}/${rng.int(10000, 99999)}`,
+    licenseNumber:
+      license === null
+        ? null
+        : `${license} ${rng.int(10, 99)}/${rng.int(10000, 99999)}`,
     specialties: SPECIALTIES[profession.id].slice(0, 2),
     avatarUrl: null,
     active: true,
@@ -78,7 +81,10 @@ export function buildProfessionals(ctx: GeneratorContext): Professional[] {
     email: `${slugifyEmail(colleagueName)}@exemplo.com.br`,
     phone: "11987650002",
     profession: profession.id,
-    licenseNumber: `${license} ${rng.int(10, 99)}/${rng.int(10000, 99999)}`,
+    licenseNumber:
+      license === null
+        ? null
+        : `${license} ${rng.int(10, 99)}/${rng.int(10000, 99999)}`,
     specialties: SPECIALTIES[profession.id].slice(1, 3),
     avatarUrl: null,
     active: true,

@@ -314,6 +314,11 @@ profissao: terminologia, duracao e preco padrao, modalidades, taxonomia de
 classificacao habilitada, perfil de sensibilidade de dados, regras sugeridas,
 flags de funcionalidade e cor de destaque.
 
+Duracao e preco padrao podem ser `null`: na estetica os dois dependem do
+servico e sao sempre definidos pela profissional. Sem valor, o formulario abre
+vazio e a Dara escala a pergunta de preco em vez de responder um numero que
+ninguem cadastrou.
+
 Adicionar uma profissao = acrescentar uma entrada nessa tabela. Nenhum
 componente, servico ou motor muda.
 
@@ -450,7 +455,7 @@ frameworks do Firebase ou Cloud Run. Nenhum codigo de dominio muda — apenas
 
 ## 13. Cobranca da plataforma
 
-O Atendara e operado pela Three Devs e vendido por mensalidade. Existem dois
+O Atendara e vendido por mensalidade pela operadora. Existem dois
 dinheiros no produto e a arquitetura os mantem separados por construcao, nao por
 disciplina:
 

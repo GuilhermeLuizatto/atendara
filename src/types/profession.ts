@@ -13,6 +13,7 @@ export const PROFESSION_IDS = [
   "PHYSIOTHERAPIST",
   "THERAPIST",
   "PERSONAL_TRAINER",
+  "AESTHETICS",
 ] as const;
 
 export type ProfessionId = (typeof PROFESSION_IDS)[number];
@@ -117,10 +118,16 @@ export interface ProfessionConfig {
     | "teal"
     | "emerald"
     | "amber"
-    | "rose";
+    | "rose"
+    | "fuchsia";
   terminology: ProfessionTerminology;
-  defaultAppointmentDurationMinutes: number;
-  defaultPriceInCents: number;
+  /**
+   * `null` quando a profissao nao tem valor tipico: na estetica preco e duracao
+   * dependem do servico e sao sempre definidos pela profissional. Um numero
+   * inventado aqui viraria resposta da Dara ao cliente.
+   */
+  defaultAppointmentDurationMinutes: number | null;
+  defaultPriceInCents: number | null;
   modalities: ServiceModality[];
   /** Rotulos de classificacao habilitados para esta profissao. */
   messageClassifications: MessageClassificationId[];

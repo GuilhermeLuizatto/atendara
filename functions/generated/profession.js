@@ -8,4 +8,5 @@ export const PROFESSION_IDS = [
     "PHYSIOTHERAPIST",
     "THERAPIST",
     "PERSONAL_TRAINER",
+    "AESTHETICS",
 ];

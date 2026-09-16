@@ -25,6 +25,7 @@ const DEFAULT_KIND = {
     PHYSIOTHERAPIST: "STUDIO",
     THERAPIST: "SOLO_PRACTITIONER",
     PERSONAL_TRAINER: "GYM",
+    AESTHETICS: "SOLO_PRACTITIONER",
 };
 export function defaultOrganizationKind(id) {
     return DEFAULT_KIND[id] ?? "SOLO_PRACTITIONER";

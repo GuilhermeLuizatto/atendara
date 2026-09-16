@@ -49,7 +49,7 @@ por conversa. As demais sao colecoes diretas da organizacao.
 
 As colecoes `platform*` sao a excecao deliberada a "tudo vive sob
 `organizations/`": elas nao pertencem a tenant nenhum, e sim a operadora. Sao a
-mensalidade que a Three Devs cobra dos assinantes, e **nunca** viram
+mensalidade que a operadora cobra dos assinantes, e **nunca** viram
 `transactions` de uma organizacao. O mecanismo esta em
 [`functions/billing.js`](../functions/billing.js) e a politica de acesso em
 [`src/lib/billing/policy.ts`](../src/lib/billing/policy.ts).

@@ -15,7 +15,6 @@ import {
   AI_ASSISTANT_NAME,
   APP_DESCRIPTION,
   APP_NAME,
-  OPERATOR_NAME,
   APP_TAGLINE,
 } from "@/config/app";
 import { listProfessions } from "@/config/professions";
@@ -123,7 +122,17 @@ export default function LandingPage() {
         </section>
 
         <footer className="border-border text-muted-foreground mt-12 border-t pt-6 text-xs">
-          {APP_NAME} é uma plataforma {OPERATOR_NAME}.
+          <p>
+            {APP_NAME} — {APP_TAGLINE}
+          </p>
+          <p className="mt-2 flex gap-4">
+            <Link href="/termos" className="underline underline-offset-2">
+              Termos de Uso
+            </Link>
+            <Link href="/privacidade" className="underline underline-offset-2">
+              Política de Privacidade
+            </Link>
+          </p>
         </footer>
       </main>
     </div>

@@ -7,7 +7,7 @@ com informações e encaminha ao profissional os assuntos que exigem atenção h
 
 **Plataforma multiprofissional de gestao e automacao para quem atende pessoas.**
 
-Uma plataforma **Three Devs**.
+Feito por Guilherme Luizatto.
 
 Agenda, CRM, financeiro e central de mensagens com um agente de IA que responde o
 administrativo dentro de regras que o profissional define — e encaminha todo o
@@ -18,7 +18,9 @@ resto para o humano.
 Nao e um sistema para psicologos com outros nomes. O nucleo nao conhece
 profissao: terminologia, taxonomia de mensagens, regras e comportamento da
 interface vem de configuracao. A mesma base atende psicologo, psiquiatra, medico,
-dentista, nutricionista, fisioterapeuta, terapeuta e personal trainer.
+dentista, nutricionista, fisioterapeuta, terapeuta, personal trainer e
+profissionais de estetica (manicure e pedicure, sobrancelha, cilios, depilacao e
+maquiagem).
 
 **Status:** em desenvolvimento. Agenda, clientes, mensagens e financeiro
 persistem no Firestore com isolamento por organizacao. A assinatura da
@@ -175,6 +177,7 @@ apontam para os emuladores.
 | `npm run type-check`   | Gera tipos de rota e roda `tsc --noEmit`                   |
 | `npm run test`         | Suite de testes                                            |
 | `npm run check:bundle` | Confere que nenhum segredo foi parar em `out/`             |
+| `npm run scan:secrets` | Varre a arvore versionada atras de credencial               |
 | `npm run format`       | Prettier                                                   |
 | `npm run verify`       | lint + type-check + testes + build + conferencia do bundle |
 
@@ -275,3 +278,14 @@ producao exige validacao tecnica e juridica fora do escopo deste estagio.
 ## Licenca
 
 Projeto de portfolio e estudo. Sem licenca de uso definida.
+
+### Varredura de segredos
+
+```bash
+npm run scan:secrets              # arvore versionada
+npm run scan:secrets:historico    # + todos os commits
+git config core.hooksPath scripts/hooks   # varre o indice a cada commit
+```
+
+O relatorio mostra caminho e linha, nunca o valor. Falso positivo se resolve em
+`ALLOWED`, dentro de `scripts/scan-secrets.mjs`, com o motivo escrito.

@@ -25,6 +25,13 @@ function futureStatus(roll: number): AppointmentStatus {
 }
 
 /**
+ * A grade da demonstracao precisa de uma duracao mesmo quando a profissao nao
+ * tem padrao. O numero vive so aqui e nunca vira padrao do produto; o preco,
+ * sem padrao, fica zerado.
+ */
+const DEMO_DURATION_MINUTES = 60;
+
+/**
  * Gera a agenda em torno de "hoje". Os status derivam da comparacao do horario
  * com o instante atual, entao o dashboard mostra atendimentos ja realizados
  * pela manha e confirmados a tarde sem nenhum ajuste manual.
@@ -35,7 +42,8 @@ export function buildAppointments(
   professionals: Professional[],
 ): Appointment[] {
   const { rng, profession, organizationId, now, today } = ctx;
-  const duration = profession.defaultAppointmentDurationMinutes;
+  const duration =
+    profession.defaultAppointmentDurationMinutes ?? DEMO_DURATION_MINUTES;
   const appointments: Appointment[] = [];
   // Somente quem nao e apenas interessado ocupa a agenda.
   const schedulable = clients.filter((client) => client.status !== "LEAD");
@@ -75,7 +83,7 @@ export function buildAppointments(
         durationMinutes: duration,
         modality: client.preferredModality,
         status,
-        priceInCents: profession.defaultPriceInCents,
+        priceInCents: profession.defaultPriceInCents ?? 0,
         administrativeNotes: rng.bool(0.15) ? "Primeira vez no horário." : null,
         origin: rng.bool(0.2) ? "AI_AGENT" : "MANUAL",
         confirmedAt: status === "CONFIRMED" ? now : null,

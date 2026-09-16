@@ -159,6 +159,18 @@ const CLASSIFICATION_TERMS: Partial<Record<MessageClassificationId, string[]>> =
       "intolerancia",
       "desconforto",
       "incomodo",
+      // Reacao a cera, esmalte, produto ou alicate: na estetica e o relato que
+      // nunca pode receber resposta automatica.
+      "alergi",
+      "irritacao",
+      "irritou",
+      "inflam",
+      "sangr",
+      "encravad",
+      "queimou",
+      "queimadura",
+      "coceira",
+      "ferida",
     ],
     URGENT: [
       "urgente",

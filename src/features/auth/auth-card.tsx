@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { APP_NAME, APP_TAGLINE, OPERATOR_NAME } from "@/config/app";
+import { APP_NAME, APP_TAGLINE } from "@/config/app";
 
 /** Moldura das telas fora do painel: entrar, pedir e criar nova senha. */
 export function AuthCard({
@@ -40,7 +40,15 @@ export function AuthCard({
           </Link>
         </p>
         <p className="text-muted-foreground mt-2 text-center text-xs">
-          {APP_NAME} é uma plataforma {OPERATOR_NAME}.
+          {APP_NAME} — {APP_TAGLINE}
+        </p>
+        <p className="text-muted-foreground mt-2 flex justify-center gap-4 text-xs">
+          <Link href="/termos" className="underline underline-offset-2">
+            Termos de Uso
+          </Link>
+          <Link href="/privacidade" className="underline underline-offset-2">
+            Política de Privacidade
+          </Link>
         </p>
       </main>
     </div>

@@ -10,12 +10,32 @@
  * "outro": concessao sem categoria e exatamente o ajuste solto que o registro
  * existe para impedir.
  */
-export const ACCESS_GRANT_KINDS = ["COURTESY", "PILOT", "CORRECTION"];
+export const MANUAL_ACCESS_GRANT_KINDS = [
+    "COURTESY",
+    "PILOT",
+    "CORRECTION",
+];
+/**
+ * `TRIAL` fica fora das manuais de proposito: o teste de 14 dias nasce so da
+ * callable de autocadastro, com prazo e motivo fixos. A operadora nao escolhe
+ * esse tipo na tela nem pela callable de concessao — se pudesse, "teste" viraria
+ * o rotulo comodo de qualquer cortesia, e o relatorio de quem esta testando
+ * deixaria de significar alguma coisa.
+ */
+export const ACCESS_GRANT_KINDS = [
+    ...MANUAL_ACCESS_GRANT_KINDS,
+    "TRIAL",
+];
 export const PLATFORM_AUDIT_ACTIONS = [
     "ACCOUNT_REGISTERED",
     "ACCOUNT_UPDATED",
     "ACCESS_GRANTED",
     "ACCESS_REVOKED",
+    // Autocadastro: a pessoa se cadastra sozinha e o teste comeca quando ela
+    // confirma o e-mail. Sao dois atos distintos porque acontecem em momentos
+    // diferentes, e o segundo e o que abre o painel.
+    "SELF_SERVICE_REGISTERED",
+    "TRIAL_STARTED",
     // Atos da chave mestra sobre contas de administrador.
     "PLATFORM_ADMIN_CREATED",
     "PLATFORM_ADMIN_SUSPENDED",

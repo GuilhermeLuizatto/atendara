@@ -186,17 +186,20 @@ describe("Concessao manual registrada", () => {
 });
 
 describe("Pontos de escrita da validade e atestado do aplicativo", () => {
-  it("so o webhook e a concessao escrevem situacao e validade da conta", () => {
+  it("so o webhook e as concessoes registradas escrevem situacao e validade da conta", () => {
     // Varre o codigo do backend: um terceiro caminho, mesmo bem-intencionado,
     // quebra a regra 10 do AGENTS.md e precisa aparecer aqui.
     const writers = readdirSync(new URL(".", import.meta.url))
       .filter(name => name.endsWith(".js") && !name.endsWith(".test.js"))
       .filter(name => /\b(subscriptionStatus|accessUntil|accessUntilMs)\s*:/.test(readFileSync(new URL(name, import.meta.url), "utf8")));
-    expect(writers.sort()).toEqual(["billing.js", "platform.js"]);
+    // `self-service.js` entrou na lista com a A.2: o teste de 14 dias e
+    // concessao registrada de tipo `TRIAL`, com prazo fixo, uma por
+    // organizacao e trilha na mesma transacao — a terceira frase da regra 10.
+    expect(writers.sort()).toEqual(["billing.js", "platform.js", "self-service.js"]);
   });
 
   it("toda callable exige App Check; o webhook, que o gateway chama, nao", () => {
-    const callables = ["registerProfessional", "updateAccount", "completeInitialPassword", "grantAccess", "revokeAccess", "createPlatformAdmin", "setPlatformAdminStatus", "createSubscriptionCheckout", "openBillingPortal", "cancelPlatformSubscription", "exportClientData", "eraseClientData", "startOrganizationExport", "exportOrganizationPage", "deleteOrganization"];
+    const callables = ["registerProfessional", "updateAccount", "completeInitialPassword", "grantAccess", "revokeAccess", "createPlatformAdmin", "setPlatformAdminStatus", "createSubscriptionCheckout", "openBillingPortal", "cancelPlatformSubscription", "exportClientData", "eraseClientData", "startOrganizationExport", "exportOrganizationPage", "deleteOrganization", "registerSelfService", "activateTrial"];
     for (const name of callables) expect(backend[name].options, name).toMatchObject({ enforceAppCheck: true });
     expect(backend.stripeWebhook.options.enforceAppCheck).toBeUndefined();
   });

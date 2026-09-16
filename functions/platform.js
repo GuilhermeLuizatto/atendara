@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { paths } from "./generated/paths.js";
-import { ACCESS_GRANT_KINDS } from "./generated/platform-types.js";
+import { MANUAL_ACCESS_GRANT_KINDS } from "./generated/platform-types.js";
 import { ACCESS_GRANT_REASON_LENGTH } from "./generated/platform-config.js";
 import { accessGrantWindowError, isGrantInForce, resolveAccountGate } from "./generated/access-gate.js";
 import { ACCOUNT_CALL_OPTIONS, adminOf, parse } from "./platform-auth.js";
@@ -22,7 +22,9 @@ import { ACCOUNT_CALL_OPTIONS, adminOf, parse } from "./platform-auth.js";
 const db = () => getFirestore();
 
 const reason = z.string().trim().min(ACCESS_GRANT_REASON_LENGTH.min).max(ACCESS_GRANT_REASON_LENGTH.max);
-export const initialGrantSchema = z.object({ kind: z.enum(ACCESS_GRANT_KINDS), until: z.iso.datetime(), reason }).strict();
+// `MANUAL_...`: a operadora nao emite concessao de teste. `TRIAL` sai so do
+// autocadastro, com prazo e motivo fixos.
+export const initialGrantSchema = z.object({ kind: z.enum(MANUAL_ACCESS_GRANT_KINDS), until: z.iso.datetime(), reason }).strict();
 const grantSchema = initialGrantSchema.extend({ organizationId: z.string().min(1).max(128) }).strict();
 const revokeSchema = z.object({ organizationId: z.string().min(1).max(128), reason }).strict();
 

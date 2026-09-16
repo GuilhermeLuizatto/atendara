@@ -4,6 +4,19 @@ import type { ProfessionId } from "./profession";
 export const APP_MODULES = ["dashboard", "agenda", "clientes", "mensagens", "financeiro", "agente", "configuracoes"] as const;
 export type AppModule = (typeof APP_MODULES)[number];
 
+/**
+ * Como a conta nasceu. Ausente nas criadas antes do autocadastro existir, que
+ * sao todas da operadora — por isso o campo e opcional em vez de exigir
+ * migracao de dado.
+ */
+export type AccountOrigin = "OPERATOR" | "SELF_SERVICE";
+
+/** Versao dos textos legais aceita no cadastro, e quando. */
+export interface LegalAcceptance {
+  version: string;
+  acceptedAt: string;
+}
+
 export interface AccountAccess {
   userId: string;
   email: string;
@@ -26,7 +39,30 @@ export interface AccountAccess {
   subscriptionStatus: "ACTIVE" | "PENDING" | "CANCELLED";
   accessUntil: string | null;
   mustChangePassword: boolean;
+  origin?: AccountOrigin;
+  /**
+   * So existe em cadastro aberto: o aceite acontece na tela de cadastro. Quem a
+   * operadora cadastrou aceitou fora do produto, e inventar um registro aqui
+   * seria afirmar um consentimento que ninguem deu.
+   */
+  legal?: LegalAcceptance | null;
   createdAt: string;
+}
+
+/**
+ * O que a tela de autocadastro envia. Sem modulos e sem validade: o teste abre
+ * tudo, e a validade so nasce da concessao registrada na confirmacao do e-mail.
+ */
+export interface SelfServiceRegistration {
+  displayName: string;
+  email: string;
+  /** Ausente em quem entra pelo Google: nao ha senha a escolher. */
+  password?: string;
+  professionId: ProfessionId;
+  /** So para profissao com conselho; o formato e conferido, a veracidade nao. */
+  councilRegistration?: string;
+  businessName: string;
+  acceptedLegalVersion: string;
 }
 
 /**

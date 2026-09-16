@@ -48,8 +48,10 @@ SaaS multiprofissional de gestao e automacao. Leia
 10. **Assinatura e validade so mudam pelo webhook ou por concessao registrada.**
     `subscriptionStatus` e `accessUntil` sao escritos exclusivamente pelo
     backend: pelo webhook, depois de conferir a assinatura criptografica do
-    evento, ou pela concessao manual da operadora — com segundo fator, motivo,
-    prazo maximo e registro append-only na mesma transacao. Nenhuma outra
+    evento; pela concessao manual da operadora — com segundo fator, motivo,
+    prazo maximo e registro append-only na mesma transacao; ou pela concessao de
+    teste do autocadastro, de tipo `TRIAL`, com prazo fixo, motivo fixo, uma
+    unica vez por organizacao e o mesmo registro. Nenhuma outra
     callable escreve esses campos. Retornar do checkout nao prova pagamento, e
     nenhuma callable de cobranca aceita `organizationId` do cliente.
 11. **Aviso ao cliente e sempre opt-in explicito.** Nenhuma acao da agenda envia

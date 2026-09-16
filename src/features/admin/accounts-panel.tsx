@@ -7,12 +7,12 @@ import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { LoadMore } from "@/components/ui/load-more";
 import { MODULE_LABELS } from "@/config/access";
 import { ACCESS_GRANT_KIND_LABELS, ACCESS_GRANT_REASON_LENGTH } from "@/config/platform";
-import { listProfessions } from "@/config/professions";
+import { getProfession, listProfessions } from "@/config/professions";
 import { authAdapter } from "@/lib/auth";
 import { formatDate } from "@/lib/utils/format";
 import { useNow } from "@/lib/utils/use-now";
 import { useAuth } from "@/providers/auth-provider";
-import { ACCESS_GRANT_KINDS, type AccessGrantKind, type PageRequest, type ProfessionId } from "@/types";
+import { MANUAL_ACCESS_GRANT_KINDS, type ManualAccessGrantKind, type PageRequest, type ProfessionId } from "@/types";
 import { APP_MODULES, type AccountAccess, type AppModule } from "@/types/access";
 
 import { LATEST_GRANT_OFFSET_DAYS, dateInputValue, untilFromDateInput } from "./grant-dates";
@@ -46,7 +46,7 @@ export function AccountsPanel() {
     try {
       const email = String(values.get("email"));
       const initialGrant = withGrant
-        ? { kind: String(values.get("kind")) as AccessGrantKind, until: untilFromDateInput(String(values.get("until"))), reason: String(values.get("reason")) }
+        ? { kind: String(values.get("kind")) as ManualAccessGrantKind, until: untilFromDateInput(String(values.get("until"))), reason: String(values.get("reason")) }
         : undefined;
       const result = await authAdapter.registerProfessional({ email, displayName: String(values.get("name")), professionId: String(values.get("profession")) as ProfessionId, modules, initialGrant });
       setCredential({ email, password: result.temporaryPassword });
@@ -84,7 +84,7 @@ export function AccountsPanel() {
         <legend className="text-foreground text-sm">Concessão inicial</legend>
         <label className="text-muted-foreground flex min-h-6 items-center gap-2 text-sm"><input type="checkbox" className="accent-primary size-4" checked={withGrant} onChange={e => setWithGrant(e.target.checked)} />Liberar acesso agora, por concessão registrada</label>
         {withGrant ? <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Tipo">{props => <Select {...props} name="kind">{ACCESS_GRANT_KINDS.map(kind => <option key={kind} value={kind}>{ACCESS_GRANT_KIND_LABELS[kind]}</option>)}</Select>}</Field>
+          <Field label="Tipo">{props => <Select {...props} name="kind">{MANUAL_ACCESS_GRANT_KINDS.map(kind => <option key={kind} value={kind}>{ACCESS_GRANT_KIND_LABELS[kind]}</option>)}</Select>}</Field>
           <Field label="Acesso até">{props => <Input {...props} name="until" type="date" required defaultValue={dateInputValue(LATEST_GRANT_OFFSET_DAYS)} min={dateInputValue(0)} max={dateInputValue(LATEST_GRANT_OFFSET_DAYS)} />}</Field>
           <div className="sm:col-span-2"><Field label="Motivo" hint="Fica na trilha da operadora.">{props => <Textarea {...props} name="reason" required minLength={ACCESS_GRANT_REASON_LENGTH.min} maxLength={ACCESS_GRANT_REASON_LENGTH.max} />}</Field></div>
         </div> : null}
@@ -95,7 +95,7 @@ export function AccountsPanel() {
     <section className="space-y-4" aria-busy={accounts.status === "loading" || undefined}><h2 className="text-foreground font-semibold">Profissionais cadastrados</h2>
       {accounts.status === "loading" ? <p role="status" className="text-muted-foreground text-sm">Carregando cadastros...</p> : null}
       {professionals.map(account => <article key={account.userId} aria-labelledby={`conta-${account.userId}`} className="bg-surface border-border space-y-4 rounded-xl border p-5">
-        <div><h3 id={`conta-${account.userId}`} className="text-foreground font-medium">{account.displayName}</h3><p className="text-muted-foreground text-sm break-words">{account.email} · {listProfessions().find(p => p.id === account.professionId)?.label} · {accessLabel(account, now)}</p></div>
+        <div><h3 id={`conta-${account.userId}`} className="text-foreground font-medium">{account.displayName}</h3><p className="text-muted-foreground text-sm break-words">{account.email} · {account.professionId ? getProfession(account.professionId).label : null} · {accessLabel(account, now)}{account.origin === "SELF_SERVICE" ? " · Autocadastro" : null}</p></div>
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Situação do cadastro">{props => <Select {...props} value={account.status} onChange={e => edit(account.userId, { status: e.target.value as AccountAccess["status"] })}><option value="ACTIVE">Ativo</option><option value="SUSPENDED">Suspenso</option></Select>}</Field>
         </div>

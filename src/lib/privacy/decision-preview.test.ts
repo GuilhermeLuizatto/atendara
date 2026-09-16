@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DECISION_INPUT_PREVIEW_CHARS } from "@/config/privacy";
-import { listProfessions } from "@/config/professions";
+import { listAllProfessions } from "@/config/professions";
 
 import { decisionInputPreview } from "./decision-preview";
 
@@ -9,7 +9,7 @@ describe("trecho da mensagem na decisao do agente", () => {
   const body = "Oi, aqui e a Maria. ".repeat(40);
 
   it("profissoes de saude nao guardam trecho nenhum", () => {
-    for (const profession of listProfessions()) {
+    for (const profession of listAllProfessions()) {
       if (profession.sensitiveDataProfile === "STANDARD") continue;
       expect(decisionInputPreview(body, profession.sensitiveDataProfile), profession.id).toBe("");
     }

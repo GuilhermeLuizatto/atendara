@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { ACCESS_GRANT_REASON_LENGTH } from "@/config/platform";
-import { ACCESS_GRANT_KINDS, PROFESSION_IDS } from "@/types";
+import { MANUAL_ACCESS_GRANT_KINDS, PROFESSION_IDS } from "@/types";
 import { APP_MODULES } from "@/types/access";
 
 // Mesmo formato que as callables aceitam (`functions/index.js`, `platform.js`).
 // Situacao da mensalidade e validade nao aparecem em cadastro nem em alteracao.
 export const initialGrantSchema = z.object({
-  kind: z.enum(ACCESS_GRANT_KINDS), until: z.iso.datetime(),
+  kind: z.enum(MANUAL_ACCESS_GRANT_KINDS), until: z.iso.datetime(),
   reason: z.string().trim().min(ACCESS_GRANT_REASON_LENGTH.min).max(ACCESS_GRANT_REASON_LENGTH.max),
 }).strict();
 export const registrationSchema = z.object({

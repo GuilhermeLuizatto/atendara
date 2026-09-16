@@ -16,6 +16,8 @@ const SOURCES = [
   ["src/types/platform.ts", "platform-types"],
   ["src/config/platform.ts", "platform-config"],
   ["src/lib/platform/access-gate.ts", "access-gate"],
+  ["src/config/legal.ts", "legal-config"],
+  ["src/lib/auth/self-service.ts", "self-service"],
   ["src/types/privacy.ts", "privacy-types"],
   ["src/config/privacy.ts", "privacy-config"],
   ["src/lib/privacy/redaction.ts", "privacy-redaction"],

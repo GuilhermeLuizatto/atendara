@@ -78,22 +78,6 @@ export const OWNER_NAMES: Record<ProfessionId, string> = {
   AESTHETICS: "Bianca Ferraz",
 };
 
-/**
- * Registro profissional ficticio, no formato do conselho de cada profissao.
- * `null` quando a profissao nao tem conselho de classe.
- */
-export const LICENSE_PREFIX: Record<ProfessionId, string | null> = {
-  PSYCHOLOGIST: "CRP",
-  PSYCHIATRIST: "CRM",
-  DOCTOR: "CRM",
-  DENTIST: "CRO",
-  NUTRITIONIST: "CRN",
-  PHYSIOTHERAPIST: "CREFITO",
-  THERAPIST: "REG",
-  PERSONAL_TRAINER: "CREF",
-  AESTHETICS: null,
-};
-
 export const SPECIALTIES: Record<ProfessionId, string[]> = {
   PSYCHOLOGIST: ["Terapia cognitivo-comportamental", "Ansiedade", "Casal"],
   PSYCHIATRIST: ["Transtornos de humor", "Ansiedade", "Sono"],

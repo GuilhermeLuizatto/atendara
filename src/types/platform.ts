@@ -78,6 +78,11 @@ export const PLATFORM_AUDIT_ACTIONS = [
   // abandonada deixa de identificar alguem. E o mesmo apagamento que o titular
   // pede, sem o titular.
   "ABANDONED_ORGANIZATION_ERASED",
+  // Troca de profissao: quem pede e o titular, quem decide e a operadora. Sao
+  // tres atos porque sao tres momentos, e a recusa tambem precisa ficar escrita.
+  "PROFESSION_CHANGE_REQUESTED",
+  "PROFESSION_CHANGE_APPROVED",
+  "PROFESSION_CHANGE_REJECTED",
   // Atos da chave mestra sobre contas de administrador.
   "PLATFORM_ADMIN_CREATED",
   "PLATFORM_ADMIN_SUSPENDED",
@@ -110,6 +115,34 @@ export interface PlatformAuditLog {
  * O que a operadora pode fazer. Nao ha permissao de tenant aqui: ler cliente,
  * agenda ou financeiro de uma organizacao nao e ato de plataforma.
  */
+/** Situacao de um pedido de troca de profissao. */
+export const PROFESSION_CHANGE_STATUSES = ["PENDING", "APPROVED", "REJECTED"] as const;
+export type ProfessionChangeStatus = (typeof PROFESSION_CHANGE_STATUSES)[number];
+
+/**
+ * Pedido de troca de profissao, um por organizacao
+ * (`platformProfessionRequests/{organizationId}`).
+ *
+ * A profissao decide vocabulario, taxonomia, canais e travas de aviso. Trocar
+ * sozinho permitiria a um dentista virar medico, ou a um psiquiatra virar
+ * psicologo, sem ninguem olhar — por isso o pedido existe e por isso a decisao
+ * e da operadora, com segundo fator e registro. Enquanto nao houver aprovacao,
+ * a profissao nao muda.
+ */
+export interface ProfessionChangeRequest {
+  organizationId: ID;
+  /** Titular que pediu. A callable confere contra o `ownerId` no servidor. */
+  requestedBy: ID;
+  from: import("./profession").ProfessionId;
+  to: import("./profession").ProfessionId;
+  reason: string;
+  status: ProfessionChangeStatus;
+  requestedAt: ISODateString;
+  decidedAt: ISODateString | null;
+  decidedBy: ID | null;
+  decisionReason: string | null;
+}
+
 export const PLATFORM_PERMISSIONS = [
   "account:list",
   "account:register",
@@ -117,6 +150,8 @@ export const PLATFORM_PERMISSIONS = [
   "accessGrant:read",
   "accessGrant:create",
   "accessGrant:revoke",
+  "professionChange:read",
+  "professionChange:decide",
   "platformBilling:read",
   "platformAudit:read",
   // So da chave mestra: criar, suspender e reativar administradores.

@@ -31,6 +31,7 @@ export const PLATFORM_COLLECTIONS = {
     platformGatewayEvents: "platformGatewayEvents",
     platformCustomers: "platformCustomers",
     platformAccessGrants: "platformAccessGrants",
+    platformProfessionRequests: "platformProfessionRequests",
     platformAuditLogs: "platformAuditLogs",
     platformRateLimits: "platformRateLimits",
 };
@@ -97,6 +98,13 @@ export const paths = {
      * assinatura: uma organizacao nao acumula duas concessoes.
      */
     platformAccessGrant: (organizationId) => `${PLATFORM_COLLECTIONS.platformAccessGrants}/${organizationId}`,
+    platformProfessionRequests: () => PLATFORM_COLLECTIONS.platformProfessionRequests,
+    /**
+     * Pedido de troca de profissao, chaveado pelo `organizationId`. Um por vez,
+     * pela mesma razao da concessao: dois pedidos abertos deixariam a operadora
+     * decidindo qual vale.
+     */
+    platformProfessionRequest: (organizationId) => `${PLATFORM_COLLECTIONS.platformProfessionRequests}/${organizationId}`,
     platformAuditLogs: () => PLATFORM_COLLECTIONS.platformAuditLogs,
     platformAuditLog: (logId) => `${PLATFORM_COLLECTIONS.platformAuditLogs}/${logId}`,
     /** Contador por usuario e callable. So o backend le e escreve. */

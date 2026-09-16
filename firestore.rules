@@ -562,6 +562,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Pedido de troca de profissao, um por organizacao. O titular ve o proprio
+    // pedido e a resposta; a operadora ve todos. Pedir e decidir so pelas
+    // callables — a profissao decide vocabulario, taxonomia e travas de aviso, e
+    // trocar pelo cliente seria trocar tudo isso sem ninguem olhar.
+    match /platformProfessionRequests/{orgId} {
+      allow read: if subscriptionOwner(orgId);
+      allow write: if false;
+    }
+
     // Trilha append-only dos atos da operadora. Nem a operadora escreve pelo
     // cliente: uma trilha que o autor edita nao prova nada.
     match /platformAuditLogs/{logId} {

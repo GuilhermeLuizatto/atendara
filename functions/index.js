@@ -97,6 +97,10 @@ export { registerSelfService, activateTrial } from "./self-service.js";
 // retencao. Nao fecha o painel — quem fecha e a data, nas regras e na interface.
 export { closeExpiredTrialsDaily, eraseAbandonedTrialsDaily } from "./trial.js";
 
+// Troca de profissao: o titular pede, a operadora decide. Enquanto nao houver
+// aprovacao, a profissao nao muda.
+export { requestProfessionChange, decideProfessionChange } from "./profession-change.js";
+
 // Administradores da plataforma: so a chave mestra cria, suspende e reativa.
 export { createPlatformAdmin, setPlatformAdminStatus } from "./platform-admins.js";
 

@@ -2,13 +2,13 @@ import type { CurrencyCode, ID, ISODateString } from "./common";
 import type { AppModule } from "./access";
 
 /**
- * Cobranca DA PLATAFORMA — a mensalidade que a Three Devs cobra de clinicas e
+ * Cobranca DA PLATAFORMA — a mensalidade que a operadora cobra de clinicas e
  * profissionais assinantes do Atendara.
  *
  * Nao confundir com `./finance.ts`, que modela o financeiro OPERACIONAL do
  * assinante (receita de atendimento, despesas, saldo de paciente). Sao duas
  * contabilidades com donos diferentes e elas nunca se encontram: uma
- * mensalidade da Three Devs jamais vira `Transaction` de um tenant, e nenhum
+ * mensalidade da operadora jamais vira `Transaction` de um tenant, e nenhum
  * indicador soma os dois.
  *
  * Valores em centavos inteiros, como no resto do produto (regra 7 do AGENTS).

@@ -19,7 +19,7 @@ import { GatewayError, stripeRequest, verifyWebhookSignature } from "./gateway.j
 import { consumeRateLimit } from "./rate-limit.js";
 
 /**
- * Cobranca DA PLATAFORMA: a mensalidade que a Three Devs cobra dos assinantes.
+ * Cobranca DA PLATAFORMA: a mensalidade que a operadora cobra dos assinantes.
  *
  * Tres garantias que este arquivo existe para sustentar:
  *

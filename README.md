@@ -7,7 +7,7 @@ com informações e encaminha ao profissional os assuntos que exigem atenção h
 
 **Plataforma multiprofissional de gestao e automacao para quem atende pessoas.**
 
-Uma plataforma **Three Devs**.
+Feito por Guilherme Luizatto.
 
 Agenda, CRM, financeiro e central de mensagens com um agente de IA que responde o
 administrativo dentro de regras que o profissional define — e encaminha todo o

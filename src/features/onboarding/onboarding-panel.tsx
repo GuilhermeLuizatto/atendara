@@ -4,7 +4,7 @@ import { Check, ChevronDown } from "lucide-react";
 import { useId, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
-import { OPERATOR_NAME } from "@/config/app";
+import { APP_NAME } from "@/config/app";
 import { MODALITY_LABELS } from "@/config/labels";
 import { AppointmentForm } from "@/features/agenda/appointment-form";
 import { ClientForm } from "@/features/clients/client-form";
@@ -87,7 +87,7 @@ export function OnboardingPanel() {
             {profession.modalities.map((modality) => MODALITY_LABELS[modality].toLocaleLowerCase("pt-BR")).join(", ")}.
           </p>
           <p className="text-muted-foreground text-sm">
-            Se a profissão estiver errada, pare aqui e fale com a {OPERATOR_NAME}: só a
+            Se a profissão estiver errada, pare aqui e fale com o suporte do {APP_NAME}: só a
             operadora altera a profissão de um cadastro.
           </p>
           <Button size="sm" onClick={() => confirm("profession")}>
@@ -225,7 +225,7 @@ export function OnboardingPanel() {
                     content[step.id].body
                   ) : (
                     <p className="text-muted-foreground text-sm">
-                      Seu cadastro não inclui esta área. Fale com a {OPERATOR_NAME} se
+                      Seu cadastro não inclui esta área. Fale com o suporte do {APP_NAME} se
                       precisar dela.
                     </p>
                   )}

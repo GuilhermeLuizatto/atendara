@@ -12,7 +12,7 @@ import type {
  * `platformInvoices` e NADA MAIS. Elas nao conhecem
  * `organizations/{orgId}/transactions`, e os agregados de `/financeiro`
  * (`src/services/aggregates.ts`) nao conhecem estas colecoes. Somar as duas
- * coisas transformaria consulta de paciente em receita da Three Devs.
+ * coisas transformaria consulta de paciente em receita da operadora.
  *
  * As definicoes em prosa estao em `METRIC_DEFINITIONS` (`src/config/billing.ts`)
  * e sao exibidas junto dos numeros.

@@ -2,14 +2,14 @@
 /** Identidade e constantes globais do produto. */
 export const APP_NAME = "Atendara";
 /**
- * Empresa que opera a plataforma.
+ * Quem opera a plataforma. Hoje o proprio produto, tocado por uma pessoa so.
  *
- * Nao e um tenant: a Three Devs nao tem agenda, clientes nem financeiro no
- * produto. E a identidade de quem publica e responde pelo Atendara, e aparece
- * na apresentacao, no login e nos metadados. Organizacoes de clientes vivem em
+ * Nao e um tenant: a operadora nao tem agenda, clientes nem financeiro no
+ * produto. Serve aos metadados da pagina e ao texto que fala de quem responde
+ * pelo servico. Organizacoes de clientes vivem em
  * `organizations/{orgId}`; esta nao.
  */
-export const OPERATOR_NAME = "Three Devs";
+export const OPERATOR_NAME = APP_NAME;
 export const AI_ASSISTANT_NAME = "Dara";
 export const APP_TAGLINE = "Mais tempo para atender.";
 export const APP_DESCRIPTION = "Agenda, clientes e financeiro em um só lugar, com Dara, sua assistente de IA para a rotina administrativa. A IA auxilia, o humano decide.";

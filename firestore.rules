@@ -506,7 +506,7 @@ service cloud.firestore {
 
     // ------------------------------------------- cobranca DA PLATAFORMA
     //
-    // Estas colecoes sao da operadora (Three Devs), nao de tenant nenhum — por
+    // Estas colecoes sao da operadora, nao de tenant nenhum — por
     // isso vivem na raiz. Elas nao se misturam com
     // `organizations/{orgId}/transactions`, que continua sendo o financeiro do
     // negocio do assinante, com as regras de sempre.

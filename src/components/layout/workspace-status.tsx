@@ -6,7 +6,7 @@ import { CloudOff, RefreshCw, ShieldAlert, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button, buttonStyles } from "@/components/ui/button";
-import { OPERATOR_NAME } from "@/config/app";
+import { APP_NAME } from "@/config/app";
 import { canManageSubscription } from "@/config/access";
 import { useAuth } from "@/providers/auth-provider";
 import { useWorkspace } from "@/providers/workspace-provider";
@@ -114,12 +114,12 @@ function UnavailablePanel({
     "organization-missing": {
       icon: TriangleAlert,
       title: "Sua área de trabalho ainda não está pronta",
-      body: `O cadastro existe, mas a organização dele não foi encontrada. Fale com a ${OPERATOR_NAME} para concluir a liberação.`,
+      body: `O cadastro existe, mas a organização dele não foi encontrada. Fale com o suporte do ${APP_NAME} para concluir a liberação.`,
     },
     "access-denied": {
       icon: ShieldAlert,
       title: "Seu acesso não abre este painel agora",
-      body: `A validade do acesso pode ter terminado, o cadastro pode estar suspenso ou a organização ainda não foi liberada. Nenhum dado foi apagado. Se não souber o motivo, fale com a ${OPERATOR_NAME}.`,
+      body: `A validade do acesso pode ter terminado, o cadastro pode estar suspenso ou a organização ainda não foi liberada. Nenhum dado foi apagado. Se não souber o motivo, fale com o suporte do ${APP_NAME}.`,
     },
     failed: {
       icon: TriangleAlert,

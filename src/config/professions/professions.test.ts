@@ -83,6 +83,19 @@ describe("registry de profissoes", () => {
     }
   });
 
+  it("diz o conselho de cada profissao, ou que nao ha", () => {
+    for (const profession of listProfessions()) {
+      if (profession.council === null) continue;
+      // Sigla como aparece no formulario: so maiusculas, sem espaco.
+      expect(profession.council.acronym).toMatch(/^[A-Z]{3,8}$/);
+      expect(profession.council.name.length).toBeGreaterThan(10);
+    }
+  });
+
+  it("estetica nao pede registro de conselho", () => {
+    expect(getProfession("AESTHETICS").council).toBeNull();
+  });
+
   it("deixa preco e duracao da estetica com a profissional", () => {
     const aesthetics = getProfession("AESTHETICS");
     expect(aesthetics.defaultPriceInCents).toBeNull();

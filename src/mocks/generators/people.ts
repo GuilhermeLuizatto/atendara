@@ -1,7 +1,6 @@
 import {
   FIRST_NAMES,
   LAST_NAMES,
-  LICENSE_PREFIX,
   OWNER_NAMES,
   SPECIALTIES,
 } from "@/mocks/names";
@@ -49,7 +48,8 @@ function weightedStatuses(): ClientStatus[] {
 export function buildProfessionals(ctx: GeneratorContext): Professional[] {
   const { rng, profession, organizationId, now } = ctx;
   const ownerName = OWNER_NAMES[profession.id];
-  const license = LICENSE_PREFIX[profession.id];
+  // A sigla vem da tabela de profissoes: quem nao tem conselho fica sem registro.
+  const license = profession.council?.acronym ?? null;
 
   const owner: Professional = {
     id: "prof-owner",

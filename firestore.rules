@@ -349,7 +349,10 @@ service cloud.firestore {
         // Excluir o cadastro inteiro continua sendo `client:delete`, e a
         // eliminacao a pedido do titular e ato do backend.
         allow create, update: if moduleAccess(orgId, 'clientes') && canWriteOperational(orgId) && belongsToOrg(orgId)
-          && consentWriteOk(resource == null ? null : resource.data.get('notificationConsent', null));
+          // Ternario de mapa com mapa, e o `get` com padrao por fora: o compilador de
+          // producao avisava `[W] 352:48` no `null` literal que ficava num dos
+          // lados. Mesmo resultado — cadastro novo nao tem consentimento anterior.
+          && consentWriteOk((resource == null ? {} : resource.data).get('notificationConsent', null));
         allow delete: if moduleAccess(orgId, 'clientes') && canManage(orgId);
       }
 

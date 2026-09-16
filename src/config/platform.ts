@@ -28,6 +28,15 @@ export const MAX_ACCESS_GRANT_DAYS = 15;
 
 export const ACCESS_GRANT_REASON_LENGTH = { min: 10, max: 500 } as const;
 
+/**
+ * Justificativa do pedido de troca de profissao, e da resposta da operadora.
+ *
+ * Exigir texto nos dois lados nao e burocracia: a profissao muda vocabulario,
+ * taxonomia e travas de aviso, e quem ler a trilha meses depois precisa saber
+ * por que aquele cadastro deixou de ser o que era.
+ */
+export const PROFESSION_CHANGE_REASON_LENGTH = { min: 10, max: 500 } as const;
+
 export const ACCESS_GRANT_KIND_LABELS: Record<AccessGrantKind, string> = {
   COURTESY: "Cortesia",
   PILOT: "Piloto",
@@ -95,6 +104,9 @@ export const PLATFORM_AUDIT_ACTION_LABELS: Record<PlatformAuditAction, string> =
   TRIAL_STARTED: "Início do teste de 14 dias",
   TRIAL_ENDED: "Fim do teste de 14 dias",
   ABANDONED_ORGANIZATION_ERASED: "Exclusão automática do cadastro abandonado",
+  PROFESSION_CHANGE_REQUESTED: "Pedido de troca de profissão",
+  PROFESSION_CHANGE_APPROVED: "Troca de profissão aprovada",
+  PROFESSION_CHANGE_REJECTED: "Troca de profissão recusada",
   PLATFORM_ADMIN_CREATED: "Cadastro de administrador",
   PLATFORM_ADMIN_SUSPENDED: "Suspensão de administrador",
   PLATFORM_ADMIN_REACTIVATED: "Reativação de administrador",
@@ -128,6 +140,7 @@ export const CALLABLE_RATE_LIMITS = {
   selfServiceSignupByNetwork: { max: 5, windowSeconds: 3600 },
   selfServiceSignupByAccount: { max: 3, windowSeconds: 3600 },
   selfServiceTrialActivation: { max: 3, windowSeconds: 3600 },
+  professionChangeRequest: { max: 3, windowSeconds: 3600 },
 } as const;
 
 export type RateLimitKey = keyof typeof CALLABLE_RATE_LIMITS;

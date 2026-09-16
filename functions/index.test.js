@@ -210,7 +210,7 @@ describe("Pontos de escrita da validade e atestado do aplicativo", () => {
   });
 
   it("toda callable exige App Check; o webhook, que o gateway chama, nao", () => {
-    const callables = ["registerProfessional", "updateAccount", "completeInitialPassword", "grantAccess", "revokeAccess", "createPlatformAdmin", "setPlatformAdminStatus", "createSubscriptionCheckout", "openBillingPortal", "cancelPlatformSubscription", "exportClientData", "eraseClientData", "startOrganizationExport", "exportOrganizationPage", "deleteOrganization", "registerSelfService", "activateTrial"];
+    const callables = ["registerProfessional", "updateAccount", "completeInitialPassword", "grantAccess", "revokeAccess", "createPlatformAdmin", "setPlatformAdminStatus", "createSubscriptionCheckout", "openBillingPortal", "cancelPlatformSubscription", "exportClientData", "eraseClientData", "startOrganizationExport", "exportOrganizationPage", "deleteOrganization", "registerSelfService", "activateTrial", "requestProfessionChange", "decideProfessionChange"];
     for (const name of callables) expect(backend[name].options, name).toMatchObject({ enforceAppCheck: true });
     expect(backend.stripeWebhook.options.enforceAppCheck).toBeUndefined();
   });

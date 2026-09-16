@@ -12,13 +12,15 @@ import { AccountsPanel } from "./accounts-panel";
 import { PlatformAdminsPanel } from "./platform-admins-panel";
 import { PlatformAuditPanel } from "./platform-audit-panel";
 import { PlatformBillingPanel } from "./platform-billing";
+import { ProfessionRequestsPanel } from "./profession-requests-panel";
 import { SecondFactorGate } from "./second-factor-gate";
 
-type AdminTab = "cadastros" | "concessoes" | "cobranca" | "trilha" | "administradores";
+type AdminTab = "cadastros" | "concessoes" | "profissoes" | "cobranca" | "trilha" | "administradores";
 
 const TABS: { value: AdminTab; label: string }[] = [
   { value: "cadastros", label: "Cadastros" },
   { value: "concessoes", label: "Concessões de acesso" },
+  { value: "profissoes", label: "Troca de profissão" },
   { value: "cobranca", label: "Cobrança da plataforma" },
   { value: "trilha", label: "Trilha da operadora" },
 ];
@@ -42,13 +44,15 @@ export function AdminView() {
       <div>
         <h1 className="text-foreground text-2xl font-semibold">Administração</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Profissionais, concessões de acesso, cobrança da plataforma e a trilha dos atos da operadora.
+          Profissionais, concessões de acesso, pedidos de troca de profissão, cobrança da plataforma
+          e a trilha dos atos da operadora.
         </p>
       </div>
       <SecondFactorGate>
         <Tabs options={tabs} value={tab} onChange={setTab} />
         {tab === "cadastros" ? <AccountsPanel /> : null}
         {tab === "concessoes" ? <AccessGrantsPanel /> : null}
+        {tab === "profissoes" ? <ProfessionRequestsPanel /> : null}
         {tab === "cobranca" ? <PlatformBillingPanel /> : null}
         {tab === "trilha" ? <PlatformAuditPanel /> : null}
         {tab === "administradores" ? <PlatformAdminsPanel /> : null}

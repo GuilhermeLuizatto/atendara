@@ -28,7 +28,7 @@ import { hasRequiredSecondFactor } from "@/lib/platform/access-gate";
 import { passwordError } from "./passwords";
 import type { AccountAccess, AccessUpdate, PlatformAdminRegistration, ProfessionalRegistration, SelfServiceRegistration } from "@/types/access";
 import type { AccessGrantInput } from "@/types/platform";
-import type { AuthenticatedUser, Page, PageRequest } from "@/types";
+import type { AuthenticatedUser, Page, PageRequest, ProfessionId } from "@/types";
 
 import { AuthError, SecondFactorRequiredError, type AuthAdapter, type SecondFactorState, type TotpEnrollment } from "./types";
 
@@ -309,6 +309,12 @@ class FirebaseAuthAdapter implements AuthAdapter {
   }
   async grantAccess(input: AccessGrantInput): Promise<void> {
     await callable<AccessGrantInput, { ok: boolean }>("grantAccess")(input);
+  }
+  async requestProfessionChange(professionId: ProfessionId, reason: string): Promise<void> {
+    await callable<{ professionId: ProfessionId; reason: string }, { ok: boolean }>("requestProfessionChange")({ professionId, reason });
+  }
+  async decideProfessionChange(organizationId: string, decision: "APPROVED" | "REJECTED", reason: string): Promise<void> {
+    await callable<{ organizationId: string; decision: string; reason: string }, { ok: boolean }>("decideProfessionChange")({ organizationId, decision, reason });
   }
   async revokeAccess(organizationId: string, reason: string): Promise<void> {
     await callable<{ organizationId: string; reason: string }, { ok: boolean }>("revokeAccess")({ organizationId, reason });

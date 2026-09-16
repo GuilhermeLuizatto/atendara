@@ -113,6 +113,7 @@ try {
       await setDoc(doc(db, paths.platformSubscription(org)), { organizationId: org, subscriberUserId: owner, status: "ACTIVE", amountInCents: 19900, currency: "BRL", interval: "MONTH" });
       await setDoc(doc(db, paths.platformInvoice(`in-${org}`)), { id: `in-${org}`, organizationId: org, status: "PAID", amountDueInCents: 19900, issuedAt: new Date().toISOString() });
       await setDoc(doc(db, paths.platformAccessGrant(org)), { organizationId: org, subscriberUserId: owner, kind: "PILOT", reason: "Piloto combinado.", until: "2026-12-01T00:00:00.000Z", revokedAt: null });
+      await setDoc(doc(db, paths.platformProfessionRequest(org)), { organizationId: org, requestedBy: owner, from: "PSYCHOLOGIST", to: "AESTHETICS", reason: "Mudei de area de atuacao.", status: "PENDING", requestedAt: new Date().toISOString(), decidedAt: null, decidedBy: null, decisionReason: null });
     }
     await setDoc(doc(db, paths.platformGatewayEvent("evt-1")), { id: "evt-1", type: "invoice.paid", outcome: "APPLIED", organizationId: "org-a", receivedAt: new Date().toISOString() });
     await setDoc(doc(db, paths.platformCustomer("cus_1")), { customerId: "cus_1", organizationId: "org-a", subscriberUserId: "a" });
@@ -370,6 +371,21 @@ try {
   await denied(updateDoc(doc(withTotp("admin"), paths.platformAccessGrant("org-b")), { until: "2099-01-01T00:00:00.000Z" }));
   await denied(deleteDoc(doc(withTotp("admin"), paths.platformAccessGrant("org-b"))));
 
+  // ------------------------------------------------------------- Etapa A.7
+  // Pedido de troca de profissao: o titular le o proprio, a operadora le todos,
+  // e ninguem escreve pelo cliente — trocar a profissao pela tela mudaria
+  // vocabulario, taxonomia e travas de aviso de uma vez.
+
+  await allowed(getDoc(doc(db("a"), paths.platformProfessionRequest("org-a"))));
+  await denied(getDoc(doc(db("a"), paths.platformProfessionRequest("org-b"))));
+  await denied(getDoc(doc(db("restricted"), paths.platformProfessionRequest("org-a"))));
+  await allowed(getDocs(collection(withTotp("admin"), paths.platformProfessionRequests())));
+  await denied(getDocs(collection(db("admin"), paths.platformProfessionRequests())));
+  await denied(setDoc(doc(db("a"), paths.platformProfessionRequest("org-a")), { organizationId: "org-a", status: "APPROVED" }));
+  await denied(updateDoc(doc(db("a"), paths.platformProfessionRequest("org-a")), { status: "APPROVED" }));
+  await denied(updateDoc(doc(withTotp("admin"), paths.platformProfessionRequest("org-a")), { status: "APPROVED" }));
+  await denied(deleteDoc(doc(db("a"), paths.platformProfessionRequest("org-a"))));
+
   await allowed(getDocs(collection(withTotp("admin"), paths.platformAuditLogs())));
   await denied(getDocs(collection(db("admin"), paths.platformAuditLogs())));
   await denied(getDocs(collection(db("a"), paths.platformAuditLogs())));
@@ -501,6 +517,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 281);
+  assert.equal(checks, 290);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

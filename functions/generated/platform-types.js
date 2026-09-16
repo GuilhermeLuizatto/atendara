@@ -43,6 +43,11 @@ export const PLATFORM_AUDIT_ACTIONS = [
     // abandonada deixa de identificar alguem. E o mesmo apagamento que o titular
     // pede, sem o titular.
     "ABANDONED_ORGANIZATION_ERASED",
+    // Troca de profissao: quem pede e o titular, quem decide e a operadora. Sao
+    // tres atos porque sao tres momentos, e a recusa tambem precisa ficar escrita.
+    "PROFESSION_CHANGE_REQUESTED",
+    "PROFESSION_CHANGE_APPROVED",
+    "PROFESSION_CHANGE_REJECTED",
     // Atos da chave mestra sobre contas de administrador.
     "PLATFORM_ADMIN_CREATED",
     "PLATFORM_ADMIN_SUSPENDED",
@@ -57,6 +62,8 @@ export const PLATFORM_AUDIT_ACTIONS = [
  * O que a operadora pode fazer. Nao ha permissao de tenant aqui: ler cliente,
  * agenda ou financeiro de uma organizacao nao e ato de plataforma.
  */
+/** Situacao de um pedido de troca de profissao. */
+export const PROFESSION_CHANGE_STATUSES = ["PENDING", "APPROVED", "REJECTED"];
 export const PLATFORM_PERMISSIONS = [
     "account:list",
     "account:register",
@@ -64,6 +71,8 @@ export const PLATFORM_PERMISSIONS = [
     "accessGrant:read",
     "accessGrant:create",
     "accessGrant:revoke",
+    "professionChange:read",
+    "professionChange:decide",
     "platformBilling:read",
     "platformAudit:read",
     // So da chave mestra: criar, suspender e reativar administradores.

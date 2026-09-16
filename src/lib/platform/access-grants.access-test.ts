@@ -263,3 +263,82 @@ describe("Etapa 5B — concessao manual registrada", () => {
     expect(await auditActions()).toEqual(["ACCESS_GRANTED", "ACCESS_GRANTED", "ACCESS_REVOKED", "ACCOUNT_REGISTERED"]);
   });
 });
+
+/**
+ * A.7: a troca de profissao, com as pecas reais.
+ *
+ * O que so o emulador prova: enquanto a operadora nao responde, a profissao
+ * gravada continua a mesma — e quando ela responde, conta, organizacao e perfil
+ * mudam juntos, com a trilha na mesma transacao.
+ */
+describe("troca de profissao", () => {
+  const MOTIVO = "Passei a atender estetica e nao exerco mais a profissao anterior.";
+
+  async function pedido() {
+    return (await adminDb().doc(paths.platformProfessionRequest(organizationId)).get()).data();
+  }
+
+  it("so o titular pede, e pedir nao muda nada", async () => {
+    await expect(operator.call("requestProfessionChange", { professionId: "AESTHETICS", reason: MOTIVO })).rejects.toMatchObject({
+      code: "permission-denied",
+    });
+
+    await titularCall("requestProfessionChange", { professionId: "AESTHETICS", reason: MOTIVO });
+    expect(await pedido()).toMatchObject({ to: "AESTHETICS", status: "PENDING", requestedBy: titularUid });
+    // A profissao gravada continua a mesma: pedir nao e trocar.
+    expect(await accountOf(titularUid)).toMatchObject({ professionId: "PSYCHOLOGIST" });
+
+    // Um segundo pedido aberto deixaria a operadora decidindo qual vale.
+    await expect(titularCall("requestProfessionChange", { professionId: "DENTIST", reason: MOTIVO })).rejects.toMatchObject({
+      code: "failed-precondition",
+    });
+  });
+
+  it("o titular le o proprio pedido e nao escreve nele", async () => {
+    await expect(getDoc(doc(db, paths.platformProfessionRequest(organizationId)))).resolves.toBeDefined();
+    await expectDenied(
+      setDoc(doc(db, paths.platformProfessionRequest(organizationId)), { organizationId, status: "APPROVED" }),
+    );
+    await expectDenied(
+      setDoc(doc(operator.firestore, paths.platformProfessionRequest(organizationId)), { organizationId, status: "APPROVED" }),
+    );
+  });
+
+  it("decidir exige a operadora com segundo fator", async () => {
+    for (const sessao of [operatorWithoutFactor, operatorWithSms]) {
+      await expect(
+        sessao.call("decideProfessionChange", { organizationId, decision: "APPROVED", reason: MOTIVO }),
+      ).rejects.toMatchObject({ code: "permission-denied" });
+    }
+    await expect(
+      titularCall("decideProfessionChange", { organizationId, decision: "APPROVED", reason: MOTIVO }),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+    expect(await pedido()).toMatchObject({ status: "PENDING" });
+  });
+
+  it("aprovar move conta, organizacao e perfil, e deixa registro", async () => {
+    // Com registro preenchido: e o apagamento dele que precisa ser provado.
+    await adminDb()
+      .doc(paths.document(organizationId, "professionals", titularUid))
+      .update({ licenseNumber: "CRP 06/123456" });
+
+    await operator.call("decideProfessionChange", {
+      organizationId,
+      decision: "APPROVED",
+      reason: "Conferi a atividade declarada e o registro apresentado.",
+    });
+
+    expect(await pedido()).toMatchObject({ status: "APPROVED", decidedBy: OPERATOR_UID });
+    expect(await accountOf(titularUid)).toMatchObject({ professionId: "AESTHETICS" });
+    expect((await adminDb().doc(paths.organization(organizationId)).get()).data()).toMatchObject({
+      primaryProfession: "AESTHETICS",
+      professions: ["AESTHETICS"],
+    });
+    // O registro no conselho anterior nao vale para a profissao nova.
+    expect((await adminDb().doc(paths.document(organizationId, "professionals", titularUid)).get()).data()).toMatchObject({
+      profession: "AESTHETICS",
+      licenseNumber: null,
+    });
+    expect(await auditActions()).toContain("PROFESSION_CHANGE_APPROVED");
+  });
+});

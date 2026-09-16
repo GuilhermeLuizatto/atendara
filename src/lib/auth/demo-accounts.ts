@@ -1,5 +1,5 @@
 import { APP_MODULES, type AccountAccess } from "@/types/access";
-import type { AccessGrantKind } from "@/types/platform";
+import type { AccessGrantKind, ProfessionChangeRequest } from "@/types/platform";
 import { PLATFORM_ADMIN_EMAIL } from "@/config/access";
 import { DEMO_ADMIN_VERIFIER } from "@/config/demo-admin";
 
@@ -9,6 +9,8 @@ export interface DemoAccount {
   hash: string;
   /** Concessao simulada da demonstracao. Sem trilha: nada aqui e registro real. */
   grant?: { kind: AccessGrantKind; reason: string; until: string; revokedAt: string | null };
+  /** Pedido de troca de profissao simulado. Idem: nao e registro real. */
+  professionRequest?: ProfessionChangeRequest;
 }
 const KEY = "atendo:demo-accounts:v2";
 

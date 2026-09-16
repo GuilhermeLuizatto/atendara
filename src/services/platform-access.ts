@@ -2,9 +2,17 @@ import { collection, doc, getDoc, orderBy, query } from "firebase/firestore";
 
 import { getDb } from "@/lib/firebase/client";
 import { isDemoMode } from "@/lib/firebase/config";
+import { readDemoAccounts } from "@/lib/auth/demo-accounts";
 import { readPage } from "@/lib/firebase/paging";
 import { paths } from "@/lib/firebase/paths";
-import type { ID, Page, PageRequest, PlatformAccessGrant, PlatformAuditLog } from "@/types";
+import type {
+  ID,
+  Page,
+  PageRequest,
+  PlatformAccessGrant,
+  PlatformAuditLog,
+  ProfessionChangeRequest,
+} from "@/types";
 
 /**
  * Leitura das concessoes e da trilha da operadora.
@@ -20,6 +28,10 @@ export interface PlatformAccessReader {
   /** Da concessao mais recente para a mais antiga. */
   allAccessGrants(request?: PageRequest): Promise<Page<PlatformAccessGrant>>;
   recentAuditLogs(request?: PageRequest): Promise<Page<PlatformAuditLog>>;
+  /** O pedido de troca de profissao da organizacao, se houver algum. */
+  professionChangeRequest(organizationId: ID): Promise<ProfessionChangeRequest | null>;
+  /** Do pedido mais recente para o mais antigo. So a operadora alcanca todos. */
+  allProfessionChangeRequests(request?: PageRequest): Promise<Page<ProfessionChangeRequest>>;
 }
 
 const GRANTS_PAGE_SIZE = 25;
@@ -52,6 +64,20 @@ class FirestorePlatformAccessReader implements PlatformAccessReader {
       (document) => document.data() as PlatformAuditLog,
     );
   }
+
+  async professionChangeRequest(organizationId: ID): Promise<ProfessionChangeRequest | null> {
+    const snapshot = await getDoc(doc(getDb(), paths.platformProfessionRequest(organizationId)));
+    return snapshot.exists() ? (snapshot.data() as ProfessionChangeRequest) : null;
+  }
+
+  allProfessionChangeRequests(request: PageRequest = {}): Promise<Page<ProfessionChangeRequest>> {
+    return readPage(
+      query(collection(getDb(), paths.platformProfessionRequests()), orderBy("requestedAt", "desc")),
+      request,
+      GRANTS_PAGE_SIZE,
+      (document) => document.data() as ProfessionChangeRequest,
+    );
+  }
 }
 
 class UnavailablePlatformAccessReader implements PlatformAccessReader {
@@ -64,6 +90,21 @@ class UnavailablePlatformAccessReader implements PlatformAccessReader {
   }
   async recentAuditLogs(): Promise<Page<PlatformAuditLog>> {
     return EMPTY_PAGE;
+  }
+  /**
+   * A demonstracao guarda o pedido de troca junto da conta, em
+   * `localStorage`. E a unica leitura simulada aqui: sem ela nao daria para
+   * conferir a tela que mostra "aguardando resposta" sem projeto Firebase.
+   */
+  async professionChangeRequest(organizationId: ID): Promise<ProfessionChangeRequest | null> {
+    return readDemoAccounts().find((account) => account.access.organizationId === organizationId)?.professionRequest ?? null;
+  }
+  async allProfessionChangeRequests(): Promise<Page<ProfessionChangeRequest>> {
+    const items = readDemoAccounts()
+      .map((account) => account.professionRequest)
+      .filter((pedido): pedido is ProfessionChangeRequest => Boolean(pedido))
+      .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
+    return { items, next: null };
   }
 }
 

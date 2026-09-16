@@ -1,5 +1,4 @@
 import { createHmac } from "node:crypto";
-import { createRequire } from "node:module";
 
 import { deleteApp, initializeApp, type FirebaseApp } from "firebase/app";
 import { connectAuthEmulator, getAuth, signInWithEmailAndPassword, signOut, type Auth } from "firebase/auth";
@@ -37,8 +36,7 @@ import {
  * Rodar com: npm run test:access
  */
 
-const require = createRequire(import.meta.url);
-const admin = require("../../../functions/node_modules/firebase-admin/lib/index.js");
+import { adminDb, deleteAdminApps, initializeAdminSdk } from "../testing/admin-sdk";
 
 const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9098";
 const [FIRESTORE_HOST, FIRESTORE_PORT] = (process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8087").split(":");
@@ -63,11 +61,11 @@ const inDays = (days: number) => inSeconds(days * 86_400);
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function accountOf(uid: string): Promise<Record<string, unknown>> {
-  return (await admin.firestore().doc(paths.account(uid)).get()).data();
+  return (await adminDb().doc(paths.account(uid)).get()).data();
 }
 
 async function auditActions(): Promise<string[]> {
-  const entries = await admin.firestore().collection(paths.platformAuditLogs()).where("organizationId", "==", organizationId).get();
+  const entries = await adminDb().collection(paths.platformAuditLogs()).where("organizationId", "==", organizationId).get();
   return entries.docs.map((entry: { data(): { action: string } }) => entry.data().action).sort();
 }
 
@@ -97,11 +95,11 @@ async function deliver(event: Record<string, unknown>) {
 beforeAll(async () => {
   process.env.FIREBASE_AUTH_EMULATOR_HOST = AUTH_HOST;
   process.env.FIRESTORE_EMULATOR_HOST = `${FIRESTORE_HOST}:${FIRESTORE_PORT}`;
-  admin.initializeApp({ projectId: PROJECT });
+  initializeAdminSdk(PROJECT);
 
   // A operadora so precisa do documento de autoridade: quem entra com TOTP e o
   // token de teste, que o emulador de Auth nao sabe emitir.
-  await admin.firestore().doc(paths.account(OPERATOR_UID)).set({
+  await adminDb().doc(paths.account(OPERATOR_UID)).set({
     userId: OPERATOR_UID,
     email: "operadora-concessoes@atendara.test",
     displayName: "Operadora das Concessoes",
@@ -142,7 +140,7 @@ afterAll(async () => {
   await Promise.all([operator, operatorWithoutFactor, operatorWithSms].map((session) => session.dispose()));
   await terminate(db);
   await deleteApp(app);
-  await Promise.all(admin.apps.map((instance: { delete(): Promise<void> }) => instance.delete()));
+  await deleteAdminApps();
 });
 
 describe("Etapa 5B — concessao manual registrada", () => {
@@ -160,7 +158,7 @@ describe("Etapa 5B — concessao manual registrada", () => {
     await expect(operatorWithSms.call("grantAccess", payload)).rejects.toMatchObject({ code: "permission-denied" });
     await expect(callFunction("grantAccess", payload, { idToken: operator.idToken, appCheck: false })).rejects.toMatchObject({ code: "unauthenticated" });
 
-    expect((await admin.firestore().doc(paths.platformAccessGrant(organizationId)).get()).exists).toBe(false);
+    expect((await adminDb().doc(paths.platformAccessGrant(organizationId)).get()).exists).toBe(false);
     await expectDenied(getDoc(tenantClient()));
   });
 
@@ -168,7 +166,7 @@ describe("Etapa 5B — concessao manual registrada", () => {
     await expect(
       operator.call("grantAccess", { organizationId, kind: "PILOT", until: inDays(MAX_ACCESS_GRANT_DAYS + 1), reason: REASON }),
     ).rejects.toMatchObject({ code: "invalid-argument" });
-    expect((await admin.firestore().doc(paths.platformAccessGrant(organizationId)).get()).exists).toBe(false);
+    expect((await adminDb().doc(paths.platformAccessGrant(organizationId)).get()).exists).toBe(false);
   });
 
   it("concessao abre o painel e expira sozinha", async () => {
@@ -236,7 +234,7 @@ describe("Etapa 5B — concessao manual registrada", () => {
 
     expect(linked).toMatchObject({ status: 200, outcome: "APPLIED" });
     expect(incomplete).toMatchObject({ status: 200, outcome: "APPLIED" });
-    expect((await admin.firestore().doc(paths.platformSubscription(organizationId)).get()).data()).toMatchObject({ status: "INCOMPLETE" });
+    expect((await adminDb().doc(paths.platformSubscription(organizationId)).get()).data()).toMatchObject({ status: "INCOMPLETE" });
     expect(await accountOf(titularUid)).toMatchObject({ subscriptionStatus: "ACTIVE", accessUntil: until });
     await expect(getDoc(tenantClient())).resolves.toBeDefined();
   });

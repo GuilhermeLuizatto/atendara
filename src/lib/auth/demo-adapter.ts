@@ -1,12 +1,15 @@
 import type { AuthenticatedUser, Page, PageCursor, PageRequest } from "@/types";
 import { APP_MODULES } from "@/types/access";
-import type { AccessUpdate, AccountAccess, PlatformAdminRegistration, ProfessionalRegistration } from "@/types/access";
+import type { AccessUpdate, AccountAccess, PlatformAdminRegistration, ProfessionalRegistration, SelfServiceRegistration } from "@/types/access";
 import type { AccessGrantInput } from "@/types/platform";
 import { hasActiveAccess, isPlatformAdmin } from "@/config/access";
+import { LEGAL_VERSION } from "@/config/legal";
+import { TRIAL_GRANT_REASON } from "@/config/platform";
+import { councilRegistrationError, selfServiceModules, trialUntil } from "@/lib/auth/self-service";
 import { accessGrantReasonError, accessGrantWindowError, isGrantInForce, resolveAccountGate } from "@/lib/platform/access-gate";
 import { readDemoAccounts, writeDemoAccounts, type DemoAccount } from "./demo-accounts";
 import { createTemporaryPassword, passwordDigest, passwordError } from "./passwords";
-import { accessGrantSchema, accessUpdateSchema, platformAdminRegistrationSchema, registrationSchema } from "./registration";
+import { accessGrantSchema, accessUpdateSchema, platformAdminRegistrationSchema, registrationSchema, selfServiceRegistrationSchema } from "./registration";
 import { AuthError, type AuthAdapter, type SecondFactorState, type TotpEnrollment } from "./types";
 
 const SESSION_KEY = "atendo:demo-session:v2";
@@ -31,7 +34,9 @@ export class DemoAuthAdapter implements AuthAdapter {
   }
   private user(): AuthenticatedUser | null {
     const account = this.current();
-    return account ? { ...account.access, avatarUrl: null, access: account.access } : null;
+    // A demonstracao nao envia e-mail, entao a confirmacao ja vem dada: aqui o
+    // que se exercita e o caminho depois dela.
+    return account ? { ...account.access, avatarUrl: null, emailVerified: true, access: account.access } : null;
   }
   private emit = () => { for (const listener of this.listeners) listener(this.user()); };
   subscribe(listener: (user: AuthenticatedUser | null) => void) {
@@ -52,6 +57,7 @@ export class DemoAuthAdapter implements AuthAdapter {
     this.emit();
     return this.user()!;
   }
+  async signInWithGoogle(): Promise<AuthenticatedUser> { throw new AuthError("A demonstração local não entra pelo Google. Crie a conta com e-mail e senha."); }
   async completeSecondFactorSignIn(): Promise<AuthenticatedUser> { throw new AuthError(NO_SECOND_FACTOR); }
   async signOut() { localStorage.removeItem(SESSION_KEY); this.emit(); }
   private requireAdmin() {
@@ -74,6 +80,40 @@ export class DemoAuthAdapter implements AuthAdapter {
   async confirmPasswordReset(): Promise<void> { throw new AuthError(NO_PASSWORD_EMAIL); }
   async secondFactorState(): Promise<SecondFactorState> { return "not-applicable"; }
   async sendEmailVerification() { throw new AuthError(NO_SECOND_FACTOR); }
+  async refreshSession(): Promise<AuthenticatedUser | null> { return this.user(); }
+  /**
+   * Cadastro aberto simulado. Repete a regra do backend no que importa para a
+   * interface: a conta nasce sem validade, e quem abre e a concessao de teste.
+   * E-mail ja cadastrado nao levanta erro — a resposta e a mesma.
+   */
+  async registerSelfService(input: SelfServiceRegistration): Promise<void> {
+    const data = selfServiceRegistrationSchema.parse(input);
+    if (data.acceptedLegalVersion !== LEGAL_VERSION) throw new AuthError("Os Termos e a Política foram atualizados. Recarregue a página.");
+    const council = councilRegistrationError(data.professionId, data.councilRegistration);
+    if (council) throw new AuthError(council);
+    if (!data.password) throw new AuthError("Escolha uma senha para entrar.");
+    if (readDemoAccounts().some(a => a.access.email === data.email)) return;
+    const userId = crypto.randomUUID(), salt = crypto.randomUUID();
+    const hash = await passwordDigest(data.password, salt);
+    writeDemoAccounts([...readDemoAccounts(), { salt, hash, access: {
+      userId, email: data.email, displayName: data.displayName, professionId: data.professionId,
+      organizationId: `org-${userId}`, platformRole: "PROFESSIONAL", modules: selfServiceModules(),
+      status: "ACTIVE", subscriptionStatus: "PENDING", accessUntil: null, mustChangePassword: false,
+      origin: "SELF_SERVICE", legal: { version: LEGAL_VERSION, acceptedAt: new Date().toISOString() },
+      createdAt: new Date().toISOString(),
+    } }]);
+    this.emit();
+  }
+  /** Uma concessao por organizacao: chamar de novo devolve a mesma data. */
+  async activateTrial(): Promise<{ accessUntil: string | null }> {
+    const account = this.current();
+    if (!account || account.access.origin !== "SELF_SERVICE") throw new AuthError("Este cadastro não tem teste a começar.");
+    if (account.grant) return { accessUntil: account.access.accessUntil };
+    const grant = { kind: "TRIAL" as const, reason: TRIAL_GRANT_REASON, until: trialUntil(Date.now()), revokedAt: null };
+    const gate = resolveAccountGate({ subscription: null, grant, nowMs: Date.now() });
+    this.replace({ ...account, grant, access: { ...account.access, ...gate } });
+    return { accessUntil: gate.accessUntil };
+  }
   async startTotpEnrollment(): Promise<TotpEnrollment> { throw new AuthError(NO_SECOND_FACTOR); }
   async finishTotpEnrollment() { throw new AuthError(NO_SECOND_FACTOR); }
   async listAccounts(request: PageRequest = {}): Promise<Page<AccountAccess>> {

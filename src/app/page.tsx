@@ -11,6 +11,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
+import { TRIAL_DAYS } from "@/config/platform";
 import {
   AI_ASSISTANT_NAME,
   APP_DESCRIPTION,
@@ -49,9 +50,14 @@ export default function LandingPage() {
         <span className="text-foreground text-sm font-semibold tracking-tight">
           {APP_NAME}
         </span>
-        <Link href="/login" className={buttonStyles({ variant: "secondary", size: "sm" })}>
-          Entrar
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/login" className={buttonStyles({ variant: "ghost", size: "sm" })}>
+            Entrar
+          </Link>
+          <Link href="/cadastro" className={buttonStyles({ variant: "secondary", size: "sm" })}>
+            Criar conta
+          </Link>
+        </div>
       </header>
 
       <main className="mx-auto w-full max-w-5xl px-6 pb-20">
@@ -66,12 +72,15 @@ export default function LandingPage() {
             {APP_DESCRIPTION}
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link href="/dashboard" className={buttonStyles({ size: "lg" })}>
-              Abrir o painel
+            <Link href="/cadastro" className={buttonStyles({ size: "lg" })}>
+              Começar o teste de {TRIAL_DAYS} dias
               <ArrowRight className="size-4" aria-hidden strokeWidth={2} />
             </Link>
+            <Link href="/dashboard" className={buttonStyles({ variant: "outline", size: "lg" })}>
+              Ver o painel de demonstração
+            </Link>
             <p className="text-muted-foreground text-xs">
-              Dados fictícios. Nenhuma informação real é usada.
+              Sem cartão. O painel de demonstração usa dados fictícios.
             </p>
           </div>
         </section>

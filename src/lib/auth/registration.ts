@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { ACCESS_GRANT_REASON_LENGTH } from "@/config/platform";
+import { ACCESS_GRANT_REASON_LENGTH, SELF_SERVICE_PASSWORD_LENGTH } from "@/config/platform";
+import { COUNCIL_REGISTRATION_LENGTH } from "@/lib/auth/self-service";
 import { MANUAL_ACCESS_GRANT_KINDS, PROFESSION_IDS } from "@/types";
 import { APP_MODULES } from "@/types/access";
 
@@ -13,6 +14,16 @@ export const registrationSchema = z.object({
   displayName: z.string().trim().min(3).max(100), email: z.email().trim().toLowerCase(),
   professionId: z.enum(PROFESSION_IDS), modules: z.array(z.enum(APP_MODULES)).min(1),
   initialGrant: initialGrantSchema.optional(),
+}).strict();
+// Mesmo formato de `registerSelfService` (`functions/self-service.js`). A tela
+// recusa antes de chamar; o servidor recusa de novo, que e o que vale.
+export const selfServiceRegistrationSchema = z.object({
+  displayName: z.string().trim().min(3).max(100), email: z.email().trim().toLowerCase(),
+  password: z.string().min(SELF_SERVICE_PASSWORD_LENGTH.min).max(SELF_SERVICE_PASSWORD_LENGTH.max).optional(),
+  professionId: z.enum(PROFESSION_IDS),
+  councilRegistration: z.string().trim().max(COUNCIL_REGISTRATION_LENGTH.max).optional(),
+  businessName: z.string().trim().min(2).max(120),
+  acceptedLegalVersion: z.string().min(1).max(64),
 }).strict();
 export const accessUpdateSchema = z.object({
   status: z.enum(["ACTIVE", "SUSPENDED"]), modules: z.array(z.enum(APP_MODULES)).min(1),

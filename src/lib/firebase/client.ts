@@ -1,6 +1,7 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { ReCaptchaEnterpriseProvider, initializeAppCheck } from "firebase/app-check";
 import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth";
+import { connectFunctionsEmulator, getFunctions, type Functions } from "firebase/functions";
 import {
   connectFirestoreEmulator,
   getFirestore,
@@ -8,6 +9,9 @@ import {
 } from "firebase/firestore";
 
 import { appCheckSiteKey, getFirebaseConfig, useEmulators } from "./config";
+
+/** Onde as callables sao publicadas. O mesmo valor de `platform-auth.js`. */
+const FUNCTIONS_REGION = "southamerica-east1";
 
 /**
  * Inicializacao preguicosa e idempotente do SDK cliente.
@@ -20,6 +24,7 @@ import { appCheckSiteKey, getFirebaseConfig, useEmulators } from "./config";
 let cachedApp: FirebaseApp | null = null;
 let cachedAuth: Auth | null = null;
 let cachedDb: Firestore | null = null;
+let cachedFunctions: Functions | null = null;
 let authEmulatorConnected = false;
 let dbEmulatorConnected = false;
 let appCheckActivated = false;
@@ -65,6 +70,22 @@ export function getDb(): Firestore {
   cachedDb = getFirestore(getFirebaseApp());
   connectEmulatorsOnce();
   return cachedDb;
+}
+
+/**
+ * As callables, na regiao onde elas vivem.
+ *
+ * Existe por causa do emulador: `getFunctions` sozinho aponta sempre para a
+ * nuvem, e uma verificacao local acabaria chamando producao — que e exatamente
+ * o que nao se quer ao conferir uma tela nova.
+ */
+export function getFirebaseFunctions(): Functions {
+  if (cachedFunctions) return cachedFunctions;
+  cachedFunctions = getFunctions(getFirebaseApp(), FUNCTIONS_REGION);
+  if (useEmulators && typeof window !== "undefined") {
+    connectFunctionsEmulator(cachedFunctions, "127.0.0.1", 5001);
+  }
+  return cachedFunctions;
 }
 
 function connectEmulatorsOnce(): void {

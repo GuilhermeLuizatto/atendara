@@ -52,6 +52,13 @@ export interface AuthAdapter {
   subscribe(listener: (user: AuthenticatedUser | null) => void): () => void;
   /** Lanca `SecondFactorRequiredError` quando a conta tem segundo fator cadastrado. */
   signIn(email: string, password: string): Promise<AuthenticatedUser>;
+  /**
+   * Entrada pelo Google. E so a PRIMEIRA etapa do cadastro aberto: o Google
+   * entrega nome e e-mail ja confirmados, e a segunda tela ainda precisa
+   * perguntar profissao, conselho e nome do negocio. Sem ela nao ha
+   * organizacao, e sem organizacao nao ha painel.
+   */
+  signInWithGoogle(): Promise<AuthenticatedUser>;
   completeSecondFactorSignIn(code: string): Promise<AuthenticatedUser>;
   signOut(): Promise<void>;
   completeInitialPassword(password: string): Promise<void>;
@@ -65,6 +72,21 @@ export interface AuthAdapter {
   confirmPasswordReset(code: string, password: string): Promise<void>;
   secondFactorState(): Promise<SecondFactorState>;
   sendEmailVerification(): Promise<void>;
+  /**
+   * Relê a sessao e o cadastro, forcando token novo.
+   *
+   * `email_verified` viaja no token: sem renovar, quem acabou de confirmar o
+   * e-mail continuaria sendo recusado pela callable que comeca o teste.
+   */
+  refreshSession(): Promise<AuthenticatedUser | null>;
+  /**
+   * Cadastro aberto. Nao devolve nada de proposito: a resposta e a mesma para
+   * e-mail novo e para e-mail ja cadastrado, e a tela nunca fica sabendo qual
+   * dos dois aconteceu.
+   */
+  registerSelfService(input: import("@/types/access").SelfServiceRegistration): Promise<void>;
+  /** Comeca o teste de 14 dias depois do e-mail confirmado. Idempotente. */
+  activateTrial(): Promise<{ accessUntil: string | null }>;
   startTotpEnrollment(): Promise<TotpEnrollment>;
   finishTotpEnrollment(code: string): Promise<void>;
   /** Cadastros em ordem de e-mail, uma pagina por vez. */

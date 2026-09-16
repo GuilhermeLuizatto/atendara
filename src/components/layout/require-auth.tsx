@@ -4,6 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { hasActiveAccess, canAccessModule, canManageSubscription, isPlatformAdmin } from "@/config/access";
 import { APP_MODULES, type AppModule } from "@/types/access";
+import { EmailConfirmation } from "@/features/auth/email-confirmation";
 import { PasswordSetup } from "@/features/auth/password-setup";
 import { Button } from "@/components/ui/button";
 
@@ -40,6 +41,10 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
 
   if (user?.access?.mustChangePassword) return <PasswordSetup />;
+  // Cadastro aberto que ainda nao teve teste nenhum: a conta existe, e o que
+  // falta e a confirmacao do e-mail. Depois do 15o dia `accessUntil` existe e
+  // esta vencido — ai o caminho e outro, e nao este.
+  if (user?.access?.origin === "SELF_SERVICE" && !user.access.accessUntil) return <EmailConfirmation />;
   const area = pathname.split("/")[1];
   // "Minha assinatura" e a unica area que NAO exige acesso vigente: quem esta
   // com a mensalidade vencida precisa chegar ate ela para regularizar. As

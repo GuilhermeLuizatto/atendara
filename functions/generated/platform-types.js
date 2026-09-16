@@ -39,6 +39,10 @@ export const PLATFORM_AUDIT_ACTIONS = [
     // O fim do teste, aplicado pela rotina diaria. Nao e ato de ninguem: e a
     // validade que a concessao ja trazia, chegando.
     "TRIAL_ENDED",
+    // Trinta dias depois do bloqueio, sem assinatura e sem pedido: a organizacao
+    // abandonada deixa de identificar alguem. E o mesmo apagamento que o titular
+    // pede, sem o titular.
+    "ABANDONED_ORGANIZATION_ERASED",
     // Atos da chave mestra sobre contas de administrador.
     "PLATFORM_ADMIN_CREATED",
     "PLATFORM_ADMIN_SUSPENDED",

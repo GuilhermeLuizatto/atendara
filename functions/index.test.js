@@ -198,6 +198,17 @@ describe("Pontos de escrita da validade e atestado do aplicativo", () => {
     expect(writers.sort()).toEqual(["billing.js", "platform.js", "self-service.js"]);
   });
 
+  it("so um arquivo sabe pseudonimizar", () => {
+    // A D25 exige que o resultado impeca a reidentificacao. Uma segunda
+    // implementacao do apagamento — por exemplo na rotina que limpa cadastro
+    // abandonado — poderia esquecer um campo, e a que esquece seria descoberta
+    // tarde. Quem apaga chama `eraseOrganization`; quem redige mora aqui.
+    const redigem = readdirSync(new URL(".", import.meta.url))
+      .filter(name => name.endsWith(".js") && !name.endsWith(".test.js"))
+      .filter(name => /redactionPatch\(|pseudonymizeCollection\(|deleteRecursively\(/.test(readFileSync(new URL(name, import.meta.url), "utf8")));
+    expect(redigem.sort()).toEqual(["privacy.js"]);
+  });
+
   it("toda callable exige App Check; o webhook, que o gateway chama, nao", () => {
     const callables = ["registerProfessional", "updateAccount", "completeInitialPassword", "grantAccess", "revokeAccess", "createPlatformAdmin", "setPlatformAdminStatus", "createSubscriptionCheckout", "openBillingPortal", "cancelPlatformSubscription", "exportClientData", "eraseClientData", "startOrganizationExport", "exportOrganizationPage", "deleteOrganization", "registerSelfService", "activateTrial"];
     for (const name of callables) expect(backend[name].options, name).toMatchObject({ enforceAppCheck: true });

@@ -7,6 +7,11 @@ import { paths } from "./generated/paths.js";
 import { APP_MODULES } from "./generated/access.js";
 import { ACCOUNT_CALL_OPTIONS, initialCredential, masterOf, parse } from "./platform-auth.js";
 import { auditEntry } from "./platform.js";
+import { runAs } from "./service-accounts.js";
+
+// Criar e suspender administrador pede Authentication, como as concessoes pedem
+// Firestore: mesma conta da operadora (H.3).
+const OPERADORA_CALL_OPTIONS = { ...ACCOUNT_CALL_OPTIONS, ...runAs("operadora") };
 
 /**
  * Contas de administrador da plataforma.
@@ -23,7 +28,7 @@ const db = () => getFirestore();
 const adminRegistration = z.object({ displayName: z.string().trim().min(3).max(100), email: z.email().trim().toLowerCase() }).strict();
 const statusChange = z.object({ userId: z.string().min(1).max(128), status: z.enum(["ACTIVE", "SUSPENDED"]) }).strict();
 
-export const createPlatformAdmin = onCall(ACCOUNT_CALL_OPTIONS, async (request) => {
+export const createPlatformAdmin = onCall(OPERADORA_CALL_OPTIONS, async (request) => {
   await masterOf(request);
   const input = parse(adminRegistration, request.data);
   const { temporaryPassword, verifier } = initialCredential();
@@ -70,7 +75,7 @@ export const createPlatformAdmin = onCall(ACCOUNT_CALL_OPTIONS, async (request) 
  * leem `status` e fecham na hora —, depois o Auth, que impede novo login e
  * derruba as sessoes abertas.
  */
-export const setPlatformAdminStatus = onCall(ACCOUNT_CALL_OPTIONS, async (request) => {
+export const setPlatformAdminStatus = onCall(OPERADORA_CALL_OPTIONS, async (request) => {
   await masterOf(request);
   const { userId, status } = parse(statusChange, request.data);
   if (userId === request.auth.uid) {

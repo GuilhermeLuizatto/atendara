@@ -10,6 +10,7 @@ import { PROFESSION_IDS } from "./generated/profession.js";
 import { resolveAccountGate } from "./generated/access-gate.js";
 import { ACCOUNT_CALL_OPTIONS, accountOf, adminOf, initialCredential, parse } from "./platform-auth.js";
 import { assertGrantWindow, auditEntry, gateFields, grantDocument, initialGrantSchema } from "./platform.js";
+import { runAs } from "./service-accounts.js";
 
 initializeApp();
 const db = getFirestore();
@@ -18,7 +19,9 @@ const modules = z.array(z.enum(APP_MODULES)).min(1).max(APP_MODULES.length);
 // concessao registrada (regra 10 do AGENTS.md). `strict` recusa os dois campos.
 const registration = z.object({ displayName: z.string().trim().min(3).max(100), email: z.email().trim().toLowerCase(), professionId: z.enum(PROFESSION_IDS), modules, initialGrant: initialGrantSchema.optional() }).strict();
 const changes = z.object({ userId: z.string().min(1).max(128), status: z.enum(["ACTIVE", "SUSPENDED"]), modules }).strict();
-export const registerProfessional = onCall(ACCOUNT_CALL_OPTIONS, async request => {
+// Conta propria (H.3): criar e trocar senha de conta pede Authentication, e so.
+const CONTAS_CALL_OPTIONS = { ...ACCOUNT_CALL_OPTIONS, ...runAs("contas") };
+export const registerProfessional = onCall(CONTAS_CALL_OPTIONS, async request => {
   await adminOf(request);
   const { initialGrant, ...input } = parse(registration, request.data);
   const nowMs = Date.now();
@@ -54,7 +57,7 @@ export const registerProfessional = onCall(ACCOUNT_CALL_OPTIONS, async request =
   try { await batch.commit(); } catch { await getAuth().deleteUser(user.uid); throw new HttpsError("internal", "Não foi possível concluir o cadastro."); }
   return { userId: user.uid, temporaryPassword };
 });
-export const updateAccount = onCall(ACCOUNT_CALL_OPTIONS, async request => {
+export const updateAccount = onCall(CONTAS_CALL_OPTIONS, async request => {
   await adminOf(request);
   const { userId, ...input } = parse(changes, request.data);
   const ref = db.doc(paths.account(userId));
@@ -68,7 +71,7 @@ export const updateAccount = onCall(ACCOUNT_CALL_OPTIONS, async request => {
   });
   return { ok: true };
 });
-export const completeInitialPassword = onCall(ACCOUNT_CALL_OPTIONS, async request => {
+export const completeInitialPassword = onCall(CONTAS_CALL_OPTIONS, async request => {
   const account = await accountOf(request);
   if (!account.mustChangePassword) throw new HttpsError("failed-precondition", "A senha inicial já foi substituída.");
   if (Date.now() / 1000 - request.auth.token.auth_time > 300) throw new HttpsError("unauthenticated", "Entre novamente para alterar sua senha.");

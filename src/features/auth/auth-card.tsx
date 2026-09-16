@@ -42,6 +42,14 @@ export function AuthCard({
         <p className="text-muted-foreground mt-2 text-center text-xs">
           {APP_NAME} — {APP_TAGLINE}
         </p>
+        <p className="text-muted-foreground mt-2 flex justify-center gap-4 text-xs">
+          <Link href="/termos" className="underline underline-offset-2">
+            Termos de Uso
+          </Link>
+          <Link href="/privacidade" className="underline underline-offset-2">
+            Política de Privacidade
+          </Link>
+        </p>
       </main>
     </div>
   );

@@ -2,31 +2,42 @@
 
 **Mais tempo para atender.**
 
-Dara é a assistente de IA da Atendara para a rotina administrativa. Ela auxilia
-com informações e encaminha ao profissional os assuntos que exigem atenção humana.
+Plataforma multiprofissional em desenvolvimento para organizar **agenda, clientes,
+mensagens e financeiro**.
 
-**Plataforma multiprofissional de gestao e automacao para quem atende pessoas.**
-
-Feito por Guilherme Luizatto.
-
-Agenda, CRM, financeiro e central de mensagens com um agente de IA que responde o
-administrativo dentro de regras que o profissional define — e encaminha todo o
-resto para o humano.
+Dara é a assistente para a rotina administrativa: aplica regras configuradas pelo
+profissional e encaminha assuntos que exigem atenção humana.
 
 > **A IA auxilia. O humano decide.**
 
-Nao e um sistema para psicologos com outros nomes. O nucleo nao conhece
-profissao: terminologia, taxonomia de mensagens, regras e comportamento da
-interface vem de configuracao. A mesma base atende psicologo, psiquiatra, medico,
-dentista, nutricionista, fisioterapeuta, terapeuta, personal trainer e
-profissionais de estetica (manicure e pedicure, sobrancelha, cilios, depilacao e
-maquiagem).
+**Estágio atual:** demonstração e desenvolvimento. Os módulos têm persistência
+no Firestore com isolamento por organização. Dara usa um motor de simulação,
+o provedor de mensagens é simulado e a cobrança usa o modo de testes do gateway.
+Isso não representa integrações de WhatsApp, n8n ou IA externa em produção.
 
-**Status:** em desenvolvimento. Agenda, clientes, mensagens e financeiro
-persistem no Firestore com isolamento por organizacao. A assinatura da
-plataforma funciona apenas no modo de testes do gateway, os avisos ao cliente
-usam um provedor simulado e a Dara usa um motor de simulacao, sem envio para
-canais externos. O produto ainda nao recebe dados reais nem faz cobranca real.
+## Para conhecer o projeto
+
+- **Problema:** a rotina de quem atende pessoas fica distribuída entre agenda,
+  cadastros, mensagens e controle financeiro.
+- **Solução:** reunir esses fluxos em uma base configurável por profissão, com
+  permissões e regras administrativas explícitas.
+- **Diferenciais técnicos:** isolamento por organização, domínio independente do
+  Firebase, configuração de profissões, auditoria e testes automatizados.
+
+| O que avaliar | Onde começar |
+| --- | --- |
+| Decisões e limites da arquitetura | [Arquitetura](docs/ARCHITECTURE.md) |
+| Estrutura dos dados e consultas | [Modelo do Firestore](docs/FIRESTORE-DATA-MODEL.md) |
+| Profissões como configuração | [Definições](src/config/professions/definitions.ts) |
+| Permissões e proteção dos dados | [Matriz de permissões](src/config/permissions.ts) e [Security Rules](firestore.rules) |
+| Motor administrativo da Dara | [Decisões](src/lib/ai/decision-engine.ts) e [testes](src/lib/ai/decision-engine.test.ts) |
+| Fila de automação no servidor | [Cloud Functions](functions/automation.js) |
+| Integração contínua | [Workflow de CI](.github/workflows/ci.yml) |
+
+O repositório é mantido por [Guilherme Luizatto](https://github.com/GuilhermeLuizatto).
+O [histórico de desenvolvimento](https://github.com/GuilhermeLuizatto/atendara/commits/main/)
+registra assistência de IA e coautorias. As funcionalidades descritas aqui
+representam o estado do projeto, sem alegação de autoria individual exclusiva.
 
 ---
 
@@ -213,21 +224,29 @@ no ar com o banco ainda desprotegido.
 ## CI/CD
 
 ```
-install → lint → type-check → testes → build → deploy
+install → varredura → lint → type-check → testes → auditoria → build
 ```
 
-- **`.github/workflows/ci.yml`** — todo push e PR. Funciona em fork sem segredos.
+- **`.github/workflows/ci.yml`** — todo push e PR. Executa varredura de segredos,
+  lint, tipos, testes, auditoria de dependências, build e análise com CodeQL.
 - **`.github/workflows/deploy.yml`** — `main`. Publica Security Rules e indices e
   depois o Hosting; sem credenciais configuradas, registra que pulou e termina
   com sucesso.
 
-Segredos necessarios para o deploy:
+Configuração do deploy no GitHub Actions:
 
-| Segredo                    | Para que serve                                   |
-| -------------------------- | ------------------------------------------------ |
-| `FIREBASE_SERVICE_ACCOUNT` | JSON da conta de servico com permissao de deploy |
-| `FIREBASE_PROJECT_ID`      | Id do projeto Firebase                           |
-| `NEXT_PUBLIC_FIREBASE_*`   | Configuracao publica usada no build              |
+| Configuração | Para que serve |
+| --- | --- |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Provedor de federação usado na autenticação OIDC |
+| `GCP_SERVICE_ACCOUNT` | Conta de serviço usada pela federação |
+| `FIREBASE_PROJECT_ID` | Projeto de destino |
+| `NEXT_PUBLIC_FIREBASE_*` | Identificadores públicos do Firebase usados no build |
+| `NEXT_PUBLIC_APP_CHECK_SITE_KEY` | Chave pública do App Check |
+
+O workflow usa credenciais temporárias via federação. Se a federação não estiver
+configurada, o deploy é pulado. Com a federação configurada, a ausência dos campos
+públicos obrigatórios do Firebase ou do App Check interrompe a publicação para
+não colocar um build de demonstração no ar.
 
 Nenhum segredo fica no codigo.
 

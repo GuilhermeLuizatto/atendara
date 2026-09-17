@@ -239,6 +239,7 @@ async function existingClient(organizationId, clientId) {
 export const exportClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
   const { account, organizationId, organization } = await responsibleMember(request);
   const input = parse(clientRequest, request.data);
+  await consumeRateLimit(request.auth.uid, "exportClientData");
   const client = await existingClient(organizationId, input.clientId);
   const linked = await linkedToClient(organizationId, input.clientId);
 
@@ -362,6 +363,7 @@ export const eraseClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
 export const startOrganizationExport = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
   const { account, organizationId, organization } = await responsibleMember(request);
   parse(z.object({}).strict(), request.data ?? {});
+  await consumeRateLimit(request.auth.uid, "startOrganizationExport");
 
   const at = new Date();
   const requestId = randomUUID();

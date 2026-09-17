@@ -62,11 +62,6 @@ const WITHOUT_RATE_LIMIT = {
   setPlatformAdminStatus: "Chave mestra com segundo fator; suspender administrador e resposta a incidente.",
   completeInitialPassword: "Roda uma vez por conta (a trava de senha inicial se desliga no sucesso) e exige login de ate 5 minutos.",
   exportOrganizationPage: "Paginada de proposito: uma exportacao grande faz dezenas de chamadas seguidas, e um teto quebraria a portabilidade.",
-  // PENDENTE DE DECISAO DO TITULAR (16/09/2026): as duas abaixo gravam um
-  // registro em `privacyRequests` e na trilha a cada chamada. Recomendacao:
-  // limitar, como `eraseClientData`. Ficam aqui ate a resposta.
-  exportClientData: "Pendente de decisao: cada chamada grava registro; recomendado limitar.",
-  startOrganizationExport: "Pendente de decisao: cada chamada grava registro; recomendado limitar.",
 };
 
 let callables = [];

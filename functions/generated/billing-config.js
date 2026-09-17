@@ -13,17 +13,17 @@
  * plano quer assinar.
  */
 /**
- * Catalogo PROVISORIO. Nomes, precos e modulos definitivos continuam com o
- * titular; estes valores existem para exercitar o
- * fluxo inteiro no ambiente de testes e devem ser revistos antes de qualquer
- * cobranca real. Precos em centavos inteiros.
+ * Catalogo PROVISORIO. Precos definidos pelo titular em 17/09/2026, iguais aos
+ * cadastrados na area restrita da Stripe: a tela de assinatura mostra este
+ * valor, e a Stripe cobra o do preco dela, entao os dois precisam bater. Modulos
+ * definitivos continuam com o titular (ADR 0004). Precos em centavos inteiros.
  */
 export const PLATFORM_PLANS = [
     {
         id: "essencial-mensal",
         name: "Essencial",
         description: "Agenda e cadastro para quem atende sozinho.",
-        priceInCents: 9_900,
+        priceInCents: 4_990,
         currency: "BRL",
         interval: "MONTH",
         modules: ["dashboard", "agenda", "clientes", "configuracoes"],
@@ -37,7 +37,7 @@ export const PLATFORM_PLANS = [
         id: "profissional-mensal",
         name: "Profissional",
         description: "Acrescenta caixa de entrada, financeiro e a Dara.",
-        priceInCents: 19_900,
+        priceInCents: 9_990,
         currency: "BRL",
         interval: "MONTH",
         modules: [
@@ -56,7 +56,7 @@ export const PLATFORM_PLANS = [
         id: "profissional-anual",
         name: "Profissional anual",
         description: "O plano Profissional com doze meses pagos de uma vez.",
-        priceInCents: 199_000,
+        priceInCents: 119_000,
         currency: "BRL",
         interval: "YEAR",
         modules: [

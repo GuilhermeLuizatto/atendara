@@ -27,7 +27,10 @@ export const PLATFORM_PLANS = [
         currency: "BRL",
         interval: "MONTH",
         modules: ["dashboard", "agenda", "clientes", "configuracoes"],
-        trialDays: 7,
+        // Sem teste na Stripe (decisao do titular em 17/09/2026): o teste gratuito
+        // vive so no Atendara, 14 dias pela concessao TRIAL. Somar os dois dava 21
+        // dias gratis a quem assina depois do teste, com cancelamento antes de pagar.
+        trialDays: 0,
         active: true,
     },
     {
@@ -46,7 +49,7 @@ export const PLATFORM_PLANS = [
             "agente",
             "configuracoes",
         ],
-        trialDays: 7,
+        trialDays: 0,
         active: true,
     },
     {

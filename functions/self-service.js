@@ -171,6 +171,9 @@ export const registerSelfService = onCall(SIGNUP_CALL_OPTIONS, async (request) =
     // A rotina diaria procura por este campo. Ausente, o documento nao apareceria
     // na consulta e o teste nunca seria dado por encerrado.
     blockedSince: null,
+    // Idem: a mesma consulta exclui quem ja assinou, e `== null` nao encontra
+    // documento sem o campo.
+    subscribedAt: null,
     legal: { version: LEGAL_VERSION, acceptedAt: createdAt },
     createdAt,
   };

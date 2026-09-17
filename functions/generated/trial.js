@@ -19,6 +19,10 @@ const NOT_A_TRIAL = { phase: "NONE", daysLeft: 0, daysUntilErasure: null };
 export function trialState(account, nowMs) {
     if (!account || account.origin !== "SELF_SERVICE" || !account.accessUntil)
         return NOT_A_TRIAL;
+    // Quem ja assinou saiu do teste: a validade dali em diante e a do ciclo pago,
+    // e avisar "seu teste termina" a quem esta pagando seria mentira.
+    if (account.subscribedAt)
+        return NOT_A_TRIAL;
     const endsAt = Date.parse(account.accessUntil);
     if (!Number.isFinite(endsAt))
         return NOT_A_TRIAL;

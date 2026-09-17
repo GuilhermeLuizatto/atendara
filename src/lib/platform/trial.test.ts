@@ -62,3 +62,11 @@ describe("estado do teste de 14 dias", () => {
     ).toBe(0);
   });
 });
+
+describe("depois da assinatura (A.6)", () => {
+  it("quem assinou nao esta mais em teste, nem avisado, nem bloqueado", () => {
+    const assinou = { subscribedAt: "2026-09-10T10:00:00.000Z" };
+    expect(trialState(conta({ ...assinou, accessUntil: emDias(2) }), NOW).phase).toBe("NONE");
+    expect(trialState(conta({ ...assinou, accessUntil: emDias(-5) }), NOW).phase).toBe("NONE");
+  });
+});

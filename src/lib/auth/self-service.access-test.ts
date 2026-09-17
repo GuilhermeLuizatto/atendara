@@ -1,3 +1,5 @@
+import { createHmac } from "node:crypto";
+
 import { doc, getDoc } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -7,6 +9,9 @@ import { paths } from "@/lib/firebase/paths";
 import { adminDb, deleteAdminApps, initializeAdminSdk } from "@/lib/testing/admin-sdk";
 import {
   CallableError,
+  FUNCTIONS_PORT,
+  PROJECT,
+  REGION,
   callFunction,
   tokenSession,
   type TokenSession,
@@ -275,5 +280,92 @@ describe("teste vencido fecha o painel pela data", () => {
     const account = await accountByEmail(ESTETICISTA.email);
     const propria = await getDoc(doc(bianca.firestore, paths.account(String(account!.userId))));
     expect(propria.data()).toMatchObject({ origin: "SELF_SERVICE", blockedSince: null });
+  });
+});
+
+/**
+ * A.6: o teste venceu, a conta foi bloqueada, a pessoa assinou.
+ *
+ * O pagamento chega pelo webhook assinado, como chegaria da Stripe. O que se
+ * prova: o painel reabre pelas regras reais, a marca de bloqueio some e a conta
+ * sai do ciclo do teste — a rotina diaria nao a pega mais.
+ */
+describe("assinatura depois do bloqueio devolve tudo ao normal", () => {
+  const WEBHOOK_SECRET = "whsec_apenas_para_o_emulador";
+  const WEBHOOK_URL = `http://127.0.0.1:${FUNCTIONS_PORT}/${PROJECT}/${REGION}/stripeWebhook`;
+  let biancaUid: string;
+
+  async function deliver(event: Record<string, unknown>) {
+    const body = JSON.stringify(event);
+    const timestamp = Math.floor(Date.now() / 1000);
+    const digest = createHmac("sha256", WEBHOOK_SECRET).update(`${timestamp}.${body}`).digest("hex");
+    const response = await fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "stripe-signature": `t=${timestamp},v1=${digest}` },
+      body,
+    });
+    return { status: response.status, ...((await response.json().catch(() => ({}))) as { outcome?: string }) };
+  }
+
+  beforeAll(async () => {
+    const account = await accountByEmail(ESTETICISTA.email);
+    biancaUid = String(account!.userId);
+    // O que a rotina diaria teria feito: marcar o inicio da retencao.
+    await adminDb().doc(paths.account(biancaUid)).update({ blockedSince: new Date(Date.now() - DAY_MS).toISOString() });
+  });
+
+  it("o pagamento reabre o painel e tira a conta do ciclo do teste", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const metadata = { organizationId: biancaOrg, subscriberUserId: biancaUid, planId: "profissional-mensal" };
+    const vinculo = await deliver({
+      id: "evt_a6_vinculo",
+      type: "checkout.session.completed",
+      created: now,
+      data: { object: { mode: "subscription", customer: "cus_a6", subscription: "sub_a6", client_reference_id: biancaOrg, metadata } },
+    });
+    const ativa = await deliver({
+      id: "evt_a6_ativa",
+      type: "customer.subscription.created",
+      created: now + 1,
+      data: {
+        object: {
+          id: "sub_a6",
+          customer: "cus_a6",
+          status: "active",
+          cancel_at_period_end: false,
+          currency: "brl",
+          current_period_start: now,
+          current_period_end: now + 30 * 86_400,
+          items: { data: [{ price: { unit_amount: 19_900, recurring: { interval: "month" } } }] },
+          metadata,
+        },
+      },
+    });
+    expect(vinculo).toMatchObject({ status: 200, outcome: "APPLIED" });
+    expect(ativa).toMatchObject({ status: 200, outcome: "APPLIED" });
+
+    const account = await accountByEmail(ESTETICISTA.email);
+    expect(account).toMatchObject({ subscriptionStatus: "ACTIVE", blockedSince: null });
+    expect(Date.parse(String(account!.subscribedAt))).not.toBeNaN();
+
+    // As regras reais voltam a entregar a organizacao.
+    const organizacao = await getDoc(doc(bianca.firestore, paths.organization(biancaOrg)));
+    expect(organizacao.data()).toMatchObject({ primaryProfession: "AESTHETICS" });
+  });
+
+  it("a rotina diaria nao encontra mais a conta", async () => {
+    // Mesma consulta de `closeExpiredTrials`, com a validade forcada ao passado.
+    const vencido = new Date(Date.now() - DAY_MS).toISOString();
+    await adminDb().doc(paths.account(biancaUid)).update({ accessUntil: vencido, accessUntilMs: Date.parse(vencido) });
+    const candidatas = await adminDb()
+      .collection(paths.accounts())
+      .where("origin", "==", "SELF_SERVICE")
+      .where("blockedSince", "==", null)
+      .where("subscribedAt", "==", null)
+      .where("accessUntilMs", ">", 0)
+      .where("accessUntilMs", "<=", Date.now())
+      .get();
+    const ids = candidatas.docs.map((entry: { id: string }) => entry.id);
+    expect(ids).not.toContain(biancaUid);
   });
 });

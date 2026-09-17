@@ -40,6 +40,9 @@ export async function closeExpiredTrials(nowMs = Date.now()) {
     .collection(paths.accounts())
     .where("origin", "==", "SELF_SERVICE")
     .where("blockedSince", "==", null)
+    // Quem ja pagou saiu do ciclo do teste (A.6). Na consulta, e nao depois: um
+    // ex-assinante voltaria todo dia e ocuparia vaga no lote de quem precisa.
+    .where("subscribedAt", "==", null)
     .where("accessUntilMs", ">", 0)
     .where("accessUntilMs", "<=", nowMs)
     .limit(BATCH)
@@ -49,8 +52,10 @@ export async function closeExpiredTrials(nowMs = Date.now()) {
 
   const stamp = new Date(nowMs).toISOString();
   const batch = db().batch();
+  let closed = 0;
   for (const account of vencidas.docs) {
     const data = account.data();
+    closed += 1;
     batch.update(account.ref, { blockedSince: stamp });
     const entry = auditEntry({
       action: "TRIAL_ENDED",
@@ -65,10 +70,11 @@ export async function closeExpiredTrials(nowMs = Date.now()) {
     });
     batch.create(entry.ref, entry.data);
   }
+  if (closed === 0) return { closed: 0 };
   await batch.commit();
 
-  logger.info("Testes encerrados", { quantidade: vencidas.size });
-  return { closed: vencidas.size };
+  logger.info("Testes encerrados", { quantidade: closed });
+  return { closed };
 }
 
 /**
@@ -112,6 +118,9 @@ export async function eraseAbandonedTrials(nowMs = Date.now()) {
     const data = account.data();
     const organizationId = data.organizationId;
     if (!organizationId) continue;
+    // Quem ja pagou alguma vez nunca e apagado por esta rotina (A.6). O que fazer
+    // com quem pagou e cancelou ainda esta em aberto.
+    if (data.subscribedAt) continue;
 
     const organizationRef = db().doc(paths.organization(organizationId));
     const organization = (await organizationRef.get()).data();

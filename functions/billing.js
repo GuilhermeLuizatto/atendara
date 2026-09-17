@@ -380,7 +380,7 @@ async function readAccountGate(transaction, subscriberUserId, organizationId) {
   if (account.platformRole !== "PROFESSIONAL") return null;
   if (account.organizationId !== organizationId) return null;
   const grant = (await transaction.get(db().doc(paths.platformAccessGrant(organizationId)))).data() ?? null;
-  return { accountRef, grant };
+  return { accountRef, grant, account };
 }
 
 /**
@@ -408,6 +408,19 @@ function applyAccountGate(transaction, target, subscription, planId) {
   const plan = planId ? findPlan(planId) : null;
   if (plan && (subscription.status === "ACTIVE" || subscription.status === "TRIALING")) {
     changes.modules = plan.modules;
+  }
+
+  // A.6: quem veio do cadastro aberto e pagou volta ao normal. O portao acima ja
+  // reabre o painel; isto tira a conta do ciclo do teste, para que a rotina
+  // diaria nao a marque como bloqueada nem a apague aos 30 dias. So com
+  // pagamento confirmado (`ACTIVE`) e com o acesso de fato aberto.
+  const paidAndOpen =
+    subscription.status === "ACTIVE" &&
+    gate.subscriptionStatus === "ACTIVE" &&
+    changes.accessUntilMs > Date.now();
+  if (target.account?.origin === "SELF_SERVICE" && paidAndOpen) {
+    changes.blockedSince = null;
+    if (!target.account.subscribedAt) changes.subscribedAt = new Date().toISOString();
   }
 
   transaction.update(target.accountRef, changes);

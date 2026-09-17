@@ -6,6 +6,7 @@
       "fields": [
         { "fieldPath": "origin", "order": "ASCENDING" },
         { "fieldPath": "blockedSince", "order": "ASCENDING" },
+        { "fieldPath": "subscribedAt", "order": "ASCENDING" },
         { "fieldPath": "accessUntilMs", "order": "ASCENDING" }
       ]
     },

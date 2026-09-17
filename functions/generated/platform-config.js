@@ -81,6 +81,16 @@ export const TRIAL_ENDING_NOTICE_DAYS = 3;
  * exclusao. Quem aplica o fim do prazo e a A.5.
  */
 export const BLOCKED_RETENTION_DAYS = 30;
+/**
+ * Quanto tempo um login que nunca virou cadastro confirmado sobrevive (A.8).
+ *
+ * Sete dias pela decisao operacional 6 da ADR 0005. Vale para os dois jeitos de
+ * desistir no meio: o cadastro por senha que nunca confirmou o e-mail, e a
+ * entrada pelo Google abandonada antes da segunda tela. Nos dois a pessoa nao
+ * chegou a usar nada, e guardar o e-mail dela sem finalidade e o que a LGPD
+ * pede para nao fazer.
+ */
+export const UNCONFIRMED_SIGNUP_RETENTION_DAYS = 7;
 export const PLATFORM_AUDIT_ACTION_LABELS = {
     ACCOUNT_REGISTERED: "Cadastro de profissional",
     ACCOUNT_UPDATED: "Alteração de conta",
@@ -90,6 +100,8 @@ export const PLATFORM_AUDIT_ACTION_LABELS = {
     TRIAL_STARTED: "Início do teste de 14 dias",
     TRIAL_ENDED: "Fim do teste de 14 dias",
     ABANDONED_ORGANIZATION_ERASED: "Exclusão automática do cadastro abandonado",
+    UNCONFIRMED_SIGNUP_ERASED: "Exclusão automática do cadastro sem e-mail confirmado",
+    ORPHAN_LOGIN_REMOVED: "Exclusão automática do login sem cadastro",
     PROFESSION_CHANGE_REQUESTED: "Pedido de troca de profissão",
     PROFESSION_CHANGE_APPROVED: "Troca de profissão aprovada",
     PROFESSION_CHANGE_REJECTED: "Troca de profissão recusada",

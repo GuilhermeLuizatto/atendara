@@ -22,6 +22,7 @@ const GROUP_OF_FILE = {
   // Rotinas do ciclo do teste: fecham a conta vencida e, na A.5, apagam o
   // cadastro abandonado. Mesmo alcance da exclusao de organizacao.
   "trial.js": "privacidade",
+  "signup-cleanup.js": "privacidade",
   "platform.js": "operadora",
   "platform-admins.js": "operadora",
   "profession-change.js": "operadora",

@@ -1,9 +1,8 @@
-import { createRequire } from "node:module";
-
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { paths } from "@/lib/firebase/paths";
+import { adminDb, deleteAdminApps, initializeAdminSdk } from "@/lib/testing/admin-sdk";
 import { PROJECT, tokenSession, type TokenSession } from "@/lib/testing/emulator-session";
 
 /**
@@ -25,9 +24,6 @@ import { PROJECT, tokenSession, type TokenSession } from "@/lib/testing/emulator
  * Rodar com: npm run test:access
  */
 
-const require = createRequire(import.meta.url);
-const admin = require("../../../functions/node_modules/firebase-admin/lib/index.js");
-
 const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9098";
 const [FIRESTORE_HOST, FIRESTORE_PORT] = (process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8087").split(":");
 
@@ -40,17 +36,16 @@ let expiresAt: number;
 let aberta: TokenSession;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const fs = () => admin.firestore();
-const clientRef = () => fs().doc(paths.document(ORG, "clients", CLIENT));
+const clientRef = () => adminDb().doc(paths.document(ORG, "clients", CLIENT));
 
 beforeAll(async () => {
   process.env.FIREBASE_AUTH_EMULATOR_HOST = AUTH_HOST;
   process.env.FIRESTORE_EMULATOR_HOST = `${FIRESTORE_HOST}:${FIRESTORE_PORT}`;
-  if (!admin.apps.length) admin.initializeApp({ projectId: PROJECT });
+  initializeAdminSdk(PROJECT);
 
   expiresAt = Date.now() + VALIDADE_MS;
   const stamp = new Date().toISOString();
-  await fs().doc(paths.account(UID)).set({
+  await adminDb().doc(paths.account(UID)).set({
     userId: UID,
     email: "sessao-que-vence@atendara.test",
     displayName: "Sessão Que Vence",
@@ -65,8 +60,8 @@ beforeAll(async () => {
     mustChangePassword: false,
     createdAt: stamp,
   });
-  await fs().doc(paths.organization(ORG)).set({ id: ORG, ownerId: UID, primaryProfession: "PSYCHOLOGIST", professions: ["PSYCHOLOGIST"] });
-  await fs().doc(paths.document(ORG, "members", UID)).set({ id: UID, userId: UID, organizationId: ORG, role: "PROFESSIONAL", status: "ACTIVE" });
+  await adminDb().doc(paths.organization(ORG)).set({ id: ORG, ownerId: UID, primaryProfession: "PSYCHOLOGIST", professions: ["PSYCHOLOGIST"] });
+  await adminDb().doc(paths.document(ORG, "members", UID)).set({ id: UID, userId: UID, organizationId: ORG, role: "PROFESSIONAL", status: "ACTIVE" });
   await clientRef().set({ id: CLIENT, organizationId: ORG, fullName: "Cliente Fictício", status: "ACTIVE" });
 
   aberta = tokenSession(UID, null);
@@ -74,7 +69,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await aberta?.dispose();
-  await Promise.all(admin.apps.map((instance: { delete(): Promise<void> }) => instance.delete()));
+  await deleteAdminApps();
 });
 
 describe("S-13 — validade que vence com a leitura aberta", () => {

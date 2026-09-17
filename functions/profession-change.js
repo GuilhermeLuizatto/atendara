@@ -9,6 +9,11 @@ import { PROFESSION_CHANGE_REASON_LENGTH } from "./generated/platform-config.js"
 import { ACCOUNT_CALL_OPTIONS, accountOf, adminOf, parse } from "./platform-auth.js";
 import { auditEntry } from "./platform.js";
 import { consumeRateLimit } from "./rate-limit.js";
+import { runAs } from "./service-accounts.js";
+
+// Pedido e decisao no mesmo grupo: quem grava a troca e a operadora, e o pedido
+// so abre a fila dela.
+const PROFESSION_CALL_OPTIONS = { ...ACCOUNT_CALL_OPTIONS, ...runAs("operadora") };
 
 /**
  * Troca de profissao: pedido do titular, decisao da operadora.
@@ -61,7 +66,7 @@ async function holderOf(request) {
   return { account, organization, organizationRef };
 }
 
-export const requestProfessionChange = onCall(ACCOUNT_CALL_OPTIONS, async (request) => {
+export const requestProfessionChange = onCall(PROFESSION_CALL_OPTIONS, async (request) => {
   const { account, organization } = await holderOf(request);
   await consumeRateLimit(request.auth.uid, "professionChangeRequest");
   const input = parse(requestSchema, request.data);
@@ -115,7 +120,7 @@ export const requestProfessionChange = onCall(ACCOUNT_CALL_OPTIONS, async (reque
   return { ok: true };
 });
 
-export const decideProfessionChange = onCall(ACCOUNT_CALL_OPTIONS, async (request) => {
+export const decideProfessionChange = onCall(PROFESSION_CALL_OPTIONS, async (request) => {
   await adminOf(request);
   const input = parse(decisionSchema, request.data);
 

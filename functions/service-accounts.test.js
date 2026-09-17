@@ -24,6 +24,7 @@ const GROUP_OF_FILE = {
   "trial.js": "privacidade",
   "platform.js": "operadora",
   "platform-admins.js": "operadora",
+  "profession-change.js": "operadora",
   "privacy.js": "privacidade",
   "billing.js": "cobranca",
   "automation.js": "automacao",

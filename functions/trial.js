@@ -153,7 +153,7 @@ export async function eraseAbandonedTrials(nowMs = Date.now()) {
  * os testes do dia sejam dados por encerrados.
  */
 export const eraseAbandonedTrialsDaily = onSchedule(
-  { region: REGION, schedule: "30 4 * * *", timeZone: "America/Sao_Paulo", maxInstances: 1, timeoutSeconds: 540 },
+  { region: REGION, schedule: "30 4 * * *", timeZone: "America/Sao_Paulo", maxInstances: 1, timeoutSeconds: 540, ...runAs("privacidade") },
   async () => {
     await eraseAbandonedTrials();
   },

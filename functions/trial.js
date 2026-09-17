@@ -6,6 +6,7 @@ import { paths } from "./generated/paths.js";
 import { auditEntry } from "./platform.js";
 import { SELF_SERVICE_ACTOR } from "./generated/platform-config.js";
 import { REGION } from "./platform-auth.js";
+import { runAs } from "./service-accounts.js";
 
 /**
  * O fim do teste de 14 dias.
@@ -66,7 +67,7 @@ export async function closeExpiredTrials(nowMs = Date.now()) {
  * venceu ja perdeu o painel na hora exata, e esta rotina so alcanca o registro.
  */
 export const closeExpiredTrialsDaily = onSchedule(
-  { region: REGION, schedule: "0 4 * * *", timeZone: "America/Sao_Paulo", maxInstances: 1 },
+  { region: REGION, schedule: "0 4 * * *", timeZone: "America/Sao_Paulo", maxInstances: 1, ...runAs("privacidade") },
   async () => {
     await closeExpiredTrials();
   },

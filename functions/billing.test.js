@@ -801,3 +801,44 @@ describe("Revisao 5B — retorno do checkout fora do emulador", () => {
     expect(String(fetchSpy.mock.calls[0][1].body)).toContain(encodeURIComponent("http://127.0.0.1:3000"));
   });
 });
+
+describe("Volta do bloqueio quando a assinatura entra (A.6)", () => {
+  const pagar = async () => {
+    await applyGatewayEvent(checkoutEvent("evt_a6_vinculo"));
+    await applyGatewayEvent(
+      subscriptionEvent("evt_a6_ativa", "customer.subscription.created", "active", PERIODO_1_FIM, "2026-09-09T12:00:05.000Z"),
+    );
+  };
+
+  it("reabre o painel e tira a conta do ciclo do teste", async () => {
+    seedAccount({ origin: "SELF_SERVICE", blockedSince: "2026-09-01T07:00:00.000Z", subscribedAt: null });
+    await pagar();
+
+    expect(account()).toMatchObject({ subscriptionStatus: "ACTIVE", blockedSince: null });
+    expect(account().accessUntilMs).toBeGreaterThan(Date.now());
+    // A marca que impede a rotina de bloquear de novo e de apagar aos 30 dias.
+    expect(Date.parse(account().subscribedAt)).not.toBeNaN();
+  });
+
+  it("guarda a PRIMEIRA assinatura: renovacao nao reescreve a data", async () => {
+    seedAccount({ origin: "SELF_SERVICE", blockedSince: null, subscribedAt: "2026-01-10T10:00:00.000Z" });
+    await pagar();
+    expect(account().subscribedAt).toBe("2026-01-10T10:00:00.000Z");
+  });
+
+  it("vinculo sem pagamento nao tira ninguem do teste", async () => {
+    seedAccount({ origin: "SELF_SERVICE", blockedSince: "2026-09-01T07:00:00.000Z", subscribedAt: null });
+    await applyGatewayEvent(checkoutEvent("evt_a6_so_vinculo"));
+    await applyGatewayEvent(
+      subscriptionEvent("evt_a6_incompleta", "customer.subscription.created", "incomplete", PERIODO_1_FIM, "2026-09-09T12:00:05.000Z"),
+    );
+    expect(account()).toMatchObject({ blockedSince: "2026-09-01T07:00:00.000Z", subscribedAt: null });
+  });
+
+  it("so mexe em conta do cadastro aberto", async () => {
+    seedAccount();
+    await pagar();
+    expect(account()).not.toHaveProperty("subscribedAt");
+    expect(account()).not.toHaveProperty("blockedSince");
+  });
+});

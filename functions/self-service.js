@@ -24,6 +24,7 @@ import {
 import { ACCOUNT_CALL_OPTIONS, parse } from "./platform-auth.js";
 import { assertGrantWindow, auditEntry, gateFields, grantDocument } from "./platform.js";
 import { consumeRateLimit, networkSubject } from "./rate-limit.js";
+import { runAs } from "./service-accounts.js";
 
 /**
  * Cadastro aberto e inicio do teste de 14 dias.
@@ -46,7 +47,11 @@ const db = () => getFirestore();
  * com a chave publica do projeto e um laco. Sem conta ainda, e a unica prova de
  * que a chamada saiu do aplicativo.
  */
-const SIGNUP_CALL_OPTIONS = { ...ACCOUNT_CALL_OPTIONS, maxInstances: 4 };
+const SIGNUP_CALL_OPTIONS = { ...ACCOUNT_CALL_OPTIONS, maxInstances: 4, ...runAs("contas") };
+const TRIAL_CALL_OPTIONS = { ...ACCOUNT_CALL_OPTIONS, ...runAs("contas") };
+
+/** Comecar o teste nao recebe dado nenhum: a organizacao sai da conta de quem chama. */
+const noInput = z.object({}).strict();
 
 const signupSchema = z
   .object({
@@ -256,8 +261,9 @@ export const registerSelfService = onCall(SIGNUP_CALL_OPTIONS, async (request) =
  * (`platformAccessGrants/{orgId}`). Chamar de novo — por recarregar a pagina ou
  * por insistencia — devolve o que ja existe e nao emenda mais catorze dias.
  */
-export const activateTrial = onCall(ACCOUNT_CALL_OPTIONS, async (request) => {
+export const activateTrial = onCall(TRIAL_CALL_OPTIONS, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Entre na sua conta.");
+  if (!noInput.safeParse(request.data ?? {}).success) throw new HttpsError("invalid-argument", "Confira os dados informados.");
   await consumeRateLimit(request.auth.uid, "selfServiceTrialActivation");
   if (request.auth.token.email_verified !== true) {
     throw new HttpsError("failed-precondition", "Confirme seu e-mail para começar o teste.");

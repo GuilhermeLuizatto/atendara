@@ -64,6 +64,14 @@ const WITHOUT_RATE_LIMIT = {
   exportOrganizationPage: "Paginada de proposito: uma exportacao grande faz dezenas de chamadas seguidas, e um teto quebraria a portabilidade.",
 };
 
+/**
+ * Callables que atendem SEM login, cada uma com o motivo. No lugar da trava de
+ * login, precisam limitar por endereco de rede antes de qualquer outra coisa.
+ */
+const WITHOUT_LOGIN = {
+  registerSelfService: "E o cadastro aberto: quem chama ainda nao tem conta. App Check, limite por rede e resposta unica seguram o abuso.",
+};
+
 let callables = [];
 const sources = new Map();
 
@@ -109,7 +117,18 @@ describe("Travas de toda callable exportada", () => {
 
   it("todas recusam quem nao entrou, antes de tocar no banco", async () => {
     for (const [name, fn] of callables) {
+      if (WITHOUT_LOGIN[name]) continue;
       await expect(fn({ data: {} }), name).rejects.toMatchObject({ code: "unauthenticated" });
+    }
+  });
+
+  it("quem atende sem login limita por rede antes de tudo", () => {
+    const names = new Set(callables.map(([name]) => name));
+    for (const name of Object.keys(WITHOUT_LOGIN)) {
+      expect(names.has(name), name).toBe(true);
+      const { body } = bodyOf(name);
+      const firstStatement = body.slice(body.indexOf("{") + 1).trim();
+      expect(firstStatement.startsWith("await consumeRateLimit(networkSubject(request)"), name).toBe(true);
     }
   });
 

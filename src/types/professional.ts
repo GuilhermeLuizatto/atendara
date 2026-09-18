@@ -101,6 +101,12 @@ export interface AuthenticatedUser {
   email: string;
   displayName: string;
   avatarUrl: string | null;
+  /**
+   * E-mail confirmado. O cadastro aberto depende disto: enquanto for `false`, a
+   * conta existe e nao abre nada. Quem decide e o token no servidor; aqui e so
+   * o que a tela mostra.
+   */
+  emailVerified: boolean;
   access?: import("./access").AccountAccess | null;
 }
 

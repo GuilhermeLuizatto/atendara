@@ -1,4 +1,5 @@
 import {
+  GoogleAuthProvider,
   TotpMultiFactorGenerator,
   confirmPasswordReset as confirmFirebasePasswordReset,
   getMultiFactorResolver,
@@ -7,6 +8,7 @@ import {
   sendEmailVerification as sendVerificationEmail,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPopup,
   verifyPasswordResetCode,
   signOut as firebaseSignOut,
   type MultiFactorError,
@@ -17,24 +19,23 @@ import {
 
 import { APP_NAME } from "@/config/app";
 import { getFirebaseAuth } from "@/lib/firebase/client";
-import { getDb, getFirebaseApp } from "@/lib/firebase/client";
+import { getDb, getFirebaseFunctions } from "@/lib/firebase/client";
 import { doc, getDoc, onSnapshot, collection, orderBy, query } from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { httpsCallable } from "firebase/functions";
 import { readPage } from "@/lib/firebase/paging";
 import { paths } from "@/lib/firebase/paths";
 import { hasRequiredSecondFactor } from "@/lib/platform/access-gate";
 import { passwordError } from "./passwords";
-import type { AccountAccess, AccessUpdate, PlatformAdminRegistration, ProfessionalRegistration } from "@/types/access";
+import type { AccountAccess, AccessUpdate, PlatformAdminRegistration, ProfessionalRegistration, SelfServiceRegistration } from "@/types/access";
 import type { AccessGrantInput } from "@/types/platform";
 import type { AuthenticatedUser, Page, PageRequest } from "@/types";
 
 import { AuthError, SecondFactorRequiredError, type AuthAdapter, type SecondFactorState, type TotpEnrollment } from "./types";
 
-const REGION = "southamerica-east1";
 const ACCOUNTS_PAGE_SIZE = 25;
 
 function callable<Input, Output>(name: string) {
-  return httpsCallable<Input, Output>(getFunctions(getFirebaseApp(), REGION), name);
+  return httpsCallable<Input, Output>(getFirebaseFunctions(), name);
 }
 
 function toAuthenticatedUser(user: User): AuthenticatedUser {
@@ -43,6 +44,7 @@ function toAuthenticatedUser(user: User): AuthenticatedUser {
     email: user.email ?? "",
     displayName: user.displayName ?? user.email?.split("@")[0] ?? "Usuário",
     avatarUrl: user.photoURL,
+    emailVerified: user.emailVerified,
   };
 }
 
@@ -134,6 +136,26 @@ class FirebaseAuthAdapter implements AuthAdapter {
     }
   }
 
+  /**
+   * O Google devolve o e-mail ja confirmado, entao a pessoa nao passa pela tela
+   * de confirmacao. Ainda assim ela nao tem organizacao: a segunda etapa do
+   * cadastro e que cria.
+   */
+  async signInWithGoogle(): Promise<AuthenticatedUser> {
+    this.resolver = null;
+    try {
+      const credential = await signInWithPopup(getFirebaseAuth(), new GoogleAuthProvider());
+      return await this.withProfile(credential.user);
+    } catch (error) {
+      const code = errorCode(error);
+      // Fechar a janela do Google nao e erro: e desistencia.
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        throw new AuthError("Entrada pelo Google cancelada.");
+      }
+      throw new AuthError(translate(code, "Não foi possível entrar com o Google. Tente novamente."));
+    }
+  }
+
   async completeSecondFactorSignIn(code: string): Promise<AuthenticatedUser> {
     const resolver = this.resolver;
     const hint = resolver?.hints.find(item => item.factorId === TotpMultiFactorGenerator.FACTOR_ID);
@@ -219,6 +241,27 @@ class FirebaseAuthAdapter implements AuthAdapter {
   async sendEmailVerification(): Promise<void> {
     try { await sendVerificationEmail(this.currentUser()); }
     catch (error) { throw new AuthError(translate(errorCode(error))); }
+  }
+
+  /**
+   * `getIdToken(true)` nao e zelo: `email_verified` viaja no token, e sem um
+   * token novo quem acabou de clicar no link continuaria sendo recusado.
+   */
+  async refreshSession(): Promise<AuthenticatedUser | null> {
+    const user = getFirebaseAuth().currentUser;
+    if (!user) return null;
+    await user.reload();
+    await user.getIdToken(true);
+    return await this.withProfile(user);
+  }
+
+  async registerSelfService(input: SelfServiceRegistration): Promise<void> {
+    await callable<SelfServiceRegistration, { ok: boolean }>("registerSelfService")(input);
+  }
+
+  async activateTrial(): Promise<{ accessUntil: string | null }> {
+    const result = await callable<Record<string, never>, { ok: boolean; accessUntil: string | null }>("activateTrial")({});
+    return { accessUntil: result.data.accessUntil };
   }
 
   async startTotpEnrollment(): Promise<TotpEnrollment> {

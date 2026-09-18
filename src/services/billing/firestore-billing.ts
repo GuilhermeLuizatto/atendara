@@ -9,9 +9,9 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { httpsCallable } from "firebase/functions";
 
-import { getDb, getFirebaseApp } from "@/lib/firebase/client";
+import { getDb, getFirebaseFunctions } from "@/lib/firebase/client";
 import { readPage } from "@/lib/firebase/paging";
 import { paths } from "@/lib/firebase/paths";
 import type {
@@ -25,18 +25,13 @@ import type {
 
 import type { PlatformBillingClient } from "./types";
 
-const REGION = "southamerica-east1";
-
 /** Pagina das listagens da operadora. */
 const ADMIN_PAGE_SIZE = 50;
 /** O assinante ve os ultimos tres anos de faturas mensais. */
 const INVOICE_PAGE_SIZE = 36;
 
 function callable<Input, Output>(name: string) {
-  return httpsCallable<Input, Output>(
-    getFunctions(getFirebaseApp(), REGION),
-    name,
-  );
+  return httpsCallable<Input, Output>(getFirebaseFunctions(), name);
 }
 
 /**

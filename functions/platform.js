@@ -8,6 +8,9 @@ import { ACCESS_GRANT_KINDS } from "./generated/platform-types.js";
 import { ACCESS_GRANT_REASON_LENGTH } from "./generated/platform-config.js";
 import { accessGrantWindowError, isGrantInForce, resolveAccountGate } from "./generated/access-gate.js";
 import { ACCOUNT_CALL_OPTIONS, adminOf, parse } from "./platform-auth.js";
+import { runAs } from "./service-accounts.js";
+
+const OPERADORA_CALL_OPTIONS = { ...ACCOUNT_CALL_OPTIONS, ...runAs("operadora") };
 
 /**
  * Concessao manual de acesso e trilha da operadora.
@@ -83,7 +86,7 @@ async function readTitular(transaction, organizationId) {
   return { accountRef, subscriberUserId: organization.ownerId };
 }
 
-export const grantAccess = onCall(ACCOUNT_CALL_OPTIONS, async (request) => {
+export const grantAccess = onCall(OPERADORA_CALL_OPTIONS, async (request) => {
   await adminOf(request);
   const input = parse(grantSchema, request.data);
   const nowMs = Date.now();
@@ -126,7 +129,7 @@ export const grantAccess = onCall(ACCOUNT_CALL_OPTIONS, async (request) => {
  * Revogacao antecipada. Fecha so a parte concedida: com assinatura paga
  * vigente, o portao volta a ser exatamente o que o gateway decidiu.
  */
-export const revokeAccess = onCall(ACCOUNT_CALL_OPTIONS, async (request) => {
+export const revokeAccess = onCall(OPERADORA_CALL_OPTIONS, async (request) => {
   await adminOf(request);
   const input = parse(revokeSchema, request.data);
   const nowMs = Date.now();

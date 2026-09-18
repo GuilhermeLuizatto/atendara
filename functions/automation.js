@@ -23,6 +23,7 @@ import {
   PLANNING_EVENT_MAX_AGE_MINUTES,
 } from "./generated/automation-config.js";
 import { providerFor } from "./generated/notifications-providers.js";
+import { runAs, SERVICE_ACCOUNTS } from "./service-accounts.js";
 import { withOrganizationDefaults } from "./generated/organization-config.js";
 import { paths } from "./generated/paths.js";
 import { getProfession, isProfessionId } from "./generated/professions.js";
@@ -209,6 +210,9 @@ export const planAppointmentNotices = onDocumentWritten(
     document: paths.document("{organizationId}", "appointments", "{appointmentId}"),
     region: REGION,
     maxInstances: 5,
+    // Mesma conta do despachante: e ela que enfileira, e a tarefa carrega a
+    // identidade de quem enfileirou.
+    ...runAs("automacao"),
     // Repetir e inofensivo — id do aviso e nome na fila sao deterministicos — e
     // cobre falha passageira da transacao ou da Cloud Tasks.
     retry: true,
@@ -392,6 +396,11 @@ export const dispatchAutomationTask = onTaskDispatched(
     maxInstances: 5,
     timeoutSeconds: DISPATCHER_TIMEOUT_SECONDS,
     retryConfig: { ...DISPATCHER_QUEUE_RETRY },
+    ...runAs("automacao"),
+    // Quem pode colocar tarefa nesta fila e chamar este despachante. Com isto a
+    // CLI concede as duas permissoes so a conta da automacao, na fila e na
+    // function — em vez de um papel no projeto inteiro.
+    invoker: [SERVICE_ACCOUNTS.automacao],
     rateLimits: { maxConcurrentDispatches: 20 },
   },
   async (request) => {

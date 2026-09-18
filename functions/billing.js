@@ -17,6 +17,7 @@ import { resolveAccountGate } from "./generated/access-gate.js";
 import { PROVISIONAL_RETENTION_DAYS } from "./generated/platform-config.js";
 import { GatewayError, stripeRequest, verifyWebhookSignature } from "./gateway.js";
 import { consumeRateLimit } from "./rate-limit.js";
+import { runAs } from "./service-accounts.js";
 
 /**
  * Cobranca DA PLATAFORMA: a mensalidade que a operadora cobra dos assinantes.
@@ -45,8 +46,10 @@ const SECRETS = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"];
 // App Check obrigatorio: sem atestado do aplicativo nao se abre sessao no
 // gateway. O webhook fica fora — quem o chama e o gateway, e ele prova a origem
 // pela assinatura do evento.
-const callOptions = { region: REGION, maxInstances: 3, cors: true, secrets: SECRETS, enforceAppCheck: true };
-const webhookOptions = { region: REGION, maxInstances: 5, secrets: SECRETS };
+// A conta da cobranca (H.3) e a unica que le os segredos da Stripe: nenhuma
+// outra function precisa deles, e nenhuma outra os alcanca.
+const callOptions = { region: REGION, maxInstances: 3, cors: true, secrets: SECRETS, enforceAppCheck: true, ...runAs("cobranca") };
+const webhookOptions = { region: REGION, maxInstances: 5, secrets: SECRETS, ...runAs("cobranca") };
 
 // `getFirestore()` preguicoso: os modulos sao avaliados antes de
 // `initializeApp()` do index.js, entao chamar no topo quebraria o carregamento.

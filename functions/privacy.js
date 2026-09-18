@@ -18,6 +18,7 @@ import { pseudonymFrom, redactionPatch } from "./generated/privacy-redaction.js"
 import { ACCOUNT_CALL_OPTIONS, accountOf, parse } from "./platform-auth.js";
 import { auditEntry } from "./platform.js";
 import { consumeRateLimit } from "./rate-limit.js";
+import { runAs } from "./service-accounts.js";
 
 /**
  * Direitos do titular dos dados, pelo backend.
@@ -44,7 +45,7 @@ const PSEUDONYMIZE_PAGE = 300;
 
 // Excluir uma organizacao percorre o tenant inteiro; os 60 s padrao nao cabem
 // numa clinica com historico.
-const PRIVACY_CALL_OPTIONS = { ...ACCOUNT_CALL_OPTIONS, timeoutSeconds: 540 };
+const PRIVACY_CALL_OPTIONS = { ...ACCOUNT_CALL_OPTIONS, timeoutSeconds: 540, ...runAs("privacidade") };
 
 const db = () => getFirestore();
 

@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 
 import { collection, getDocs } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -17,8 +16,7 @@ import { PROJECT, tokenSession, type TokenSession } from "@/lib/testing/emulator
  * Rodar com: npm run test:access
  */
 
-const require = createRequire(import.meta.url);
-const admin = require("../../../functions/node_modules/firebase-admin/lib/index.js");
+import { adminAuth, adminDb, deleteAdminApps, initializeAdminSdk } from "../testing/admin-sdk";
 
 const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9098";
 const FIRESTORE_HOST = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8087";
@@ -45,7 +43,7 @@ function operatorAccount(uid: string, platformMaster: boolean) {
 }
 
 async function accountOf(uid: string): Promise<Record<string, unknown>> {
-  return (await admin.firestore().doc(paths.account(uid)).get()).data();
+  return (await adminDb().doc(paths.account(uid)).get()).data();
 }
 
 /** Lista contas por uma sessao nova do administrador comum e a descarta. */
@@ -61,12 +59,12 @@ async function listAccountsAsPlainAdmin(): Promise<unknown> {
 beforeAll(async () => {
   process.env.FIREBASE_AUTH_EMULATOR_HOST = AUTH_HOST;
   process.env.FIRESTORE_EMULATOR_HOST = FIRESTORE_HOST;
-  admin.initializeApp({ projectId: PROJECT });
+  initializeAdminSdk(PROJECT);
 
-  await admin.firestore().doc(paths.account(MASTER_UID)).set(operatorAccount(MASTER_UID, true));
+  await adminDb().doc(paths.account(MASTER_UID)).set(operatorAccount(MASTER_UID, true));
   // O administrador comum existe no Auth: suspender precisa desativar o login dele.
-  await admin.auth().createUser({ uid: ADMIN_UID, email: `${ADMIN_UID}@atendara.test`, password: "SenhaDeTeste-Admin-7" });
-  await admin.firestore().doc(paths.account(ADMIN_UID)).set(operatorAccount(ADMIN_UID, false));
+  await adminAuth().createUser({ uid: ADMIN_UID, email: `${ADMIN_UID}@atendara.test`, password: "SenhaDeTeste-Admin-7" });
+  await adminDb().doc(paths.account(ADMIN_UID)).set(operatorAccount(ADMIN_UID, false));
 
   master = tokenSession(MASTER_UID, "totp");
   plainAdmin = tokenSession(ADMIN_UID, "totp");
@@ -74,7 +72,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await Promise.all([master, plainAdmin].map((session) => session.dispose()));
-  await Promise.all(admin.apps.map((instance: { delete(): Promise<void> }) => instance.delete()));
+  await deleteAdminApps();
 });
 
 describe("Chave mestra e administradores da plataforma", () => {
@@ -83,7 +81,7 @@ describe("Chave mestra e administradores da plataforma", () => {
     await expect(plainAdmin.call("createPlatformAdmin", payload)).rejects.toMatchObject({ code: "permission-denied" });
 
     const created = await master.call<{ userId: string; temporaryPassword: string }>("createPlatformAdmin", payload);
-    expect((await admin.auth().getUser(created.userId)).email).toBe(payload.email);
+    expect((await adminAuth().getUser(created.userId)).email).toBe(payload.email);
     expect(await accountOf(created.userId)).toMatchObject({
       platformRole: "PLATFORM_ADMIN",
       platformMaster: false,
@@ -91,7 +89,7 @@ describe("Chave mestra e administradores da plataforma", () => {
       organizationId: null,
     });
 
-    const trail = await admin.firestore().collection(paths.platformAuditLogs()).where("targetUserId", "==", created.userId).get();
+    const trail = await adminDb().collection(paths.platformAuditLogs()).where("targetUserId", "==", created.userId).get();
     expect(trail.docs.map((entry: { data(): Record<string, unknown> }) => entry.data())).toEqual([
       expect.objectContaining({ action: "PLATFORM_ADMIN_CREATED", actorId: MASTER_UID }),
     ]);
@@ -101,7 +99,7 @@ describe("Chave mestra e administradores da plataforma", () => {
     await expect(listAccountsAsPlainAdmin()).resolves.toBeDefined();
 
     await master.call("setPlatformAdminStatus", { userId: ADMIN_UID, status: "SUSPENDED" });
-    expect((await admin.auth().getUser(ADMIN_UID)).disabled).toBe(true);
+    expect((await adminAuth().getUser(ADMIN_UID)).disabled).toBe(true);
     expect(await accountOf(ADMIN_UID)).toMatchObject({ status: "SUSPENDED" });
     await expect(listAccountsAsPlainAdmin()).rejects.toMatchObject({ code: "permission-denied" });
     await expect(
@@ -109,7 +107,7 @@ describe("Chave mestra e administradores da plataforma", () => {
     ).rejects.toMatchObject({ code: "permission-denied" });
 
     await master.call("setPlatformAdminStatus", { userId: ADMIN_UID, status: "ACTIVE" });
-    expect((await admin.auth().getUser(ADMIN_UID)).disabled).toBe(false);
+    expect((await adminAuth().getUser(ADMIN_UID)).disabled).toBe(false);
     await expect(listAccountsAsPlainAdmin()).resolves.toBeDefined();
   });
 

@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 
 import { deleteApp, initializeApp, type FirebaseApp } from "firebase/app";
 import { connectAuthEmulator, getAuth, signInWithEmailAndPassword, signOut, type Auth } from "firebase/auth";
@@ -43,8 +42,7 @@ import type {
  * Rodar com: npm run test:access
  */
 
-const require = createRequire(import.meta.url);
-const admin = require("../../../functions/node_modules/firebase-admin/lib/index.js");
+import { adminDb, deleteAdminApps, initializeAdminSdk } from "../testing/admin-sdk";
 
 const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9098";
 const [FIRESTORE_HOST, FIRESTORE_PORT] = (process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8087").split(":");
@@ -78,7 +76,7 @@ let viewer: TokenSession;
 let titularA: Person;
 let titularB: Person;
 
-const fs = () => admin.firestore();
+const fs = () => adminDb();
 const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
 const clientPath = (id: string) => paths.document(titularA.organizationId, "clients", id);
 
@@ -171,7 +169,7 @@ function clientDocument(organizationId: string, consent: StoredNotificationConse
 beforeAll(async () => {
   process.env.FIREBASE_AUTH_EMULATOR_HOST = AUTH_HOST;
   process.env.FIRESTORE_EMULATOR_HOST = `${FIRESTORE_HOST}:${FIRESTORE_PORT}`;
-  admin.initializeApp({ projectId: PROJECT });
+  initializeAdminSdk(PROJECT);
 
   await fs().doc(paths.account(OPERATOR_UID)).set({
     userId: OPERATOR_UID, email: "operadora-consentimento@atendara.test", displayName: "Operadora", platformRole: "PLATFORM_ADMIN",
@@ -193,7 +191,7 @@ afterAll(async () => {
     await deleteApp(person.app);
   }
   await Promise.all([operator, assistant, viewer].filter(Boolean).map((session) => session.dispose()));
-  await Promise.all(admin.apps.map((instance: { delete(): Promise<void> }) => instance.delete()));
+  await deleteAdminApps();
 });
 
 describe("Fase 3, 13.1 — consentimento por canal", () => {

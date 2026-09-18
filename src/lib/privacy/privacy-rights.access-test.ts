@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 
 import { deleteApp, initializeApp, type FirebaseApp } from "firebase/app";
 import { connectAuthEmulator, getAuth, signInWithEmailAndPassword, signOut, type Auth } from "firebase/auth";
@@ -39,8 +38,7 @@ import type {
  * Rodar com: npm run test:access
  */
 
-const require = createRequire(import.meta.url);
-const admin = require("../../../functions/node_modules/firebase-admin/lib/index.js");
+import { AdminTimestamp, adminAuth, adminDb, deleteAdminApps, initializeAdminSdk } from "../testing/admin-sdk";
 
 const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9098";
 const [FIRESTORE_HOST, FIRESTORE_PORT] = (process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8087").split(":");
@@ -77,9 +75,9 @@ let titularA: Person;
 let titularB: Person;
 let subjectPseudonym: string;
 
-const fs = () => admin.firestore();
+const fs = () => adminDb();
 const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
-const timestamp = (iso: string) => admin.firestore.Timestamp.fromDate(new Date(iso));
+const timestamp = (iso: string) => AdminTimestamp.fromDate(new Date(iso));
 const ids = (prefix: string) => ({
   client: `cliente-${prefix}`,
   appointment: `atendimento-${prefix}`,
@@ -267,7 +265,7 @@ async function seedClient(organizationId: string, by: string, person: { name: st
 beforeAll(async () => {
   process.env.FIREBASE_AUTH_EMULATOR_HOST = AUTH_HOST;
   process.env.FIRESTORE_EMULATOR_HOST = `${FIRESTORE_HOST}:${FIRESTORE_PORT}`;
-  admin.initializeApp({ projectId: PROJECT });
+  initializeAdminSdk(PROJECT);
 
   await fs().doc(paths.account(OPERATOR_UID)).set({
     userId: OPERATOR_UID, email: "operadora-titulares@atendara.test", displayName: "Operadora", platformRole: "PLATFORM_ADMIN",
@@ -293,7 +291,7 @@ afterAll(async () => {
     await deleteApp(person.app);
   }
   await Promise.all([operator, colleague, clinicAdmin].filter(Boolean).map((session) => session.dispose()));
-  await Promise.all(admin.apps.map((instance: { delete(): Promise<void> }) => instance.delete()));
+  await deleteAdminApps();
 });
 
 describe("Etapa 5C — direitos do titular dos dados", () => {
@@ -581,7 +579,7 @@ describe("Etapa 5C — direitos do titular dos dados", () => {
     for (const uid of [titularA.uid, COLLEAGUE_UID, CLINIC_ADMIN_UID]) {
       expect((await fs().doc(paths.account(uid)).get()).exists, uid).toBe(false);
     }
-    await expect(admin.auth().getUser(titularA.uid)).rejects.toMatchObject({ code: "auth/user-not-found" });
+    await expect(adminAuth().getUser(titularA.uid)).rejects.toMatchObject({ code: "auth/user-not-found" });
     await expectDenied(getDoc(doc(titularA.db, paths.document(orgA, "aiDecisions", Y.decision))));
 
     // Plataforma: e-mail fora da assinatura, registro do ato na trilha dela.

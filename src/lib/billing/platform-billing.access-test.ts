@@ -1,5 +1,4 @@
 import { createHmac } from "node:crypto";
-import { createRequire } from "node:module";
 
 import { deleteApp, initializeApp, type FirebaseApp } from "firebase/app";
 import {
@@ -48,7 +47,6 @@ import { callFunction, tokenSession, type TokenSession } from "@/lib/testing/emu
  * Rodar com: npm run test:access
  */
 
-const require = createRequire(import.meta.url);
 const PROJECT = "demo-atendara";
 const REGION = "southamerica-east1";
 const FUNCTIONS_PORT = 5002;
@@ -71,7 +69,7 @@ const SUBSCRIPTION = "sub_assinante";
 const PERIOD_1_END = "2026-10-09T12:00:00.000Z";
 const PERIOD_2_END = "2026-11-09T12:00:00.000Z";
 
-const admin = require("../../../functions/node_modules/firebase-admin/lib/index.js");
+import { adminAuth, adminDb, deleteAdminApps, initializeAdminSdk } from "../testing/admin-sdk";
 
 let app: FirebaseApp;
 let auth: Auth;
@@ -193,11 +191,11 @@ function invoiceEvent(
 }
 
 async function accountOf(uid: string): Promise<Record<string, unknown>> {
-  return (await admin.firestore().doc(paths.account(uid)).get()).data() as Record<string, unknown>;
+  return (await adminDb().doc(paths.account(uid)).get()).data() as Record<string, unknown>;
 }
 
 async function subscriptionOf(org: string): Promise<Record<string, unknown> | undefined> {
-  const snapshot = await admin.firestore().doc(paths.platformSubscription(org)).get();
+  const snapshot = await adminDb().doc(paths.platformSubscription(org)).get();
   return snapshot.data() as Record<string, unknown> | undefined;
 }
 
@@ -236,9 +234,9 @@ async function register(
 beforeAll(async () => {
   process.env.FIREBASE_AUTH_EMULATOR_HOST = AUTH_HOST;
   process.env.FIRESTORE_EMULATOR_HOST = `${FIRESTORE_HOST}:${FIRESTORE_PORT}`;
-  admin.initializeApp({ projectId: PROJECT });
+  initializeAdminSdk(PROJECT);
 
-  await admin.firestore().doc(paths.account(OPERATOR_UID)).set({
+  await adminDb().doc(paths.account(OPERATOR_UID)).set({
     userId: OPERATOR_UID,
     email: "operadora@atendara.test",
     displayName: "Operadora de Teste",
@@ -269,12 +267,12 @@ beforeAll(async () => {
 
   // Membro da organizacao do assinante que NAO responde por ela. Existe para
   // provar que a cobranca e do dono, e nao de qualquer pessoa do time.
-  const employee = await admin.auth().createUser({
+  const employee = await adminAuth().createUser({
     email: EMPLOYEE.email,
     password: EMPLOYEE.password,
     displayName: "Secretaria de Teste",
   });
-  await admin.firestore().doc(paths.account(employee.uid)).set({
+  await adminDb().doc(paths.account(employee.uid)).set({
     userId: employee.uid,
     email: EMPLOYEE.email,
     displayName: "Secretaria de Teste",
@@ -289,8 +287,7 @@ beforeAll(async () => {
     mustChangePassword: false,
     createdAt: new Date().toISOString(),
   });
-  await admin
-    .firestore()
+  await adminDb()
     .doc(paths.document(ownerOrg, "members", employee.uid))
     .set({ id: employee.uid, userId: employee.uid, organizationId: ownerOrg, role: "ASSISTANT", status: "ACTIVE" });
 }, 120_000);
@@ -301,7 +298,7 @@ afterAll(async () => {
   await operatorWithoutFactor.dispose();
   await terminate(db);
   await deleteApp(app);
-  await Promise.all(admin.apps.map((instance: { delete(): Promise<void> }) => instance.delete()));
+  await deleteAdminApps();
 });
 
 describe("Etapa 3 — o webhook e a unica autoridade", () => {
@@ -312,7 +309,7 @@ describe("Etapa 3 — o webhook e a unica autoridade", () => {
     expect((await deliver(event, { header: "t=1,v1=deadbeef" })).status).toBe(400);
     expect((await deliver(event, { header: "" })).status).toBe(400);
 
-    const registro = await admin.firestore().doc(paths.platformGatewayEvent("evt_forjado")).get();
+    const registro = await adminDb().doc(paths.platformGatewayEvent("evt_forjado")).get();
     expect(registro.exists).toBe(false);
     expect(await subscriptionOf(ownerOrg)).toBeUndefined();
     // E o painel continua fechado.
@@ -385,7 +382,7 @@ describe("Etapa 3 — o webhook e a unica autoridade", () => {
     const esperado = withGrace(PERIOD_2_END);
     expect(await accountOf(ownerUid)).toMatchObject({ accessUntil: esperado, subscriptionStatus: "ACTIVE" });
 
-    const fatura = await admin.firestore().doc(paths.platformInvoice("in_ciclo_2")).get();
+    const fatura = await adminDb().doc(paths.platformInvoice("in_ciclo_2")).get();
     expect(fatura.data()).toMatchObject({
       organizationId: ownerOrg,
       status: "PAID",
@@ -422,7 +419,7 @@ describe("Etapa 3 — o webhook e a unica autoridade", () => {
       accessUntil: antes?.accessUntil,
     });
     expect(
-      (await admin.firestore().doc(paths.platformGatewayEvent("evt_atrasado")).get()).data(),
+      (await adminDb().doc(paths.platformGatewayEvent("evt_atrasado")).get()).data(),
     ).toMatchObject({ outcome: "OUT_OF_ORDER" });
   });
 
@@ -435,7 +432,7 @@ describe("Etapa 3 — o webhook e a unica autoridade", () => {
     );
 
     expect(
-      (await admin.firestore().doc(paths.platformInvoice("in_falhou")).get()).data(),
+      (await adminDb().doc(paths.platformInvoice("in_falhou")).get()).data(),
     ).toMatchObject({ status: "PAST_DUE" });
     // Cartao recusado fecha o painel na hora, por decisao do titular: a conta
     // vai a PENDING e as regras exigem ACTIVE, qualquer que seja a data.
@@ -595,7 +592,7 @@ describe("Etapa 3 — encerramento", () => {
     expect(result).toMatchObject({ status: 200, outcome: "APPLIED" });
 
     expect(
-      (await admin.firestore().doc(paths.platformInvoice("in_ciclo_2")).get()).data(),
+      (await adminDb().doc(paths.platformInvoice("in_ciclo_2")).get()).data(),
     ).toMatchObject({ status: "REFUNDED", amountRefundedInCents: 19_900 });
     expect(await accountOf(ownerUid)).toMatchObject({
       subscriptionStatus: "PENDING",
@@ -628,8 +625,7 @@ describe("Etapa 3 — encerramento", () => {
   });
 
   it("a cobranca da plataforma nao deixou rastro no financeiro do assinante", async () => {
-    const transacoes = await admin
-      .firestore()
+    const transacoes = await adminDb()
       .collection(paths.collection(ownerOrg, "transactions"))
       .get();
 

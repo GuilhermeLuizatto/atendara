@@ -34,6 +34,7 @@ vi.mock("firebase-functions/v2/https", () => ({
 }));
 
 import { CLEANUP_BATCH, eraseUnconfirmedSignups, eraseUnconfirmedSignupsDaily } from "./signup-cleanup.js";
+import { SERVICE_ACCOUNTS } from "./service-accounts.js";
 import { paths } from "./generated/paths.js";
 import { SELF_SERVICE_ACTOR, UNCONFIRMED_SIGNUP_RETENTION_DAYS } from "./generated/platform-config.js";
 
@@ -184,7 +185,7 @@ describe("rodada", () => {
       schedule: "45 4 * * *",
       timeZone: "America/Sao_Paulo",
       maxInstances: 1,
-      serviceAccount: "fn-privacidade@",
+      serviceAccount: SERVICE_ACCOUNTS.privacidade,
     });
   });
 });

@@ -57,6 +57,22 @@ export const SELF_SERVICE_ACTOR = "sistema:autocadastro";
  * uma configuracao de console que alguem pode afrouxar sem revisao de codigo.
  */
 export const SELF_SERVICE_PASSWORD_LENGTH = { min: 8, max: 128 };
+/**
+ * Quantos dias antes do fim o painel avisa que o teste esta acabando.
+ *
+ * Aviso de plataforma, dentro do painel — nunca pelo canal da clinica (regra
+ * 12). Enquanto nao houver remetente proprio, este e o unico aviso honesto: a
+ * pessoa le quando abre o painel.
+ */
+export const TRIAL_ENDING_NOTICE_DAYS = 3;
+/**
+ * Quanto tempo a conta bloqueada continua inteira antes da pseudonimizacao.
+ *
+ * Trinta dias por decisao do titular em 16/09/2026. Bloquear nao e apagar: no
+ * periodo a pessoa assina, exporta o que e dela (art. 18, V) e pode pedir a
+ * exclusao. Quem aplica o fim do prazo e a A.5.
+ */
+export const BLOCKED_RETENTION_DAYS = 30;
 export const PLATFORM_AUDIT_ACTION_LABELS = {
     ACCOUNT_REGISTERED: "Cadastro de profissional",
     ACCOUNT_UPDATED: "Alteração de conta",
@@ -64,6 +80,7 @@ export const PLATFORM_AUDIT_ACTION_LABELS = {
     ACCESS_REVOKED: "Revogação de acesso",
     SELF_SERVICE_REGISTERED: "Cadastro aberto pelo profissional",
     TRIAL_STARTED: "Início do teste de 14 dias",
+    TRIAL_ENDED: "Fim do teste de 14 dias",
     PLATFORM_ADMIN_CREATED: "Cadastro de administrador",
     PLATFORM_ADMIN_SUSPENDED: "Suspensão de administrador",
     PLATFORM_ADMIN_REACTIVATED: "Reativação de administrador",

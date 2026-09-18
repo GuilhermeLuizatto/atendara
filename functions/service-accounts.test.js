@@ -19,6 +19,9 @@ import { SERVICE_ACCOUNTS, runAs } from "./service-accounts.js";
 const GROUP_OF_FILE = {
   "index.js": "contas",
   "self-service.js": "contas",
+  // Rotinas do ciclo do teste: fecham a conta vencida e, na A.5, apagam o
+  // cadastro abandonado. Mesmo alcance da exclusao de organizacao.
+  "trial.js": "privacidade",
   "platform.js": "operadora",
   "platform-admins.js": "operadora",
   "privacy.js": "privacidade",

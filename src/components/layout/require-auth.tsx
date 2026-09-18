@@ -1,13 +1,16 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { hasActiveAccess, canAccessModule, canManageSubscription, isPlatformAdmin } from "@/config/access";
 import { APP_MODULES, type AppModule } from "@/types/access";
 import { EmailConfirmation } from "@/features/auth/email-confirmation";
 import { PasswordSetup } from "@/features/auth/password-setup";
+import { TrialEnded } from "@/features/auth/trial-ended";
+import { trialState } from "@/lib/platform/trial";
 import { Button } from "@/components/ui/button";
 
+import { useNow } from "@/lib/utils/use-now";
 import { useAuth } from "@/providers/auth-provider";
 
 /**
@@ -22,11 +25,9 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const { status, user, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [, tick] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => tick(value => value + 1), 15000);
-    return () => clearInterval(timer);
-  }, []);
+  // Releitura periodica: o acesso vence pela HORA, e sem o tique a tela
+  // continuaria aberta ate a proxima navegacao.
+  const now = useNow(15_000);
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
@@ -45,6 +46,12 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   // falta e a confirmacao do e-mail. Depois do 15o dia `accessUntil` existe e
   // esta vencido — ai o caminho e outro, e nao este.
   if (user?.access?.origin === "SELF_SERVICE" && !user.access.accessUntil) return <EmailConfirmation />;
+  // Teste vencido: o painel ja esta fechado pela data. Esta tela existe para
+  // fechar nao virar perder — assinar, exportar e apagar continuam aqui.
+  // "assinatura" passa direto: e para onde ela manda.
+  if (trialState(user?.access, now.getTime()).phase === "BLOCKED" && pathname.split("/")[1] !== "assinatura") {
+    return <TrialEnded />;
+  }
   const area = pathname.split("/")[1];
   // "Minha assinatura" e a unica area que NAO exige acesso vigente: quem esta
   // com a mensalidade vencida precisa chegar ate ela para regularizar. As

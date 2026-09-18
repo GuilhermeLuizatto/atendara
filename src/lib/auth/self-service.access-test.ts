@@ -243,3 +243,37 @@ describe("teto de cadastros por origem", () => {
     await clearRateLimits();
   });
 });
+
+/**
+ * A.4 pelo lado que importa: quem fecha o painel e a DATA, nao uma rotina.
+ *
+ * A rotina diaria so marca o inicio da retencao e registra o ato — isso esta
+ * provado em `functions/trial.test.js`. O que so o emulador prova e que, passada
+ * a validade, as Security Rules reais param de entregar dado nenhum.
+ */
+describe("teste vencido fecha o painel pela data", () => {
+  beforeAll(async () => {
+    const account = await accountByEmail(ESTETICISTA.email);
+    const vencido = new Date(Date.now() - DAY_MS).toISOString();
+    await adminDb().doc(paths.account(String(account!.userId))).update({
+      accessUntil: vencido,
+      accessUntilMs: Date.parse(vencido),
+    });
+  });
+
+  it("nao entrega mais nada da organizacao", async () => {
+    const db = bianca.firestore;
+    await expect(getDoc(doc(db, paths.organization(biancaOrg)))).rejects.toMatchObject({
+      code: "permission-denied",
+    });
+    await expect(
+      getDoc(doc(db, paths.document(biancaOrg, "clients", "qualquer"))),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+  });
+
+  it("continua entregando a propria conta, que e o que a tela de bloqueio le", async () => {
+    const account = await accountByEmail(ESTETICISTA.email);
+    const propria = await getDoc(doc(bianca.firestore, paths.account(String(account!.userId))));
+    expect(propria.data()).toMatchObject({ origin: "SELF_SERVICE", blockedSince: null });
+  });
+});

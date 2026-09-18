@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils/cn";
 import { useDialogFocus } from "@/lib/utils/use-dialog-focus";
 import { useWorkspace } from "@/providers/workspace-provider";
 
+import { TrialNotice } from "@/features/auth/trial-notice";
+
 import { Header } from "./header";
 import { RequireAuth } from "./require-auth";
 import { Sidebar, SidebarContent } from "./sidebar";
@@ -88,6 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             className="flex-1 px-4 py-6 outline-none sm:px-6 lg:px-8"
           >
             <div className="mx-auto w-full max-w-7xl">
+              <TrialNotice />
               <WorkspaceGate>{children}</WorkspaceGate>
             </div>
           </main>

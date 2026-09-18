@@ -501,6 +501,94 @@ async function removeAccess(userId, organizationId) {
 const deletionRequest = z.object({ confirmOrganizationId: z.string().min(1).max(128) }).strict();
 
 /**
+ * O apagamento em si, sem nenhuma pergunta sobre quem pediu.
+ *
+ * Dois caminhos chegam aqui e precisam fazer exatamente a mesma coisa: o
+ * titular que encerra a propria organizacao e a rotina que limpa o cadastro
+ * abandonado depois do teste (A.5). Se fossem duas implementacoes, uma
+ * pseudonimizaria menos que a outra — e a que pseudonimiza menos seria
+ * descoberta tarde.
+ *
+ * `lastAccountUserId` e a conta que sai por ultimo: enquanto ela existe, o
+ * pedido pode ser repetido. A rotina automatica nao tem pedinte e passa `null`.
+ */
+export async function eraseOrganization({ organizationId, organization, organizationRef, subscription, subscriptionRef, actorId, action, lastAccountUserId = null }) {
+  const at = new Date();
+  const requestId = organization.deletion?.requestId ?? randomUUID();
+  const startedAt = organization.deletion?.startedAt ?? at.toISOString();
+  // A marca vem primeiro: se algo falhar no meio, a organizacao ja nao e usada,
+  // e repetir o pedido retoma com o mesmo id, sem pseudonimizar duas vezes.
+  await organizationRef.update({ deletion: { status: "IN_PROGRESS", requestId, requestedBy: actorId, startedAt } });
+
+  const pseudonyms = new Map();
+  const context = {
+    mark: { scope: "ORGANIZATION_DELETION", requestId, redactedAt: at.toISOString() },
+    pseudonymOf: (clientId) => {
+      if (!pseudonyms.has(clientId)) pseudonyms.set(clientId, pseudonymFrom(randomUUID()));
+      return pseudonyms.get(clientId);
+    },
+  };
+  const trailExpiresAt = new Date(at.getTime() + PROVISIONAL_PRIVACY_RETENTION_DAYS.deletedOrganizationTrail * DAY_MS);
+  const { counts, add } = counter();
+
+  const memberIds = (await db().collection(paths.collection(organizationId, "members")).get()).docs.map((member) => member.id);
+
+  // Vinculos primeiro: sem membro, as rules fecham o tenant para todo mundo
+  // antes de o resto sair. `messages` e subcolecao e vai junto das conversas.
+  const order = ["members", ...Object.keys(TENANT_COLLECTIONS).filter((name) => name !== "members" && name !== "messages")];
+  for (const name of order) {
+    const treatment = PERSONAL_DATA_MAP[name].onOrganizationDeletion;
+    const collection = db().collection(paths.collection(organizationId, name));
+    if (treatment.action === "DELETE") {
+      add(name, "deleted", await deleteRecursively(collection));
+    } else if (treatment.action === "PSEUDONYMIZE") {
+      add(name, "pseudonymized", await pseudonymizeCollection(collection, treatment, context, { expiresAt: trailExpiresAt }));
+    }
+  }
+
+  // Plataforma: so o que o mapa manda tirar. Faturas, eventos e trilha ficam,
+  // com o motivo escrito no mapa.
+  if (subscription) {
+    const patch = redactionPatch(PERSONAL_DATA_MAP.platformSubscriptions.onOrganizationDeletion, subscription, context);
+    if (patch) {
+      await subscriptionRef.update(patch);
+      add("platformSubscriptions", "pseudonymized");
+    }
+  }
+
+  for (const userId of memberIds.filter((id) => id !== lastAccountUserId)) {
+    if (await removeAccess(userId, organizationId)) add("accounts", "deleted");
+  }
+  // Contada antes de acontecer: a conta guardada para o fim sai depois do registro.
+  if (lastAccountUserId) add("accounts", "deleted");
+
+  const entry = auditEntry({
+    action,
+    actorId: actorId,
+    organizationId,
+    targetUserId: lastAccountUserId,
+    details: { requestId, counts },
+    createdAt: at.toISOString(),
+  });
+  const batch = db().batch();
+  // Lapide: sem nome, dono, profissao nem configuracao. Fica para que a trilha
+  // pseudonimizada continue tendo onde morar ate o prazo provisorio.
+  batch.set(organizationRef, {
+    id: organizationId,
+    deletion: { status: "DONE", requestId, startedAt, completedAt: new Date().toISOString() },
+    expiresAt: trailExpiresAt,
+  });
+  batch.create(entry.ref, entry.data);
+  await batch.commit();
+
+  // Por ultimo a conta de quem pediu: enquanto ela existe, o pedido pode ser
+  // repetido.
+  if (lastAccountUserId) await removeAccess(lastAccountUserId, organizationId);
+
+  return { requestId, counts };
+}
+
+/**
  * Exclusao da organizacao pelo titular.
  *
  * Nao exige painel aberto: quem parou de pagar tambem pode encerrar. Exige o
@@ -539,77 +627,14 @@ export const deleteOrganization = onCall(PRIVACY_CALL_OPTIONS, async (request) =
     throw new HttpsError("failed-precondition", "Cancele a assinatura antes de excluir a organização.");
   }
 
-  const at = new Date();
-  const requestId = organization.deletion?.requestId ?? randomUUID();
-  const startedAt = organization.deletion?.startedAt ?? at.toISOString();
-  // A marca vem primeiro: se algo falhar no meio, a organizacao ja nao e usada,
-  // e repetir o pedido retoma com o mesmo id, sem pseudonimizar duas vezes.
-  await organizationRef.update({ deletion: { status: "IN_PROGRESS", requestId, requestedBy: request.auth.uid, startedAt } });
-
-  const pseudonyms = new Map();
-  const context = {
-    mark: { scope: "ORGANIZATION_DELETION", requestId, redactedAt: at.toISOString() },
-    pseudonymOf: (clientId) => {
-      if (!pseudonyms.has(clientId)) pseudonyms.set(clientId, pseudonymFrom(randomUUID()));
-      return pseudonyms.get(clientId);
-    },
-  };
-  const trailExpiresAt = new Date(at.getTime() + PROVISIONAL_PRIVACY_RETENTION_DAYS.deletedOrganizationTrail * DAY_MS);
-  const { counts, add } = counter();
-
-  const memberIds = (await db().collection(paths.collection(organizationId, "members")).get()).docs.map((member) => member.id);
-
-  // Vinculos primeiro: sem membro, as rules fecham o tenant para todo mundo
-  // antes de o resto sair. `messages` e subcolecao e vai junto das conversas.
-  const order = ["members", ...Object.keys(TENANT_COLLECTIONS).filter((name) => name !== "members" && name !== "messages")];
-  for (const name of order) {
-    const treatment = PERSONAL_DATA_MAP[name].onOrganizationDeletion;
-    const collection = db().collection(paths.collection(organizationId, name));
-    if (treatment.action === "DELETE") {
-      add(name, "deleted", await deleteRecursively(collection));
-    } else if (treatment.action === "PSEUDONYMIZE") {
-      add(name, "pseudonymized", await pseudonymizeCollection(collection, treatment, context, { expiresAt: trailExpiresAt }));
-    }
-  }
-
-  // Plataforma: so o que o mapa manda tirar. Faturas, eventos e trilha ficam,
-  // com o motivo escrito no mapa.
-  if (subscription) {
-    const patch = redactionPatch(PERSONAL_DATA_MAP.platformSubscriptions.onOrganizationDeletion, subscription, context);
-    if (patch) {
-      await subscriptionRef.update(patch);
-      add("platformSubscriptions", "pseudonymized");
-    }
-  }
-
-  for (const userId of memberIds.filter((id) => id !== request.auth.uid)) {
-    if (await removeAccess(userId, organizationId)) add("accounts", "deleted");
-  }
-  // Contada antes de acontecer: a conta de quem pede sai depois do registro.
-  add("accounts", "deleted");
-
-  const entry = auditEntry({
-    action: "ORGANIZATION_DELETED",
-    actorId: request.auth.uid,
+  return await eraseOrganization({
     organizationId,
-    targetUserId: request.auth.uid,
-    details: { requestId, counts },
-    createdAt: at.toISOString(),
+    organization,
+    organizationRef,
+    subscription,
+    subscriptionRef,
+    actorId: request.auth.uid,
+    action: "ORGANIZATION_DELETED",
+    lastAccountUserId: request.auth.uid,
   });
-  const batch = db().batch();
-  // Lapide: sem nome, dono, profissao nem configuracao. Fica para que a trilha
-  // pseudonimizada continue tendo onde morar ate o prazo provisorio.
-  batch.set(organizationRef, {
-    id: organizationId,
-    deletion: { status: "DONE", requestId, startedAt, completedAt: new Date().toISOString() },
-    expiresAt: trailExpiresAt,
-  });
-  batch.create(entry.ref, entry.data);
-  await batch.commit();
-
-  // Por ultimo a conta de quem pediu: enquanto ela existe, o pedido pode ser
-  // repetido.
-  await removeAccess(request.auth.uid, organizationId);
-
-  return { requestId, counts };
 });

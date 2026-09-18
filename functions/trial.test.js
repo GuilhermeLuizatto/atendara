@@ -7,9 +7,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * escrever validade. A rotina so marca o inicio da retencao e registra o ato;
  * quem fecha o painel e a data, nas regras e na interface.
  */
-const mock = vi.hoisted(() => ({ contas: [], writes: [], commit: vi.fn(), consulta: [] }));
+const mock = vi.hoisted(() => ({ contas: [], writes: [], commit: vi.fn(), consulta: [], documentos: new Map(), apagar: vi.fn() }));
 vi.mock("firebase-admin/firestore", () => ({ getFirestore: () => ({
-  doc: path => ({ path }),
+  doc: path => ({ path, get: async () => ({ data: () => mock.documentos.get(path) }) }),
   collection: path => {
     const query = {
       where: (field, op, value) => { mock.consulta.push({ path, field, op, value }); return query; },
@@ -25,12 +25,16 @@ vi.mock("firebase-admin/firestore", () => ({ getFirestore: () => ({
   }),
 }) }));
 vi.mock("firebase-functions/logger", () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
+// O apagamento de verdade tem suite propria (`privacy-rights.access-test.ts`,
+// que varre o que sobrou atras dos nomes originais). Aqui o que se prova e QUEM
+// a rotina escolhe — e, acima de tudo, quem ela nao escolhe.
+vi.mock("./privacy.js", () => ({ eraseOrganization: (...args) => mock.apagar(...args) }));
 vi.mock("firebase-functions/v2/scheduler", () => ({ onSchedule: (options, handler) => Object.assign(handler, { options }) }));
 vi.mock("firebase-functions/v2/https", () => ({ onCall: (options, handler) => Object.assign(handler, { options }), HttpsError: class extends Error { constructor(code, message) { super(message); this.code = code; } } }));
 
-import { closeExpiredTrials, closeExpiredTrialsDaily } from "./trial.js";
+import { closeExpiredTrials, closeExpiredTrialsDaily, eraseAbandonedTrials, eraseAbandonedTrialsDaily } from "./trial.js";
 import { paths } from "./generated/paths.js";
-import { SELF_SERVICE_ACTOR } from "./generated/platform-config.js";
+import { BLOCKED_RETENTION_DAYS, SELF_SERVICE_ACTOR } from "./generated/platform-config.js";
 
 const NOW = Date.parse("2026-10-01T07:00:00.000Z");
 const conta = (userId, extra = {}) => ({
@@ -41,7 +45,8 @@ const conta = (userId, extra = {}) => ({
 const auditWrites = () => mock.writes.filter(write => write.path.startsWith("platformAuditLogs/"));
 
 beforeEach(() => {
-  vi.clearAllMocks(); mock.contas = []; mock.writes = []; mock.consulta = []; mock.commit.mockResolvedValue(undefined);
+  vi.clearAllMocks(); mock.contas = []; mock.writes = []; mock.consulta = []; mock.documentos.clear();
+  mock.commit.mockResolvedValue(undefined); mock.apagar.mockResolvedValue({ requestId: "pedido", counts: {} });
 });
 
 describe("Fim do teste de 14 dias", () => {
@@ -92,6 +97,68 @@ describe("Fim do teste de 14 dias", () => {
       schedule: "0 4 * * *",
       timeZone: "America/Sao_Paulo",
       maxInstances: 1,
+    });
+  });
+});
+
+describe("Apagamento do cadastro abandonado", () => {
+  const DIA = 86_400_000;
+  const abandonada = (userId, extra = {}) => {
+    const conta = {
+      id: userId,
+      ref: { path: paths.account(userId) },
+      data: () => ({ userId, organizationId: `org-${userId}`, origin: "SELF_SERVICE", ...extra }),
+    };
+    mock.documentos.set(paths.organization(`org-${userId}`), { id: `org-${userId}`, ownerId: userId });
+    return conta;
+  };
+
+  it("procura so quem ja foi bloqueada e ja cumpriu o prazo inteiro", async () => {
+    await eraseAbandonedTrials(NOW);
+    const limite = new Date(NOW - BLOCKED_RETENTION_DAYS * DIA).toISOString();
+    expect(mock.consulta).toEqual([
+      { path: paths.accounts(), field: "origin", op: "==", value: "SELF_SERVICE" },
+      // Sem esta, `null` entraria: no Firestore ele vem antes de qualquer texto.
+      { path: paths.accounts(), field: "blockedSince", op: ">=", value: "" },
+      { path: paths.accounts(), field: "blockedSince", op: "<=", value: limite },
+    ]);
+    expect(mock.apagar).not.toHaveBeenCalled();
+  });
+
+  it("apaga pelo mesmo caminho do titular, com a conta dele saindo por ultimo", async () => {
+    mock.contas = [abandonada("bianca")];
+    expect(await eraseAbandonedTrials(NOW)).toEqual({ erased: 1 });
+    expect(mock.apagar).toHaveBeenCalledTimes(1);
+    expect(mock.apagar.mock.calls[0][0]).toMatchObject({
+      organizationId: "org-bianca",
+      actorId: SELF_SERVICE_ACTOR,
+      action: "ABANDONED_ORGANIZATION_ERASED",
+      lastAccountUserId: "bianca",
+    });
+  });
+
+  it("nao apaga quem voltou a pagar, nem o que ja foi apagado", async () => {
+    mock.contas = [abandonada("pagante"), abandonada("ja-apagada"), abandonada("sem-org", { organizationId: null })];
+    mock.documentos.set(paths.platformSubscription("org-pagante"), { status: "ACTIVE" });
+    mock.documentos.set(paths.organization("org-ja-apagada"), { id: "org-ja-apagada", deletion: { status: "DONE" } });
+
+    expect(await eraseAbandonedTrials(NOW)).toEqual({ erased: 0 });
+    expect(mock.apagar).not.toHaveBeenCalled();
+  });
+
+  it("uma falha nao impede as outras", async () => {
+    mock.contas = [abandonada("quebra"), abandonada("segue")];
+    mock.apagar.mockRejectedValueOnce(new Error("indisponivel"));
+    expect(await eraseAbandonedTrials(NOW)).toEqual({ erased: 1 });
+    expect(mock.apagar).toHaveBeenCalledTimes(2);
+  });
+
+  it("roda depois da rotina que encerra, com tempo para varrer", () => {
+    expect(eraseAbandonedTrialsDaily.options).toMatchObject({
+      region: "southamerica-east1",
+      schedule: "30 4 * * *",
+      timeZone: "America/Sao_Paulo",
+      timeoutSeconds: 540,
     });
   });
 });

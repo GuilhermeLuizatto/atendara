@@ -6,6 +6,7 @@ import { PROFESSION_IDS, type MessageClassificationId } from "@/types";
 import {
   getProfession,
   isProfessionId,
+  listAllProfessions,
   listProfessions,
   resolveProfession,
 } from ".";
@@ -17,14 +18,14 @@ import {
  */
 describe("registry de profissoes", () => {
   it("tem configuracao para toda profissao declarada", () => {
-    expect(listProfessions()).toHaveLength(PROFESSION_IDS.length);
+    expect(listAllProfessions()).toHaveLength(PROFESSION_IDS.length);
     for (const id of PROFESSION_IDS) {
       expect(getProfession(id).id).toBe(id);
     }
   });
 
   it("preenche as quatro formas de cada termo", () => {
-    for (const profession of listProfessions()) {
+    for (const profession of listAllProfessions()) {
       for (const term of Object.values(profession.terminology)) {
         expect(term.singular.length).toBeGreaterThan(0);
         expect(term.plural.length).toBeGreaterThan(0);
@@ -43,7 +44,7 @@ describe("registry de profissoes", () => {
       "UNKNOWN",
     ];
 
-    for (const profession of listProfessions()) {
+    for (const profession of listAllProfessions()) {
       for (const classification of required) {
         expect(profession.messageClassifications).toContain(classification);
       }
@@ -51,7 +52,7 @@ describe("registry de profissoes", () => {
   });
 
   it("usa apenas classificacoes que existem na taxonomia", () => {
-    for (const profession of listProfessions()) {
+    for (const profession of listAllProfessions()) {
       for (const classification of profession.messageClassifications) {
         expect(CLASSIFICATION_META[classification]).toBeDefined();
       }
@@ -62,7 +63,7 @@ describe("registry de profissoes", () => {
     // Trava central do produto: so o administrativo pode ser respondido pelo
     // agente. Se uma profissao nova habilitar outra classificacao elegivel,
     // este teste falha antes de o comportamento chegar ao usuario.
-    for (const profession of listProfessions()) {
+    for (const profession of listAllProfessions()) {
       const eligible = profession.messageClassifications.filter(
         (id) => CLASSIFICATION_META[id].autoResponseEligible,
       );
@@ -71,7 +72,7 @@ describe("registry de profissoes", () => {
   });
 
   it("define ao menos uma modalidade e valores plausiveis", () => {
-    for (const profession of listProfessions()) {
+    for (const profession of listAllProfessions()) {
       expect(profession.modalities.length).toBeGreaterThan(0);
       // `null` significa "a profissional define"; zero nunca e padrao.
       const duration = profession.defaultAppointmentDurationMinutes ?? 1;
@@ -84,7 +85,7 @@ describe("registry de profissoes", () => {
   });
 
   it("diz o conselho de cada profissao, ou que nao ha", () => {
-    for (const profession of listProfessions()) {
+    for (const profession of listAllProfessions()) {
       if (profession.council === null) continue;
       // Sigla como aparece no formulario: so maiusculas, sem espaco.
       expect(profession.council.acronym).toMatch(/^[A-Z]{3,8}$/);
@@ -103,13 +104,31 @@ describe("registry de profissoes", () => {
   });
 
   it("traz regras sugeridas com pelo menos uma trava de seguranca", () => {
-    for (const profession of listProfessions()) {
+    for (const profession of listAllProfessions()) {
       expect(profession.suggestedRules.length).toBeGreaterThan(0);
       const hasSafety = profession.suggestedRules.some(
         (rule) => rule.category === "SAFETY" || rule.category === "ESCALATION",
       );
       expect(hasSafety).toBe(true);
     }
+  });
+
+  it("esconde da vitrine quem nao esta listado, sem tirar do produto", () => {
+    const visiveis = listProfessions();
+    const escondidas = listAllProfessions().filter(
+      (profession) => !profession.listed,
+    );
+
+    expect(escondidas.map((profession) => profession.id)).toContain(
+      "THERAPIST",
+    );
+    for (const profession of escondidas) {
+      expect(visiveis).not.toContain(profession);
+      // Some da lista, continua valendo para quem ja a usa.
+      expect(getProfession(profession.id).id).toBe(profession.id);
+      expect(resolveProfession(profession.id).id).toBe(profession.id);
+    }
+    expect(visiveis.length).toBe(listAllProfessions().length - escondidas.length);
   });
 
   it("resolve valor nao confiavel para o padrao, sem lancar", () => {

@@ -5,7 +5,7 @@ import {
   FORBIDDEN_TEMPLATE_TERMS,
   NOTIFICATION_CONSENT_TEXT_VERSION,
 } from "@/config/notifications";
-import { listProfessions } from "@/config/professions";
+import { listAllProfessions } from "@/config/professions";
 
 import { consentStatement } from "./consent-text";
 
@@ -46,7 +46,7 @@ describe("texto de consentimento dos avisos", () => {
   });
 
   it("nao usa vocabulario clinico em nenhuma profissao, nem sem nome de organizacao", () => {
-    for (const profession of listProfessions()) {
+    for (const profession of listAllProfessions()) {
       const statement = consentStatement({
         organizationName: "",
         channels: profession.notifications.allowedChannels,

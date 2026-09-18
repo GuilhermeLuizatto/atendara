@@ -36,6 +36,12 @@ function unsignedJwt(payload: object): string {
 export interface TokenOptions {
   /** Segundos desde o login. Acima de 300, callables que pedem login recente recusam. */
   signedInSecondsAgo?: number;
+  /** E-mail no token, para as callables que o conferem. */
+  email?: string;
+  /** `email_verified`: o autocadastro so comeca o teste com ele verdadeiro. */
+  emailVerified?: boolean;
+  /** Provedor de entrada, para distinguir Google de senha. */
+  signInProvider?: string;
 }
 
 /** Token de ID nao assinado, com ou sem segundo fator. */
@@ -49,8 +55,10 @@ export function unsignedIdToken(uid: string, secondFactor: string | null, option
     iat: now,
     exp: now + 3600,
     auth_time: now - (options.signedInSecondsAgo ?? 0),
+    ...(options.email ? { email: options.email } : {}),
+    ...(options.emailVerified === undefined ? {} : { email_verified: options.emailVerified }),
     firebase: {
-      sign_in_provider: "password",
+      sign_in_provider: options.signInProvider ?? "password",
       ...(secondFactor ? { sign_in_second_factor: secondFactor } : {}),
     },
   });

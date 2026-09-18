@@ -18,6 +18,7 @@ import { SERVICE_ACCOUNTS, runAs } from "./service-accounts.js";
 /** Arquivo de origem -> grupo. Cada arquivo e um assunto, e cada assunto uma conta. */
 const GROUP_OF_FILE = {
   "index.js": "contas",
+  "self-service.js": "contas",
   "platform.js": "operadora",
   "platform-admins.js": "operadora",
   "privacy.js": "privacidade",

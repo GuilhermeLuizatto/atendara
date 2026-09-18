@@ -92,6 +92,10 @@ export const completeInitialPassword = onCall(CONTAS_CALL_OPTIONS, async request
 // Concessao manual e revogacao: atos da operadora, com registro.
 export { grantAccess, revokeAccess } from "./platform.js";
 
+// Cadastro aberto: a pessoa cria a propria conta e o teste de 14 dias comeca
+// quando ela confirma o e-mail. Concessao registrada, como as da operadora.
+export { registerSelfService, activateTrial } from "./self-service.js";
+
 // Administradores da plataforma: so a chave mestra cria, suspende e reativa.
 export { createPlatformAdmin, setPlatformAdminStatus } from "./platform-admins.js";
 

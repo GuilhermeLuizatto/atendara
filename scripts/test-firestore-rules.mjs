@@ -6,7 +6,30 @@ import { messagePath, messagesPath, paths } from "../functions/generated/paths.j
 // As ferramentas do emulador ficam fora do bundle e das dependencias do aplicativo.
 const requireTools = createRequire(new URL("../.local/firebase-tools/package.json", import.meta.url));
 const { initializeTestEnvironment, assertSucceeds, assertFails } = requireTools("@firebase/rules-unit-testing");
-const { doc, setDoc, getDoc, updateDoc, deleteDoc, getDocs, collection, collectionGroup, query, where, limit } = requireTools("firebase/firestore");
+const firestoreSdk = requireTools("firebase/firestore");
+const { doc, collection, collectionGroup, query, where, limit } = firestoreSdk;
+
+// Cobertura por papel (H.6). Cada operacao guarda o alvo; cada negacao registra
+// o alvo com QUEM tentou. No fim, toda colecao de `firestore.rules` precisa de
+// negacao testada para sessao de tenant e para a operadora — uma colecao nova
+// sem essas duas provas quebra a suite, em vez de nascer protegida so no papel.
+const roleOf = new WeakMap();
+let lastTarget = null;
+const tracked = (name) => (target, ...rest) => { lastTarget = target; return firestoreSdk[name](target, ...rest); };
+const getDoc = tracked("getDoc");
+const setDoc = tracked("setDoc");
+const updateDoc = tracked("updateDoc");
+const deleteDoc = tracked("deleteDoc");
+const getDocs = tracked("getDocs");
+// O contexto de teste entrega a instancia de compatibilidade; a referencia criada
+// por `doc()` aponta para a instancia modular por dentro dela. As duas levam o papel.
+const tag = (firestore, role) => { roleOf.set(firestore, role); if (firestore._delegate) roleOf.set(firestore._delegate, role); return firestore; };
+function collectionOf(target) {
+  if (target.type === "document") return target.parent.id;
+  if (target.type === "collection") return target.id;
+  return target._query.collectionGroup ?? target._query.path.lastSegment();
+}
+const deniedBy = new Map();
 const environment = await initializeTestEnvironment({ projectId: "demo-atendara", firestore: { host: "127.0.0.1", port: 8085, rules: readFileSync("firestore.rules", "utf8") } });
 const account = (org, patch = {}) => ({ platformRole: "PROFESSIONAL", organizationId: org, professionId: "PSYCHOLOGIST", modules: ["clientes", "agenda", "financeiro", "agente", "mensagens"], status: "ACTIVE", mustChangePassword: false, subscriptionStatus: "ACTIVE", accessUntilMs: Date.now() + 86400000, ...patch });
 
@@ -28,7 +51,15 @@ async function allowed(operation) {
   try { await assertSucceeds(operation); } catch (error) { throw new Error(`verificacao ${checks + 1} deveria passar: ${error.message}`); }
   checks++;
 }
-async function denied(operation) { await assertFails(operation); checks++; }
+async function denied(operation) {
+  const target = lastTarget;
+  await assertFails(operation);
+  checks++;
+  const role = target ? roleOf.get(target.firestore) ?? "desconhecido" : "desconhecido";
+  const name = target ? collectionOf(target) : "desconhecida";
+  if (!deniedBy.has(name)) deniedBy.set(name, new Set());
+  deniedBy.get(name).add(role);
+}
 async function deniedBecause(reason, operation) {
   try { await denied(operation); } catch (error) { throw new Error(`${reason}: ${error.message}`); }
 }
@@ -88,9 +119,9 @@ try {
     await setDoc(doc(db, paths.platformAuditLog("log-1")), { id: "log-1", action: "ACCESS_GRANTED", actorId: "admin", organizationId: "org-a", createdAt: new Date().toISOString() });
     await setDoc(doc(db, paths.platformRateLimit("createSubscriptionCheckout_a")), { count: 1, windowStartMs: Date.now() });
   });
-  const db = uid => environment.authenticatedContext(uid).firestore();
-  const withTotp = uid => environment.authenticatedContext(uid, TOTP).firestore();
-  const withPhone = uid => environment.authenticatedContext(uid, PHONE).firestore();
+  const db = uid => tag(environment.authenticatedContext(uid).firestore(), uid === "admin" ? "operadora-sem-fator" : "tenant");
+  const withTotp = uid => tag(environment.authenticatedContext(uid, TOTP).firestore(), uid === "admin" ? "operadora" : "tenant");
+  const withPhone = uid => tag(environment.authenticatedContext(uid, PHONE).firestore(), uid === "admin" ? "operadora-sem-fator" : "tenant");
   const own = collection => paths.document("org-a", collection, "example");
   await allowed(getDoc(doc(db("a"), own("clients"))));
   // Estas tres afirmavam acesso da operadora aos tenants e foram
@@ -117,7 +148,16 @@ try {
   }
   await denied(setDoc(doc(db("a"), paths.document("org-a", "clients", "foreign")), { organizationId: "org-b" }));
   await denied(getDoc(doc(withTotp("admin"), paths.initialPassword("a"))));
-  await denied(getDoc(doc(environment.unauthenticatedContext().firestore(), paths.account("a"))));
+  await denied(getDoc(doc(tag(environment.unauthenticatedContext().firestore(), "anonimo"), paths.account("a"))));
+
+  // Lacunas achadas pela cobertura por papel (H.6). Nenhuma regra mudou: estas
+  // negacoes ja valiam, so nao estavam provadas para este papel.
+  await denied(setDoc(doc(withTotp("admin"), paths.account("a")), { ...account("org-a"), modules: ["clientes"] }));
+  await denied(getDoc(doc(db("a"), paths.initialPassword("a"))));
+  await denied(setDoc(doc(db("a"), paths.platformPlan("plano-inventado")), { id: "plano-inventado", priceInCents: 1 }));
+  await denied(getDoc(doc(db("a"), paths.userMembership("b"))));
+  await denied(setDoc(doc(db("a"), paths.userMembership("a")), { organizations: { "org-b": "OWNER" } }));
+  await denied(getDoc(doc(withTotp("admin"), paths.userMembership("a"))));
 
   // ------------------------------------------------------------- Etapa 1
   // Criterio de conclusao: duas organizacoes nao leem nem alteram os dados uma
@@ -290,7 +330,7 @@ try {
   await denied(getDoc(doc(db("ownerExpired"), paths.document("org-c", "clients", "example"))));
   await allowed(getDocs(collection(db("ownerExpired"), paths.platformPlans())));
   await allowed(getDocs(collection(db("a"), paths.platformPlans())));
-  await denied(getDocs(collection(environment.unauthenticatedContext().firestore(), paths.platformPlans())));
+  await denied(getDocs(collection(tag(environment.unauthenticatedContext().firestore(), "anonimo"), paths.platformPlans())));
 
   // Faturas: mesmo mecanismo do collectionGroup de mensagens — sem o filtro de
   // tenant o Firestore nao consegue provar a regra e recusa a consulta inteira.
@@ -448,6 +488,19 @@ try {
   await allowed(updateDoc(antigo(), { notificationConsent: recordConsent(threeGrants(), LEGACY_CONSENT) }));
   await deniedBecause("reescrever o formato antigo guardado", updateDoc(antigo(), { notificationConsent: recordConsent(threeGrants(), { ...LEGACY_CONSENT, channels: ["EMAIL", "SMS"] }) }));
 
-  assert.equal(checks, 275);
+  // Cobertura por papel: lida do proprio arquivo de regras, para que uma colecao
+  // nova entre na conta sem ninguem lembrar de acrescenta-la aqui.
+  const COLLECTIONS = [...readFileSync("firestore.rules", "utf8").matchAll(/match \/(\w+)\/\{/g)]
+    .map((match) => match[1])
+    .filter((name) => name !== "databases");
+  console.log("Negacoes testadas por colecao:");
+  const lacunas = [];
+  for (const name of [...new Set(COLLECTIONS)].sort()) {
+    const roles = deniedBy.get(name) ?? new Set();
+    console.log(`  ${name.padEnd(24)} ${[...roles].sort().join(", ") || "(nenhuma)"}`);
+    for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
+  }
+  assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
+  assert.equal(checks, 281);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

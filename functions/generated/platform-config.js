@@ -50,6 +50,11 @@ export const CALLABLE_RATE_LIMITS = {
     openBillingPortal: { max: 10, windowSeconds: 600 },
     cancelPlatformSubscription: { max: 3, windowSeconds: 600 },
     eraseClientData: { max: 10, windowSeconds: 600 },
+    // Exportar tambem grava registro em `privacyRequests` e na trilha a cada
+    // chamada: sem teto, uma sessao comprometida enche a trilha num laco. A
+    // exportacao da organizacao inteira e rara e pesada; a de um cliente, pontual.
+    exportClientData: { max: 10, windowSeconds: 600 },
+    startOrganizationExport: { max: 3, windowSeconds: 600 },
     deleteOrganization: { max: 3, windowSeconds: 600 },
 };
 /**

@@ -3,6 +3,16 @@ import type { Permission, ProfessionId, Role } from "@/types";
 import { permissionsForMembership, permissionsForRole } from "./permissions";
 
 export const PLATFORM_ADMIN_EMAIL = "guilhermeluizatto@gmail.com";
+
+/**
+ * De quanto em quanto tempo o navegador reconfere se o acesso ainda vale.
+ *
+ * O acesso vence pela HORA, sem nenhuma escrita que avise o cliente. Sem este
+ * tique, a tela e as leituras abertas seguiriam como estavam ate a proxima
+ * navegacao (S-13). Quinze segundos e a janela maxima em que uma sessao vencida
+ * ainda recebe dado.
+ */
+export const ACCESS_RECHECK_INTERVAL_MS = 15_000;
 export const MODULE_LABELS: Record<AppModule, string> = {
   dashboard: "Dashboard", agenda: "Agenda", clientes: "Clientes", mensagens: "Mensagens",
   financeiro: "Financeiro", agente: "Dara", configuracoes: "Configurações",

@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as backend from "./index.js";
-import { SERVICE_ACCOUNTS, runAs } from "./service-accounts.js";
+import { SERVICE_ACCOUNTS, runAs, serviceAccountsFor } from "./service-accounts.js";
 
 /**
  * Menor privilegio (H.3), conferido pelo que a CLI do Firebase le.
@@ -70,7 +70,46 @@ describe("Conta de servico de cada function", () => {
   });
 
   it("recusa grupo desconhecido em vez de rodar sem conta", () => {
-    expect(runAs("contas")).toEqual({ serviceAccount: "fn-contas@" });
+    expect(runAs("contas")).toEqual({ serviceAccount: SERVICE_ACCOUNTS.contas });
     expect(() => runAs("inventado")).toThrow("sem conta de servico");
+  });
+});
+
+/**
+ * O que a CLI le ao publicar: ela roda este codigo com `GCLOUD_PROJECT` do
+ * projeto. Em 18/09/2026 a forma curta `fn-cobranca@` derrubou a publicacao,
+ * porque a CLI a manda sem completar ao dar acesso aos segredos e ao criar o
+ * agendamento das rotinas. Com o projeto conhecido, nenhuma conta pode sair curta.
+ */
+describe("Conta de servico com o projeto que a CLI informa", () => {
+  const PROJECT = "atendo-a3481";
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("monta o e-mail completo de cada grupo", () => {
+    expect(serviceAccountsFor(PROJECT)).toEqual({
+      contas: "fn-contas@atendo-a3481.iam.gserviceaccount.com",
+      operadora: "fn-operadora@atendo-a3481.iam.gserviceaccount.com",
+      privacidade: "fn-privacidade@atendo-a3481.iam.gserviceaccount.com",
+      cobranca: "fn-cobranca@atendo-a3481.iam.gserviceaccount.com",
+      automacao: "fn-automacao@atendo-a3481.iam.gserviceaccount.com",
+    });
+  });
+
+  it("nenhuma function, rotina ou fila publica conta na forma curta", async () => {
+    vi.stubEnv("GCLOUD_PROJECT", PROJECT);
+    vi.resetModules();
+    const publicado = await import("./index.js");
+    const endpoints = Object.entries(publicado).filter(([, value]) => typeof value === "function" && value.__endpoint);
+    expect(endpoints.length).toBeGreaterThanOrEqual(18);
+
+    const completa = /^fn-[a-z]+@atendo-a3481\.iam\.gserviceaccount\.com$/;
+    for (const [name, fn] of endpoints) {
+      expect(fn.__endpoint.serviceAccountEmail, name).toMatch(completa);
+      for (const invoker of fn.__endpoint.taskQueueTrigger?.invoker ?? []) expect(invoker, name).toMatch(completa);
+    }
   });
 });

@@ -81,10 +81,13 @@ export async function stripeRequest(path, params = {}, options = {}) {
   // Chave de idempotencia: uma retentativa de rede nao cria duas assinaturas.
   if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
 
-  const response = await fetch(`${STRIPE_API_BASE}/v1/${path}`, {
+  // Consulta leva os filtros no endereco; GET com corpo e ignorado pelo gateway.
+  const reading = options.method === "GET";
+  const query = reading ? encodeForm(params) : "";
+  const response = await fetch(`${STRIPE_API_BASE}/v1/${path}${query ? `?${query}` : ""}`, {
     method: options.method ?? "POST",
     headers,
-    body: options.method === "GET" ? undefined : encodeForm(params),
+    body: reading ? undefined : encodeForm(params),
   });
 
   const payload = await response.json().catch(() => ({}));

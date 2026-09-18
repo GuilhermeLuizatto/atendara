@@ -842,3 +842,160 @@ describe("Volta do bloqueio quando a assinatura entra (A.6)", () => {
     expect(account()).not.toHaveProperty("blockedSince");
   });
 });
+
+describe("S-01 — reembolso no formato da versao fixada, sem charge.invoice", () => {
+  const PAYMENT_INTENT = "pi_ciclo_1";
+  let fetchSpy;
+
+  /** Resposta do gateway como `fetch` a entrega. */
+  const gatewayAnswer = (body, ok = true, status = 200) => ({ ok, status, json: async () => body });
+
+  /** Como o gateway lista os pagamentos de fatura de um `payment_intent`. */
+  const invoicePayments = (...entries) =>
+    gatewayAnswer({
+      object: "list",
+      has_more: false,
+      data: entries.map(([invoiceId, status]) => ({
+        id: `inpay_${invoiceId}`,
+        object: "invoice_payment",
+        invoice: invoiceId,
+        status,
+        payment: { type: "payment_intent", payment_intent: PAYMENT_INTENT },
+      })),
+    });
+
+  /** `charge.refunded` como a `2026-04-22.dahlia` envia: a cobranca nao traz a fatura. */
+  const refundEvent = (id, createdIso, amountRefunded) => ({
+    id,
+    type: "charge.refunded",
+    created: seconds(createdIso),
+    data: {
+      object: {
+        id: "ch_ciclo_1",
+        object: "charge",
+        amount: 19_900,
+        amount_refunded: amountRefunded,
+        refunded: amountRefunded >= 19_900,
+        payment_intent: PAYMENT_INTENT,
+        customer: CUSTOMER,
+      },
+    },
+  });
+
+  const pagarCiclo = async () => {
+    await applyGatewayEvent(checkoutEvent("evt_1"));
+    await applyGatewayEvent(
+      subscriptionEvent("evt_2", "customer.subscription.created", "active", PERIODO_1_FIM, "2026-09-09T12:00:05.000Z"),
+    );
+    await applyGatewayEvent(invoiceEvent("evt_3", "invoice.paid", "in_1", PERIODO_1_FIM, "2026-09-09T12:00:08.000Z"));
+  };
+
+  beforeEach(() => {
+    process.env.STRIPE_SECRET_KEY = "sk_test_apenas_para_teste_sem_rede";
+    fetchSpy = vi.spyOn(globalThis, "fetch");
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    delete process.env.STRIPE_SECRET_KEY;
+  });
+
+  it("acha a fatura pelo payment_intent e o reembolso integral fecha o acesso", async () => {
+    await pagarCiclo();
+    fetchSpy.mockResolvedValue(invoicePayments(["in_1", "paid"]));
+
+    const result = await applyGatewayEvent(refundEvent("evt_4", "2026-09-13T10:00:00.000Z", 19_900));
+
+    expect(result).toMatchObject({ outcome: "APPLIED", organizationId: ORG });
+    expect(invoice("in_1")).toMatchObject({ status: "REFUNDED", amountRefundedInCents: 19_900 });
+    expect(account()).toMatchObject({ subscriptionStatus: "PENDING", accessUntil: "2026-09-13T10:00:00.000Z" });
+  });
+
+  it("consulta o gateway por GET, com o filtro no endereco e a versao fixada", async () => {
+    await pagarCiclo();
+    fetchSpy.mockResolvedValue(invoicePayments(["in_1", "paid"]));
+
+    await applyGatewayEvent(refundEvent("evt_4", "2026-09-13T10:00:00.000Z", 19_900));
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, request] = fetchSpy.mock.calls[0];
+    expect(url).toBe(
+      "https://api.stripe.com/v1/invoice_payments?" +
+        `${encodeURIComponent("payment[type]")}=payment_intent&` +
+        `${encodeURIComponent("payment[payment_intent]")}=${PAYMENT_INTENT}&limit=10`,
+    );
+    expect(request).toMatchObject({ method: "GET", body: undefined });
+    expect(request.headers["Stripe-Version"]).toBe("2026-04-22.dahlia");
+  });
+
+  it("parcial fica registrado e nao mexe no acesso", async () => {
+    await pagarCiclo();
+    const acessoAntes = account().accessUntil;
+    fetchSpy.mockResolvedValue(invoicePayments(["in_1", "paid"]));
+
+    await applyGatewayEvent(refundEvent("evt_4", "2026-09-12T10:00:00.000Z", 5_000));
+
+    expect(invoice("in_1")).toMatchObject({ status: "PARTIALLY_REFUNDED", amountRefundedInCents: 5_000 });
+    expect(account().accessUntil).toBe(acessoAntes);
+  });
+
+  it("vale a fatura paga, nao a tentativa cancelada do mesmo pagamento", async () => {
+    await pagarCiclo();
+    fetchSpy.mockResolvedValue(invoicePayments(["in_tentativa", "canceled"], ["in_1", "paid"]));
+
+    await applyGatewayEvent(refundEvent("evt_4", "2026-09-13T10:00:00.000Z", 19_900));
+
+    expect(invoice("in_1")).toMatchObject({ status: "REFUNDED" });
+    expect(invoice("in_tentativa")).toBeUndefined();
+  });
+
+  it("sem payment_intent nem fatura, ignora sem falar com o gateway", async () => {
+    await pagarCiclo();
+    const evento = refundEvent("evt_4", "2026-09-13T10:00:00.000Z", 19_900);
+    delete evento.data.object.payment_intent;
+
+    const result = await applyGatewayEvent(evento);
+
+    expect(result).toMatchObject({ outcome: "IGNORED", reason: "Reembolso sem fatura associada." });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(account().subscriptionStatus).toBe("ACTIVE");
+  });
+
+  it("pagamento que nao e de fatura nossa e ignorado", async () => {
+    await pagarCiclo();
+    fetchSpy.mockResolvedValue(invoicePayments());
+
+    const result = await applyGatewayEvent(refundEvent("evt_4", "2026-09-13T10:00:00.000Z", 19_900));
+
+    expect(result.outcome).toBe("IGNORED");
+    expect(account().subscriptionStatus).toBe("ACTIVE");
+  });
+
+  it("gateway fora do ar: falha sem gravar nada, para a Stripe reentregar", async () => {
+    await pagarCiclo();
+    fetchSpy.mockResolvedValue(gatewayAnswer({ error: { message: "indisponivel" } }, false, 503));
+
+    await expect(applyGatewayEvent(refundEvent("evt_4", "2026-09-13T10:00:00.000Z", 19_900))).rejects.toMatchObject({
+      name: "GatewayError",
+    });
+    expect(store.has(paths.platformGatewayEvent("evt_4"))).toBe(false);
+    expect(account().subscriptionStatus).toBe("ACTIVE");
+
+    // Na reentrega, com o gateway de volta, o reembolso se aplica.
+    fetchSpy.mockResolvedValue(invoicePayments(["in_1", "paid"]));
+    const result = await applyGatewayEvent(refundEvent("evt_4", "2026-09-13T10:00:00.000Z", 19_900));
+    expect(result.outcome).toBe("APPLIED");
+    expect(account().subscriptionStatus).toBe("PENDING");
+  });
+
+  it("reembolso reentregue nao se aplica duas vezes", async () => {
+    await pagarCiclo();
+    fetchSpy.mockResolvedValue(invoicePayments(["in_1", "paid"]));
+    const evento = refundEvent("evt_4", "2026-09-13T10:00:00.000Z", 19_900);
+
+    await applyGatewayEvent(evento);
+    const again = await applyGatewayEvent(evento);
+
+    expect(again.outcome).toBe("DUPLICATE");
+  });
+});

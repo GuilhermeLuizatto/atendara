@@ -710,14 +710,51 @@ async function handleInvoiceEvent(transaction, event) {
   return { outcome: "APPLIED", reason: null, organizationId };
 }
 
+function idOf(value) {
+  if (typeof value === "string") return value;
+  return value?.id ?? null;
+}
+
+/**
+ * A fatura de uma cobranca reembolsada (S-01).
+ *
+ * Ate a `2025-03-31.basil` ela vinha em `charge.invoice`. A versao fixada
+ * (`2026-04-22.dahlia`) tirou o campo da cobranca: o elo passou a ser o
+ * pagamento da fatura (`invoice_payment`), que se acha pelo `payment_intent`
+ * da cobranca. O campo antigo fica como primeira opcao para eventos de versoes
+ * anteriores.
+ *
+ * Um mesmo `payment_intent` pode ter tentativas canceladas ligadas a outras
+ * faturas; vale a que foi paga.
+ */
+export async function refundedInvoiceId(charge) {
+  const legacy = idOf(charge?.invoice);
+  if (legacy) return legacy;
+
+  const paymentIntent = idOf(charge?.payment_intent);
+  if (!paymentIntent) return null;
+
+  const list = await stripeRequest(
+    "invoice_payments",
+    { payment: { type: "payment_intent", payment_intent: paymentIntent }, limit: 10 },
+    { method: "GET" },
+  );
+  const payments = Array.isArray(list?.data) ? list.data : [];
+  const paid = payments.find((payment) => payment?.status === "paid") ?? payments[0];
+  return idOf(paid?.invoice);
+}
+
 /**
  * Reembolso. Integral do ciclo corrente fecha o acesso no instante do
  * reembolso — o periodo deixou de estar pago. Parcial fica registrado e nao
  * mexe no acesso.
+ *
+ * A fatura chega resolvida de fora (`context.invoiceId`): a busca no gateway
+ * nao pode ficar dentro da transacao, que se repete a cada conflito.
  */
-async function handleRefundEvent(transaction, event) {
+async function handleRefundEvent(transaction, event, context = {}) {
   const charge = event.data.object;
-  const invoiceId = typeof charge.invoice === "string" ? charge.invoice : charge.invoice?.id;
+  const invoiceId = context.invoiceId ?? null;
   if (!invoiceId) return SKIP("Reembolso sem fatura associada.");
 
   const invoiceRef = db().doc(paths.platformInvoice(invoiceId));
@@ -801,6 +838,12 @@ const HANDLERS = {
 export async function applyGatewayEvent(event) {
   const eventRef = db().doc(paths.platformGatewayEvent(event.id));
 
+  // O que depende de rede e resolvido antes, uma vez. Se o gateway falhar, a
+  // excecao sobe, o webhook responde 500 e a Stripe reentrega o evento — nada
+  // foi gravado, entao repetir e seguro.
+  const context =
+    event.type === "charge.refunded" ? { invoiceId: await refundedInvoiceId(event.data?.object) } : {};
+
   return db().runTransaction(async (transaction) => {
     const already = await transaction.get(eventRef);
     if (already.exists) {
@@ -809,7 +852,7 @@ export async function applyGatewayEvent(event) {
 
     const handler = HANDLERS[event.type];
     const result = handler
-      ? await handler(transaction, event)
+      ? await handler(transaction, event, context)
       : SKIP("Tipo de evento sem efeito sobre acesso ou cobrança.");
 
     transaction.create(eventRef, {

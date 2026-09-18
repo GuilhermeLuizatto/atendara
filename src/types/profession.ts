@@ -53,6 +53,21 @@ export type ServiceModality = "IN_PERSON" | "ONLINE" | "HOME_VISIT" | "HYBRID";
  */
 export type SensitiveDataProfile = "STANDARD" | "ELEVATED" | "HIGH";
 
+/**
+ * Conselho de classe que registra quem exerce a profissao.
+ *
+ * `null` quando a profissao nao tem conselho — estetica e terapia integrativa,
+ * por exemplo. E o que decide se o cadastro pede o numero de registro: sem este
+ * campo, a tela precisaria de uma lista de profissoes por dentro, e a regra 1
+ * existe justamente para isso nao acontecer.
+ */
+export interface ProfessionCouncil {
+  /** Sigla que aparece no formulario: CRP, CRM, CRO... */
+  acronym: string;
+  /** Nome por extenso, para quem nao conhece a sigla. */
+  name: string;
+}
+
 export interface ProfessionFeatureFlags {
   /** Habilita o modulo de dados clinicos (fora do escopo do MVP). */
   clinicalRecords: boolean;
@@ -132,6 +147,8 @@ export interface ProfessionConfig {
   /** Rotulos de classificacao habilitados para esta profissao. */
   messageClassifications: MessageClassificationId[];
   sensitiveDataProfile: SensitiveDataProfile;
+  /** Conselho de classe, ou `null` para quem nao tem. */
+  council: ProfessionCouncil | null;
   /** Aviso exibido na interface. Texto informativo, nao parecer juridico. */
   complianceNotice: string;
   suggestedRules: SuggestedRuleSeed[];

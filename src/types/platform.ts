@@ -78,6 +78,12 @@ export const PLATFORM_AUDIT_ACTIONS = [
   // abandonada deixa de identificar alguem. E o mesmo apagamento que o titular
   // pede, sem o titular.
   "ABANDONED_ORGANIZATION_ERASED",
+  // Sete dias sem confirmar o e-mail: o cadastro por senha sai inteiro, pelo
+  // mesmo apagamento da exclusao de organizacao (A.8).
+  "UNCONFIRMED_SIGNUP_ERASED",
+  // Sete dias com login e sem conta no Atendara: a entrada pelo Google que parou
+  // antes da segunda tela. So o login existe, e so ele sai (A.8).
+  "ORPHAN_LOGIN_REMOVED",
   // Troca de profissao: quem pede e o titular, quem decide e a operadora. Sao
   // tres atos porque sao tres momentos, e a recusa tambem precisa ficar escrita.
   "PROFESSION_CHANGE_REQUESTED",

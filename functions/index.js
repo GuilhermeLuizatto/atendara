@@ -99,6 +99,7 @@ export { registerSelfService, activateTrial } from "./self-service.js";
 // Fim do teste: rotina diaria que registra o vencimento e abre o prazo de
 // retencao. Nao fecha o painel — quem fecha e a data, nas regras e na interface.
 export { closeExpiredTrialsDaily, eraseAbandonedTrialsDaily } from "./trial.js";
+export { eraseUnconfirmedSignupsDaily } from "./signup-cleanup.js";
 
 // Troca de profissao: o titular pede, a operadora decide. Enquanto nao houver
 // aprovacao, a profissao nao muda.

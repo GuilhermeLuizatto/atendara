@@ -61,6 +61,8 @@ describe("Fim do teste de 14 dias", () => {
     expect(mock.consulta).toEqual([
       { path: paths.accounts(), field: "origin", op: "==", value: "SELF_SERVICE" },
       { path: paths.accounts(), field: "blockedSince", op: "==", value: null },
+      // Quem ja pagou saiu do ciclo do teste (A.6).
+      { path: paths.accounts(), field: "subscribedAt", op: "==", value: null },
       // `> 0` tira quem nunca confirmou o e-mail: sem concessao, nao ha teste a encerrar.
       { path: paths.accounts(), field: "accessUntilMs", op: ">", value: 0 },
       { path: paths.accounts(), field: "accessUntilMs", op: "<=", value: NOW },
@@ -142,6 +144,12 @@ describe("Apagamento do cadastro abandonado", () => {
     mock.documentos.set(paths.platformSubscription("org-pagante"), { status: "ACTIVE" });
     mock.documentos.set(paths.organization("org-ja-apagada"), { id: "org-ja-apagada", deletion: { status: "DONE" } });
 
+    expect(await eraseAbandonedTrials(NOW)).toEqual({ erased: 0 });
+    expect(mock.apagar).not.toHaveBeenCalled();
+  });
+
+  it("nunca apaga quem ja pagou alguma vez (A.6)", async () => {
+    mock.contas = [abandonada("ex-assinante", { subscribedAt: "2026-06-01T10:00:00.000Z" })];
     expect(await eraseAbandonedTrials(NOW)).toEqual({ erased: 0 });
     expect(mock.apagar).not.toHaveBeenCalled();
   });

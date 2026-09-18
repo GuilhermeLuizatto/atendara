@@ -49,6 +49,16 @@ export interface AccountAccess {
    */
   blockedSince?: string | null;
   /**
+   * Quando uma assinatura PAGA abriu o acesso pela primeira vez. Escrito so pelo
+   * webhook, uma unica vez.
+   *
+   * E o que tira a conta do ciclo do teste: a partir dele nao ha aviso de fim de
+   * teste, nem bloqueio marcado pela rotina, nem apagamento aos 30 dias. O que
+   * acontece com quem pagou e depois cancelou ainda nao foi decidido — ate la,
+   * nada e apagado automaticamente.
+   */
+  subscribedAt?: string | null;
+  /**
    * So existe em cadastro aberto: o aceite acontece na tela de cadastro. Quem a
    * operadora cadastrou aceitou fora do produto, e inventar um registro aqui
    * seria afirmar um consentimento que ninguem deu.

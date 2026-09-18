@@ -347,6 +347,15 @@ export const PERSONAL_DATA_MAP = {
             why: "Ato registrado da operadora. O motivo é texto livre e deve ser escrito sem dado pessoal.",
         },
     },
+    platformProfessionRequests: {
+        personalFields: ["requestedBy", "reason", "decidedBy", "decisionReason"],
+        retention: { kind: "UNDEFINED" },
+        onClientErasure: NOT_APPLICABLE,
+        onOrganizationDeletion: {
+            action: "KEEP",
+            why: "Ato registrado da operadora sobre a organização, não sobre quem ela atende. A justificativa é texto livre e deve ser escrita sem dado pessoal.",
+        },
+    },
     platformAuditLogs: {
         personalFields: ["actorId", "targetUserId", "reason", "details"],
         retention: { kind: "UNDEFINED" },

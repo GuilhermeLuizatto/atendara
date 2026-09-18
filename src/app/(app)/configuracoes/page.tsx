@@ -11,6 +11,7 @@ import { ROLE_LABELS } from "@/config/permissions";
 import { AgendaSettingsForm } from "@/features/settings/agenda-settings-form";
 import { AuditTrail } from "@/features/settings/audit-trail";
 import { NotificationSettings } from "@/features/settings/notification-settings";
+import { ProfessionChange } from "@/features/settings/profession-change";
 import { formatDate } from "@/lib/utils/format";
 import { useAuth } from "@/providers/auth-provider";
 import { useWorkspace } from "@/providers/workspace-provider";
@@ -81,6 +82,21 @@ export default function SettingsPage() {
                 ) : null}
               </CardBody>
             </Card>
+
+            {!admin && access?.organizationId && access.professionId ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Minha profissão</CardTitle>
+                </CardHeader>
+                <CardBody>
+                  <ProfessionChange
+                    organizationId={access.organizationId}
+                    current={access.professionId}
+                    isHolder={session?.isOrganizationHolder ?? false}
+                  />
+                </CardBody>
+              </Card>
+            ) : null}
 
             {data && organization ? (
               <Card>

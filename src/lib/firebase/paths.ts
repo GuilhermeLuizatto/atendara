@@ -34,6 +34,7 @@ export const PLATFORM_COLLECTIONS = {
   platformGatewayEvents: "platformGatewayEvents",
   platformCustomers: "platformCustomers",
   platformAccessGrants: "platformAccessGrants",
+  platformProfessionRequests: "platformProfessionRequests",
   platformAuditLogs: "platformAuditLogs",
   platformRateLimits: "platformRateLimits",
 } as const;
@@ -125,6 +126,15 @@ export const paths = {
    */
   platformAccessGrant: (organizationId: ID) =>
     `${PLATFORM_COLLECTIONS.platformAccessGrants}/${organizationId}`,
+
+  platformProfessionRequests: () => PLATFORM_COLLECTIONS.platformProfessionRequests,
+  /**
+   * Pedido de troca de profissao, chaveado pelo `organizationId`. Um por vez,
+   * pela mesma razao da concessao: dois pedidos abertos deixariam a operadora
+   * decidindo qual vale.
+   */
+  platformProfessionRequest: (organizationId: ID) =>
+    `${PLATFORM_COLLECTIONS.platformProfessionRequests}/${organizationId}`,
 
   platformAuditLogs: () => PLATFORM_COLLECTIONS.platformAuditLogs,
   platformAuditLog: (logId: ID) =>

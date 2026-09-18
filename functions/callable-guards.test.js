@@ -58,6 +58,7 @@ const WITHOUT_RATE_LIMIT = {
   updateAccount: "Operadora com segundo fator; suspender varias contas num incidente nao pode esbarrar num teto.",
   grantAccess: "Operadora com segundo fator; cada ato ja fica na trilha append-only.",
   revokeAccess: "Operadora com segundo fator; revogar em massa e resposta a incidente.",
+  decideProfessionChange: "Operadora com segundo fator; cada decisao fica na trilha append-only, e o pedido do outro lado ja tem limite.",
   createPlatformAdmin: "Chave mestra com segundo fator; uma pessoa so.",
   setPlatformAdminStatus: "Chave mestra com segundo fator; suspender administrador e resposta a incidente.",
   completeInitialPassword: "Roda uma vez por conta (a trava de senha inicial se desliga no sucesso) e exige login de ate 5 minutos.",

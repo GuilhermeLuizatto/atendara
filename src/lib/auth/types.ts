@@ -96,6 +96,13 @@ export interface AuthAdapter {
   registerProfessional(input: import("@/types/access").ProfessionalRegistration): Promise<{ userId: string; temporaryPassword: string }>;
   updateAccount(userId: string, input: import("@/types/access").AccessUpdate): Promise<void>;
   grantAccess(input: AccessGrantInput): Promise<void>;
+  /**
+   * O titular pede para mudar de profissao. So pede: enquanto a operadora nao
+   * decidir, a profissao continua a mesma.
+   */
+  requestProfessionChange(professionId: import("@/types").ProfessionId, reason: string): Promise<void>;
+  /** A operadora responde. Aprovar muda conta, organizacao e perfil de uma vez. */
+  decideProfessionChange(organizationId: string, decision: "APPROVED" | "REJECTED", reason: string): Promise<void>;
   revokeAccess(organizationId: string, reason: string): Promise<void>;
   /** So a chave mestra. O novo administrador troca a senha e cadastra o segundo fator no primeiro acesso. */
   createPlatformAdmin(input: import("@/types/access").PlatformAdminRegistration): Promise<{ userId: string; temporaryPassword: string }>;

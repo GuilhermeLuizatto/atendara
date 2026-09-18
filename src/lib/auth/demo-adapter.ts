@@ -6,10 +6,12 @@ import { hasActiveAccess, isPlatformAdmin } from "@/config/access";
 import { LEGAL_VERSION } from "@/config/legal";
 import { TRIAL_GRANT_REASON } from "@/config/platform";
 import { councilRegistrationError, selfServiceModules, trialUntil } from "@/lib/auth/self-service";
+import { getProfession } from "@/config/professions";
+import type { ProfessionId } from "@/types";
 import { accessGrantReasonError, accessGrantWindowError, isGrantInForce, resolveAccountGate } from "@/lib/platform/access-gate";
 import { readDemoAccounts, writeDemoAccounts, type DemoAccount } from "./demo-accounts";
 import { createTemporaryPassword, passwordDigest, passwordError } from "./passwords";
-import { accessGrantSchema, accessUpdateSchema, platformAdminRegistrationSchema, registrationSchema, selfServiceRegistrationSchema } from "./registration";
+import { accessGrantSchema, accessUpdateSchema, platformAdminRegistrationSchema, professionChangeDecisionSchema, professionChangeRequestSchema, registrationSchema, selfServiceRegistrationSchema } from "./registration";
 import { AuthError, type AuthAdapter, type SecondFactorState, type TotpEnrollment } from "./types";
 
 const SESSION_KEY = "atendo:demo-session:v2";
@@ -182,6 +184,37 @@ export class DemoAuthAdapter implements AuthAdapter {
     const gate = resolveAccountGate({ subscription: null, grant: null, nowMs: Date.now() });
     this.replace({ ...account, grant: { ...account.grant, revokedAt: new Date().toISOString() }, access: { ...account.access, ...gate } });
   }
+  /** Troca de profissao simulada. Guarda o pedido junto da conta, sem trilha. */
+  async requestProfessionChange(professionId: ProfessionId, reason: string) {
+    const account = this.current();
+    if (!account || account.access.platformRole !== "PROFESSIONAL" || !account.access.organizationId) {
+      throw new AuthError("Somente o titular pede a troca de profissão.");
+    }
+    const data = professionChangeRequestSchema.parse({ professionId, reason });
+    if (data.professionId === account.access.professionId) throw new AuthError("Esta já é a sua profissão.");
+    if (!getProfession(data.professionId).listed) throw new AuthError("Escolha uma das profissões oferecidas.");
+    if (account.professionRequest?.status === "PENDING") throw new AuthError("Você já tem um pedido aguardando resposta.");
+    this.replace({ ...account, professionRequest: {
+      organizationId: account.access.organizationId, requestedBy: account.access.userId,
+      from: account.access.professionId!, to: data.professionId, reason: data.reason,
+      status: "PENDING", requestedAt: new Date().toISOString(),
+      decidedAt: null, decidedBy: null, decisionReason: null,
+    } });
+  }
+
+  async decideProfessionChange(organizationId: string, decision: "APPROVED" | "REJECTED", reason: string) {
+    this.requireAdmin();
+    const data = professionChangeDecisionSchema.parse({ organizationId, decision, reason });
+    const account = this.titularOf(data.organizationId);
+    if (account.professionRequest?.status !== "PENDING") throw new AuthError("Não há pedido aguardando resposta nesta organização.");
+    const approved = data.decision === "APPROVED";
+    this.replace({
+      ...account,
+      professionRequest: { ...account.professionRequest, status: approved ? "APPROVED" : "REJECTED", decidedAt: new Date().toISOString(), decidedBy: this.current()!.access.userId, decisionReason: data.reason },
+      access: approved ? { ...account.access, professionId: account.professionRequest.to } : account.access,
+    });
+  }
+
   private requireMaster() {
     this.requireAdmin();
     if (this.current()?.access.platformMaster !== true) throw new AuthError("Somente a chave mestra gerencia administradores.");

@@ -7,6 +7,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/form";
 import { AuthError, authAdapter } from "@/lib/auth";
+import { PASSWORD_HINT } from "@/lib/auth/password-policy";
 import { passwordError } from "@/lib/auth/passwords";
 
 type State =
@@ -118,7 +119,7 @@ export function ResetPasswordForm() {
       {/* Campo de usuario oculto: gerenciadores de senha associam a senha nova
           a conta certa. */}
       <input type="email" name="username" autoComplete="username" value={state.email} readOnly hidden />
-      <Field label="Nova senha" hint="Use de 12 a 128 caracteres.">
+      <Field label="Nova senha" hint={PASSWORD_HINT}>
         {(props) => (
           <Input
             {...props}

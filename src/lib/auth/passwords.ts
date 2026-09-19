@@ -1,12 +1,14 @@
+import { passwordPolicyError } from "./password-policy";
+
+// O prefixo fixo garante as quatro classes da politica; a forca vem do sorteio.
 export function createTemporaryPassword(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(20));
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-  return `At!${Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("")}`;
+  return `At!7${Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("")}`;
 }
 
 export function passwordError(password: string): string | null {
-  if (password.length < 12 || password.length > 128) return "Use uma senha de 12 a 128 caracteres.";
-  return null;
+  return passwordPolicyError(password);
 }
 
 export async function passwordDigest(password: string, salt: string): Promise<string> {

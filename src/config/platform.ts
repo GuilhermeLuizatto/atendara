@@ -71,11 +71,21 @@ export const TRIAL_GRANT_REASON =
 export const SELF_SERVICE_ACTOR = "sistema:autocadastro";
 
 /**
- * Senha minima do autocadastro, conferida no servidor. A politica do Identity
- * Platform vale em paralelo: esta trava existe para a callable nao depender de
- * uma configuracao de console que alguem pode afrouxar sem revisao de codigo.
+ * Politica de senha, decidida pelo titular em 19/09/2026: de 12 a 128
+ * caracteres, com maiuscula, minuscula, numero e simbolo. Conferida na tela e
+ * no servidor (`src/lib/auth/password-policy.ts`) e, em paralelo, pela politica
+ * do Identity Platform no console — esta trava existe para o cadastro nao
+ * depender de uma configuracao que alguem pode afrouxar sem revisao de codigo.
  */
-export const SELF_SERVICE_PASSWORD_LENGTH = { min: 8, max: 128 } as const;
+export const PASSWORD_LENGTH = { min: 12, max: 128 } as const;
+
+/**
+ * Os simbolos que o Identity Platform aceita como "caractere especial"
+ * (docs.cloud.google.com/identity-platform/docs/password-policy). Hifen, "+"
+ * e "=" NAO estao na lista: uma senha que so os tivesse passaria aqui e seria
+ * recusada la.
+ */
+export const PASSWORD_SPECIAL_CHARACTERS = "^$*.[]{}()?\"!@#%&/\\,><':;|_~`";
 
 /**
  * Quantos dias antes do fim o painel avisa que o teste esta acabando.

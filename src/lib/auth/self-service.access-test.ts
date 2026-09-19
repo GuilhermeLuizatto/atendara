@@ -33,7 +33,7 @@ const DAY_MS = 86_400_000;
 const PSICOLOGA = {
   displayName: "Helena Prado",
   email: "helena-autocadastro@atendara.test",
-  password: "senha-de-teste-helena",
+  password: "Senha#Teste-Helena1",
   professionId: "PSYCHOLOGIST" as const,
   councilRegistration: "CRP 06/123456",
   businessName: "Consultório Núcleo",
@@ -43,7 +43,7 @@ const PSICOLOGA = {
 const ESTETICISTA = {
   displayName: "Bianca Ferraz",
   email: "bianca-autocadastro@atendara.test",
-  password: "senha-de-teste-bianca",
+  password: "Senha#Teste-Bianca1",
   professionId: "AESTHETICS" as const,
   businessName: "Espaço Lume",
   acceptedLegalVersion: LEGAL_VERSION,

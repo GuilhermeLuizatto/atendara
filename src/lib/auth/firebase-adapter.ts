@@ -18,6 +18,7 @@ import {
 } from "firebase/auth";
 
 import { APP_NAME } from "@/config/app";
+import { PASSWORD_HINT } from "@/lib/auth/password-policy";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { getDb, getFirebaseFunctions } from "@/lib/firebase/client";
 import { doc, getDoc, onSnapshot, collection, orderBy, query } from "firebase/firestore";
@@ -65,7 +66,7 @@ function translate(code: unknown, fallback = "Não foi possível entrar. Tente n
       return "Este link já foi usado ou está incompleto. Peça um novo na tela de entrada, em Esqueci minha senha.";
     case "auth/weak-password":
     case "auth/password-does-not-meet-requirements":
-      return "Escolha uma senha mais forte, de 12 a 128 caracteres.";
+      return `Escolha uma senha mais forte. ${PASSWORD_HINT}.`;
     case "auth/user-disabled":
       return "Esta conta está desativada.";
     case "auth/invalid-credential":

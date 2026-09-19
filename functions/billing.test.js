@@ -800,6 +800,20 @@ describe("Revisao 5B — retorno do checkout fora do emulador", () => {
     await expect(createSubscriptionCheckout(chamadaDe(USER, { planId: PLAN }))).rejects.toMatchObject({ code: "internal" });
     expect(String(fetchSpy.mock.calls[0][1].body)).toContain(encodeURIComponent("http://127.0.0.1:3000"));
   });
+
+  it("os enderecos de volta vao so com caractere ASCII, que e o que o gateway aceita", async () => {
+    // Em 18/09/2026 o primeiro checkout real voltou 400 url_invalid: o
+    // `?retorno=concluído` tinha acento, e a Stripe recusa URL com caractere
+    // fora do ASCII.
+    process.env.FUNCTIONS_EMULATOR = "true";
+
+    await createSubscriptionCheckout(chamadaDe(USER, { planId: PLAN })).catch(() => undefined);
+    const form = new URLSearchParams(String(fetchSpy.mock.calls[0][1].body));
+
+    for (const name of ["success_url", "cancel_url"]) {
+      expect(form.get(name), name).toMatch(/^[\x21-\x7e]+$/);
+    }
+  });
 });
 
 describe("Volta do bloqueio quando a assinatura entra (A.6)", () => {

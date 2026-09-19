@@ -46,9 +46,9 @@ const [FIRESTORE_HOST, FIRESTORE_PORT] = (
   process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8087"
 ).split(":");
 
-const ADMIN = { email: "administrador@atendara.test", password: "SenhaDeTeste-Admin-1" };
+const ADMIN = { email: "administrador@atendara.test", password: "SenhaDeTeste#Admin-1" };
 const PROFESSIONAL = { email: "profissional@atendara.test" };
-const NEW_PASSWORD = "SenhaDeTeste-Profissional-2";
+const NEW_PASSWORD = "SenhaDeTeste#Profissional-2";
 const OTHER_TENANT = "org-de-outro-profissional";
 const MODULES = ["dashboard", "agenda", "clientes"];
 
@@ -308,12 +308,16 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
     const original = await accountOf(professionalUid);
 
     // Suspender continua sendo ato da operadora, pela callable e com registro.
-    await operator.call("updateAccount", { userId: professionalUid, status: "SUSPENDED", modules: MODULES });
+    // A sessao aberta antes da suspensao e barrada pelas regras na leitura
+    // seguinte; e, desde a H.7, o login tambem fecha: entrar de novo e recusado.
     await signInAsProfessional(NEW_PASSWORD);
+    await operator.call("updateAccount", { userId: professionalUid, status: "SUSPENDED", modules: MODULES });
     await expectDenied(
       getDoc(doc(db, paths.document(organizationId, "clients", "qualquer"))),
     );
+    await expect(signInAsProfessional(NEW_PASSWORD)).rejects.toMatchObject({ code: "auth/user-disabled" });
     await operator.call("updateAccount", { userId: professionalUid, status: "ACTIVE", modules: MODULES });
+    await signInAsProfessional(NEW_PASSWORD);
 
     // Validade vencida e assinatura cancelada nao tem mais callable que as
     // escreva: sao preparadas pelo SDK administrativo, como o webhook faria.

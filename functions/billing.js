@@ -136,7 +136,9 @@ async function subscriptionOwner(request) {
 
 function gatewayFailure(error) {
   if (error instanceof GatewayError) {
-    logger.error("Gateway recusou a chamada.", { status: error.status, message: error.message });
+    // Sem `error.message`: a Stripe repete nela o valor recusado, e ele pode ser
+    // um e-mail. O codigo e o campo bastam para achar a causa no painel dela.
+    logger.error("Gateway recusou a chamada.", { status: error.status, code: error.code, param: error.param });
     return new HttpsError(
       error.status === 503 ? "failed-precondition" : "internal",
       error.status === 503 ? error.message : "Não foi possível falar com o gateway agora.",

@@ -63,7 +63,7 @@ beforeAll(async () => {
 
   await adminDb().doc(paths.account(MASTER_UID)).set(operatorAccount(MASTER_UID, true));
   // O administrador comum existe no Auth: suspender precisa desativar o login dele.
-  await adminAuth().createUser({ uid: ADMIN_UID, email: `${ADMIN_UID}@atendara.test`, password: "SenhaDeTeste-Admin-7" });
+  await adminAuth().createUser({ uid: ADMIN_UID, email: `${ADMIN_UID}@atendara.test`, password: "SenhaDeTeste#Admin-7" });
   await adminDb().doc(paths.account(ADMIN_UID)).set(operatorAccount(ADMIN_UID, false));
 
   master = tokenSession(MASTER_UID, "totp");

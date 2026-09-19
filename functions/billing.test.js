@@ -803,6 +803,24 @@ describe("Revisao 5B — retorno do checkout fora do emulador", () => {
     expect(String(fetchSpy.mock.calls[0][1].body)).toContain(encodeURIComponent("http://127.0.0.1:3000"));
   });
 
+  it("erro do gateway vai ao log com codigo e campo, nunca com a mensagem (H.7)", async () => {
+    // A Stripe repete na mensagem o valor recusado — pode ser um e-mail.
+    const logger = await import("firebase-functions/logger");
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: { code: "email_invalid", param: "email", message: "Invalid email address: fulano@exemplo.com" } }),
+    });
+    store.set(paths.platformSubscription(ORG), { ...store.get(paths.platformSubscription(ORG)), gateway: {} });
+    process.env.FUNCTIONS_EMULATOR = "true";
+
+    await createSubscriptionCheckout(chamadaDe(USER, { planId: PLAN })).catch(() => undefined);
+
+    const chamada = logger.error.mock.calls.find(([mensagem]) => mensagem === "Gateway recusou a chamada.");
+    expect(chamada[1]).toEqual({ status: 400, code: "email_invalid", param: "email" });
+    expect(JSON.stringify(logger.error.mock.calls)).not.toContain("fulano@exemplo.com");
+  });
+
   it("os enderecos de volta vao so com caractere ASCII, que e o que o gateway aceita", async () => {
     // Em 18/09/2026 o primeiro checkout real voltou 400 url_invalid: o
     // `?retorno=concluído` tinha acento, e a Stripe recusa URL com caractere

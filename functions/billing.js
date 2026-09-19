@@ -218,7 +218,7 @@ export const createSubscriptionCheckout = onCall(callOptions, async (request) =>
         client_reference_id: organizationId,
         line_items: [{ price, quantity: 1 }],
         locale: "pt-BR",
-        success_url: `${baseUrl}/assinatura/?retorno=concluído`,
+        success_url: `${baseUrl}/assinatura/?retorno=concluido`,
         cancel_url: `${baseUrl}/assinatura/?retorno=cancelado`,
         metadata: { organizationId, subscriberUserId: account.userId, planId: plan.id },
         subscription_data: {

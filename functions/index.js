@@ -11,6 +11,8 @@ import { resolveAccountGate } from "./generated/access-gate.js";
 import { ACCOUNT_CALL_OPTIONS, accountOf, adminOf, initialCredential, parse } from "./platform-auth.js";
 import { assertGrantWindow, auditEntry, gateFields, grantDocument, initialGrantSchema } from "./platform.js";
 import { runAs } from "./service-accounts.js";
+import { passwordPolicyError } from "./generated/password-policy.js";
+import { PASSWORD_LENGTH } from "./generated/platform-config.js";
 
 initializeApp();
 const db = getFirestore();
@@ -61,21 +63,34 @@ export const updateAccount = onCall(CONTAS_CALL_OPTIONS, async request => {
   await adminOf(request);
   const { userId, ...input } = parse(changes, request.data);
   const ref = db.doc(paths.account(userId));
-  await db.runTransaction(async transaction => {
+  const previous = await db.runTransaction(async transaction => {
     const account = (await transaction.get(ref)).data();
     if (!account || account.platformRole !== "PROFESSIONAL") throw new HttpsError("permission-denied", "Somente cadastros profissionais podem ser alterados.");
     const createdAt = new Date().toISOString();
     const entry = auditEntry({ action: "ACCOUNT_UPDATED", actorId: request.auth.uid, organizationId: account.organizationId ?? null, targetUserId: userId, details: { status: { from: account.status, to: input.status }, modules: { from: account.modules ?? [], to: input.modules } }, createdAt });
     transaction.update(ref, input);
     transaction.create(entry.ref, entry.data);
+    return account.status;
   });
+  // As regras ja fecham o painel pela situacao da conta; isto fecha o login. Num
+  // incidente, suspender tem de derrubar tambem a sessao aberta, e nao so a
+  // proxima leitura — o mesmo que `setPlatformAdminStatus` faz com administrador.
+  if (previous !== input.status) {
+    await getAuth().updateUser(userId, { disabled: input.status === "SUSPENDED" });
+    if (input.status === "SUSPENDED") await getAuth().revokeRefreshTokens(userId);
+  }
   return { ok: true };
 });
 export const completeInitialPassword = onCall(CONTAS_CALL_OPTIONS, async request => {
   const account = await accountOf(request);
   if (!account.mustChangePassword) throw new HttpsError("failed-precondition", "A senha inicial já foi substituída.");
   if (Date.now() / 1000 - request.auth.token.auth_time > 300) throw new HttpsError("unauthenticated", "Entre novamente para alterar sua senha.");
-  const { password } = parse(z.object({ password: z.string().min(12).max(128) }).strict(), request.data);
+  const { password } = parse(z.object({ password: z.string().min(1).max(PASSWORD_LENGTH.max) }).strict(), request.data);
+  // Quem grava e o SDK de administrador, que nao passa pela politica de senha
+  // do Identity Platform: sem esta trava, uma senha fora dela seria aceita aqui
+  // e recusada no login seguinte.
+  const weak = passwordPolicyError(password);
+  if (weak) throw new HttpsError("invalid-argument", weak);
   const verifierRef = db.doc(paths.initialPassword(request.auth.uid));
   const verifier = (await verifierRef.get()).data();
   if (!verifier) throw new HttpsError("failed-precondition", "Solicite ao administrador uma nova senha inicial.");

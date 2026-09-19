@@ -49,7 +49,7 @@ const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9098";
 const [FIRESTORE_HOST, FIRESTORE_PORT] = (process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8087").split(":");
 
 const OPERATOR_UID = "operadora-da-fila";
-const TITULAR = { name: "Titular Fila Automacao", email: "titular-fila@atendara.test", password: "SenhaDeTeste-Fila-A1" };
+const TITULAR = { name: "Titular Fila Automacao", email: "titular-fila@atendara.test", password: "SenhaDeTeste#Fila-A1" };
 const MODULES = ["dashboard", "agenda", "clientes"];
 const CLIENT_ID = "cliente-da-fila";
 const APPOINTMENT_ID = "atendimento-da-fila";

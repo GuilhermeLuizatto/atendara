@@ -26,10 +26,14 @@ const STRIPE_API_VERSION = "2026-04-22.dahlia";
 const SIGNATURE_TOLERANCE_SECONDS = 300;
 
 export class GatewayError extends Error {
-  constructor(message, status) {
+  constructor(message, status, detail = {}) {
     super(message);
     this.name = "GatewayError";
     this.status = status;
+    // Codigo e campo do erro da Stripe (`url_invalid`, `success_url`): o que
+    // se investiga, sem o valor recusado.
+    this.code = detail.code ?? null;
+    this.param = detail.param ?? null;
   }
 }
 
@@ -92,7 +96,10 @@ export async function stripeRequest(path, params = {}, options = {}) {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new GatewayError(payload?.error?.message ?? "Falha na comunicação com o gateway.", response.status);
+    throw new GatewayError(payload?.error?.message ?? "Falha na comunicação com o gateway.", response.status, {
+      code: payload?.error?.code,
+      param: payload?.error?.param,
+    });
   }
   return payload;
 }

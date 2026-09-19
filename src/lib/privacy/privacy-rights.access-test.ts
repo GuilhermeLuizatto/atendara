@@ -46,8 +46,8 @@ const [FIRESTORE_HOST, FIRESTORE_PORT] = (process.env.FIRESTORE_EMULATOR_HOST ??
 const OPERATOR_UID = "operadora-dos-pedidos-de-titular";
 const COLLEAGUE_UID = "colega-sem-responsabilidade";
 const CLINIC_ADMIN_UID = "administradora-da-clinica";
-const TITULAR_A = { name: "Titular A Privacidade", email: "titular-a-privacidade@atendara.test", password: "SenhaDeTeste-Privacidade-A1" };
-const TITULAR_B = { name: "Titular B Privacidade", email: "titular-b-privacidade@atendara.test", password: "SenhaDeTeste-Privacidade-B1" };
+const TITULAR_A = { name: "Titular A Privacidade", email: "titular-a-privacidade@atendara.test", password: "SenhaDeTeste#Privacidade-A1" };
+const TITULAR_B = { name: "Titular B Privacidade", email: "titular-b-privacidade@atendara.test", password: "SenhaDeTeste#Privacidade-B1" };
 
 const SUBJECT = { name: "Maria Exemplo Titular", prefix: "x" };
 const CONTROL = { name: "Joao Controle Intacto", prefix: "y" };

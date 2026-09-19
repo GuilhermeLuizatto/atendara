@@ -1,5 +1,6 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import * as logger from "firebase-functions/logger";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
@@ -39,6 +40,9 @@ export function assertGrantWindow(until, nowMs) {
 /** Entrada da trilha. O chamador decide se entra num lote ou numa transacao. */
 export function auditEntry({ action, actorId, organizationId = null, targetUserId = null, reason: why = null, details = {}, createdAt }) {
   const id = randomUUID();
+  // So identificadores: o motivo e os detalhes ficam na trilha do banco, que tem
+  // regra de acesso; o log do Google e lido por quem tem papel no projeto.
+  logger.info("plataforma.ato", { action, actorId, organizationId, auditId: id });
   return {
     ref: db().doc(paths.platformAuditLog(id)),
     data: { id, action, actorId, organizationId, targetUserId, reason: why, details, createdAt },

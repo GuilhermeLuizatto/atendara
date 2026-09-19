@@ -59,9 +59,9 @@ const [FIRESTORE_HOST, FIRESTORE_PORT] = (
   process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8087"
 ).split(":");
 
-const OWNER = { email: "assinante@atendara.test", password: "SenhaDeTeste-Assinante-2" };
-const NEIGHBOUR = { email: "vizinho@atendara.test", password: "SenhaDeTeste-Vizinho-2" };
-const EMPLOYEE = { email: "secretaria@atendara.test", password: "SenhaDeTeste-Secretaria-1" };
+const OWNER = { email: "assinante@atendara.test", password: "SenhaDeTeste#Assinante-2" };
+const NEIGHBOUR = { email: "vizinho@atendara.test", password: "SenhaDeTeste#Vizinho-2" };
+const EMPLOYEE = { email: "secretaria@atendara.test", password: "SenhaDeTeste#Secretaria-1" };
 
 const PLAN = "profissional-mensal";
 const CUSTOMER = "cus_assinante";

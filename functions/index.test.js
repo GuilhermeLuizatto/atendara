@@ -4,9 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Cada escrita e registrada com a origem: lote (`batch`) ou transacao (`tx`,
 // numerada). E o que permite afirmar que ato e registro saem juntos.
-const mock = vi.hoisted(() => ({ documents: new Map(), createUser: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn(), commit: vi.fn(), writes: [], transactions: 0 }));
+const mock = vi.hoisted(() => ({ documents: new Map(), createUser: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn(), revokeRefreshTokens: vi.fn(), commit: vi.fn(), writes: [], transactions: 0 }));
 vi.mock("firebase-admin/app", () => ({ initializeApp: vi.fn() }));
-vi.mock("firebase-admin/auth", () => ({ getAuth: () => ({ createUser: mock.createUser, updateUser: mock.updateUser, deleteUser: mock.deleteUser }) }));
+vi.mock("firebase-admin/auth", () => ({ getAuth: () => ({ createUser: mock.createUser, updateUser: mock.updateUser, deleteUser: mock.deleteUser, revokeRefreshTokens: mock.revokeRefreshTokens }) }));
 vi.mock("firebase-admin/firestore", () => ({ getFirestore: () => ({
   doc: path => ({ path, get: async () => ({ data: () => mock.documents.get(path) }) }),
   batch: () => ({
@@ -94,17 +94,47 @@ describe("Backend de contas", () => {
     expect(audit.origin).toBe(change.origin);
   });
 
+  it("suspender derruba o login e a sessao aberta; reativar devolve o login (H.7)", async () => {
+    await updateAccount(request({ userId: "professional", status: "SUSPENDED", modules: ["agenda"] }));
+    expect(mock.updateUser).toHaveBeenCalledWith("professional", { disabled: true });
+    expect(mock.revokeRefreshTokens).toHaveBeenCalledWith("professional");
+
+    mock.updateUser.mockClear();
+    mock.revokeRefreshTokens.mockClear();
+    mock.documents.set(paths.account("professional"), { ...mock.documents.get(paths.account("professional")), status: "SUSPENDED" });
+    await updateAccount(request({ userId: "professional", status: "ACTIVE", modules: ["agenda"] }));
+    expect(mock.updateUser).toHaveBeenCalledWith("professional", { disabled: false });
+    expect(mock.revokeRefreshTokens).not.toHaveBeenCalled();
+  });
+
+  it("mudar so os modulos nao mexe no login", async () => {
+    await updateAccount(request({ userId: "professional", status: "ACTIVE", modules: ["agenda", "clientes"] }));
+    expect(mock.updateUser).not.toHaveBeenCalled();
+    expect(mock.revokeRefreshTokens).not.toHaveBeenCalled();
+  });
+
   it("nao permite alterar contas administrativas", async () => {
     await expect(updateAccount(request({ userId: "admin", status: "SUSPENDED", modules: ["agenda"] }))).rejects.toMatchObject({ code: "permission-denied" });
   });
 
   it("nao libera o cadastro se o Auth falhar ao trocar a senha", async () => {
     mock.documents.set(paths.account("admin"), { status: "ACTIVE", platformRole: "PLATFORM_ADMIN", mustChangePassword: true });
-    mock.documents.set(paths.initialPassword("admin"), { salt: "salt", hash: scryptSync("initial-password", "salt", 32).toString("hex") });
-    await expect(completeInitialPassword(request({ password: "initial-password" }, { token: PASSWORD_ONLY }))).rejects.toMatchObject({ code: "invalid-argument" });
+    mock.documents.set(paths.initialPassword("admin"), { salt: "salt", hash: scryptSync("Inicial#Senha1", "salt", 32).toString("hex") });
+    await expect(completeInitialPassword(request({ password: "Inicial#Senha1" }, { token: PASSWORD_ONLY }))).rejects.toThrow("diferente");
     mock.updateUser.mockRejectedValueOnce(new Error("Auth unavailable"));
-    await expect(completeInitialPassword(request({ password: "new-personal-password" }, { token: PASSWORD_ONLY }))).rejects.toThrow("Auth unavailable");
+    await expect(completeInitialPassword(request({ password: "Nova#Senha-Pessoal1" }, { token: PASSWORD_ONLY }))).rejects.toThrow("Auth unavailable");
     expect(mock.writes).toHaveLength(0);
+  });
+
+  it("recusa senha nova fora da politica antes de grava-la (o SDK de administrador nao passa pela do console)", async () => {
+    mock.documents.set(paths.account("admin"), { status: "ACTIVE", platformRole: "PLATFORM_ADMIN", mustChangePassword: true });
+    mock.documents.set(paths.initialPassword("admin"), { salt: "salt", hash: scryptSync("Inicial#Senha1", "salt", 32).toString("hex") });
+
+    const erro = await completeInitialPassword(request({ password: "senhasemsimbolo12" }, { token: PASSWORD_ONLY })).catch((caught) => caught);
+
+    expect(erro).toMatchObject({ code: "invalid-argument" });
+    expect(erro.message).toContain("símbolo");
+    expect(mock.updateUser).not.toHaveBeenCalled();
   });
 });
 

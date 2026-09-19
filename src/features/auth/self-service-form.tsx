@@ -3,7 +3,8 @@
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { SELF_SERVICE_PASSWORD_LENGTH } from "@/config/platform";
+import { PASSWORD_LENGTH } from "@/config/platform";
+import { PASSWORD_HINT, passwordPolicyError } from "@/lib/auth/password-policy";
 import { getProfession, listProfessions } from "@/config/professions";
 import { AUTH_FIELD_CLASSES } from "@/features/auth/auth-card";
 import { councilRegistrationError } from "@/lib/auth/self-service";
@@ -56,7 +57,8 @@ export function SelfServiceForm({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const registration = council ? councilRegistration.trim() : "";
-    const error = councilRegistrationError(professionId, registration || null);
+    const error =
+      (identity ? null : passwordPolicyError(password)) ?? councilRegistrationError(professionId, registration || null);
     if (error) {
       setInvalid(error);
       return;
@@ -112,7 +114,7 @@ export function SelfServiceForm({
           <Fieldset
             id="senha"
             label="Senha"
-            hint={`De ${SELF_SERVICE_PASSWORD_LENGTH.min} a ${SELF_SERVICE_PASSWORD_LENGTH.max} caracteres.`}
+            hint={PASSWORD_HINT}
           >
             <input
               id="senha"
@@ -120,8 +122,8 @@ export function SelfServiceForm({
               type="password"
               autoComplete="new-password"
               required
-              minLength={SELF_SERVICE_PASSWORD_LENGTH.min}
-              maxLength={SELF_SERVICE_PASSWORD_LENGTH.max}
+              minLength={PASSWORD_LENGTH.min}
+              maxLength={PASSWORD_LENGTH.max}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               className={AUTH_FIELD_CLASSES}

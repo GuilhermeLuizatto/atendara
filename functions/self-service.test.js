@@ -35,7 +35,7 @@ import { MAX_ACCESS_GRANT_DAYS, SELF_SERVICE_ACTOR, TRIAL_DAYS } from "./generat
 
 const DAY = 86_400_000;
 const NEW_UID = "novo";
-const signup = extra => ({ displayName: "Bianca Ferraz", email: "Bianca@Exemplo.com.br", password: "senha-de-teste-1", professionId: "AESTHETICS", businessName: "Espaço Lume", acceptedLegalVersion: LEGAL_VERSION, ...extra });
+const signup = extra => ({ displayName: "Bianca Ferraz", email: "Bianca@Exemplo.com.br", password: "Senha#DeTeste1", professionId: "AESTHETICS", businessName: "Espaço Lume", acceptedLegalVersion: LEGAL_VERSION, ...extra });
 const anonymous = data => ({ data, rawRequest: { headers: { "x-forwarded-for": "203.0.113.7" }, ip: "203.0.113.7" } });
 const signedIn = (data, { uid = NEW_UID, token = {} } = {}) => ({ ...anonymous(data), auth: { uid, token: { email_verified: true, email: "bianca@exemplo.com.br", ...token } } });
 const writesTo = path => mock.writes.filter(write => write.path === path);
@@ -113,6 +113,17 @@ describe("Cadastro aberto", () => {
 
   it("recusa senha curta", async () => {
     await expect(registerSelfService(anonymous(signup({ password: "1234567" })))).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("recusa senha fora da politica antes de criar o login, e diz o que falta", async () => {
+    // Doze caracteres, sem maiuscula nem simbolo: o Identity Platform a
+    // recusaria no primeiro login, com a conta ja criada.
+    const erro = await registerSelfService(anonymous(signup({ password: "senhafraca12" }))).catch((caught) => caught);
+
+    expect(erro).toMatchObject({ code: "invalid-argument" });
+    expect(erro.message).toContain("letra maiúscula");
+    expect(erro.message).toContain("símbolo");
+    expect(mock.createUser).not.toHaveBeenCalled();
   });
 
   it("apaga a conta do Authentication quando a gravacao falha", async () => {

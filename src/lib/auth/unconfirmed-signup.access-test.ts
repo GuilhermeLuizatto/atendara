@@ -26,7 +26,7 @@ const DAY_MS = 86_400_000;
 const PARADA = {
   displayName: "Marina Teles",
   email: "marina-nao-confirmou@atendara.test",
-  password: "senha-de-teste-marina",
+  password: "Senha#Teste-Marina1",
   professionId: "PSYCHOLOGIST" as const,
   councilRegistration: "CRP 06/654321",
   businessName: "Consultório Travessia",

@@ -7,7 +7,7 @@ import { TRIAL_DAYS } from "@/config/platform";
 
 vi.mock("@/config/demo-admin", async () => {
   const { pbkdf2Sync } = await import("node:crypto");
-  return { DEMO_ADMIN_VERIFIER: { salt: "test-only", hash: pbkdf2Sync("Temporary-test-password", "test-only", 210000, 32, "sha256").toString("hex") } };
+  return { DEMO_ADMIN_VERIFIER: { salt: "test-only", hash: pbkdf2Sync("Temporario#Teste1", "test-only", 210000, 32, "sha256").toString("hex") } };
 });
 beforeEach(() => {
   const values = new Map<string, string>();
@@ -24,11 +24,11 @@ describe("Fluxo de cadastro e senha inicial", () => {
   });
   it("exige troca, cadastra profissional restrito e invalida a senha inicial", async () => {
     const adapter = new DemoAuthAdapter();
-    const initial = await adapter.signIn(PLATFORM_ADMIN_EMAIL, "Temporary-test-password");
+    const initial = await adapter.signIn(PLATFORM_ADMIN_EMAIL, "Temporario#Teste1");
     expect(initial.access?.mustChangePassword).toBe(true);
     await expect(adapter.listAccounts()).rejects.toThrow("administrador");
-    await expect(adapter.completeInitialPassword("Temporary-test-password")).rejects.toThrow("diferente");
-    await adapter.completeInitialPassword("Personal-test-password");
+    await expect(adapter.completeInitialPassword("Temporario#Teste1")).rejects.toThrow("diferente");
+    await adapter.completeInitialPassword("Pessoal#Teste22");
     // Sem concessao inicial a conta nasce pendente, como no backend.
     const pending = await adapter.registerProfessional({ email: "pendente@example.com", displayName: "Profissional pendente", professionId: "PSYCHOLOGIST", modules: [...APP_MODULES] });
     expect((await adapter.listAccounts()).items.find(a => a.userId === pending.userId)).toMatchObject({ subscriptionStatus: "PENDING", accessUntil: null });
@@ -41,10 +41,10 @@ describe("Fluxo de cadastro e senha inicial", () => {
     await adapter.grantAccess({ organizationId, kind: "COURTESY", until, reason: "Cortesia para concluir o teste." });
     expect((await adapter.listAccounts()).items.find(a => a.userId === created.userId)).toMatchObject({ subscriptionStatus: "ACTIVE", accessUntil: until });
     await adapter.signOut();
-    await expect(adapter.signIn(PLATFORM_ADMIN_EMAIL, "Temporary-test-password")).rejects.toThrow("incorretos");
+    await expect(adapter.signIn(PLATFORM_ADMIN_EMAIL, "Temporario#Teste1")).rejects.toThrow("incorretos");
     const professional = await adapter.signIn("prof@example.com", created.temporaryPassword);
     expect(professional.access).toMatchObject({ platformRole: "PROFESSIONAL", professionId: "PSYCHOLOGIST", mustChangePassword: true });
-    await adapter.completeInitialPassword("Professional-personal-password");
+    await adapter.completeInitialPassword("Profissional#Teste3");
     await expect(adapter.listAccounts()).rejects.toThrow("administrador");
     await expect(adapter.updateAccount(initial.userId, { status: "ACTIVE", modules: [...APP_MODULES] })).rejects.toThrow("administrador");
     await expect(adapter.grantAccess({ organizationId, kind: "COURTESY", until, reason: "Tentativa do proprio profissional." })).rejects.toThrow("administrador");
@@ -53,14 +53,14 @@ describe("Fluxo de cadastro e senha inicial", () => {
 
 describe("Cadastro aberto na demonstracao", () => {
   const cadastro = (extra: Record<string, unknown> = {}) => ({
-    displayName: "Bianca Ferraz", email: "bianca@example.com", password: "senha-de-teste",
+    displayName: "Bianca Ferraz", email: "bianca@example.com", password: "Senha#DeTeste1",
     professionId: "AESTHETICS" as const, businessName: "Espaço Lume", acceptedLegalVersion: LEGAL_VERSION, ...extra,
   });
 
   it("cria a conta sem abrir nada e so o teste abre, uma vez so", async () => {
     const adapter = new DemoAuthAdapter();
     await adapter.registerSelfService(cadastro());
-    const entrou = await adapter.signIn("bianca@example.com", "senha-de-teste");
+    const entrou = await adapter.signIn("bianca@example.com", "Senha#DeTeste1");
     // A conta nasce pendente, como no backend: quem abre e a concessao.
     expect(entrou.access).toMatchObject({ origin: "SELF_SERVICE", subscriptionStatus: "PENDING", accessUntil: null, mustChangePassword: false });
     expect(entrou.access?.modules).toEqual([...APP_MODULES]);
@@ -81,13 +81,13 @@ describe("Cadastro aberto na demonstracao", () => {
 
     await adapter.registerSelfService(cadastro());
     // Mesma resposta de um cadastro novo: a tela nunca diz quem ja tem conta.
-    await expect(adapter.registerSelfService(cadastro({ password: "outra-senha-aqui" }))).resolves.toBeUndefined();
+    await expect(adapter.registerSelfService(cadastro({ password: "Outra#Senha2x9" }))).resolves.toBeUndefined();
     await expect(adapter.signIn("bianca@example.com", "outra-senha-aqui")).rejects.toThrow("incorretos");
   });
 
   it("nao comeca teste em conta que a operadora cadastrou", async () => {
     const adapter = new DemoAuthAdapter();
-    await adapter.signIn(PLATFORM_ADMIN_EMAIL, "Temporary-test-password");
+    await adapter.signIn(PLATFORM_ADMIN_EMAIL, "Temporario#Teste1");
     await expect(adapter.activateTrial()).rejects.toThrow("teste");
   });
 });

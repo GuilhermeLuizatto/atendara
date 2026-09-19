@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { ACCESS_GRANT_REASON_LENGTH, PROFESSION_CHANGE_REASON_LENGTH, SELF_SERVICE_PASSWORD_LENGTH } from "@/config/platform";
+import { ACCESS_GRANT_REASON_LENGTH, PASSWORD_LENGTH, PROFESSION_CHANGE_REASON_LENGTH } from "@/config/platform";
+import { passwordPolicyError } from "@/lib/auth/password-policy";
 import { COUNCIL_REGISTRATION_LENGTH } from "@/lib/auth/self-service";
 import { MANUAL_ACCESS_GRANT_KINDS, PROFESSION_IDS } from "@/types";
 import { APP_MODULES } from "@/types/access";
@@ -19,7 +20,11 @@ export const registrationSchema = z.object({
 // recusa antes de chamar; o servidor recusa de novo, que e o que vale.
 export const selfServiceRegistrationSchema = z.object({
   displayName: z.string().trim().min(3).max(100), email: z.email().trim().toLowerCase(),
-  password: z.string().min(SELF_SERVICE_PASSWORD_LENGTH.min).max(SELF_SERVICE_PASSWORD_LENGTH.max).optional(),
+  password: z
+    .string()
+    .max(PASSWORD_LENGTH.max)
+    .refine((value) => passwordPolicyError(value) === null, { message: "A senha não cumpre a política." })
+    .optional(),
   professionId: z.enum(PROFESSION_IDS),
   councilRegistration: z.string().trim().max(COUNCIL_REGISTRATION_LENGTH.max).optional(),
   businessName: z.string().trim().min(2).max(120),

@@ -12,7 +12,7 @@ import { resolveAccountGate } from "./generated/access-gate.js";
 import { LEGAL_VERSION } from "./generated/legal-config.js";
 import {
   SELF_SERVICE_ACTOR,
-  SELF_SERVICE_PASSWORD_LENGTH,
+  PASSWORD_LENGTH,
   TRIAL_GRANT_REASON,
 } from "./generated/platform-config.js";
 import {
@@ -25,6 +25,7 @@ import { ACCOUNT_CALL_OPTIONS, parse } from "./platform-auth.js";
 import { assertGrantWindow, auditEntry, gateFields, grantDocument } from "./platform.js";
 import { consumeRateLimit, networkSubject } from "./rate-limit.js";
 import { runAs } from "./service-accounts.js";
+import { passwordPolicyError } from "./generated/password-policy.js";
 
 /**
  * Cadastro aberto e inicio do teste de 14 dias.
@@ -59,8 +60,7 @@ const signupSchema = z
     email: z.email().trim().toLowerCase(),
     password: z
       .string()
-      .min(SELF_SERVICE_PASSWORD_LENGTH.min)
-      .max(SELF_SERVICE_PASSWORD_LENGTH.max)
+      .max(PASSWORD_LENGTH.max)
       .optional(),
     professionId: z.enum(PROFESSION_IDS),
     councilRegistration: z.string().trim().max(COUNCIL_REGISTRATION_LENGTH.max).optional(),
@@ -139,6 +139,10 @@ export const registerSelfService = onCall(SIGNUP_CALL_OPTIONS, async (request) =
     userId = google.uid;
   } else {
     if (!input.password) throw new HttpsError("invalid-argument", "Escolha uma senha para entrar.");
+    // A mesma politica da tela e do Identity Platform. Conta criada com senha
+    // fora dela nao conseguiria entrar depois.
+    const weak = passwordPolicyError(input.password);
+    if (weak) throw new HttpsError("invalid-argument", weak);
     try {
       const user = await getAuth().createUser({
         email: input.email,

@@ -69,7 +69,9 @@ export async function masterOf(request) {
 
 /** Senha inicial aleatoria e o verificador que a troca obrigatoria confere. */
 export function initialCredential() {
-  const temporaryPassword = `At!${randomBytes(24).toString("base64url")}`;
+  // O prefixo fixo garante as quatro classes da politica de senha
+  // (`src/lib/auth/password-policy.ts`); a forca vem do sorteio.
+  const temporaryPassword = `At!7${randomBytes(24).toString("base64url")}`;
   const salt = randomBytes(16).toString("hex");
   return { temporaryPassword, verifier: { salt, hash: scryptSync(temporaryPassword, salt, 32).toString("hex") } };
 }

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { encodeForm, signWebhookPayload, verifyWebhookSignature } from "./gateway.js";
@@ -1011,5 +1013,115 @@ describe("S-01 — reembolso no formato da versao fixada, sem charge.invoice", (
     const again = await applyGatewayEvent(evento);
 
     expect(again.outcome).toBe("DUPLICATE");
+  });
+});
+
+describe("S-01 — o evento real do teste de ponta a ponta e o ciclo reembolsado que nao reabre", () => {
+  // `charge.refunded` capturado em 19/09/2026 na area restrita (versao
+  // 2026-08-26.dahlia), com e-mail, nome e link do recibo trocados por
+  // ficticios. A cobranca nao traz `invoice`: e o formato que a S-01 corrige.
+  const capturado = JSON.parse(
+    readFileSync(new URL("./fixtures/stripe/charge-refunded-2026-08-26.dahlia.json", import.meta.url), "utf8"),
+  );
+  const PAYMENT_INTENT = capturado.data.object.payment_intent;
+  const REEMBOLSO_EM = new Date(capturado.created * 1000).toISOString();
+  // O ciclo pago precisa envolver a data real do reembolso.
+  const FIM_DO_CICLO = new Date((capturado.created + 30 * 86_400) * 1000).toISOString();
+  const INICIO_ISO = new Date((capturado.created - 180) * 1000).toISOString();
+  let fetchSpy;
+
+  const invoicePaymentsOf = (invoiceId) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      object: "list",
+      data: [{ object: "invoice_payment", invoice: invoiceId, status: "paid", payment: { type: "payment_intent", payment_intent: PAYMENT_INTENT } }],
+    }),
+  });
+
+  const pagarCiclo = async () => {
+    const created = (offset) => new Date(Date.parse(INICIO_ISO) + offset * 1000).toISOString();
+    await applyGatewayEvent({ ...checkoutEvent("evt_real_1"), created: seconds(created(0)) });
+    await applyGatewayEvent(
+      subscriptionEvent("evt_real_2", "customer.subscription.created", "active", FIM_DO_CICLO, created(5), {
+        current_period_start: seconds(INICIO_ISO),
+      }),
+    );
+    await applyGatewayEvent(
+      invoiceEvent("evt_real_3", "invoice.paid", "in_real", FIM_DO_CICLO, created(8), {
+        amount_due: capturado.data.object.amount,
+        amount_paid: capturado.data.object.amount,
+        lines: { data: [{ period: { start: seconds(INICIO_ISO), end: seconds(FIM_DO_CICLO) } }] },
+      }),
+    );
+  };
+
+  beforeEach(() => {
+    process.env.STRIPE_SECRET_KEY = "sk_test_apenas_para_teste_sem_rede";
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(invoicePaymentsOf("in_real"));
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    delete process.env.STRIPE_SECRET_KEY;
+  });
+
+  it("o evento capturado nao traz a fatura e, mesmo assim, fecha o acesso", async () => {
+    expect(capturado.type).toBe("charge.refunded");
+    expect(capturado.data.object).not.toHaveProperty("invoice");
+    await pagarCiclo();
+
+    const result = await applyGatewayEvent(capturado);
+
+    expect(result).toMatchObject({ outcome: "APPLIED", organizationId: ORG });
+    expect(String(fetchSpy.mock.calls[0][0])).toContain(`payment%5Bpayment_intent%5D=${PAYMENT_INTENT}`);
+    expect(invoice("in_real")).toMatchObject({ status: "REFUNDED", amountRefundedInCents: capturado.data.object.amount_refunded });
+    expect(account()).toMatchObject({ subscriptionStatus: "PENDING", accessUntil: REEMBOLSO_EM });
+  });
+
+  it("agendar o cancelamento depois do reembolso nao reabre o ciclo", async () => {
+    await pagarCiclo();
+    await applyGatewayEvent(capturado);
+    const depois = new Date(Date.parse(REEMBOLSO_EM) + 60_000).toISOString();
+
+    // O que a Stripe mandou quando o portal agendou o cancelamento em 19/09.
+    await applyGatewayEvent(
+      subscriptionEvent("evt_real_cancela", "customer.subscription.updated", "active", FIM_DO_CICLO, depois, {
+        current_period_start: seconds(INICIO_ISO),
+        cancel_at_period_end: true,
+      }),
+    );
+
+    expect(subscription()).toMatchObject({ status: "PAST_DUE", accessUntil: REEMBOLSO_EM, cancelAtPeriodEnd: true });
+    expect(account()).toMatchObject({ subscriptionStatus: "PENDING", accessUntil: REEMBOLSO_EM });
+  });
+
+  it("o fim da assinatura depois do reembolso tambem nao reabre", async () => {
+    await pagarCiclo();
+    await applyGatewayEvent(capturado);
+
+    await applyGatewayEvent(
+      subscriptionEvent("evt_real_fim", "customer.subscription.deleted", "canceled", FIM_DO_CICLO, FIM_DO_CICLO, {
+        current_period_start: seconds(INICIO_ISO),
+      }),
+    );
+
+    expect(subscription()).toMatchObject({ status: "CANCELED", accessUntil: REEMBOLSO_EM });
+    expect(account().accessUntil).toBe(REEMBOLSO_EM);
+  });
+
+  it("um ciclo novo, pago depois do reembolso, abre normalmente", async () => {
+    await pagarCiclo();
+    await applyGatewayEvent(capturado);
+    const proximoFim = new Date(Date.parse(FIM_DO_CICLO) + 30 * 86_400_000).toISOString();
+
+    await applyGatewayEvent(
+      subscriptionEvent("evt_real_renova", "customer.subscription.updated", "active", proximoFim, FIM_DO_CICLO, {
+        current_period_start: seconds(FIM_DO_CICLO),
+      }),
+    );
+
+    expect(subscription()).toMatchObject({ status: "ACTIVE", currentPeriodEnd: proximoFim });
+    expect(Date.parse(account().accessUntil)).toBeGreaterThan(Date.parse(proximoFim));
   });
 });

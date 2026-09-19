@@ -1,5 +1,5 @@
 {
-  "functions": { "source": "functions", "predeploy": ["node scripts/build-functions.mjs"], "ignore": ["node_modules", ".git", "*.log", "bootstrap-admin.js", "**/*.test.js"] },
+  "functions": { "source": "functions", "predeploy": ["node scripts/build-functions.mjs"], "ignore": ["node_modules", ".git", "*.log", "bootstrap-admin.js", "**/*.test.js", "fixtures"] },
   "hosting": {
     "public": "out",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],

@@ -559,12 +559,28 @@ async function handleSubscriptionEvent(transaction, event) {
   const accountRef = await readAccountGate(transaction, subscriberUserId, organizationId);
 
   const deleted = event.type === "customer.subscription.deleted";
-  const status = toPlatformStatus(deleted ? "canceled" : object.status);
+  const gatewayStatus = toPlatformStatus(deleted ? "canceled" : object.status);
   const period = subscriptionPeriod(object);
   const planId = object.metadata?.planId ?? existing?.planId ?? null;
   const plan = planId ? findPlan(planId) : null;
   const currentPeriodEnd = period.end ?? existing?.currentPeriodEnd ?? null;
-  const accessUntil = computeAccessUntil({ status, currentPeriodEnd });
+  // Ciclo reembolsado continua fechado. A assinatura segue viva no gateway, e
+  // o evento seguinte dela — agendar o cancelamento, trocar o cartao —
+  // recalcularia o acesso pelo fim do ciclo, reabrindo o que o reembolso fechou.
+  // Visto no teste de ponta a ponta de 19/09/2026. Ciclo NOVO, depois do
+  // reembolsado, segue a regra de sempre.
+  const refundedCycle = Boolean(
+    existing?.refundedPeriodEnd &&
+      existing?.refundedAt &&
+      currentPeriodEnd &&
+      Date.parse(currentPeriodEnd) <= Date.parse(existing.refundedPeriodEnd),
+  );
+  const status = refundedCycle && !deleted ? existing.status : gatewayStatus;
+  const computedAccessUntil = computeAccessUntil({ status: gatewayStatus, currentPeriodEnd });
+  const accessUntil =
+    refundedCycle && computedAccessUntil && Date.parse(computedAccessUntil) > Date.parse(existing.refundedAt)
+      ? existing.refundedAt
+      : computedAccessUntil;
   const gatewayInterval = object.items?.data?.[0]?.price?.recurring?.interval;
 
   const next = {
@@ -802,6 +818,10 @@ async function handleRefundEvent(transaction, event, context = {}) {
       // possibilidade de a assinatura se recuperar.
       status: subscription.status === "CANCELED" ? "CANCELED" : "PAST_DUE",
       accessUntil: gatewayCreatedAt,
+      // Marca o ciclo reembolsado, para os eventos seguintes da assinatura nao o
+      // reabrirem (`handleSubscriptionEvent`).
+      refundedPeriodEnd: stored.periodEnd,
+      refundedAt: gatewayCreatedAt,
       updatedAt: now(),
       // Fecha mesmo chegando atrasado — o dinheiro voltou —, mas sem fazer o
       // carimbo da assinatura voltar no tempo.

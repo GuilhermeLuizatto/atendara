@@ -99,6 +99,8 @@ try {
       await setDoc(doc(db, paths.document(org, "notifications", "alert")), { organizationId: org, status: "UNREAD", title: "Alerta" });
       await setDoc(doc(db, paths.document(org, "notificationDeliveries", "envio")), { organizationId: org, status: "PLANNED", attempts: 0, sentAt: null, channel: "SMS", event: "APPOINTMENT_REMINDER", bodyHash: "abcdef12", contactHint: "***0000" });
       await setDoc(doc(db, paths.document(org, "privacyRequests", "pedido")), { organizationId: org, type: "CLIENT_EXPORT", subjectId: "example", requestedBy: "a" });
+      await setDoc(doc(db, paths.document(org, "calendarConnections", "a")), { organizationId: org, professionalId: "a", provider: "GOOGLE", status: "CONNECTED", refreshTokenCiphertext: "cifrado" });
+      await setDoc(doc(db, paths.document(org, "calendarBusyBlocks", "a")), { organizationId: org, professionalId: "a", blocks: [] });
       await setDoc(doc(db, paths.document(org, "rescheduleRequests", "conversa")), { organizationId: org, clientId: "example", appointmentId: "example", status: "OFFERED" });
       await setDoc(doc(db, paths.document(org, "messagingSenders", "WHATSAPP")), { organizationId: org, channel: "WHATSAPP", providerId: "N8N_BRIDGE", providerSenderId: "123", displayNumber: "+5513999990000", displayName: "Clinica", status: "APPROVED", mode: "TEST", testRecipients: ["+5513999990000"] });
     }
@@ -186,7 +188,7 @@ try {
   await denied(getDocs(query(collectionGroup(db("restricted"), "messages"), where("organizationId", "==", "org-a"))));
 
   // Listagem cruzada de cada colecao operacional.
-  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "rescheduleRequests", "auditLogs"]) {
+  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "auditLogs"]) {
     await denied(getDocs(query(collection(db("a"), paths.collection("org-b", name)), limit(5))));
   }
 
@@ -246,6 +248,18 @@ try {
   await deniedBecause("alerta forjado pelo navegador", setDoc(taskOf("ownerRole", "alerta-forjado"), task({ type: "RAISE_ALERT", status: "SUCCEEDED" })));
   await deniedBecause("trilha forjada pelo navegador", setDoc(taskOf("adminRole", "trilha-forjada"), task({ type: "WRITE_AUDIT", status: "SUCCEEDED" })));
   await deniedBecause("fila sem o modulo de agenda", getDoc(taskOf("restricted", "example")));
+
+  // Agenda externa (13.7). A conexao guarda token cifrado: ninguem le pelo
+  // cliente, nem a propria pessoa. O ocupado, que e so faixa de tempo, abre
+  // para quem tem o modulo de agenda.
+  for (const uid of ["a", "ownerRole", "adminRole"]) {
+    await deniedBecause(`${uid} lendo a conexao de agenda`, getDoc(doc(db(uid), paths.document("org-a", "calendarConnections", "a"))));
+    await deniedBecause(`${uid} gravando conexao de agenda`, setDoc(doc(db(uid), paths.document("org-a", "calendarConnections", uid)), { organizationId: "org-a", professionalId: uid, status: "CONNECTED" }));
+  }
+  await allowed(getDoc(doc(db("a"), paths.document("org-a", "calendarBusyBlocks", "a"))));
+  await deniedBecause("ocupado sem o modulo de agenda", getDoc(doc(db("restricted"), paths.document("org-a", "calendarBusyBlocks", "a"))));
+  await deniedBecause("gravando ocupado pelo navegador", setDoc(doc(db("ownerRole"), paths.document("org-a", "calendarBusyBlocks", "a")), { organizationId: "org-a", blocks: [] }));
+  await deniedBecause("ocupado de outra organizacao", getDoc(doc(db("a"), paths.document("org-b", "calendarBusyBlocks", "a"))));
 
   // Pedido de remarcacao (13.6): ninguem le nem escreve pelo cliente. Segurar
   // horario sem pedido, ou confirmar horario que nunca foi oferecido, comecaria
@@ -307,7 +321,7 @@ try {
   await denied(getDoc(doc(operator, paths.document("org-a", "members", "a"))));
   await denied(updateDoc(doc(operator, paths.document("org-a", "members", "a")), { role: "OWNER" }));
   await denied(deleteDoc(doc(operator, paths.document("org-a", "members", "restricted"))));
-  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "rescheduleRequests", "auditLogs"]) {
+  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "auditLogs"]) {
     await denied(getDoc(doc(operator, own(name))));
     await denied(setDoc(doc(operator, paths.document("org-a", name, "da-operadora")), { organizationId: "org-a" }));
   }
@@ -548,6 +562,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 322);
+  assert.equal(checks, 338);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

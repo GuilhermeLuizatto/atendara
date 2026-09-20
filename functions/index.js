@@ -138,6 +138,7 @@ export { planAppointmentNotices, dispatchAutomationTask } from "./automation.js"
 export { automationCallback } from "./automation-callback.js";
 export { registerMessagingSender } from "./messaging-senders.js";
 export { inboundWebhook } from "./inbound.js";
+export { startCalendarConnection, googleOAuthCallback, disconnectCalendar, calendarBusyCallback } from "./calendar.js";
 
 // Cobranca da plataforma. Vive em billing.js porque e outro assunto: aqui
 // estao contas e acesso; la esta a mensalidade que a operadora cobra.

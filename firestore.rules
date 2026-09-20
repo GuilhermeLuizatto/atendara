@@ -456,6 +456,24 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // ------------------------------------------ agenda externa
+
+      // Conexao com o Google Calendar (13.7). Ninguem le pelo cliente — NEM a
+      // propria pessoa: o documento carrega o token de atualizacao cifrado, e
+      // texto cifrado que chega ao navegador e texto cifrado que sai dali. A
+      // tela mostra a situacao da conexao pela callable, nao pelo documento.
+      match /calendarConnections/{professionalId} {
+        allow read, write: if false;
+      }
+
+      // Ocupado lido da agenda externa: so faixas de tempo, sem titulo e sem
+      // convidado. Quem tem o modulo de agenda LE, porque e isso que explica um
+      // horario indisponivel na tela; escrita e do backend.
+      match /calendarBusyBlocks/{professionalId} {
+        allow read: if moduleAccess(orgId, 'agenda');
+        allow write: if false;
+      }
+
       // ------------------------------------------ pedido de remarcacao
 
       // Os horarios oferecidos e ate quando a escolha esta segurada (13.6).

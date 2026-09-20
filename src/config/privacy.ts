@@ -326,6 +326,23 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     },
     onOrganizationDeletion: DELETE,
   },
+  // Conexao com a agenda externa (13.7). O que ha de pessoal e de quem ATENDE,
+  // nao de quem e atendido: por isso pedido de titular de dados nao alcanca.
+  // O token cifrado sai inteiro na desconexao, nao na pseudonimizacao.
+  calendarConnections: {
+    personalFields: ["professionalId"],
+    retention: { kind: "WHILE_ORGANIZATION_EXISTS" },
+    onClientErasure: { action: "NOT_APPLICABLE" },
+    onOrganizationDeletion: DELETE,
+  },
+  // Ocupado lido da agenda externa: so faixas de tempo. Nao identifica ninguem
+  // — nem quem atende, alem do proprio id, nem quem e atendido.
+  calendarBusyBlocks: {
+    personalFields: ["professionalId"],
+    retention: { kind: "UNDEFINED" },
+    onClientErasure: { action: "NOT_APPLICABLE" },
+    onOrganizationDeletion: DELETE,
+  },
   // Pedido de remarcacao em andamento (13.6). Guarda horarios e ids; o texto
   // da conversa fica em `messages`, e o pedido morre quando a escolha vence.
   rescheduleRequests: {

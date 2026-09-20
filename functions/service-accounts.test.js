@@ -37,6 +37,8 @@ const GROUP_OF_FILE = {
   // A entrada grava mensagem, conversa e decisao do tenant: mesmo alcance da
   // fila que a alimenta.
   "inbound.js": "automacao",
+  // A agenda externa e da automacao: e ela que sincroniza e le ocupado.
+  "calendar.js": "automacao",
 };
 
 function sourceFileOf(name) {

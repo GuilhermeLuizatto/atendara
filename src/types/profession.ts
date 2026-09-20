@@ -86,6 +86,14 @@ export interface ProfessionFeatureFlags {
    * precise de catalogo liga a flag e pronto — nenhuma tela muda.
    */
   serviceCatalog: boolean;
+  /**
+   * Sinal antecipado na marcacao (E2.2): parte do valor paga antes do
+   * atendimento, que **abate** do que fica a pagar.
+   *
+   * Tambem e flag, e nao nome de profissao. Sinal e comum em estetica e raro
+   * em consultorio de saude, mas quem decide e a tabela, nao o codigo.
+   */
+  depositOnBooking: boolean;
 }
 
 /** Semente de regra de nivel PROFESSION, aplicada ao criar a organizacao. */

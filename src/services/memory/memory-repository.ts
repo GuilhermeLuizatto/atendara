@@ -4,6 +4,14 @@ import { getProfession } from "@/config/professions";
 import { ruleInputSchema, validateRuleInput } from "@/lib/rules/validation";
 import { decide } from "@/lib/ai/decision-engine";
 import { nextServicePosition, validateService } from "@/lib/agenda/services";
+import {
+  depositDueDate,
+  partOf,
+  serviceAmountFor,
+  settleDeposit,
+  validateDeposit,
+} from "@/lib/agenda/deposit";
+import { DEPOSIT_DESCRIPTION_PREFIX, type DepositChoice } from "@/config/deposit";
 import { decisionInputPreview } from "@/lib/privacy/decision-preview";
 import { buildMockDataset } from "@/mocks";
 import {
@@ -24,6 +32,7 @@ import type {
   AIRule,
   Appointment,
   AppointmentNotificationEvent,
+  AppointmentPart,
   AppointmentStatus,
   AuditLog,
   Client,
@@ -525,6 +534,49 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
 
   // ------------------------------------------------------- atendimentos
 
+  /** Sinal so existe onde a profissao trabalha com sinal (E2.2). */
+  private validateDeposit(raw: number | null, priceInCents: number): number | null {
+    const validation = validateDeposit({
+      depositInCents: raw,
+      priceInCents,
+      available: getProfession(this.snapshot.organization.primaryProfession).features.depositOnBooking,
+    });
+    if (!validation.ok) throw new RepositoryError(validation.error);
+    return validation.value;
+  }
+
+  private income(
+    at: ISODateString,
+    input: {
+      appointmentId: ID;
+      part: AppointmentPart;
+      amountInCents: number;
+      dueDate: ISODateString;
+      description: string;
+      client: { id: ID; fullName: string };
+      professionalId: ID;
+    },
+  ): Transaction {
+    return {
+      id: this.nextId("txn"),
+      organizationId: this.organizationId,
+      ...this.stamp(at),
+      type: "INCOME",
+      clientId: input.client.id,
+      clientName: input.client.fullName,
+      professionalId: input.professionalId,
+      appointmentId: input.appointmentId,
+      appointmentPart: input.part,
+      description: input.description,
+      amountInCents: input.amountInCents,
+      status: "PENDING",
+      method: null,
+      dueDate: input.dueDate,
+      paidAt: null,
+      gateway: null,
+    };
+  }
+
   async createAppointment(input: AppointmentInput): Promise<ID> {
     this.assertPermission("appointment:create");
     const now = this.now();
@@ -546,6 +598,8 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       );
     }
 
+    const deposit = this.validateDeposit(input.depositInCents ?? null, input.priceInCents);
+
     const id = this.nextId("appt");
     const appointment: Appointment = {
       id,
@@ -563,6 +617,8 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       modality: input.modality,
       status: input.status,
       priceInCents: input.priceInCents,
+      depositInCents: deposit,
+      depositOutcome: null,
       administrativeNotes: input.administrativeNotes,
       origin: "MANUAL",
       confirmedAt: input.status === "CONFIRMED" ? now : null,
@@ -574,25 +630,37 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
 
     // Todo atendimento cobrado gera a receita correspondente. E o que mantem o
     // financeiro coerente com a agenda sem lancamento manual duplicado.
+    //
+    // Com sinal sao DOIS lancamentos: o sinal, que vence na marcacao, e o que
+    // fica a pagar, que vence no atendimento. Somados dao o valor cobrado.
     const transactions = [...this.snapshot.transactions];
-    if (appointment.priceInCents > 0) {
-      transactions.unshift({
-        id: this.nextId("txn"),
-        organizationId: this.organizationId,
-        ...this.stamp(now),
-        type: "INCOME",
-        clientId: client.id,
-        clientName: client.fullName,
-        professionalId: professional.id,
-        appointmentId: id,
-        description: `Atendimento de ${client.fullName}`,
-        amountInCents: appointment.priceInCents,
-        status: "PENDING",
-        method: null,
-        dueDate: appointment.startsAt,
-        paidAt: null,
-        gateway: null,
-      });
+    const aPagar = serviceAmountFor(appointment.priceInCents, deposit);
+    if (aPagar > 0) {
+      transactions.unshift(
+        this.income(now, {
+          appointmentId: id,
+          part: "SERVICE",
+          amountInCents: aPagar,
+          dueDate: appointment.startsAt,
+          description: `Atendimento de ${client.fullName}`,
+          client,
+          professionalId: professional.id,
+        }),
+      );
+    }
+    if (deposit !== null) {
+      transactions.unshift(
+        this.income(now, {
+          appointmentId: id,
+          part: "DEPOSIT",
+          amountInCents: deposit,
+          // O sinal e antecipado: vence antes do atendimento, nao no dia dele.
+          dueDate: depositDueDate(now, appointment.startsAt),
+          description: `${DEPOSIT_DESCRIPTION_PREFIX} — ${client.fullName}`,
+          client,
+          professionalId: professional.id,
+        }),
+      );
     }
 
     // Avisos ao cliente. Vazio enquanto a organizacao nao tiver ligado canal,
@@ -672,12 +740,29 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       : this.snapshot.clients.find((item) => item.id === existing.clientId);
     const professional = this.requireProfessional(professionalId);
 
+    const priceInCents = input.priceInCents ?? existing.priceInCents;
+    const deposit =
+      input.depositInCents === undefined
+        ? existing.depositInCents
+        : this.validateDeposit(input.depositInCents, priceInCents);
+
+    const ligados = this.snapshot.transactions.filter((item) => item.appointmentId === id);
+    if (
+      deposit !== existing.depositInCents &&
+      ligados.some((item) => partOf(item) === "DEPOSIT" && item.status === "PAID")
+    ) {
+      throw new RepositoryError(
+        "O sinal já foi pago. Devolva o sinal pelo cancelamento antes de mudar o valor.",
+      );
+    }
+
     const updated: Appointment = {
       ...existing,
       ...input,
       startsAt,
       endsAt,
       durationMinutes,
+      depositInCents: deposit,
       professionalId,
       professionalName: professional.displayName,
       clientId: client?.id ?? existing.clientId,
@@ -717,18 +802,9 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       appointments: this.snapshot.appointments
         .map((appointment) => (appointment.id === id ? updated : appointment))
         .sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
-      // A receita vinculada acompanha valor e vencimento do atendimento.
-      transactions: this.snapshot.transactions.map((transaction) =>
-        transaction.appointmentId === id && transaction.status !== "PAID"
-          ? {
-              ...transaction,
-              amountInCents: updated.priceInCents,
-              dueDate: updated.startsAt,
-              clientName: updated.clientName,
-              updatedAt: now,
-            }
-          : transaction,
-      ),
+      // Os lancamentos vinculados acompanham valor e vencimento. O do servico
+      // e o que sobra depois do sinal; o do sinal e o sinal.
+      transactions: this.updatedLinkedTransactions(id, updated, deposit, now),
       auditLogs: [
         this.audit(
           {
@@ -745,14 +821,72 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     });
   }
 
+  /**
+   * Devolve os lancamentos do atendimento acertados com o valor e o sinal.
+   * Sinal que deixou de existir vira cobranca cancelada, e nao some: linha do
+   * financeiro nao se apaga.
+   */
+  private updatedLinkedTransactions(
+    id: ID,
+    updated: Appointment,
+    deposit: number | null,
+    now: ISODateString,
+  ): Transaction[] {
+    const aPagar = serviceAmountFor(updated.priceInCents, deposit);
+    const existentes = this.snapshot.transactions.map((transaction) => {
+      if (transaction.appointmentId !== id || transaction.status === "PAID") return transaction;
+      const parte = partOf(transaction);
+      if (parte === "DEPOSIT" && deposit === null) {
+        return { ...transaction, status: "CANCELLED" as const, clientName: updated.clientName, updatedAt: now };
+      }
+      return {
+        ...transaction,
+        amountInCents: parte === "DEPOSIT" ? (deposit ?? 0) : aPagar,
+        dueDate: parte === "DEPOSIT" ? transaction.dueDate : updated.startsAt,
+        clientName: updated.clientName,
+        updatedAt: now,
+      };
+    });
+
+    // Sinal pedido depois da marcacao precisa nascer agora.
+    const jaTem = existentes.some(
+      (transaction) => transaction.appointmentId === id && partOf(transaction) === "DEPOSIT",
+    );
+    if (deposit === null || jaTem) return existentes;
+
+    return [
+      this.income(now, {
+        appointmentId: id,
+        part: "DEPOSIT",
+        amountInCents: deposit,
+        dueDate: depositDueDate(now, updated.startsAt),
+        description: `${DEPOSIT_DESCRIPTION_PREFIX} — ${updated.clientName}`,
+        client: { id: updated.clientId, fullName: updated.clientName },
+        professionalId: updated.professionalId,
+      }),
+      ...existentes,
+    ];
+  }
+
   async setAppointmentStatus(
     id: ID,
     status: AppointmentStatus,
     reason?: string,
+    options?: { deposit?: DepositChoice | null },
   ): Promise<void> {
     this.assertPermission(status === "CANCELLED" ? "appointment:cancel" : "appointment:update");
     const now = this.now();
     const existing = this.requireAppointment(id);
+
+    const lancamentoDoSinal = this.snapshot.transactions.find(
+      (item) => item.appointmentId === id && partOf(item) === "DEPOSIT",
+    );
+    const destino = settleDeposit({
+      status,
+      hasDeposit: existing.depositInCents !== null,
+      depositPaid: lancamentoDoSinal?.status === "PAID",
+      choice: options?.deposit ?? null,
+    });
 
     const updated: Appointment = {
       ...existing,
@@ -763,6 +897,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
         status === "CANCELLED"
           ? (reason ?? "Cancelado pelo profissional.")
           : existing.cancellationReason,
+      depositOutcome: destino.outcome ?? existing.depositOutcome,
       updatedAt: now,
       updatedBy: this.actor.userId,
     };
@@ -822,14 +957,19 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       }
     }
 
-    // Cancelamento nao cobra: a receita pendente e cancelada junto.
-    const transactions = this.snapshot.transactions.map((transaction) =>
-      transaction.appointmentId === id &&
-      status === "CANCELLED" &&
-      transaction.status !== "PAID"
-        ? { ...transaction, status: "CANCELLED" as const, updatedAt: now }
-        : transaction,
-    );
+    // Cancelamento nao cobra: o que ficou a pagar e cancelado junto. O sinal
+    // segue o que `settleDeposit` decidiu — reter, devolver ou cair.
+    const transactions = this.snapshot.transactions.map((transaction) => {
+      if (transaction.appointmentId !== id) return transaction;
+      const acao = partOf(transaction) === "DEPOSIT" ? destino.deposit : destino.service;
+      if (acao === "UNCHANGED" || acao === "KEEP_PAID") return transaction;
+      if (acao === "CANCEL" && transaction.status === "PAID") return transaction;
+      return {
+        ...transaction,
+        status: acao === "REFUND" ? ("REFUNDED" as const) : ("CANCELLED" as const),
+        updatedAt: now,
+      };
+    });
 
     this.commit({
       ...this.snapshot,
@@ -846,7 +986,9 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
             actorType: "USER",
             resource: { type: "appointment", id },
             summary: `Atendimento de ${existing.clientName}: ${status}.`,
-            metadata: { status },
+            // O destino do sinal entra na trilha: e dinheiro da cliente mudando
+            // de lugar, e depois alguem vai perguntar quem decidiu o que.
+            metadata: destino.outcome ? { status, deposit: destino.outcome } : { status },
           },
           now,
         ),
@@ -871,6 +1013,8 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       ...this.stamp(now),
       ...input,
       clientName: client?.fullName ?? null,
+      // Lancamento digitado a mao nao nasce de atendimento (E2.2).
+      appointmentPart: null,
       paidAt: input.status === "PAID" ? now : null,
       gateway: null,
     };

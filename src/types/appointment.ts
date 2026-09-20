@@ -10,6 +10,9 @@ export type AppointmentStatus =
   | "NO_SHOW"
   | "RESCHEDULED";
 
+/** O que aconteceu com o sinal quando o atendimento nao aconteceu (E2.2). */
+export type DepositOutcome = "KEPT" | "REFUNDED";
+
 export type AppointmentOrigin =
   "MANUAL" | "AI_AGENT" | "CLIENT_SELF_SERVICE" | "IMPORTED";
 
@@ -42,6 +45,21 @@ export interface Appointment extends TenantScopedEntity {
   modality: ServiceModality;
   status: AppointmentStatus;
   priceInCents: number;
+  /**
+   * Sinal combinado na marcacao (E2.2), em centavos inteiros. `null` quando a
+   * profissao nao trabalha com sinal ou quando ela nao pediu sinal aqui.
+   *
+   * O sinal **abate**: a receita do servico nasce por `priceInCents` menos
+   * este valor, e o sinal vira um lancamento proprio. Somados, os dois dao o
+   * valor do atendimento — o financeiro nao cobra duas vezes.
+   */
+  depositInCents: number | null;
+  /**
+   * O que foi feito com o sinal quando o atendimento nao aconteceu. Fica no
+   * atendimento, e nao so na trilha, porque a tela precisa dizer "sinal
+   * retido" sem varrer a auditoria.
+   */
+  depositOutcome: DepositOutcome | null;
   /** Observacao administrativa. Nao e registro clinico. */
   administrativeNotes: string | null;
   origin: AppointmentOrigin;

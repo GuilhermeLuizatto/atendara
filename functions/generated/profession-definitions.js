@@ -86,6 +86,7 @@ export const PROFESSION_DEFINITIONS = {
             recurringByDefault: true,
             sessionPackages: true,
             serviceCatalog: false,
+            depositOnBooking: false,
         },
     },
     PSYCHIATRIST: {
@@ -156,6 +157,7 @@ export const PROFESSION_DEFINITIONS = {
             recurringByDefault: true,
             sessionPackages: false,
             serviceCatalog: false,
+            depositOnBooking: false,
         },
     },
     DOCTOR: {
@@ -226,6 +228,7 @@ export const PROFESSION_DEFINITIONS = {
             recurringByDefault: false,
             sessionPackages: false,
             serviceCatalog: false,
+            depositOnBooking: false,
         },
     },
     DENTIST: {
@@ -292,6 +295,7 @@ export const PROFESSION_DEFINITIONS = {
             recurringByDefault: false,
             sessionPackages: true,
             serviceCatalog: false,
+            depositOnBooking: false,
         },
     },
     NUTRITIONIST: {
@@ -358,6 +362,7 @@ export const PROFESSION_DEFINITIONS = {
             recurringByDefault: true,
             sessionPackages: true,
             serviceCatalog: false,
+            depositOnBooking: false,
         },
     },
     PHYSIOTHERAPIST: {
@@ -424,6 +429,7 @@ export const PROFESSION_DEFINITIONS = {
             recurringByDefault: true,
             sessionPackages: true,
             serviceCatalog: false,
+            depositOnBooking: false,
         },
     },
     THERAPIST: {
@@ -497,6 +503,7 @@ export const PROFESSION_DEFINITIONS = {
             recurringByDefault: true,
             sessionPackages: true,
             serviceCatalog: false,
+            depositOnBooking: false,
         },
     },
     PERSONAL_TRAINER: {
@@ -565,6 +572,7 @@ export const PROFESSION_DEFINITIONS = {
             recurringByDefault: true,
             sessionPackages: true,
             serviceCatalog: false,
+            depositOnBooking: false,
         },
     },
     AESTHETICS: {
@@ -637,6 +645,7 @@ export const PROFESSION_DEFINITIONS = {
             recurringByDefault: false,
             sessionPackages: false,
             serviceCatalog: true,
+            depositOnBooking: true,
         },
     },
 };

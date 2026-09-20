@@ -15,6 +15,7 @@ import {
   toFirestoreData,
   type ConvertedCollection,
 } from "@/lib/firebase/converters";
+import type { DepositChoice } from "@/config/deposit";
 import type { TenantCollection } from "@/lib/firebase/paths";
 import type {
   AgendaSettings,
@@ -610,6 +611,7 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
     id: ID,
     status: AppointmentStatus,
     reason?: string,
+    options?: { deposit?: DepositChoice | null },
   ): Promise<void> {
     const base = this.context();
     const appointmentRef = doc(this.db, docPath(base, "appointments", id));
@@ -653,7 +655,7 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
           }),
         });
 
-        for (const write of planSetAppointmentStatus(ctx, id, status, reason)
+        for (const write of planSetAppointmentStatus(ctx, id, status, reason, options?.deposit)
           .writes) {
           this.applyWrite(transaction, write);
         }

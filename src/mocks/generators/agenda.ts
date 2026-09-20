@@ -83,6 +83,9 @@ export function buildAppointments(
         durationMinutes: duration,
         serviceId: null,
         serviceName: null,
+        // A demonstracao nao inventa sinal: quem pede sinal e ela.
+        depositInCents: null,
+        depositOutcome: null,
         modality: client.preferredModality,
         status,
         priceInCents: profession.defaultPriceInCents ?? 0,

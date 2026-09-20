@@ -98,6 +98,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       recurringByDefault: true,
       sessionPackages: true,
       serviceCatalog: false,
+      depositOnBooking: false,
     },
   },
 
@@ -175,6 +176,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       recurringByDefault: true,
       sessionPackages: false,
       serviceCatalog: false,
+      depositOnBooking: false,
     },
   },
 
@@ -251,6 +253,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       recurringByDefault: false,
       sessionPackages: false,
       serviceCatalog: false,
+      depositOnBooking: false,
     },
   },
 
@@ -324,6 +327,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       recurringByDefault: false,
       sessionPackages: true,
       serviceCatalog: false,
+      depositOnBooking: false,
     },
   },
 
@@ -397,6 +401,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       recurringByDefault: true,
       sessionPackages: true,
       serviceCatalog: false,
+      depositOnBooking: false,
     },
   },
 
@@ -469,6 +474,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       recurringByDefault: true,
       sessionPackages: true,
       serviceCatalog: false,
+      depositOnBooking: false,
     },
   },
 
@@ -548,6 +554,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       recurringByDefault: true,
       sessionPackages: true,
       serviceCatalog: false,
+      depositOnBooking: false,
     },
   },
 
@@ -622,6 +629,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       recurringByDefault: true,
       sessionPackages: true,
       serviceCatalog: false,
+      depositOnBooking: false,
     },
   },
 
@@ -701,6 +709,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       recurringByDefault: false,
       sessionPackages: false,
       serviceCatalog: true,
+      depositOnBooking: true,
     },
   },
 };

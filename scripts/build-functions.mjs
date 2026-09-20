@@ -81,6 +81,8 @@ const SOURCES = [
   ["src/lib/agenda/availability.ts", "agenda-availability"],
   ["src/lib/agenda/reschedule.ts", "agenda-reschedule"],
   ["src/config/reschedule.ts", "reschedule-config"],
+  ["src/lib/agenda/calendar.ts", "agenda-calendar"],
+  ["src/config/calendar.ts", "calendar-config"],
   ["src/lib/automation/dispatch.ts", "automation-dispatch"],
   ["src/lib/automation/effects.ts", "automation-effects"],
   ["src/lib/automation/tasks.ts", "automation-tasks"],

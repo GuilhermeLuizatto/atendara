@@ -485,3 +485,76 @@ describe("remarcacao pela propria pessoa (13.6)", () => {
     expect(resultado.outcome).not.toBe("RESCHEDULE_CONFIRMED");
   });
 });
+
+describe("agenda externa na oferta (13.7)", () => {
+  it("compromisso pessoal no Google impede oferecer aquele horario", async () => {
+    consultas.clients = [{ id: "cliente-1", organizationId: ORG, fullName: "Alex Fictício", phone: `+${FROM}`, notificationConsent: null }];
+    consultas.appointments = [
+      {
+        id: "atendimento-1",
+        organizationId: ORG,
+        clientId: "cliente-1",
+        clientName: "Alex Fictício",
+        professionalId: "profissional-1",
+        professionalName: "Sam Fictício",
+        startsAt: "2026-09-25T13:00:00.000Z",
+        endsAt: "2026-09-25T13:50:00.000Z",
+        durationMinutes: 50,
+        modality: "IN_PERSON",
+        status: "SCHEDULED",
+        priceInCents: 20000,
+        administrativeNotes: null,
+        origin: "MANUAL",
+        confirmedAt: null,
+        cancelledAt: null,
+        cancellationReason: null,
+        rescheduledFromId: null,
+        externalCalendar: null,
+        createdAt: "2026-09-01T12:00:00.000Z",
+        createdBy: "membro",
+        updatedAt: "2026-09-01T12:00:00.000Z",
+        updatedBy: "membro",
+      },
+    ];
+    store.set(paths.organization(ORG), {
+      id: ORG,
+      primaryProfession: "PSYCHOLOGIST",
+      ownerId: "dono",
+      timezone: "America/Sao_Paulo",
+      settings: {
+        agenda: {
+          workingDays: [1, 2, 3, 4, 5],
+          workdayStart: "08:00",
+          workdayEnd: "12:00",
+          slotIntervalMinutes: 30,
+          defaultModality: "IN_PERSON",
+          allowDoubleBooking: false,
+          reschedule: { enabled: true, minimumNoticeHours: 24, maxReschedulesPerAppointment: 1, offeredSlots: 3, allowProfessionalChange: false, searchWindowDays: 14 },
+        },
+      },
+    });
+
+    const agora = "2026-09-21T11:00:00.000Z";
+    // A manha inteira de 22/09 ocupada na agenda pessoal.
+    store.set(paths.document(ORG, "calendarBusyBlocks", "profissional-1"), {
+      id: "profissional-1",
+      organizationId: ORG,
+      professionalId: "profissional-1",
+      blocks: [{ startsAt: "2026-09-22T11:00:00.000Z", endsAt: "2026-09-22T15:00:00.000Z" }],
+      readAt: agora,
+    });
+
+    const resultado = await applyInboundEvent(
+      { kind: "BUTTON", providerSenderId: SENDER_ID, from: FROM, providerMessageId: "wamid.externa", button: "RESCHEDULE", repliedTo: null, sentAt: agora },
+      { clock: () => agora },
+    );
+
+    expect(resultado.outcome).toBe("RESCHEDULE_OFFERED");
+    const oferecidos = store.get(paths.document(ORG, "rescheduleRequests", "wa-cliente-1")).slots;
+    const comoIso = (valor) => (typeof valor === "string" ? valor : valor.toDate().toISOString());
+    // Nenhum horario oferecido cai dentro do compromisso pessoal.
+    for (const slot of oferecidos) {
+      expect(comoIso(slot.startsAt) >= "2026-09-22T15:00:00.000Z" || comoIso(slot.startsAt) < "2026-09-22T11:00:00.000Z").toBe(true);
+    }
+  });
+});

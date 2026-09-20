@@ -151,6 +151,9 @@ export const CALLABLE_RATE_LIMITS = {
     // Cadastro de remetente e raro e sempre da operadora. O teto existe porque
     // cada chamada grava na trilha: sessao comprometida nao enche a trilha.
     messagingSenderRegistration: { max: 10, windowSeconds: 3600 },
+    // Conectar e desconectar agenda sao atos raros da propria pessoa. O teto
+    // existe porque cada tentativa fala com o Google e com o KMS.
+    calendarConnection: { max: 10, windowSeconds: 3600 },
 };
 /**
  * Retencao PROVISORIA, em dias, gravada como `expiresAt` para uma futura

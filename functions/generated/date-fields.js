@@ -46,6 +46,8 @@ export const COLLECTION_DATE_FIELDS = {
     ],
     messagingSenders: [...STAMP_FIELDS],
     rescheduleRequests: [...STAMP_FIELDS, "holdEndsAt", "offeredAt"],
+    calendarConnections: [...STAMP_FIELDS, "connectedAt", "lastSyncAt"],
+    calendarBusyBlocks: [...STAMP_FIELDS, "readAt"],
     automationTasks: [
         ...STAMP_FIELDS,
         "scheduledFor",

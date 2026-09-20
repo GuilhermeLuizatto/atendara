@@ -21,6 +21,7 @@ import { INBOUND_CONFIRMATION_NOTE, INBOUND_OPT_OUT_NOTE, INBOUND_PREVIEW_LENGTH
 import { decide } from "./generated/decision-engine.js";
 import { confirmReschedule, decideReschedule, policyOf } from "./generated/agenda-reschedule.js";
 import { RESCHEDULE_REFUSAL_LABELS } from "./generated/reschedule-config.js";
+import { isBusySnapshotFresh } from "./generated/agenda-calendar.js";
 import { applyConsentChanges, plannedConsentChanges } from "./generated/notifications-consent-record.js";
 import { withOrganizationDefaults } from "./generated/organization-config.js";
 import { getProfession, isProfessionId } from "./generated/professions.js";
@@ -515,6 +516,10 @@ async function handleRescheduleRequest(ctx) {
     : [];
   const appointment = futuros.find((item) => item.status === "SCHEDULED" || item.status === "CONFIRMED") ?? futuros[0] ?? null;
 
+  const agendaExterna = appointment
+    ? stored("calendarBusyBlocks", await transaction.get(scope.doc("calendarBusyBlocks", appointment.professionalId)))
+    : null;
+
   const busy = (
     await transaction.get(
       firestore
@@ -527,6 +532,13 @@ async function handleRescheduleRequest(ctx) {
     .map((document) => stored("appointments", document))
     .filter((item) => item.status !== "CANCELLED" && item.status !== "NO_SHOW")
     .map((item) => ({ startsAt: item.startsAt, endsAt: item.endsAt }));
+
+  // Ocupado da agenda pessoal (13.7). Entra na MESMA lista: um compromisso no
+  // Google impede oferecer aquele horario. Leitura velha NAO entra — oferecer
+  // com dado velho e como oferecer horario que ja foi tomado.
+  if (agendaExterna && isBusySnapshotFresh(agendaExterna.readAt, now)) {
+    busy.push(...(agendaExterna.blocks ?? []));
+  }
 
   const decided = decideReschedule({
     policy,

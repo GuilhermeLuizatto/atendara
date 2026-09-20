@@ -57,6 +57,12 @@ export const TENANT_COLLECTIONS = {
   // Fila de automacao: cada execucao (aviso, alerta, registro na trilha), com
   // estado, tentativa e validade. So o backend le e escreve.
   automationTasks: "automationTasks",
+  // Conexao com a agenda externa de cada profissional (13.7). Guarda o token
+  // de atualizacao CIFRADO com KMS; as regras recusam leitura pelo cliente.
+  calendarConnections: "calendarConnections",
+  // Ocupado lido da agenda externa: so faixas de tempo, nunca titulo ou
+  // convidado. Escrito pelo backend; lido por quem tem o modulo de agenda.
+  calendarBusyBlocks: "calendarBusyBlocks",
   // Pedido de remarcacao em andamento (13.6): os horarios oferecidos e ate
   // quando a escolha esta segurada. Um por conversa, com o id da conversa.
   // So o backend le e escreve — o navegador nem oferece nem confirma.

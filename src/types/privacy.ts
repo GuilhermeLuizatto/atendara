@@ -55,6 +55,8 @@ export const ORGANIZATION_EXPORT_SECTIONS = [
   "notificationDeliveries",
   "messagingSenders",
   "rescheduleRequests",
+  "calendarConnections",
+  "calendarBusyBlocks",
   "automationTasks",
   "auditLogs",
   "privacyRequests",

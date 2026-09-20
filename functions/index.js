@@ -135,6 +135,7 @@ export {
 // Fila de automacao: o gatilho da agenda planeja os avisos e o despachante os
 // executa no horario, conferindo as travas de novo. O navegador so le a fila.
 export { planAppointmentNotices, dispatchAutomationTask } from "./automation.js";
+export { automationCallback } from "./automation-callback.js";
 
 // Cobranca da plataforma. Vive em billing.js porque e outro assunto: aqui
 // estao contas e acesso; la esta a mensalidade que a operadora cobra.

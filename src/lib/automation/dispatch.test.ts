@@ -13,7 +13,7 @@ import {
 } from "@/lib/notifications/fixtures";
 import { SIMULATED_DESTINATIONS, createSimulatedProvider } from "@/lib/notifications/providers";
 
-import { completeDispatch, decideDispatch, type DispatchInput } from "./dispatch";
+import { applyDispatchResult, completeDispatch, decideDispatch, handoffDispatch, type DispatchInput } from "./dispatch";
 import { ANCHOR, PROFESSIONAL_NAME, REMINDER_AT, plannedReminder } from "./fixtures";
 import { dispatchPayloadFor, newInternalTask, transitionTask } from "./tasks";
 
@@ -270,5 +270,49 @@ describe("o que nunca sai do Atendara", () => {
       expect(written).not.toContain(forbidden);
     }
     expect(done.effects.map((effect) => effect.task.id)).toEqual(again.effects.map((effect) => effect.task.id));
+  });
+});
+
+describe("entrega em duas etapas (13.3)", () => {
+  it("entregar ao executor nao marca o aviso como enviado: so a volta decide", () => {
+    const step = decideDispatch(dispatchInput());
+    if (step.kind !== "SEND") throw new Error(step.kind);
+
+    const entregue = handoffDispatch(step.task, REMINDER_AT);
+
+    expect(entregue.status).toBe("DISPATCHED");
+    expect(entregue.completedAt).toBeNull();
+    expect(step.delivery.status).toBe("SENDING");
+    expect(step.delivery.sentAt).toBeNull();
+  });
+
+  it("o resultado que volta depois entra pelo mesmo caminho do provedor sincrono", () => {
+    const step = decideDispatch(dispatchInput());
+    if (step.kind !== "SEND") throw new Error(step.kind);
+    const entregue = handoffDispatch(step.task, REMINDER_AT);
+
+    const depois = plus(REMINDER_AT, 1);
+    const done = applyDispatchResult({
+      task: entregue,
+      delivery: step.delivery,
+      result: { outcome: "ACCEPTED", providerMessageId: "wamid.abc", failureCode: null },
+      now: depois,
+    });
+
+    expect(done.task).toMatchObject({ status: "SUCCEEDED", providerMessageId: "wamid.abc" });
+    expect(done.delivery).toMatchObject({ status: "SENT", sentAt: depois });
+    expect(done.effects.map((effect) => effect.kind)).toEqual(["WRITE_AUDIT"]);
+  });
+
+  it("a tarefa que sai leva a propria identidade, para o resultado voltar ao lugar certo", () => {
+    const step = decideDispatch(dispatchInput());
+    if (step.kind !== "SEND") throw new Error(step.kind);
+
+    expect(step.request).toMatchObject({
+      taskId: step.task.id,
+      organizationId: step.task.organizationId,
+      idempotencyKey: step.task.idempotencyKey,
+      expiresAt: step.task.expiresAt,
+    });
   });
 });

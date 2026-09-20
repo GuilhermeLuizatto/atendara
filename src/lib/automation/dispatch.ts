@@ -31,8 +31,10 @@ import {
  * aceito como verdade alem de qual tarefa e qual tentativa: a Cloud Tasks entrega
  * pelo menos uma vez, entao a mesma entrega duas vezes tem de ser inofensiva.
  *
- * `completeDispatch` aplica o resultado do provedor. As duas funcoes so mudam o
- * estado por `transitionTask`.
+ * `handoffDispatch` marca a entrega ao executor e `applyDispatchResult` aplica o
+ * resultado — juntos em `completeDispatch` quando o provedor responde na hora,
+ * separados quando o resultado volta depois pela ponte do n8n (13.3). Todas so
+ * mudam o estado por `transitionTask`.
  */
 
 export interface DispatchInput {
@@ -179,6 +181,10 @@ export function decideDispatch(input: DispatchInput): DispatchStep {
       destination: check.destination,
       body: check.body,
       attempt: task.attempt,
+      taskId: task.id,
+      organizationId: task.organizationId,
+      idempotencyKey: task.idempotencyKey,
+      expiresAt: task.expiresAt,
     },
   };
 }
@@ -191,14 +197,32 @@ export interface DispatchCompletion {
   requeueAt: ISODateString | null;
 }
 
-export function completeDispatch(input: {
+/**
+ * A tarefa saiu das nossas maos: `DISPATCHING` -> `DISPATCHED` (Fase 3, 13.3).
+ *
+ * Com provedor simulado isso e um instante dentro de `completeDispatch`. Com a
+ * ponte do n8n e um estado de espera de verdade: a entrega continua `SENDING`
+ * ate o retorno assinado chegar. **Marcar `SENT` aqui seria dizer que o
+ * WhatsApp entregou porque o n8n atendeu o telefone.**
+ */
+export function handoffDispatch(task: AutomationTask, now: ISODateString): AutomationTask {
+  return transitionTask(task, "DISPATCHED", { at: now });
+}
+
+/**
+ * Aplica um resultado a uma tarefa **ja entregue ao executor**. E o mesmo
+ * caminho para o resultado sincrono do provedor simulado e para o que volta
+ * pelo `automationCallback`: um so lugar decide sucesso, nova tentativa e
+ * falha, e um so lugar grava trilha e alerta.
+ */
+export function applyDispatchResult(input: {
+  /** Tarefa em `DISPATCHED`. */
   task: AutomationTask;
   delivery: NotificationDelivery;
   result: AttemptResult;
   now: ISODateString;
 }): DispatchCompletion {
-  const { task, delivery, result, now } = input;
-  const dispatched = transitionTask(task, "DISPATCHED", { at: now });
+  const { task: dispatched, delivery, result, now } = input;
   const outcome = applyAttempt(delivery, result, now);
   const nextDelivery: NotificationDelivery = { ...delivery, ...outcome, updatedAt: now, updatedBy: null };
 
@@ -214,7 +238,7 @@ export function completeDispatch(input: {
     const retry = transitionTask(dispatched, "SCHEDULED", {
       at: now,
       code: outcome.failureCode,
-      patch: { attempt: task.attempt + 1, scheduledFor: outcome.nextAttemptAt, failureCode: outcome.failureCode },
+      patch: { attempt: dispatched.attempt + 1, scheduledFor: outcome.nextAttemptAt, failureCode: outcome.failureCode },
     });
     return {
       task: retry,
@@ -235,4 +259,17 @@ export function completeDispatch(input: {
     effects: [auditEffect(failed, now), alertEffect(failed, now)],
     requeueAt: null,
   };
+}
+
+/**
+ * Provedor sincrono: entrega e resultado no mesmo ato. Continua sendo o caminho
+ * do simulado e de qualquer provedor que responda na hora.
+ */
+export function completeDispatch(input: {
+  task: AutomationTask;
+  delivery: NotificationDelivery;
+  result: AttemptResult;
+  now: ISODateString;
+}): DispatchCompletion {
+  return applyDispatchResult({ ...input, task: handoffDispatch(input.task, input.now) });
 }

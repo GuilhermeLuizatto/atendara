@@ -31,11 +31,16 @@ export interface ChannelMeta {
   /** Campo do cadastro que guarda o destino. */
   contactField: "email" | "phone";
   /**
-   * Provedor que atende o canal hoje. `SIMULATED` significa que nenhuma
-   * mensagem sai do processo: o provedor devolve um resultado deterministico e
-   * nao abre conexao nenhuma.
+   * Provedor que atende o canal hoje.
+   *
+   * - `SIMULATED`: nenhuma mensagem sai do processo — resultado deterministico,
+   *   nenhuma conexao aberta.
+   * - `N8N_BRIDGE` (13.3): a tarefa vai assinada ao n8n, que executa o canal
+   *   real. **Nenhum canal usa este valor ainda**, e trocar um deles e uma
+   *   linha que aparece no diff — e que so funciona com os segredos da ponte
+   *   configurados no Secret Manager.
    */
-  providerId: "SIMULATED";
+  providerId: "SIMULATED" | "N8N_BRIDGE";
   /** Limite de caracteres do corpo. Deriva do canal, nao do gosto do texto. */
   maxBodyLength: number;
   /**

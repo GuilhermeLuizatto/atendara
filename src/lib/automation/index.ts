@@ -6,6 +6,7 @@
  * gravar esta aqui, testavel sem emulador. Nenhum arquivo importa `firebase/*`.
  */
 export * from "./appointment-changes";
+export * from "./bridge";
 export * from "./dispatch";
 export * from "./effects";
 export * from "./tasks";

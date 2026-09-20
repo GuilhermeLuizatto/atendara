@@ -73,6 +73,7 @@ export function createSimulatedProvider() {
     return {
         id: "SIMULATED",
         simulated: true,
+        handoff: false,
         async send(request) {
             return decide(request);
         },

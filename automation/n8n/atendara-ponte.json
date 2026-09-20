@@ -1,0 +1,146 @@
+{
+  "name": "Atendara — ponte (13.3, provedor fictício)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "atendara-ponte",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "5a1f0f3c-0001-4a00-8000-000000000001",
+      "name": "Tarefa do Atendara",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-360, 0],
+      "webhookId": "5a1f0f3c-0001-4a00-8000-000000000001"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Confere o segredo A sobre horario + corpo BRUTO, na mesma janela de 5\n// minutos do Atendara. Sem isto, qualquer um que descubra a URL do webhook\n// manda mensagem em nome de uma clinica.\nconst { createHmac, timingSafeEqual } = require('crypto');\n\nconst item = $input.first();\nconst headers = item.json.headers ?? {};\nconst timestamp = headers['x-atendara-timestamp'] ?? '';\nconst signature = headers['x-atendara-signature'] ?? '';\n\n// Corpo exatamente como chegou: reserializar mudaria um espaco e derrubaria a\n// conferencia.\nconst raw = item.binary?.data?.data\n  ? Buffer.from(item.binary.data.data, 'base64').toString('utf8')\n  : JSON.stringify(item.json.body ?? {});\n\nconst expected = createHmac('sha256', $env.ATENDARA_TASK_SECRET).update(`${timestamp}.${raw}`).digest('hex');\nconst mesmoTamanho = expected.length === String(signature).length;\nconst assinaturaValida =\n  mesmoTamanho && timingSafeEqual(Buffer.from(expected), Buffer.from(String(signature)));\nconst dentroDaJanela = Math.abs(Date.now() - Date.parse(timestamp)) <= 300000;\n\nconst tarefa = JSON.parse(raw);\nconst vencida = Date.parse(tarefa.expiresAt) <= Date.now();\n\nreturn [\n  {\n    json: {\n      aceita: assinaturaValida && dentroDaJanela && !vencida,\n      motivo: !assinaturaValida ? 'BAD_SIGNATURE' : !dentroDaJanela ? 'STALE_TIMESTAMP' : vencida ? 'TASK_EXPIRED' : 'OK',\n      tarefa\n    }\n  }\n];"
+      },
+      "id": "5a1f0f3c-0001-4a00-8000-000000000002",
+      "name": "Conferir assinatura",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-140, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "aceita",
+              "leftValue": "={{ $json.aceita }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5a1f0f3c-0001-4a00-8000-000000000003",
+      "name": "Assinatura válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [80, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Provedor FICTICIO: o resultado e escolhido pelo destino, igual ao provedor\n// simulado do Atendara (src/lib/notifications/providers/simulated.ts). Nenhuma\n// mensagem sai para ninguem.\nconst { createHmac } = require('crypto');\n\nconst tarefa = $json.tarefa;\nconst destino = String(tarefa.destination ?? '').toLowerCase();\n\nconst FICTICIOS = {\n  '+550000000001': { outcome: 'REJECTED', failureCode: 'INVALID_DESTINATION' },\n  'recusado@exemplo.invalid': { outcome: 'REJECTED', failureCode: 'INVALID_DESTINATION' },\n  '+550000000002': { outcome: 'TEMPORARY_FAILURE', failureCode: 'PROVIDER_UNAVAILABLE' },\n  'indisponivel@exemplo.invalid': { outcome: 'TEMPORARY_FAILURE', failureCode: 'PROVIDER_UNAVAILABLE' },\n  '+550000000004': { outcome: 'TEMPORARY_FAILURE', failureCode: 'RATE_LIMITED' },\n  'limitado@exemplo.invalid': { outcome: 'TEMPORARY_FAILURE', failureCode: 'RATE_LIMITED' }\n};\n\nconst instavel = destino === '+550000000003' || destino === 'instavel@exemplo.invalid';\nconst resultado = FICTICIOS[destino]\n  ?? (instavel && tarefa.attempt === 1\n    ? { outcome: 'TEMPORARY_FAILURE', failureCode: 'PROVIDER_UNAVAILABLE' }\n    : { outcome: 'ACCEPTED', failureCode: null });\n\nconst corpo = JSON.stringify({\n  version: tarefa.version,\n  taskId: tarefa.taskId,\n  organizationId: tarefa.organizationId,\n  attempt: tarefa.attempt,\n  outcome: resultado.outcome,\n  providerMessageId: resultado.outcome === 'ACCEPTED' ? `n8n_${$execution.id}` : null,\n  failureCode: resultado.failureCode\n});\n\n// Segredo B, diferente do A: quem recebe tarefas nao consegue forjar\n// resultados.\nconst timestamp = new Date().toISOString();\nconst assinatura = createHmac('sha256', $env.ATENDARA_CALLBACK_SECRET).update(`${timestamp}.${corpo}`).digest('hex');\n\nreturn [{ json: { corpo, timestamp, assinatura, url: $env.ATENDARA_CALLBACK_URL } }];"
+      },
+      "id": "5a1f0f3c-0001-4a00-8000-000000000004",
+      "name": "Resultado fictício e assinatura",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [300, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type", "value": "application/json" },
+            { "name": "x-atendara-timestamp", "value": "={{ $json.timestamp }}" },
+            { "name": "x-atendara-signature", "value": "={{ $json.assinatura }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.corpo }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "5a1f0f3c-0001-4a00-8000-000000000005",
+      "name": "Devolver ao Atendara",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ accepted: true, handoffId: `n8n_${$execution.id}` }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "5a1f0f3c-0001-4a00-8000-000000000006",
+      "name": "Aceito",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [740, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ accepted: false }) }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "5a1f0f3c-0001-4a00-8000-000000000007",
+      "name": "Recusado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [300, 120]
+    }
+  ],
+  "connections": {
+    "Tarefa do Atendara": { "main": [[{ "node": "Conferir assinatura", "type": "main", "index": 0 }]] },
+    "Conferir assinatura": { "main": [[{ "node": "Assinatura válida?", "type": "main", "index": 0 }]] },
+    "Assinatura válida?": {
+      "main": [
+        [{ "node": "Resultado fictício e assinatura", "type": "main", "index": 0 }],
+        [{ "node": "Recusado", "type": "main", "index": 0 }]
+      ]
+    },
+    "Resultado fictício e assinatura": { "main": [[{ "node": "Devolver ao Atendara", "type": "main", "index": 0 }]] },
+    "Devolver ao Atendara": { "main": [[{ "node": "Aceito", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "atendara": "Fase 3, prompt 13.3. Nenhuma credencial neste arquivo: os segredos vêm de variáveis de ambiente do n8n."
+  }
+}

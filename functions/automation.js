@@ -10,6 +10,7 @@ import {
   completeDispatch,
   decideDispatch,
   dispatchPayloadFor,
+  handoffDispatch,
   isTerminalStatus,
   planAppointmentChange,
   queueEnqueueAt,
@@ -23,6 +24,7 @@ import {
   PLANNING_EVENT_MAX_AGE_MINUTES,
 } from "./generated/automation-config.js";
 import { providerFor } from "./generated/notifications-providers.js";
+import { bridgeProviderFrom } from "./n8n-bridge.js";
 import { runAs, SERVICE_ACCOUNTS } from "./service-accounts.js";
 import { withOrganizationDefaults } from "./generated/organization-config.js";
 import { paths } from "./generated/paths.js";
@@ -121,6 +123,14 @@ async function enqueueDispatch(payload, { at, name }) {
     if (error?.code === "functions/task-already-exists") return;
     throw error;
   }
+}
+
+/**
+ * Repor uma tentativa na Cloud Tasks a partir de fora do despachante — hoje so
+ * o retorno da ponte do n8n (13.3), que decide a nova tentativa noutra function.
+ */
+export async function requeueTask(task, at) {
+  await enqueueDispatch(dispatchPayloadFor(task), { at, name: queueTaskName(task, at) });
 }
 
 async function scheduleTask(task, { enqueue, clock }) {
@@ -241,14 +251,53 @@ export const planAppointmentNotices = onDocumentWritten(
 
 // ------------------------------------------------------------ despachante
 
+/**
+ * Provedor de cada canal. Todos os canais estao em `SIMULATED` hoje
+ * (`CHANNEL_META`), entao a ponte do n8n so entra se alguem trocar aquela
+ * linha — e mesmo assim so existe com `N8N_WEBHOOK_URL` e o segredo A no
+ * ambiente. Sem eles, o canal falha dizendo isso, em vez de sair por outro
+ * caminho.
+ */
+function defaultProviders(channel) {
+  const bridge = bridgeProviderFrom();
+  return providerFor(channel, bridge ? { N8N_BRIDGE: () => bridge } : {});
+}
+
+/**
+ * Entrega aceita por um executor de fora (13.3): a tarefa fica em `DISPATCHED`
+ * e a entrega segue `SENDING` ate o retorno assinado chegar pelo
+ * `automationCallback`. Nada de `SENT` aqui — o canal real ainda nem falou.
+ */
+async function handoff(step, scope, { clock }) {
+  const firestore = db();
+  const taskRef = scope.doc("automationTasks", step.task.id);
+  return firestore.runTransaction(async (transaction) => {
+    const current = stored("automationTasks", await transaction.get(taskRef));
+    if (
+      !current ||
+      current.status !== "DISPATCHING" ||
+      current.attempt !== step.task.attempt ||
+      current.dispatchingSince !== step.task.dispatchingSince
+    ) {
+      return "LEASE_LOST";
+    }
+    transaction.set(taskRef, toStored("automationTasks", handoffDispatch(current, clock())));
+    return "DISPATCHED";
+  });
+}
+
 async function send(step, scope, { enqueue, clock, providers }) {
+  const provider = providers(step.request.channel);
   let result;
   try {
-    result = await providers(step.request.channel).send(step.request);
+    result = await provider.send(step.request);
   } catch {
     // Excecao do provedor e falha temporaria: a politica de tentativas decide.
     result = { outcome: "TEMPORARY_FAILURE", providerMessageId: null, failureCode: "PROVIDER_UNAVAILABLE" };
   }
+
+  // Provedor de entrega em duas etapas: aceitar nao e enviar.
+  if (provider.handoff && result.outcome === "ACCEPTED") return handoff(step, scope, { clock });
 
   const firestore = db();
   const taskRef = scope.doc("automationTasks", step.task.id);
@@ -293,7 +342,7 @@ export async function runAutomationTask(data, deps = {}) {
   const {
     enqueue = enqueueDispatch,
     clock = () => new Date().toISOString(),
-    providers = providerFor,
+    providers = defaultProviders,
     // Nome da tarefa na Cloud Tasks que trouxe este ponteiro, quando houver.
     currentTaskName = null,
   } = deps;

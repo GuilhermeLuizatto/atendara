@@ -110,12 +110,32 @@ export function decideDispatch(input) {
             destination: check.destination,
             body: check.body,
             attempt: task.attempt,
+            taskId: task.id,
+            organizationId: task.organizationId,
+            idempotencyKey: task.idempotencyKey,
+            expiresAt: task.expiresAt,
         },
     };
 }
-export function completeDispatch(input) {
-    const { task, delivery, result, now } = input;
-    const dispatched = transitionTask(task, "DISPATCHED", { at: now });
+/**
+ * A tarefa saiu das nossas maos: `DISPATCHING` -> `DISPATCHED` (Fase 3, 13.3).
+ *
+ * Com provedor simulado isso e um instante dentro de `completeDispatch`. Com a
+ * ponte do n8n e um estado de espera de verdade: a entrega continua `SENDING`
+ * ate o retorno assinado chegar. **Marcar `SENT` aqui seria dizer que o
+ * WhatsApp entregou porque o n8n atendeu o telefone.**
+ */
+export function handoffDispatch(task, now) {
+    return transitionTask(task, "DISPATCHED", { at: now });
+}
+/**
+ * Aplica um resultado a uma tarefa **ja entregue ao executor**. E o mesmo
+ * caminho para o resultado sincrono do provedor simulado e para o que volta
+ * pelo `automationCallback`: um so lugar decide sucesso, nova tentativa e
+ * falha, e um so lugar grava trilha e alerta.
+ */
+export function applyDispatchResult(input) {
+    const { task: dispatched, delivery, result, now } = input;
     const outcome = applyAttempt(delivery, result, now);
     const nextDelivery = { ...delivery, ...outcome, updatedAt: now, updatedBy: null };
     if (outcome.status === "SENT") {
@@ -129,7 +149,7 @@ export function completeDispatch(input) {
         const retry = transitionTask(dispatched, "SCHEDULED", {
             at: now,
             code: outcome.failureCode,
-            patch: { attempt: task.attempt + 1, scheduledFor: outcome.nextAttemptAt, failureCode: outcome.failureCode },
+            patch: { attempt: dispatched.attempt + 1, scheduledFor: outcome.nextAttemptAt, failureCode: outcome.failureCode },
         });
         return {
             task: retry,
@@ -149,4 +169,11 @@ export function completeDispatch(input) {
         effects: [auditEffect(failed, now), alertEffect(failed, now)],
         requeueAt: null,
     };
+}
+/**
+ * Provedor sincrono: entrega e resultado no mesmo ato. Continua sendo o caminho
+ * do simulado e de qualquer provedor que responda na hora.
+ */
+export function completeDispatch(input) {
+    return applyDispatchResult({ ...input, task: handoffDispatch(input.task, input.now) });
 }

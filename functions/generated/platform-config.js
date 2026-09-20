@@ -154,6 +154,10 @@ export const CALLABLE_RATE_LIMITS = {
     // Conectar e desconectar agenda sao atos raros da propria pessoa. O teto
     // existe porque cada tentativa fala com o Google e com o KMS.
     calendarConnection: { max: 10, windowSeconds: 3600 },
+    // A chave e para emergencia: um punhado de vezes por hora e muito mais do
+    // que qualquer emergencia real precisa, e ja segura um laco.
+    automationSwitch: { max: 20, windowSeconds: 3600 },
+    automationRetry: { max: 30, windowSeconds: 3600 },
 };
 /**
  * Retencao PROVISORIA, em dias, gravada como `expiresAt` para uma futura

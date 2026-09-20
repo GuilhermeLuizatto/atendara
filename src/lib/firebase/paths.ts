@@ -37,6 +37,10 @@ export const PLATFORM_COLLECTIONS = {
   platformProfessionRequests: "platformProfessionRequests",
   platformAuditLogs: "platformAuditLogs",
   platformRateLimits: "platformRateLimits",
+  // Chave de emergencia GERAL (13.9): um documento so, da plataforma inteira.
+  // Escrito pela chave mestra com segundo fator; lido pelo despachante antes
+  // de cada envio.
+  platformAutomationSwitch: "platformAutomationSwitch",
 } as const;
 
 export const TENANT_COLLECTIONS = {
@@ -59,6 +63,9 @@ export const TENANT_COLLECTIONS = {
   automationTasks: "automationTasks",
   // Conexao com a agenda externa de cada profissional (13.7). Guarda o token
   // de atualizacao CIFRADO com KMS; as regras recusam leitura pelo cliente.
+  // Chave de emergencia da organizacao (13.9): um documento so, de id
+  // `organization`. Escrito pelo titular, pelo backend, com trilha.
+  automationSwitches: "automationSwitches",
   calendarConnections: "calendarConnections",
   // Ocupado lido da agenda externa: so faixas de tempo, nunca titulo ou
   // convidado. Escrito pelo backend; lido por quem tem o modulo de agenda.
@@ -158,6 +165,7 @@ export const paths = {
   /** Contador por usuario e callable. So o backend le e escreve. */
   platformRateLimit: (key: string) =>
     `${PLATFORM_COLLECTIONS.platformRateLimits}/${key}`,
+  platformAutomationSwitch: () => `${PLATFORM_COLLECTIONS.platformAutomationSwitch}/global`,
 } as const;
 
 /**

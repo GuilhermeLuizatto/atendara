@@ -49,6 +49,7 @@ const ASSISTANT_PERMISSIONS: Permission[] = [
 
 const PROFESSIONAL_PERMISSIONS: Permission[] = [
   ...ASSISTANT_PERMISSIONS,
+  "automationQueue:read",
   "client:delete",
   "transaction:update",
   "rule:create",
@@ -58,6 +59,11 @@ const PROFESSIONAL_PERMISSIONS: Permission[] = [
 
 const ADMIN_PERMISSIONS: Permission[] = [
   ...PROFESSIONAL_PERMISSIONS,
+  // Reenviar faz mensagem sair de novo: fica com quem administra.
+  "automationTask:retry",
+  // A chave de emergencia tambem: parada de emergencia nao pode depender de
+  // uma unica pessoa estar alcancavel. O titular a tem pela lista de titular.
+  "automationSwitch:manage",
   "transaction:delete",
   "organization:update",
   "notificationSettings:update",
@@ -110,6 +116,9 @@ export const ROLE_DESCRIPTIONS: Record<Role, string> = {
 export const ORGANIZATION_HOLDER_PERMISSIONS: readonly Permission[] = [
   "notificationSettings:update",
   "agendaSettings:update",
+  // A chave de emergencia e do titular, mesmo sem papel administrativo: quem
+  // responde pela organizacao precisa conseguir calar a saida na hora.
+  "automationSwitch:manage",
   "privacy:export",
   "privacy:erase",
 ];

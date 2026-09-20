@@ -326,6 +326,21 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     },
     onOrganizationDeletion: DELETE,
   },
+  // Chave de emergencia da organizacao (13.9). Nenhum dado de pessoa: um
+  // liga-desliga, o motivo escrito pela equipe e quem mexeu.
+  automationSwitches: {
+    personalFields: [],
+    retention: { kind: "WHILE_ORGANIZATION_EXISTS" },
+    onClientErasure: { action: "NOT_APPLICABLE" },
+    onOrganizationDeletion: DELETE,
+  },
+  // Chave de emergencia GERAL. Documento da plataforma, sem dado de tenant.
+  platformAutomationSwitch: {
+    personalFields: [],
+    retention: { kind: "WHILE_ORGANIZATION_EXISTS" },
+    onClientErasure: { action: "NOT_APPLICABLE" },
+    onOrganizationDeletion: { action: "NOT_APPLICABLE" },
+  },
   // Conexao com a agenda externa (13.7). O que ha de pessoal e de quem ATENDE,
   // nao de quem e atendido: por isso pedido de titular de dados nao alcanca.
   // O token cifrado sai inteiro na desconexao, nao na pseudonimizacao.

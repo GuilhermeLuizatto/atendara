@@ -456,6 +456,17 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // ------------------------------------------ chave de emergencia
+
+      // Liga-desliga da saida de mensagens daquela organizacao (13.9). Quem
+      // administra e quem responde pela organizacao LEEM, para a tela dizer
+      // que a saida esta suspensa; escrever e pela callable, que exige a
+      // permissao e grava a trilha no mesmo ato.
+      match /automationSwitches/{switchId} {
+        allow read: if isAdmin(orgId) || organizationHolder(orgId);
+        allow write: if false;
+      }
+
       // ------------------------------------------ agenda externa
 
       // Conexao com o Google Calendar (13.7). Ninguem le pelo cliente — NEM a
@@ -503,8 +514,18 @@ service cloud.firestore {
       // estado, tentativa e validade. Mecanismo do backend: ninguem le nem
       // escreve pelo cliente. O painel da fila abre a leitura junto de uma
       // permissao em `src/config/permissions.ts`, quando existir.
+      // O painel da fila (13.9) LE: estado, tentativas e motivo. A fila nao
+      // guarda texto de mensagem nem contato completo, entao abrir a leitura
+      // nao abre conteudo — abre o porque de um aviso nao ter saido.
+      //
+      // Espelha `automationQueue:read` em `src/config/permissions.ts`: os dois
+      // arquivos mudam juntos (regra 8). Escrita continua de ninguem: quem
+      // reenvia chama a callable, que registra na trilha.
       match /automationTasks/{taskId} {
-        allow read, write: if false;
+        // Modulo de agenda E papel: a fila explica por que um aviso da agenda
+        // nao saiu, entao quem nao tem a agenda nao tem o que ver aqui.
+        allow read: if moduleAccess(orgId, 'agenda') && hasRole(orgId, ['OWNER', 'ADMIN', 'PROFESSIONAL']);
+        allow write: if false;
       }
 
       // ------------------------------------------------ trilha de auditoria

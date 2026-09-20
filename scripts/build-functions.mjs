@@ -66,6 +66,7 @@ const SOURCES = [
   ["src/lib/automation/index.ts", "automation"],
   ["src/lib/automation/appointment-changes.ts", "automation-appointment-changes"],
   ["src/lib/automation/bridge.ts", "automation-bridge"],
+  ["src/lib/automation/emergency.ts", "automation-emergency"],
   ["src/lib/automation/inbound.ts", "automation-inbound"],
   ["src/lib/ai/decision-engine.ts", "decision-engine"],
   ["src/lib/ai/classify.ts", "classify"],

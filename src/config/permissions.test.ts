@@ -86,9 +86,16 @@ describe("matriz de permissoes", () => {
   });
 
   it("da ao titular so a lista fechada, alem do proprio papel", () => {
-    // Espelha `organizationHolder()` nas rules: avisos, horario e pedidos de titular.
+    // Espelha `organizationHolder()` nas rules: avisos, horario, pedidos de
+    // titular e a chave de emergencia da automacao (13.9).
     expect(new Set(ORGANIZATION_HOLDER_PERMISSIONS)).toEqual(
-      new Set(["notificationSettings:update", "agendaSettings:update", "privacy:export", "privacy:erase"]),
+      new Set([
+        "notificationSettings:update",
+        "agendaSettings:update",
+        "automationSwitch:manage",
+        "privacy:export",
+        "privacy:erase",
+      ]),
     );
     const professional = new Set(permissionsForRole("PROFESSIONAL"));
     const gained = permissionsForMembership("PROFESSIONAL", true).filter(

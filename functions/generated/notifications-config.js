@@ -183,6 +183,9 @@ export const DEFAULT_NOTIFICATION_SETTINGS = {
 export const SKIP_REASON_LABELS = {
     ORGANIZATION_DISABLED: "A organização não ativou o envio de avisos.",
     SENDER_NOT_VERIFIED: "O canal não tem remetente comprovado.",
+    SENDER_NOT_REGISTERED: "O canal usa um provedor real e ainda não tem remetente cadastrado pela operadora.",
+    SENDER_NOT_APPROVED: "O remetente cadastrado ainda não foi aprovado pelo provedor.",
+    DESTINATION_NOT_IN_TEST_LIST: "O remetente está em modo de teste e este destino não está na lista de testadores.",
     NO_RULE_FOR_EVENT: "Nenhuma regra cobre este evento.",
     RULE_DISABLED: "A regra existe, mas está desativada.",
     EVENT_NOT_ALLOWED_FOR_PROFESSION: "A profissão não permite aviso para este evento.",

@@ -1,0 +1,170 @@
+{
+  "name": "Atendara — WhatsApp (13.4, Cloud API)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "atendara-whatsapp",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "7c2e0f3c-0002-4a00-8000-000000000001",
+      "name": "Tarefa do Atendara",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-360, 0],
+      "webhookId": "7c2e0f3c-0002-4a00-8000-000000000001"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mesma conferencia do fluxo ficticio: segredo A sobre horario + corpo bruto,\n// janela de 5 minutos, tarefa dentro da validade.\nconst { createHmac, timingSafeEqual } = require('crypto');\n\nconst item = $input.first();\nconst headers = item.json.headers ?? {};\nconst timestamp = headers['x-atendara-timestamp'] ?? '';\nconst signature = headers['x-atendara-signature'] ?? '';\nconst raw = item.binary?.data?.data\n  ? Buffer.from(item.binary.data.data, 'base64').toString('utf8')\n  : JSON.stringify(item.json.body ?? {});\n\nconst expected = createHmac('sha256', $env.ATENDARA_TASK_SECRET).update(`${timestamp}.${raw}`).digest('hex');\nconst assinaturaValida =\n  expected.length === String(signature).length &&\n  timingSafeEqual(Buffer.from(expected), Buffer.from(String(signature)));\nconst dentroDaJanela = Math.abs(Date.now() - Date.parse(timestamp)) <= 300000;\n\nconst tarefa = JSON.parse(raw);\nconst vencida = Date.parse(tarefa.expiresAt) <= Date.now();\n// Sem modelo aprovado nao ha envio: fora da janela de 24 h a Meta so entrega\n// modelo, e lembrete nunca acontece dentro dela.\nconst semModelo = !tarefa.template?.name;\n\nreturn [\n  {\n    json: {\n      aceita: assinaturaValida && dentroDaJanela && !vencida && !semModelo,\n      motivo: !assinaturaValida\n        ? 'BAD_SIGNATURE'\n        : !dentroDaJanela\n          ? 'STALE_TIMESTAMP'\n          : vencida\n            ? 'TASK_EXPIRED'\n            : semModelo\n              ? 'NO_TEMPLATE'\n              : 'OK',\n      tarefa\n    }\n  }\n];"
+      },
+      "id": "7c2e0f3c-0002-4a00-8000-000000000002",
+      "name": "Conferir assinatura",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-140, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "version": 2 },
+          "conditions": [
+            {
+              "id": "aceita",
+              "leftValue": "={{ $json.aceita }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7c2e0f3c-0002-4a00-8000-000000000003",
+      "name": "Assinatura válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [80, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Monta a chamada da Cloud API a partir do modelo aprovado que o Atendara\n// escolheu. O n8n nao decide texto, nao decide destinatario e nao consulta\n// banco nenhum: o que ele faz e traduzir o contrato para o formato da Meta.\nconst tarefa = $json.tarefa;\nconst modelo = tarefa.template;\n\nconst corpo = {\n  messaging_product: 'whatsapp',\n  recipient_type: 'individual',\n  to: tarefa.destination.replace(/^\\+/, ''),\n  type: 'template',\n  template: {\n    name: modelo.name,\n    language: { code: modelo.language },\n    components: [\n      {\n        type: 'body',\n        parameters: modelo.parameters.map((valor) => ({ type: 'text', text: valor }))\n      }\n    ]\n  }\n};\n\nreturn [\n  {\n    json: {\n      corpo,\n      url: `https://graph.facebook.com/v25.0/${$env.ATENDARA_PHONE_NUMBER_ID}/messages`\n    }\n  }\n];"
+      },
+      "id": "7c2e0f3c-0002-4a00-8000-000000000004",
+      "name": "Montar chamada da Meta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [300, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type", "value": "application/json" },
+            { "name": "authorization", "value": "=Bearer {{ $env.ATENDARA_META_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.corpo) }}",
+        "options": {
+          "timeout": 15000,
+          "response": { "response": { "neverError": true, "fullResponse": true } }
+        }
+      },
+      "id": "7c2e0f3c-0002-4a00-8000-000000000005",
+      "name": "Enviar pela Cloud API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// A resposta da Meta vira o resultado do contrato. Codigo de erro da Meta ->\n// codigo NOSSO: a mensagem dela costuma repetir o numero, que e contato de\n// paciente, e por isso nunca e copiada.\nconst { createHmac } = require('crypto');\n\nconst resposta = $json;\nconst tarefa = $('Conferir assinatura').first().json.tarefa;\nconst status = resposta.statusCode ?? 0;\nconst erro = resposta.body?.error ?? null;\n\nconst PERMANENTES = new Set([131026, 131047, 131051, 131052, 130497]);\nconst LIMITE = new Set([130429, 131048, 80007]);\n\nlet resultado;\nif (status >= 200 && status < 300 && !erro) {\n  resultado = {\n    outcome: 'ACCEPTED',\n    providerMessageId: resposta.body?.messages?.[0]?.id ?? null,\n    failureCode: null\n  };\n} else if (erro && PERMANENTES.has(erro.code)) {\n  resultado = { outcome: 'REJECTED', providerMessageId: null, failureCode: 'INVALID_DESTINATION' };\n} else if (erro && LIMITE.has(erro.code)) {\n  resultado = { outcome: 'TEMPORARY_FAILURE', providerMessageId: null, failureCode: 'RATE_LIMITED' };\n} else {\n  resultado = { outcome: 'TEMPORARY_FAILURE', providerMessageId: null, failureCode: 'PROVIDER_UNAVAILABLE' };\n}\n\nconst corpo = JSON.stringify({\n  version: tarefa.version,\n  taskId: tarefa.taskId,\n  organizationId: tarefa.organizationId,\n  attempt: tarefa.attempt,\n  ...resultado\n});\n\nconst timestamp = new Date().toISOString();\nconst assinatura = createHmac('sha256', $env.ATENDARA_CALLBACK_SECRET).update(`${timestamp}.${corpo}`).digest('hex');\n\nreturn [{ json: { corpo, timestamp, assinatura, url: $env.ATENDARA_CALLBACK_URL } }];"
+      },
+      "id": "7c2e0f3c-0002-4a00-8000-000000000006",
+      "name": "Traduzir resposta da Meta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [740, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type", "value": "application/json" },
+            { "name": "x-atendara-timestamp", "value": "={{ $json.timestamp }}" },
+            { "name": "x-atendara-signature", "value": "={{ $json.assinatura }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.corpo }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "7c2e0f3c-0002-4a00-8000-000000000007",
+      "name": "Devolver ao Atendara",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ accepted: true, handoffId: `n8n_${$execution.id}` }) }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "7c2e0f3c-0002-4a00-8000-000000000008",
+      "name": "Aceito",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1180, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ accepted: false, reason: $json.motivo }) }}",
+        "options": { "responseCode": 401 }
+      },
+      "id": "7c2e0f3c-0002-4a00-8000-000000000009",
+      "name": "Recusado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [300, 120]
+    }
+  ],
+  "connections": {
+    "Tarefa do Atendara": { "main": [[{ "node": "Conferir assinatura", "type": "main", "index": 0 }]] },
+    "Conferir assinatura": { "main": [[{ "node": "Assinatura válida?", "type": "main", "index": 0 }]] },
+    "Assinatura válida?": {
+      "main": [
+        [{ "node": "Montar chamada da Meta", "type": "main", "index": 0 }],
+        [{ "node": "Recusado", "type": "main", "index": 0 }]
+      ]
+    },
+    "Montar chamada da Meta": { "main": [[{ "node": "Enviar pela Cloud API", "type": "main", "index": 0 }]] },
+    "Enviar pela Cloud API": { "main": [[{ "node": "Traduzir resposta da Meta", "type": "main", "index": 0 }]] },
+    "Traduzir resposta da Meta": { "main": [[{ "node": "Devolver ao Atendara", "type": "main", "index": 0 }]] },
+    "Devolver ao Atendara": { "main": [[{ "node": "Aceito", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "atendara": "Fase 3, prompt 13.4. NÃO EXERCITADO contra a Meta: conta não verificada é impedida de enviar a números do Brasil (erro 130497). Nenhuma credencial neste arquivo: token e segredos vêm de variáveis de ambiente do n8n."
+  }
+}

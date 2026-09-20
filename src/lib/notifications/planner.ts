@@ -172,6 +172,8 @@ export function toDeliveryDocument(
     bodyLength: plan.bodyLength,
     contactHint: plan.contactHint,
     sentAt: null,
+    deliveredAt: null,
+    readAt: null,
     cancelledAt: null,
   };
 }

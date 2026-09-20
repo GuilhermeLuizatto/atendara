@@ -456,6 +456,19 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // ------------------------------------------ remetente de canal real
+
+      // Quem pode falar pelo numero da organizacao (13.4). A administracao da
+      // propria organizacao LE — precisa saber qual numero aparece para quem e
+      // atendido —, e ninguem escreve pelo cliente: o cadastro e ato da
+      // operadora, pelo backend, com segundo fator e trilha. Se a organizacao
+      // escrevesse aqui, ela se declararia habilitada a falar em nome de
+      // qualquer numero.
+      match /messagingSenders/{channel} {
+        allow read: if isAdmin(orgId);
+        allow write: if false;
+      }
+
       // ------------------------------------------- fila de automacao
 
       // Cada execucao da automacao — aviso, alerta, registro na trilha —, com

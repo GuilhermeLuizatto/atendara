@@ -57,6 +57,8 @@ const SOURCES = [
   ["src/lib/notifications/planner.ts", "notifications-planner"],
   ["src/lib/notifications/schedule.ts", "notifications-schedule"],
   ["src/lib/notifications/templates.ts", "notifications-templates"],
+  ["src/lib/notifications/whatsapp.ts", "notifications-whatsapp"],
+  ["src/config/whatsapp.ts", "whatsapp-config"],
   ["src/lib/notifications/providers/index.ts", "notifications-providers"],
   ["src/lib/notifications/providers/simulated.ts", "notifications-providers-simulated"],
   ["src/lib/notifications/providers/n8n-bridge.ts", "notifications-providers-n8n-bridge"],

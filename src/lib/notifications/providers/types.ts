@@ -1,3 +1,4 @@
+import type { WhatsappMessage } from "@/lib/notifications/whatsapp";
 import type { DeliveryFailureCode, DeliveryOutcome, ID, ISODateString, OutboundChannel } from "@/types";
 
 export interface SendRequest {
@@ -19,6 +20,11 @@ export interface SendRequest {
   idempotencyKey: string;
   /** Depois disto o envio nao vale mais, e quem o receber deve recusar. */
   expiresAt: ISODateString;
+  /**
+   * Modelo aprovado, para o canal que so entrega modelo (13.4). O provedor
+   * simulado ignora; a ponte manda ao n8n, que chama a Meta com ele.
+   */
+  template?: WhatsappMessage | null;
 }
 
 export interface SendResult {

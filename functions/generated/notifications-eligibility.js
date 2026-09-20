@@ -6,7 +6,33 @@ import { currentConsentRecord, isCompleteConsentRecord, isRecordFormat, } from "
 import { contactFor, hasRawContact } from "./notifications-contacts.js";
 import { deliveryKey } from "./notifications-delivery.js";
 import { scheduledTimeFor } from "./notifications-schedule.js";
+import { whatsappMessageFor } from "./notifications-whatsapp.js";
 import { hashBody, renderTemplate } from "./notifications-templates.js";
+/**
+ * A trava do remetente real (13.4).
+ *
+ * Com provedor simulado nao ha o que conferir: nada sai do processo. Com
+ * provedor de verdade, falar pelo numero de uma clinica exige um cadastro que
+ * **a propria clinica nao escreve** — ele vem da operadora, pelo backend, com
+ * segundo fator e trilha.
+ *
+ * O modo de teste recusa destino fora da lista de testadores **aqui**, e nao no
+ * provedor: a recusa da Meta chegaria depois de a tentativa ja ter sido gasta,
+ * e tentativa recusada conta contra a reputacao do remetente.
+ */
+export function senderProblemFor(input) {
+    if (input.providerId === "SIMULATED")
+        return null;
+    const { sender } = input;
+    if (!sender || sender.channel !== input.channel)
+        return "SENDER_NOT_REGISTERED";
+    if (sender.status !== "APPROVED")
+        return "SENDER_NOT_APPROVED";
+    if (sender.mode === "TEST" && input.destination && !sender.testRecipients.includes(input.destination)) {
+        return "DESTINATION_NOT_IN_TEST_LIST";
+    }
+    return null;
+}
 export function evaluateRule(rule, input) {
     // 1 a 5. Organizacao, profissao, produto, consentimento e contato.
     const problem = gateProblem(rule, input.event, input);
@@ -53,6 +79,13 @@ function gateProblem(rule, event, input) {
     if (!settings.verifiedSenderChannels.includes(rule.channel)) {
         return "SENDER_NOT_VERIFIED";
     }
+    const senderProblem = senderProblemFor({
+        providerId: CHANNEL_META[rule.channel].providerId,
+        sender: input.sender ?? null,
+        channel: rule.channel,
+    });
+    if (senderProblem)
+        return senderProblem;
     // 2. O que a profissao permite.
     const professionRules = input.profession.notifications;
     if (!professionRules.allowedEvents.includes(event)) {
@@ -161,16 +194,36 @@ export function composeForSend(input) {
         client,
         professionalName: input.professionalName,
     };
-    const problem = gateProblem(rule, delivery.event, context);
+    const problem = gateProblem(rule, delivery.event, { ...context, sender: input.sender ?? null });
     if (problem)
         return stop(problem);
     const contact = contactFor(client, rule.channel);
     if (!contact)
         return stop("INVALID_CONTACT");
+    // So aqui existe destino: a lista de testadores do remetente e conferida
+    // contra ele, e nao no planejamento, quando o contato ainda pode mudar.
+    const restricted = senderProblemFor({
+        providerId: CHANNEL_META[rule.channel].providerId,
+        sender: input.sender ?? null,
+        channel: rule.channel,
+        destination: contact.destination,
+    });
+    if (restricted)
+        return stop(restricted);
     const rendered = renderFor(rule, delivery.event, context);
     if (!rendered.ok)
         return stop("TEMPLATE_REJECTED");
-    return { ok: true, destination: contact.destination, body: rendered.value };
+    return {
+        ok: true,
+        destination: contact.destination,
+        body: rendered.value,
+        template: whatsappMessageFor({
+            channel: rule.channel,
+            event: delivery.event,
+            disclosure: input.profession.notifications.disclosure,
+            context: templateContext(context),
+        }),
+    };
 }
 /**
  * A conferencia do despachante: tudo de `composeForSend` e, por ultimo, o texto.

@@ -104,6 +104,8 @@ export function toDeliveryDocument(plan, organizationId, now, actorId) {
         bodyLength: plan.bodyLength,
         contactHint: plan.contactHint,
         sentAt: null,
+        deliveredAt: null,
+        readAt: null,
         cancelledAt: null,
     };
 }

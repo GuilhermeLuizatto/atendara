@@ -41,8 +41,11 @@ export const COLLECTION_DATE_FIELDS = {
     "lastAttemptAt",
     "nextAttemptAt",
     "sentAt",
+    "deliveredAt",
+    "readAt",
     "cancelledAt",
   ],
+  messagingSenders: [...STAMP_FIELDS],
   automationTasks: [
     ...STAMP_FIELDS,
     "scheduledFor",

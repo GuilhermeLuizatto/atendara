@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { fromStored, toStored } from "./firestore-dates.js";
 import { hasRequiredSecondFactor } from "./generated/access-gate.js";
-import { isTerminalStatus, queueEnqueueAt, transitionTask } from "./generated/automation.js";
+import { isTerminalStatus, queueEnqueueAt } from "./generated/automation.js";
 import { paths } from "./generated/paths.js";
 import { permissionsForMembership } from "./generated/permissions.js";
 import { requeueTask } from "./automation.js";

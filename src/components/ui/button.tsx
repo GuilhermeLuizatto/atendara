@@ -47,6 +47,25 @@ export function buttonStyles({
   );
 }
 
+/**
+ * Acao discreta em cabecalho de cartao — "Ver agenda", "Marcar como lidos".
+ *
+ * Existe por causa do criterio 2.5.8 do WCAG 2.2: o alvo precisa ter ao menos
+ * **24 por 24 pixels**. Texto de 12px desenha uma faixa de 16px de altura, e no
+ * celular isso vira um alvo que erra o dedo — o problema aparece justamente em
+ * quem tem menos firmeza na mao, que e quem o criterio existe para atender.
+ *
+ * A altura minima e do ALVO, nao do texto: o texto continua pequeno, e a area
+ * clicavel cresce em volta dele.
+ */
+export function quietActionStyles(className?: string): string {
+  return cn(
+    "inline-flex min-h-6 items-center rounded-md text-xs font-medium transition-colors",
+    "focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2",
+    className,
+  );
+}
+
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;

@@ -167,6 +167,10 @@ export function AgendaView() {
             ))}
           </Select>
 
+          {/*
+            A etiqueta inteira e clicavel, e por isso ela e o alvo do criterio
+            2.5.8 — nao a caixa de 16px. O `min-h-8` e o que garante os 24px.
+          */}
           <label className="text-muted-foreground flex min-h-8 items-center gap-2 text-xs">
             <input
               type="checkbox"
@@ -174,7 +178,9 @@ export function AgendaView() {
               onChange={(event) =>
                 agenda.setShowCancelled(event.target.checked)
               }
-              className="accent-primary size-4"
+              // 16px de desenho com 4px de folga em volta: o alvo fecha os
+              // 24px do criterio 2.5.8 sem a caixa ficar desproporcional.
+              className="accent-primary size-4 p-1"
             />
             Mostrar cancelados
           </label>

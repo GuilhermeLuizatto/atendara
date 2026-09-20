@@ -17,12 +17,23 @@ export const MODULE_LABELS: Record<AppModule, string> = {
   dashboard: "Dashboard", agenda: "Agenda", clientes: "Clientes", mensagens: "Mensagens",
   financeiro: "Financeiro", agente: "Dara", configuracoes: "Configurações",
 };
-// Permissao sem area aqui fica fora da sessao: membros, cobranca e pedidos de
-// titular ainda nao tem tela, e o que nao tem tela nao precisa estar liberado.
+/**
+ * Area do painel de cada recurso.
+ *
+ * Permissao cujo recurso nao esta aqui **some da sessao em silencio** — e o que
+ * aconteceu com `notificationConsent:record`, que tem tela e trava de escrita
+ * desde sempre e mesmo assim nunca chegava a ninguem. A lista do que fica de
+ * fora de proposito vive em `OUT_OF_SESSION_RESOURCES`, no teste: recurso
+ * novo que nao entre em nenhuma das duas derruba a suite, em vez de sumir.
+ */
 const PERMISSION_MODULE: Partial<Record<string, AppModule>> = {
   appointment: "agenda", service: "agenda", client: "clientes", conversation: "mensagens", transaction: "financeiro",
   rule: "agente", aiDecision: "agente", notification: "dashboard", organization: "dashboard",
   notificationSettings: "configuracoes", agendaSettings: "dashboard", auditLog: "configuracoes",
+  // Registrado na ficha do cadastro, pela mesma tela que cria e edita o
+  // cadastro. Sem isto, ninguem consegue registrar consentimento — e sem
+  // consentimento nenhum aviso pode sair (regra 11).
+  notificationConsent: "clientes",
 };
 
 /**

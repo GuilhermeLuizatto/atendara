@@ -1,6 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { accountPermissions, canAccessModule, canAccessProfession, hasActiveAccess, isPlatformAdmin, PLATFORM_ADMIN_EMAIL } from "./access";
 import { APP_MODULES, type AccountAccess } from "@/types/access";
+import { permissionsForMembership } from "./permissions";
+import { ROLES } from "@/types/professional";
+
+/**
+ * Recursos que ficam de fora da sessao DE PROPOSITO: nao tem tela no painel, e
+ * o que nao tem tela nao precisa estar liberado no navegador. O backend confere
+ * esses por `permissionsForMembership`, sem passar por aqui.
+ *
+ * Quem construir a tela tira o recurso daqui e o liga a uma area em
+ * `PERMISSION_MODULE` — as duas listas juntas tem de cobrir tudo.
+ */
+const OUT_OF_SESSION_RESOURCES = [
+  "member",
+  "billing",
+  "privacy",
+  "platformAdmin",
+  // 13.9: as regras e as callables existem, o painel da fila ainda nao.
+  "automationQueue",
+  "automationTask",
+  "automationSwitch",
+];
 const account: AccountAccess = { userId: "user", email: PLATFORM_ADMIN_EMAIL, displayName: "Teste", platformRole: "PROFESSIONAL", professionId: "PSYCHOLOGIST", organizationId: "org-a", modules: [...APP_MODULES], status: "ACTIVE", subscriptionStatus: "ACTIVE", accessUntil: "2099-01-01T00:00:00Z", mustChangePassword: false, createdAt: "2026-01-01T00:00:00Z" };
 describe("Acesso por cadastro", () => {
   it("nao concede administracao pelo email", () => expect(isPlatformAdmin(account)).toBe(false));
@@ -39,6 +60,32 @@ describe("Acesso por cadastro", () => {
     const semAgenda = { ...account, modules: account.modules.filter(area => area !== "agenda") };
     expect(accountPermissions(semAgenda)).not.toContain("service:read");
   });
+  // O defeito que isto tranca: recurso sem area em PERMISSION_MODULE some da
+  // sessao sem erro nenhum, e a tela que depende dele simplesmente nao aparece.
+  it("nenhuma permissao do papel some do caminho sem estar na lista do que fica de fora", () => {
+    for (const role of ROLES) {
+      for (const titular of [false, true]) {
+        const concedidas = permissionsForMembership(role, titular);
+        const naSessao = accountPermissions(account, { role, isOrganizationHolder: titular });
+        const sumiram = concedidas
+          .filter(permission => !naSessao.includes(permission))
+          .filter(permission => !OUT_OF_SESSION_RESOURCES.includes(permission.split(":")[0]));
+
+        expect({ role, titular, sumiram }).toEqual({ role, titular, sumiram: [] });
+      }
+    }
+  });
+
+  it("registrar consentimento chega a quem cuida do cadastro", () => {
+    expect(accountPermissions(account, { role: "ASSISTANT", isOrganizationHolder: false })).toContain(
+      "notificationConsent:record",
+    );
+    const semClientes = { ...account, modules: account.modules.filter(area => area !== "clientes") };
+    expect(accountPermissions(semClientes, { role: "OWNER", isOrganizationHolder: true })).not.toContain(
+      "notificationConsent:record",
+    );
+  });
+
   it("admin acessa todas as profissoes depois da troca de senha", () => {
     const admin = { ...account, platformRole: "PLATFORM_ADMIN" as const, accessUntil: null, modules: [] };
     expect(canAccessProfession(admin, "DENTIST")).toBe(true);

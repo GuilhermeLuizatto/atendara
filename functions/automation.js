@@ -362,6 +362,12 @@ export async function runAutomationTask(data, deps = {}) {
   const step = await firestore.runTransaction(async (transaction) => {
     const task = stored("automationTasks", await transaction.get(taskRef));
     const context = { delivery: null, organization: null, appointment: null, client: null, professional: null, sender: null };
+    // As duas chaves, lidas na MESMA transacao que adquire a tarefa: desligar
+    // no meio do caminho para o envio que ja estava a caminho.
+    const switches = {
+      organization: stored("automationSwitches", await transaction.get(scope.doc("automationSwitches", "organization"))),
+      global: stored("platformAutomationSwitch", await transaction.get(firestore.doc(paths.platformAutomationSwitch()))),
+    };
 
     if (task && !isTerminalStatus(task.status)) {
       if (task.deliveryId) {
@@ -396,6 +402,7 @@ export async function runAutomationTask(data, deps = {}) {
       client: context.client,
       professionalName: context.professional?.displayName ?? context.appointment?.professionalName ?? null,
       sender: context.sender,
+      switches,
       now,
     });
 

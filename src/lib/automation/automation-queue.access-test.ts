@@ -193,14 +193,19 @@ describe("Fase 3, 13.2 — fila de automacao no servidor", () => {
     const trail = await fs().collection(paths.collection(organizationId, "auditLogs")).where("metadata.automationTaskId", "==", notice.id).get();
     expect(trail.docs.map((entry: { data(): Stored }) => entry.data().metadata.status)).toEqual(["SUCCEEDED"]);
 
-    // O navegador le a entrega, e so.
+    // O navegador le a entrega e, desde a 13.9, tambem a fila — mas so LE.
     const deliveryRef = doc(db, paths.document(organizationId, "notificationDeliveries", notice.id));
     expect((await getDoc(deliveryRef)).data()?.status).toBe("SENT");
     await expect(updateDoc(deliveryRef, { status: "FAILED", attempts: 0 })).rejects.toMatchObject({ code: "permission-denied" });
-    await expect(getDoc(doc(db, paths.document(organizationId, "automationTasks", notice.id)))).rejects.toMatchObject({ code: "permission-denied" });
-    await expect(getDocs(query(collection(db, paths.collection(organizationId, "automationTasks")), limit(5)))).rejects.toMatchObject({
-      code: "permission-denied",
-    });
+
+    // O painel da fila (13.9): quem tem `automationQueue:read` ve estado,
+    // tentativas e motivo. A fila nao guarda texto nem contato completo, entao
+    // abrir a leitura nao abre conteudo — e o que ela mostra e por que um aviso
+    // saiu ou nao saiu.
+    const queued = (await getDoc(doc(db, paths.document(organizationId, "automationTasks", notice.id)))).data() as Stored;
+    expect(queued.status).toBe("SUCCEEDED");
+    expect(JSON.stringify(queued)).not.toContain("+5500900000000");
+    await expect(getDocs(query(collection(db, paths.collection(organizationId, "automationTasks")), limit(5)))).resolves.toBeTruthy();
     await expect(
       setDoc(doc(db, paths.document(organizationId, "automationTasks", "forjada")), { organizationId, type: "WRITE_AUDIT", status: "SUCCEEDED" }),
     ).rejects.toMatchObject({ code: "permission-denied" });

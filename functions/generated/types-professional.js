@@ -44,6 +44,15 @@ export const PERMISSIONS = [
     "transaction:create",
     "transaction:update",
     "transaction:delete",
+    // Fila de automacao (13.9). Ler a fila e ver estado, tentativas e motivo —
+    // nunca texto de mensagem nem contato completo, que a fila nao guarda.
+    "automationQueue:read",
+    // Repetir uma tarefa que falhou. Separada da leitura porque faz sair
+    // mensagem: quem vê o problema não é necessariamente quem decide reenviar.
+    "automationTask:retry",
+    // Desligar e religar toda a saida da organizacao. Do titular, como a chave
+    // de casa: quem responde pela organizacao pode calar o sistema na hora.
+    "automationSwitch:manage",
     "rule:read",
     "rule:create",
     "rule:update",

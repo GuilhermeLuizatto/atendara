@@ -34,6 +34,10 @@ export const PLATFORM_COLLECTIONS = {
     platformProfessionRequests: "platformProfessionRequests",
     platformAuditLogs: "platformAuditLogs",
     platformRateLimits: "platformRateLimits",
+    // Chave de emergencia GERAL (13.9): um documento so, da plataforma inteira.
+    // Escrito pela chave mestra com segundo fator; lido pelo despachante antes
+    // de cada envio.
+    platformAutomationSwitch: "platformAutomationSwitch",
 };
 export const TENANT_COLLECTIONS = {
     professionals: "professionals",
@@ -55,6 +59,9 @@ export const TENANT_COLLECTIONS = {
     automationTasks: "automationTasks",
     // Conexao com a agenda externa de cada profissional (13.7). Guarda o token
     // de atualizacao CIFRADO com KMS; as regras recusam leitura pelo cliente.
+    // Chave de emergencia da organizacao (13.9): um documento so, de id
+    // `organization`. Escrito pelo titular, pelo backend, com trilha.
+    automationSwitches: "automationSwitches",
     calendarConnections: "calendarConnections",
     // Ocupado lido da agenda externa: so faixas de tempo, nunca titulo ou
     // convidado. Escrito pelo backend; lido por quem tem o modulo de agenda.
@@ -124,6 +131,7 @@ export const paths = {
     platformAuditLog: (logId) => `${PLATFORM_COLLECTIONS.platformAuditLogs}/${logId}`,
     /** Contador por usuario e callable. So o backend le e escreve. */
     platformRateLimit: (key) => `${PLATFORM_COLLECTIONS.platformRateLimits}/${key}`,
+    platformAutomationSwitch: () => `${PLATFORM_COLLECTIONS.platformAutomationSwitch}/global`,
 };
 /**
  * Mensagens ficam em subcolecao da conversa: o volume cresce muito mais rapido

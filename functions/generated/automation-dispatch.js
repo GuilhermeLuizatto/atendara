@@ -3,6 +3,7 @@ import { AUTOMATION_TASK_META, DISPATCH_CLOCK_SKEW_SECONDS } from "./automation-
 import { applyAttempt } from "./notifications-delivery.js";
 import { recheckBeforeSend } from "./notifications-eligibility.js";
 import { alertEffect, auditEffect } from "./automation-effects.js";
+import { outboundBlock, switchRetryAt } from "./automation-emergency.js";
 import { isLeaseStale, isTaskExpired, isTerminalStatus, queueEnqueueAt, transitionTask, } from "./automation-tasks.js";
 function cancelledDelivery(delivery, at) {
     return delivery
@@ -77,6 +78,15 @@ export function decideDispatch(input) {
     if (Date.parse(task.scheduledFor) - DISPATCH_CLOCK_SKEW_SECONDS * 1000 > Date.parse(now)) {
         return { kind: "REQUEUE", task, at: queueEnqueueAt(task, now) };
     }
+    // A chave de emergência é conferida aqui, imediatamente antes do envio, e
+    // não no planejamento: desligar a chave tem de parar o que já está na fila.
+    // A tarefa NÃO é cancelada — fica esperando, e volta sozinha ao religar.
+    const blocked = outboundBlock({
+        global: input.switches?.global ?? null,
+        organization: input.switches?.organization ?? null,
+    });
+    if (blocked)
+        return { kind: "REQUEUE", task, at: switchRetryAt(now) };
     if (!input.delivery)
         return cancel(task, null, "DELIVERY_NOT_FOUND", now);
     if (!input.organization || !input.profession) {

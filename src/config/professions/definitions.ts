@@ -99,6 +99,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       sessionPackages: true,
       serviceCatalog: false,
       depositOnBooking: false,
+      homeVisitDetails: false,
     },
   },
 
@@ -177,6 +178,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       sessionPackages: false,
       serviceCatalog: false,
       depositOnBooking: false,
+      homeVisitDetails: false,
     },
   },
 
@@ -254,6 +256,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       sessionPackages: false,
       serviceCatalog: false,
       depositOnBooking: false,
+      homeVisitDetails: false,
     },
   },
 
@@ -328,6 +331,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       sessionPackages: true,
       serviceCatalog: false,
       depositOnBooking: false,
+      homeVisitDetails: false,
     },
   },
 
@@ -402,6 +406,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       sessionPackages: true,
       serviceCatalog: false,
       depositOnBooking: false,
+      homeVisitDetails: false,
     },
   },
 
@@ -475,6 +480,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       sessionPackages: true,
       serviceCatalog: false,
       depositOnBooking: false,
+      homeVisitDetails: false,
     },
   },
 
@@ -555,6 +561,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       sessionPackages: true,
       serviceCatalog: false,
       depositOnBooking: false,
+      homeVisitDetails: false,
     },
   },
 
@@ -630,6 +637,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       sessionPackages: true,
       serviceCatalog: false,
       depositOnBooking: false,
+      homeVisitDetails: false,
     },
   },
 
@@ -710,6 +718,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       sessionPackages: false,
       serviceCatalog: true,
       depositOnBooking: true,
+      homeVisitDetails: true,
     },
   },
 };

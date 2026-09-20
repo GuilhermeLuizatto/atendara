@@ -60,6 +60,18 @@ export interface Appointment extends TenantScopedEntity {
    * retido" sem varrer a auditoria.
    */
   depositOutcome: DepositOutcome | null;
+  /**
+   * Endereco do atendimento a domicilio (E2.3). **Dado pessoal**: entra no
+   * mapa de `src/config/privacy.ts`, sai na exportacao e some na eliminacao.
+   *
+   * Nunca sai do painel: nao existe variavel de modelo para ele, nenhuma
+   * tarefa de automacao o carrega, e o aviso a cliente nao o menciona
+   * (decisao do titular, 20/09). Endereco em mensagem e endereco circulando
+   * pela Meta e pela operadora de telefonia sem precisar.
+   */
+  visitAddress: string | null;
+  /** Taxa de deslocamento, em centavos inteiros. Lancamento proprio (E2.3). */
+  travelFeeInCents: number | null;
   /** Observacao administrativa. Nao e registro clinico. */
   administrativeNotes: string | null;
   origin: AppointmentOrigin;

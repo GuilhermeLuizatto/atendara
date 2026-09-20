@@ -93,6 +93,8 @@ function appointment(patch: Partial<Appointment> = {}): Appointment {
     serviceName: null,
     depositInCents: null,
     depositOutcome: null,
+    visitAddress: null,
+    travelFeeInCents: null,
     modality: "ONLINE",
     status: "COMPLETED",
     priceInCents: 18000,

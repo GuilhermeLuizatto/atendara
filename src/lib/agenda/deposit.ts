@@ -4,11 +4,9 @@ import {
   type DepositChoice,
 } from "@/config/deposit";
 import type {
-  AppointmentPart,
   AppointmentStatus,
   DepositOutcome,
   ISODateString,
-  Transaction,
 } from "@/types";
 
 /**
@@ -19,19 +17,6 @@ import type {
  * for decidido aqui, e as duas implementações do repositório chamam as mesmas
  * funções: dinheiro não pode ter duas respostas.
  */
-
-/**
- * Que parte do atendimento um lancamento cobre.
- *
- * Lancamento criado antes da E2.2 nao tem a marca, e todos eles eram a receita
- * do servico: sem este `??`, um atendimento antigo passaria a nao ter receita
- * nenhuma aos olhos do codigo novo.
- */
-export function partOf(
-  transaction: Pick<Transaction, "appointmentPart">,
-): AppointmentPart {
-  return transaction.appointmentPart ?? "SERVICE";
-}
 
 export type DepositValidation =
   { ok: true; value: number | null } | { ok: false; error: string };

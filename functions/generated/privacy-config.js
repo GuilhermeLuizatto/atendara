@@ -175,6 +175,8 @@ export const PERSONAL_DATA_MAP = {
             "administrativeNotes",
             "cancellationReason",
             "externalCalendar",
+            // Endereco do atendimento a domicilio (E2.3). Diz onde a pessoa mora.
+            "visitAddress",
         ],
         retention: WHILE_ORGANIZATION,
         // Horario, valor e profissional ficam: sao a agenda e o financeiro da
@@ -187,6 +189,7 @@ export const PERSONAL_DATA_MAP = {
                 administrativeNotes: "NULL",
                 cancellationReason: "NULL",
                 externalCalendar: "NULL",
+                visitAddress: "NULL",
             },
         },
         onOrganizationDeletion: DELETE,

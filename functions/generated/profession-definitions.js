@@ -87,6 +87,7 @@ export const PROFESSION_DEFINITIONS = {
             sessionPackages: true,
             serviceCatalog: false,
             depositOnBooking: false,
+            homeVisitDetails: false,
         },
     },
     PSYCHIATRIST: {
@@ -158,6 +159,7 @@ export const PROFESSION_DEFINITIONS = {
             sessionPackages: false,
             serviceCatalog: false,
             depositOnBooking: false,
+            homeVisitDetails: false,
         },
     },
     DOCTOR: {
@@ -229,6 +231,7 @@ export const PROFESSION_DEFINITIONS = {
             sessionPackages: false,
             serviceCatalog: false,
             depositOnBooking: false,
+            homeVisitDetails: false,
         },
     },
     DENTIST: {
@@ -296,6 +299,7 @@ export const PROFESSION_DEFINITIONS = {
             sessionPackages: true,
             serviceCatalog: false,
             depositOnBooking: false,
+            homeVisitDetails: false,
         },
     },
     NUTRITIONIST: {
@@ -363,6 +367,7 @@ export const PROFESSION_DEFINITIONS = {
             sessionPackages: true,
             serviceCatalog: false,
             depositOnBooking: false,
+            homeVisitDetails: false,
         },
     },
     PHYSIOTHERAPIST: {
@@ -430,6 +435,7 @@ export const PROFESSION_DEFINITIONS = {
             sessionPackages: true,
             serviceCatalog: false,
             depositOnBooking: false,
+            homeVisitDetails: false,
         },
     },
     THERAPIST: {
@@ -504,6 +510,7 @@ export const PROFESSION_DEFINITIONS = {
             sessionPackages: true,
             serviceCatalog: false,
             depositOnBooking: false,
+            homeVisitDetails: false,
         },
     },
     PERSONAL_TRAINER: {
@@ -573,6 +580,7 @@ export const PROFESSION_DEFINITIONS = {
             sessionPackages: true,
             serviceCatalog: false,
             depositOnBooking: false,
+            homeVisitDetails: false,
         },
     },
     AESTHETICS: {
@@ -646,6 +654,7 @@ export const PROFESSION_DEFINITIONS = {
             sessionPackages: false,
             serviceCatalog: true,
             depositOnBooking: true,
+            homeVisitDetails: true,
         },
     },
 };

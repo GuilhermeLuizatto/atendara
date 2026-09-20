@@ -58,6 +58,12 @@ somados dao `appointment.priceInCents`, nunca mais que isso. O atendimento
 guarda `depositInCents` e, quando nao acontece, `depositOutcome` (`KEPT` ou
 `REFUNDED`), para a tela dizer "sinal retido" sem varrer a auditoria.
 
+O endereco do atendimento a domicilio (E2.3, `visitAddress`) vive no proprio
+atendimento e e DADO PESSOAL: esta em `PERSONAL_DATA_MAP`, sai na exportacao do
+titular e vira `null` na eliminacao. Ele nao tem variavel de modelo de aviso,
+entao nao existe caminho dele para uma mensagem; o formato e conferido tambem
+pelas Security Rules (`visitAddressOk()`), porque tela nao e barreira.
+
 `services` (E2.1) so existe de fato para profissao com
 `features.serviceCatalog` — hoje a Estetica. A colecao nao e criada para as
 demais, e a flag decide a TELA; as Security Rules travam por papel e por

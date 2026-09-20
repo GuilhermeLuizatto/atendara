@@ -152,6 +152,12 @@ export interface AppointmentInput {
    * sinal abate: o lancamento do servico nasce pelo valor menos o sinal.
    */
   depositInCents?: number | null;
+  /**
+   * Atendimento a domicilio (E2.3). O endereco e dado pessoal e so existe em
+   * modalidade `HOME_VISIT`, na profissao que registra domicilio.
+   */
+  visitAddress?: string | null;
+  travelFeeInCents?: number | null;
 }
 
 export interface TransactionInput {

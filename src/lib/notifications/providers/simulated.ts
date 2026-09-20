@@ -85,6 +85,7 @@ export function createSimulatedProvider(): NotificationProvider {
   return {
     id: "SIMULATED",
     simulated: true,
+    handoff: false,
     async send(request: SendRequest): Promise<SendResult> {
       return decide(request);
     },

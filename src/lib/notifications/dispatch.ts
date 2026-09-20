@@ -1,3 +1,4 @@
+import { MAX_DELIVERY_DELAY_MINUTES } from "@/config/notifications";
 import type { ID, ISODateString, NotificationDelivery } from "@/types";
 
 import {
@@ -7,6 +8,7 @@ import {
   type DeliveryTransition,
 } from "./delivery";
 import { providerFor } from "./providers";
+import { addMinutes } from "./schedule";
 import { hashBody } from "./templates";
 
 /**
@@ -55,12 +57,26 @@ export async function dispatchDelivery(
   }
 
   const provider = providerFor(delivery.channel);
+  if (provider.handoff) {
+    // Provedor de entrega em duas etapas precisa de uma tarefa para o resultado
+    // voltar. Este caminho nao tem fila, entao recusa antes de enviar — pior
+    // que nao enviar seria enviar e nunca saber o que aconteceu.
+    throw new Error(`O provedor ${provider.id} exige a fila de automação: este caminho não recebe o resultado de volta.`);
+  }
   const result = await provider.send({
     deliveryId: delivery.id,
     channel: delivery.channel,
     destination,
     body,
     attempt: delivery.attempts + 1,
+    // Este caminho nao passa pela fila (e o do simulador, anterior a 13.2), e
+    // por isso nao tem tarefa: a identidade do envio e a propria entrega. Um
+    // provedor de entrega em duas etapas nao e aceito aqui — a volta precisaria
+    // de uma tarefa para voltar.
+    taskId: delivery.id,
+    organizationId: delivery.organizationId,
+    idempotencyKey: delivery.id,
+    expiresAt: addMinutes(delivery.scheduledFor, MAX_DELIVERY_DELAY_MINUTES),
   });
 
   const transition = applyAttempt(delivery, result, now);

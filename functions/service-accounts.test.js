@@ -29,6 +29,9 @@ const GROUP_OF_FILE = {
   "privacy.js": "privacidade",
   "billing.js": "cobranca",
   "automation.js": "automacao",
+  // A volta da ponte do n8n muda estado de tarefa e grava a trilha do aviso:
+  // mesmo alcance do despachante, e nada alem dele.
+  "automation-callback.js": "automacao",
 };
 
 function sourceFileOf(name) {

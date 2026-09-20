@@ -1,0 +1,49 @@
+# n8n LOCAL do Atendara (Fase 3, 13.3).
+#
+# Separado de qualquer outro n8n da maquina: porta 5679 (nao 5678), volume
+# proprio e projeto proprio. Rodar `docker compose up -d` aqui nao encosta em
+# outra instalacao.
+#
+# Isto NAO e a VPS. Aqui nao existe HTTPS, nao existe backup e nao existe
+# credencial da Meta: e um n8n descartavel para exercitar o contrato com o
+# provedor ficticio. O endurecimento da VPS de verdade e a H.8.
+name: atendara-n8n-local
+
+services:
+  n8n:
+    image: n8nio/n8n:1.109.2
+    restart: unless-stopped
+    ports:
+      - "5679:5678"
+    environment:
+      - N8N_PORT=5678
+      - N8N_HOST=localhost
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5679/
+      - N8N_EDITOR_BASE_URL=http://localhost:5679/
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+      - TZ=America/Sao_Paulo
+      # Segredos do contrato. Os valores vem do arquivo .env deste diretorio,
+      # que o .gitignore recusa. Em desenvolvimento sao inventados; em producao
+      # sao os do Secret Manager, e nunca os mesmos.
+      - ATENDARA_TASK_SECRET=${ATENDARA_TASK_SECRET}
+      - ATENDARA_CALLBACK_SECRET=${ATENDARA_CALLBACK_SECRET}
+      # Para onde o resultado volta. Emulador de functions da maquina, ou a
+      # URL da function no projeto de testes.
+      - ATENDARA_CALLBACK_URL=${ATENDARA_CALLBACK_URL}
+      # Nada de execucao bem-sucedida guardada: o corpo da tarefa tem contato de
+      # paciente, e historico de execucao no n8n seria uma copia dele fora do
+      # Firestore. So o que falhou fica, e por pouco tempo.
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=none
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - EXECUTIONS_DATA_MAX_AGE=24
+      - EXECUTIONS_DATA_PRUNE=true
+      # O no de codigo precisa do modulo crypto para conferir a assinatura.
+      - NODE_FUNCTION_ALLOW_BUILTIN=crypto
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+    volumes:
+      - atendara-n8n-local:/home/node/.n8n
+
+volumes:
+  atendara-n8n-local:

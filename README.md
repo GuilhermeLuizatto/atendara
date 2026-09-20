@@ -256,19 +256,42 @@ Nenhum segredo fica no codigo.
 
 ## Roadmap
 
-| Fase  | Escopo                                                                    | Status |
-| ----- | ------------------------------------------------------------------------- | ------ |
-| **0** | Fundacao: tipos, multi-tenancy, Security Rules, design system, shell, CI  | ✅     |
-| **1** | Modulos: dashboard, agenda, CRM, financeiro, mensagens, regras, simulador | ✅     |
-| **2** | Firestore real: repositorios, RBAC aplicado, auditoria, notificacoes      | ✅     |
-| **3** | Automacao: n8n, WhatsApp, Google Calendar, confirmacao e remarcacao       | ⬜     |
-| **4** | IA: classificacao avancada, regras contextuais, extracao, analytics       | ⬜     |
-| **5** | Escala: clinicas, equipes, planos, billing, marketplace de integracoes    | 🟨     |
+O roadmap é dividido por entregas verificáveis. A Fase 3 deixou de ser um
+bloco único: o núcleo da fila e os contratos de automação já existem, enquanto
+a ativação de canais externos continua controlada por configuração, segredos e
+testes de ponta a ponta.
 
-Na fase 5, planos e billing estao implementados apenas no modo de testes do
-gateway; clinicas com equipe e marketplace ainda nao existem. Antes de dados
-reais, o produto ainda precisa de endurecimento de seguranca, backup testado e
-revisao de privacidade.
+| Fase | Escopo | Status |
+| --- | --- | --- |
+| **0** | Fundação: tipos, multi-tenancy, Security Rules, design system, shell e CI | ✅ |
+| **1** | Operação: dashboard, agenda, CRM, financeiro, mensagens, regras e simulador | ✅ |
+| **2** | Persistência: Firestore, RBAC, auditoria, notificações e isolamento entre tenants | ✅ |
+| **3A** | Automação interna: fila, HMAC, callback, controle de emergência e n8n local | ✅ |
+| **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco | 🟨 |
+| **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | ⬜ |
+| **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | ⬜ |
+| **5** | Produto: equipes, importação administrativa, suporte, cobrança real e planos | 🟨 |
+| **6** | Expansão: portfólio da Estética, marketplace e cobrador dos clientes | ⬜ |
+
+### Próximas entregas
+
+1. Validar a saída do WhatsApp em modo de teste com o número e o destinatário
+   autorizados pela Meta.
+2. Validar a entrada pelo webhook, incluindo assinatura, identificação do
+   tenant, classificação, escalonamento e opt-out.
+3. Colocar o n8n em ambiente HTTPS controlado, com rotação dos segredos e
+   monitoramento antes de qualquer piloto.
+4. Implementar o painel operacional da fila e os alertas de tarefa vencida.
+5. Avaliar remarcação e Google Calendar como frentes independentes, sem esperar
+   o domínio. O domínio entra quando a frente de e-mail for iniciada.
+6. Depois do piloto, priorizar equipes, importação de dados administrativos e
+   suporte. O cobrador de clientes só começa após decisão contábil, jurídica e
+   de gateway sobre split, responsabilidade fiscal e consentimento.
+
+Planos e billing da plataforma continuam em modo de testes. Equipes,
+marketplace, cobrança de clientes e IA externa ainda não estão liberados para
+produção. O sistema continua sem dados reais e sem afirmar conformidade com a
+LGPD.
 
 ---
 

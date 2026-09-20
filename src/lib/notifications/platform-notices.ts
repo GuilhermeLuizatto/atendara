@@ -68,15 +68,32 @@ export function platformNoticesFor(
   }
 
   if (subscription.status === "PAST_DUE" || subscription.status === "INCOMPLETE") {
-    notices.push({
-      event: "PAYMENT_PENDING",
-      severity: "ATTENTION",
-      channel: "IN_APP",
-      title: "Pagamento pendente",
-      body: "A última cobrança não foi confirmada. Atualize a forma de pagamento para não perder o acesso.",
-      actionLabel: "Regularizar",
-      actionHref: "/assinatura",
-    });
+    // Reembolso fecha o acesso com o MESMO estado `PAST_DUE` de quem nao pagou
+    // (`functions/billing.js`), e as duas situacoes sao opostas: uma pessoa
+    // deve, a outra recebeu de volta. Pedir "atualize a forma de pagamento" a
+    // quem foi reembolsado e cobrar por um dinheiro que ja devolvemos.
+    const devolvido = subscription.refundedAt !== null;
+    notices.push(
+      devolvido
+        ? {
+            event: "PAYMENT_PENDING",
+            severity: "INFO",
+            channel: "IN_APP",
+            title: "Cobrança devolvida",
+            body: "O valor do último ciclo foi devolvido, e com ele o acesso pago terminou. Assinar de novo reabre o painel.",
+            actionLabel: "Ver planos",
+            actionHref: "/assinatura",
+          }
+        : {
+            event: "PAYMENT_PENDING",
+            severity: "ATTENTION",
+            channel: "IN_APP",
+            title: "Pagamento pendente",
+            body: "A última cobrança não foi confirmada. Atualize a forma de pagamento para não perder o acesso.",
+            actionLabel: "Regularizar",
+            actionHref: "/assinatura",
+          },
+    );
   }
 
   if (subscription.status === "CANCELED" || subscription.status === "UNPAID") {

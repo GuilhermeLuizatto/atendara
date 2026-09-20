@@ -23,6 +23,8 @@ function subscription(
     accessUntil: "2026-10-06T00:00:00.000Z",
     cancelAtPeriodEnd: false,
     canceledAt: null,
+    refundedAt: null,
+    refundedPeriodEnd: null,
     gateway: { provider: "STRIPE", customerId: "cus_1", subscriptionId: "sub_1" },
     lastEventAt: null,
     lastEventId: null,
@@ -110,5 +112,36 @@ describe("avisos da plataforma ao assinante", () => {
     // Nenhum aviso da operadora sai por canal de clinica: sao remetentes,
     // audiencias e bases legais diferentes.
     for (const notice of todos) expect(notice.channel).toBe("IN_APP");
+  });
+});
+
+describe("reembolso nao e inadimplencia (19/09)", () => {
+  it("quem recebeu o dinheiro de volta nao le 'atualize a forma de pagamento'", () => {
+    const devolvida = subscription({
+      status: "PAST_DUE",
+      accessUntil: "2026-09-19T12:00:00.000Z",
+      refundedAt: "2026-09-19T12:00:00.000Z",
+      refundedPeriodEnd: "2026-10-09T12:00:00.000Z",
+    });
+
+    const avisos = platformNoticesFor(devolvida, "2026-09-20T12:00:00.000Z");
+    const pagamento = avisos.find((aviso) => aviso.event === "PAYMENT_PENDING");
+
+    expect(pagamento?.title).toBe("Cobrança devolvida");
+    expect(pagamento?.severity).toBe("INFO");
+    expect(pagamento?.body).not.toContain("Atualize a forma de pagamento");
+    expect(pagamento?.body).toContain("devolvido");
+  });
+
+  it("quem de fato nao pagou continua lendo o pedido de regularizar", () => {
+    const inadimplente = subscription({ status: "PAST_DUE", accessUntil: "2026-09-25T12:00:00.000Z" });
+
+    const pagamento = platformNoticesFor(inadimplente, "2026-09-20T12:00:00.000Z").find(
+      (aviso) => aviso.event === "PAYMENT_PENDING",
+    );
+
+    expect(pagamento?.title).toBe("Pagamento pendente");
+    expect(pagamento?.severity).toBe("ATTENTION");
+    expect(pagamento?.actionLabel).toBe("Regularizar");
   });
 });

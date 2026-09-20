@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { onRequest } from "firebase-functions/v2/https";
 
@@ -19,6 +19,8 @@ import {
 } from "./generated/automation-inbound.js";
 import { INBOUND_CONFIRMATION_NOTE, INBOUND_OPT_OUT_NOTE, INBOUND_PREVIEW_LENGTH } from "./generated/inbound-config.js";
 import { decide } from "./generated/decision-engine.js";
+import { confirmReschedule, decideReschedule, policyOf } from "./generated/agenda-reschedule.js";
+import { RESCHEDULE_REFUSAL_LABELS } from "./generated/reschedule-config.js";
 import { applyConsentChanges, plannedConsentChanges } from "./generated/notifications-consent-record.js";
 import { withOrganizationDefaults } from "./generated/organization-config.js";
 import { getProfession, isProfessionId } from "./generated/professions.js";
@@ -131,6 +133,12 @@ export async function applyInboundEvent(event, deps = {}) {
     const rules = (await transaction.get(firestore.collection(paths.collection(organizationId, "aiRules")))).docs.map(
       (document) => stored("aiRules", document),
     );
+    const pendingRaw = stored("rescheduleRequests", await transaction.get(scope.doc("rescheduleRequests", conversationId)));
+    // Reserva vencida nao vale escolha: o horario ja voltou a ser de quem quiser.
+    const pending =
+      pendingRaw && pendingRaw.status === "OFFERED" && Date.parse(now) <= Date.parse(pendingRaw.holdEndsAt)
+        ? pendingRaw
+        : null;
 
     const decision = decideInbound({
       event,
@@ -250,6 +258,43 @@ export async function applyInboundEvent(event, deps = {}) {
           updatedBy: null,
         }),
       );
+    }
+
+    // Remarcacao pedida pelo botao (13.6). O que decide e a politica da
+    // organizacao, nao o pedido: fora dela, o pedido nao some — muda de dono.
+    if (decision.kind === "RESCHEDULE") {
+      const resultado = await handleRescheduleRequest({
+        transaction,
+        scope,
+        firestore,
+        organizationId,
+        organizationSnapshot,
+        conversationId,
+        client,
+        messageId,
+        now,
+      });
+      return { outcome: resultado.outcome, organizationId, conversationId, clientId: client?.id ?? null, reason: resultado.reason ?? null };
+    }
+
+    // Escolha de um dos horarios oferecidos: "1", "2", "3". A conferencia de
+    // que o horario CONTINUA livre acontece aqui dentro, na mesma transacao —
+    // entre oferecer e escolher passa gente marcando.
+    if (decision.kind === "CLASSIFY" && pending && event.kind === "TEXT") {
+      const escolha = Number(event.text.trim());
+      if (Number.isInteger(escolha) && escolha >= 1 && escolha <= pending.slots.length) {
+        const resultado = await confirmChosenSlot({
+          transaction,
+          scope,
+          pending,
+          chosen: pending.slots[escolha - 1],
+          appointment: stored("appointments", await transaction.get(scope.doc("appointments", pending.appointmentId))),
+          busy: pending.busy ?? [],
+          messageId,
+          now,
+        });
+        return { outcome: resultado.outcome, organizationId, conversationId, clientId: client?.id ?? null, reason: resultado.reason ?? null };
+      }
     }
 
     // Texto comum vai ao motor: classificacao, regras, contexto e permissao.
@@ -439,3 +484,162 @@ export const inboundWebhook = onRequest(
     }
   },
 );
+
+/**
+ * O pedido de remarcacao: le a politica, procura o atendimento futuro e os
+ * horarios livres, e ou oferece (segurando a escolha) ou escala com o motivo.
+ *
+ * **Escalar nao e falhar.** Fora da politica, o pedido vira alerta para a
+ * equipe — com o motivo escrito —, e a pessoa nao fica sem resposta.
+ */
+async function handleRescheduleRequest(ctx) {
+  const { transaction, scope, firestore, organizationId, organizationSnapshot, conversationId, client, messageId, now } = ctx;
+
+  const organization = stored("organizations", organizationSnapshot);
+  const agenda = organization?.settings?.agenda ?? null;
+  const policy = policyOf(agenda?.reschedule ?? null);
+
+  // Atendimentos futuros da pessoa, que sao ao mesmo tempo o candidato a
+  // remarcacao e parte do que ocupa a agenda.
+  const futuros = client
+    ? (
+        await transaction.get(
+          firestore
+            .collection(paths.collection(organizationId, "appointments"))
+            .where("clientId", "==", client.id)
+            .where("startsAt", ">=", Timestamp.fromDate(new Date(now)))
+            .orderBy("startsAt")
+            .limit(5),
+        )
+      ).docs.map((document) => stored("appointments", document))
+    : [];
+  const appointment = futuros.find((item) => item.status === "SCHEDULED" || item.status === "CONFIRMED") ?? futuros[0] ?? null;
+
+  const busy = (
+    await transaction.get(
+      firestore
+        .collection(paths.collection(organizationId, "appointments"))
+        .where("startsAt", ">=", Timestamp.fromDate(new Date(now)))
+        .orderBy("startsAt")
+        .limit(200),
+    )
+  ).docs
+    .map((document) => stored("appointments", document))
+    .filter((item) => item.status !== "CANCELLED" && item.status !== "NO_SHOW")
+    .map((item) => ({ startsAt: item.startsAt, endsAt: item.endsAt }));
+
+  const decided = decideReschedule({
+    policy,
+    appointment,
+    previousReschedules: appointment?.rescheduledFromId ? 1 : 0,
+    availability: {
+      agenda: agenda ?? { workingDays: [1, 2, 3, 4, 5], workdayStart: "08:00", workdayEnd: "18:00", slotIntervalMinutes: 30 },
+      bufferMinutes: 0,
+      from: now,
+      to: new Date(Date.parse(now) + policy.searchWindowDays * 86_400_000).toISOString(),
+      busy,
+      // Fuso da organizacao: o expediente e lido nele, e a resposta sai em UTC.
+      timezoneOffsetMinutes: offsetOfTimezone(organization?.timezone),
+    },
+    now,
+  });
+
+  if (decided.kind === "ESCALATE") {
+    const alertId = `${messageId}-remarcacao`;
+    transaction.create(
+      scope.doc("notifications", alertId),
+      toStored("notifications", {
+        id: alertId,
+        organizationId,
+        kind: "AI_ESCALATION",
+        status: "UNREAD",
+        severity: "HIGH",
+        title: "Pedido de remarcação para a equipe",
+        body: RESCHEDULE_REFUSAL_LABELS[decided.reason],
+        resource: { type: "conversation", id: conversationId },
+        createdAt: now,
+        createdBy: null,
+        updatedAt: now,
+        updatedBy: null,
+      }),
+    );
+    return { outcome: "RESCHEDULE_ESCALATED", reason: decided.reason };
+  }
+
+  transaction.set(
+    scope.doc("rescheduleRequests", conversationId),
+    toStored("rescheduleRequests", {
+      id: conversationId,
+      organizationId,
+      clientId: client?.id ?? null,
+      appointmentId: decided.appointment.id,
+      status: "OFFERED",
+      slots: decided.slots,
+      busy,
+      holdEndsAt: decided.holdEndsAt,
+      offeredAt: now,
+      createdAt: now,
+      createdBy: null,
+      updatedAt: now,
+      updatedBy: null,
+    }),
+  );
+  return { outcome: "RESCHEDULE_OFFERED" };
+}
+
+/** A escolha da pessoa, conferida contra a agenda do mesmo instante. */
+async function confirmChosenSlot(ctx) {
+  const { transaction, scope, pending, chosen, appointment, busy, messageId, now } = ctx;
+  if (!appointment) return { outcome: "RESCHEDULE_ESCALATED", reason: "APPOINTMENT_NOT_FOUND" };
+
+  const confirmacao = confirmReschedule({
+    appointment,
+    chosen,
+    busy,
+    bufferMinutes: 0,
+    holdEndsAt: pending.holdEndsAt,
+    now,
+  });
+
+  if (confirmacao.kind === "RETRY") {
+    transaction.set(
+      scope.doc("rescheduleRequests", pending.id),
+      toStored("rescheduleRequests", { ...pending, status: "EXPIRED", updatedAt: now, updatedBy: null }),
+    );
+    return { outcome: "RESCHEDULE_RETRY", reason: confirmacao.reason };
+  }
+
+  transaction.set(scope.doc("appointments", appointment.id), toStored("appointments", confirmacao.appointment));
+  transaction.set(
+    scope.doc("rescheduleRequests", pending.id),
+    toStored("rescheduleRequests", { ...pending, status: "CONFIRMED", updatedAt: now, updatedBy: null }),
+  );
+  transaction.create(
+    scope.doc("auditLogs", `${messageId}-remarcado`),
+    toStored("auditLogs", {
+      id: `${messageId}-remarcado`,
+      organizationId: appointment.organizationId,
+      actorType: "SYSTEM",
+      actorId: null,
+      actorName: "Automação do Atendara",
+      action: "APPOINTMENT_UPDATED",
+      resource: { type: "appointment", id: appointment.id },
+      summary: "Remarcado pela própria pessoa, pelo WhatsApp, dentro da política da organização.",
+      metadata: { from: appointment.startsAt, to: confirmacao.appointment.startsAt, channel: "WHATSAPP" },
+      createdAt: now,
+      createdBy: null,
+      updatedAt: now,
+      updatedBy: null,
+    }),
+  );
+  return { outcome: "RESCHEDULE_CONFIRMED" };
+}
+
+/**
+ * Fuso da organizacao em minutos. Sem biblioteca de fuso no backend: o que
+ * existe hoje e o horario de Brasilia, e qualquer outro cai no mesmo valor ate
+ * a 13.7, que traz a agenda externa e com ela a conversao completa.
+ */
+function offsetOfTimezone(timezone) {
+  return timezone === "UTC" ? 0 : -180;
+}

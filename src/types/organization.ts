@@ -13,7 +13,35 @@ export type OrganizationKind =
 
 export type PlanTier = "TRIAL" | "SOLO" | "CLINIC" | "ENTERPRISE";
 
+/**
+ * Remarcacao pela propria pessoa atendida (Fase 3, 13.6).
+ *
+ * O padrao — tudo desligado ou conservador — e os limites de cada campo vivem
+ * em `src/config/reschedule.ts`.
+ */
+export interface ReschedulePolicy {
+  /** Trava mestra. Desligada, todo pedido vai para a equipe. */
+  enabled: boolean;
+  /** Antecedencia minima, em horas, entre o pedido e o horario atual. */
+  minimumNoticeHours: number;
+  /** Quantas vezes o MESMO atendimento pode ser remarcado pela pessoa. */
+  maxReschedulesPerAppointment: number;
+  /** Quantos horarios oferecer por vez. Lista longa vira indecisao. */
+  offeredSlots: number;
+  /** A pessoa pode cair com outro profissional. */
+  allowProfessionalChange: boolean;
+  /** Ate quando olhar a frente ao oferecer horarios. */
+  searchWindowDays: number;
+}
+
 export interface AgendaSettings {
+  /**
+   * Remarcacao pela propria pessoa atendida (13.6). Ausente = desligada, como
+   * `DEFAULT_RESCHEDULE_POLICY`. Fica aqui, e nao num bloco proprio, porque
+   * quem pode mexer nela e quem administra a agenda — a permissao
+   * `agendaSettings:update` e a regra de `settings.agenda` ja dizem isso.
+   */
+  reschedule?: ReschedulePolicy;
   /** 0 = domingo ... 6 = sabado. */
   workingDays: number[];
   workdayStart: string; // "08:00"

@@ -57,6 +57,10 @@ export const TENANT_COLLECTIONS = {
   // Fila de automacao: cada execucao (aviso, alerta, registro na trilha), com
   // estado, tentativa e validade. So o backend le e escreve.
   automationTasks: "automationTasks",
+  // Pedido de remarcacao em andamento (13.6): os horarios oferecidos e ate
+  // quando a escolha esta segurada. Um por conversa, com o id da conversa.
+  // So o backend le e escreve — o navegador nem oferece nem confirma.
+  rescheduleRequests: "rescheduleRequests",
   // Remetente comprovado de cada canal real (13.4): o numero aprovado na Meta,
   // o nome de exibicao e a situacao da verificacao. Um documento por canal, com
   // o proprio canal como id. Escrito SO pela operadora, pelo backend, com

@@ -99,6 +99,7 @@ try {
       await setDoc(doc(db, paths.document(org, "notifications", "alert")), { organizationId: org, status: "UNREAD", title: "Alerta" });
       await setDoc(doc(db, paths.document(org, "notificationDeliveries", "envio")), { organizationId: org, status: "PLANNED", attempts: 0, sentAt: null, channel: "SMS", event: "APPOINTMENT_REMINDER", bodyHash: "abcdef12", contactHint: "***0000" });
       await setDoc(doc(db, paths.document(org, "privacyRequests", "pedido")), { organizationId: org, type: "CLIENT_EXPORT", subjectId: "example", requestedBy: "a" });
+      await setDoc(doc(db, paths.document(org, "rescheduleRequests", "conversa")), { organizationId: org, clientId: "example", appointmentId: "example", status: "OFFERED" });
       await setDoc(doc(db, paths.document(org, "messagingSenders", "WHATSAPP")), { organizationId: org, channel: "WHATSAPP", providerId: "N8N_BRIDGE", providerSenderId: "123", displayNumber: "+5513999990000", displayName: "Clinica", status: "APPROVED", mode: "TEST", testRecipients: ["+5513999990000"] });
     }
     await setDoc(doc(db, paths.initialPassword("a")), { hash: "test-only" });
@@ -185,7 +186,7 @@ try {
   await denied(getDocs(query(collectionGroup(db("restricted"), "messages"), where("organizationId", "==", "org-a"))));
 
   // Listagem cruzada de cada colecao operacional.
-  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "auditLogs"]) {
+  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "rescheduleRequests", "auditLogs"]) {
     await denied(getDocs(query(collection(db("a"), paths.collection("org-b", name)), limit(5))));
   }
 
@@ -246,6 +247,17 @@ try {
   await deniedBecause("trilha forjada pelo navegador", setDoc(taskOf("adminRole", "trilha-forjada"), task({ type: "WRITE_AUDIT", status: "SUCCEEDED" })));
   await deniedBecause("fila sem o modulo de agenda", getDoc(taskOf("restricted", "example")));
 
+  // Pedido de remarcacao (13.6): ninguem le nem escreve pelo cliente. Segurar
+  // horario sem pedido, ou confirmar horario que nunca foi oferecido, comecaria
+  // por uma escrita aqui.
+  const pedidoOf = (uid) => doc(db(uid), paths.document("org-a", "rescheduleRequests", "conversa"));
+  for (const uid of ["a", "ownerRole", "adminRole"]) {
+    await deniedBecause(`${uid} lendo pedido de remarcacao`, getDoc(pedidoOf(uid)));
+    await deniedBecause(`${uid} segurando horario`, setDoc(pedidoOf(uid), { organizationId: "org-a", status: "OFFERED" }));
+    await deniedBecause(`${uid} confirmando horario`, updateDoc(pedidoOf(uid), { status: "CONFIRMED" }));
+    await deniedBecause(`${uid} apagando pedido`, deleteDoc(pedidoOf(uid)));
+  }
+
   // Remetente de canal real (13.4): quem administra a organizacao LE — precisa
   // saber qual numero aparece para quem e atendido —, e NINGUEM escreve pelo
   // cliente. Se a organizacao escrevesse aqui, ela se declararia habilitada a
@@ -295,7 +307,7 @@ try {
   await denied(getDoc(doc(operator, paths.document("org-a", "members", "a"))));
   await denied(updateDoc(doc(operator, paths.document("org-a", "members", "a")), { role: "OWNER" }));
   await denied(deleteDoc(doc(operator, paths.document("org-a", "members", "restricted"))));
-  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "auditLogs"]) {
+  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "rescheduleRequests", "auditLogs"]) {
     await denied(getDoc(doc(operator, own(name))));
     await denied(setDoc(doc(operator, paths.document("org-a", name, "da-operadora")), { organizationId: "org-a" }));
   }
@@ -536,6 +548,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 307);
+  assert.equal(checks, 322);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

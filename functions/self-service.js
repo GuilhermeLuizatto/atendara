@@ -22,6 +22,7 @@ import {
   trialUntil,
 } from "./generated/self-service.js";
 import { ACCOUNT_CALL_OPTIONS, parse } from "./platform-auth.js";
+import { seedServices } from "./service-seeds.js";
 import { assertGrantWindow, auditEntry, gateFields, grantDocument } from "./platform.js";
 import { consumeRateLimit, networkSubject } from "./rate-limit.js";
 import { runAs } from "./service-accounts.js";
@@ -224,6 +225,8 @@ export const registerSelfService = onCall(SIGNUP_CALL_OPTIONS, async (request) =
     active: true,
     ...stamp,
   });
+
+  seedServices(batch, { db: db(), organizationId, professionId: input.professionId, stamp });
 
   const registered = auditEntry({
     action: "SELF_SERVICE_REGISTERED",

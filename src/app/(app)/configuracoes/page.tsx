@@ -12,11 +12,12 @@ import { AgendaSettingsForm } from "@/features/settings/agenda-settings-form";
 import { AuditTrail } from "@/features/settings/audit-trail";
 import { NotificationSettings } from "@/features/settings/notification-settings";
 import { ProfessionChange } from "@/features/settings/profession-change";
+import { ServiceCatalog } from "@/features/settings/service-catalog";
 import { formatDate } from "@/lib/utils/format";
 import { useAuth } from "@/providers/auth-provider";
 import { useWorkspace } from "@/providers/workspace-provider";
 
-type Section = "geral" | "avisos" | "auditoria";
+type Section = "geral" | "servicos" | "avisos" | "auditoria";
 
 const ID_BASE = "configuracoes";
 
@@ -28,8 +29,11 @@ export default function SettingsPage() {
   const admin = isPlatformAdmin(access);
 
   const canReadAudit = session?.permissions.includes("auditLog:read") ?? false;
+  // A aba existe pela flag da profissao, nunca pelo nome dela (regra 1).
+  const hasCatalog = profession.features.serviceCatalog && (session?.permissions.includes("service:read") ?? false);
   const options: { value: Section; label: string }[] = [
     { value: "geral", label: "Geral" },
+    ...(hasCatalog ? [{ value: "servicos" as const, label: "Serviços" }] : []),
     { value: "avisos", label: "Avisos de atendimento" },
     ...(canReadAudit ? [{ value: "auditoria" as const, label: "Trilha de auditoria" }] : []),
   ];
@@ -112,6 +116,8 @@ export default function SettingsPage() {
             )}
           </>
         ) : null}
+
+        {active === "servicos" ? data ? <ServiceCatalog /> : <SkeletonCard lines={5} /> : null}
 
         {active === "avisos" ? data ? <NotificationSettings /> : <SkeletonCard lines={6} /> : null}
 

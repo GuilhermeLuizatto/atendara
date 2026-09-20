@@ -15,6 +15,7 @@ import type { WorkspaceCollection } from "@/services";
 const COLLECTION_LABELS: Record<WorkspaceCollection, string> = {
   professionals: "profissionais",
   clients: "cadastros",
+  services: "serviços",
   appointments: "agenda",
   conversations: "conversas",
   messages: "mensagens",

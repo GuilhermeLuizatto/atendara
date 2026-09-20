@@ -366,6 +366,14 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     onClientErasure: { action: "PSEUDONYMIZE", fields: { clientId: "CLIENT_ID" } },
     onOrganizationDeletion: DELETE,
   },
+  // Catalogo de servicos (E2.1). Nome, preco e duracao do TRABALHO da
+  // organizacao — nenhum dado de quem e atendido passa por aqui.
+  services: {
+    personalFields: [],
+    retention: { kind: "WHILE_ORGANIZATION_EXISTS" },
+    onClientErasure: { action: "NOT_APPLICABLE" },
+    onOrganizationDeletion: DELETE,
+  },
   // Remetente comprovado de cada canal (13.4). O que ha de pessoal aqui e
   // contato da PROPRIA equipe — numeros de testadores —, nunca de quem e
   // atendido; por isso pedido de titular de dados nao alcanca esta colecao.

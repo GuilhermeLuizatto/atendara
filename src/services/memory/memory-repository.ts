@@ -3,6 +3,7 @@ import { permissionsForRole } from "@/config/permissions";
 import { getProfession } from "@/config/professions";
 import { ruleInputSchema, validateRuleInput } from "@/lib/rules/validation";
 import { decide } from "@/lib/ai/decision-engine";
+import { nextServicePosition, validateService } from "@/lib/agenda/services";
 import { decisionInputPreview } from "@/lib/privacy/decision-preview";
 import { buildMockDataset } from "@/mocks";
 import {
@@ -34,6 +35,7 @@ import type {
   NotificationDelivery,
   OrganizationNotificationSettings,
   ProfessionId,
+  Service,
   Transaction,
 } from "@/types";
 
@@ -47,6 +49,7 @@ import {
   type NotificationInput,
   type RepositoryActor,
   type RuleInput,
+  type ServiceInput,
   type TransactionInput,
   type WorkspaceLoadState,
   type WorkspaceRepository,
@@ -368,6 +371,158 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     });
   }
 
+  // --------------------------------------------------------- servicos
+
+  private requireService(id: ID): Service {
+    const service = this.snapshot.services.find((item) => item.id === id);
+    if (!service) throw new RepositoryError("Serviço não encontrado.");
+    return service;
+  }
+
+  /**
+   * A mesma validação do Firestore: duas respostas diferentes para o mesmo
+   * formulário seria uma regra por implementação.
+   */
+  private validateService(input: ServiceInput, editingId: ID | null): ServiceInput {
+    const validation = validateService(input, { existing: this.snapshot.services, editingId });
+    if (!validation.ok) throw new RepositoryError(validation.error);
+    return validation.value;
+  }
+
+  async createService(raw: ServiceInput): Promise<ID> {
+    this.assertPermission("service:manage");
+    const input = this.validateService(raw, null);
+    const now = this.now();
+    const id = this.nextId("service");
+
+    const service: Service = {
+      id,
+      organizationId: this.organizationId,
+      ...this.stamp(now),
+      ...input,
+      position: nextServicePosition(this.snapshot.services),
+      archivedAt: null,
+    };
+
+    this.commit({
+      ...this.snapshot,
+      services: [...this.snapshot.services, service],
+      auditLogs: [
+        this.audit(
+          {
+            action: "CREATE",
+            actorType: "USER",
+            resource: { type: "service", id },
+            summary: `Serviço "${service.name}" criado.`,
+            metadata: {
+              priceInCents: service.priceInCents,
+              durationMinutes: service.durationMinutes,
+              enabled: service.enabled,
+            },
+          },
+          now,
+        ),
+        ...this.snapshot.auditLogs,
+      ],
+    });
+
+    return id;
+  }
+
+  async updateService(id: ID, patch: Partial<ServiceInput>): Promise<void> {
+    this.assertPermission("service:manage");
+    const existing = this.requireService(id);
+    if (existing.archivedAt) throw new RepositoryError("Serviço arquivado não pode ser alterado.");
+    const input = this.validateService({ ...existing, ...patch }, id);
+    const now = this.now();
+    const updated: Service = { ...existing, ...input, updatedAt: now, updatedBy: this.actor.userId };
+
+    this.commit({
+      ...this.snapshot,
+      services: this.snapshot.services.map((service) => (service.id === id ? updated : service)),
+      auditLogs: [
+        this.audit(
+          {
+            action: "UPDATE",
+            actorType: "USER",
+            resource: { type: "service", id },
+            summary: `Serviço "${updated.name}" alterado.`,
+            metadata: {
+              priceInCents: updated.priceInCents,
+              previousPriceInCents: existing.priceInCents,
+              durationMinutes: updated.durationMinutes,
+              enabled: updated.enabled,
+            },
+          },
+          now,
+        ),
+        ...this.snapshot.auditLogs,
+      ],
+    });
+  }
+
+  /** Arquivar em vez de apagar: atendimento passado guarda o id do serviço. */
+  async archiveService(id: ID): Promise<void> {
+    this.assertPermission("service:manage");
+    const existing = this.requireService(id);
+    const now = this.now();
+    const archived: Service = {
+      ...existing,
+      enabled: false,
+      archivedAt: now,
+      updatedAt: now,
+      updatedBy: this.actor.userId,
+    };
+
+    this.commit({
+      ...this.snapshot,
+      services: this.snapshot.services.map((service) => (service.id === id ? archived : service)),
+      auditLogs: [
+        this.audit(
+          {
+            action: "UPDATE",
+            actorType: "USER",
+            resource: { type: "service", id },
+            summary: `Serviço "${existing.name}" arquivado.`,
+            metadata: { archived: true },
+          },
+          now,
+        ),
+        ...this.snapshot.auditLogs,
+      ],
+    });
+  }
+
+  async deleteService(id: ID): Promise<void> {
+    this.assertPermission("service:manage");
+    const existing = this.requireService(id);
+    const usado = this.snapshot.appointments.some((appointment) => appointment.serviceId === id);
+    if (usado) {
+      throw new RepositoryError(
+        "Este serviço já foi usado em um atendimento. Arquive em vez de apagar, para o histórico continuar legível.",
+      );
+    }
+    const now = this.now();
+
+    this.commit({
+      ...this.snapshot,
+      services: this.snapshot.services.filter((service) => service.id !== id),
+      auditLogs: [
+        this.audit(
+          {
+            action: "DELETE",
+            actorType: "USER",
+            resource: { type: "service", id },
+            summary: `Serviço "${existing.name}" apagado.`,
+            metadata: { name: existing.name },
+          },
+          now,
+        ),
+        ...this.snapshot.auditLogs,
+      ],
+    });
+  }
+
   // ------------------------------------------------------- atendimentos
 
   async createAppointment(input: AppointmentInput): Promise<ID> {
@@ -403,6 +558,8 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       startsAt: input.startsAt,
       endsAt,
       durationMinutes: input.durationMinutes,
+      serviceId: input.serviceId ?? null,
+      serviceName: input.serviceName ?? null,
       modality: input.modality,
       status: input.status,
       priceInCents: input.priceInCents,

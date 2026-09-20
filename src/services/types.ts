@@ -18,6 +18,8 @@ import type {
   Organization,
   OrganizationNotificationSettings,
   Professional,
+  Service,
+  ServiceInput,
   StoredNotificationConsent,
   Transaction,
 } from "@/types";
@@ -26,6 +28,7 @@ import type {
 export type WorkspaceCollection =
   | "professionals"
   | "clients"
+  | "services"
   | "appointments"
   | "conversations"
   | "messages"
@@ -74,6 +77,11 @@ export interface WorkspaceSnapshot {
   organization: Organization;
   professionals: Professional[];
   clients: Client[];
+  /**
+   * Catalogo de servicos (E2.1). Vazio em profissao sem
+   * `features.serviceCatalog` — a colecao nem chega a existir.
+   */
+  services: Service[];
   appointments: Appointment[];
   conversations: Conversation[];
   messages: Message[];
@@ -104,6 +112,8 @@ export interface RepositoryActor {
 
 // --------------------------------------------------------------- entradas
 
+export type { ServiceInput };
+
 export interface ClientInput {
   /** Aceite geral. Sozinho nao autoriza envio: falta nomear o canal. */
   appointmentNotificationsEnabled?: boolean;
@@ -133,6 +143,9 @@ export interface AppointmentInput {
   status: AppointmentStatus;
   priceInCents: number;
   administrativeNotes: string | null;
+  /** Servico do catalogo (E2.1). Ausente em profissao sem catalogo. */
+  serviceId?: ID | null;
+  serviceName?: string | null;
 }
 
 export interface TransactionInput {
@@ -242,6 +255,15 @@ export interface WorkspaceRepository {
    */
   loadMore(collection: WorkspaceCollection): Promise<void>;
   setActor(actor: RepositoryActor): void;
+
+  createService(input: ServiceInput): Promise<ID>;
+  updateService(id: ID, input: Partial<ServiceInput>): Promise<void>;
+  /**
+   * Arquiva em vez de apagar quando o servico ja foi usado: atendimento
+   * passado guarda o id, e apagar o servico deixaria um registro sem nome.
+   */
+  archiveService(id: ID): Promise<void>;
+  deleteService(id: ID): Promise<void>;
 
   createClient(input: ClientInput): Promise<ID>;
   updateClient(id: ID, input: Partial<ClientInput>): Promise<void>;

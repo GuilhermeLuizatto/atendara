@@ -45,6 +45,7 @@ export const ORGANIZATION_EXPORT_SECTIONS = [
     "aiDecisions",
     "notifications",
     "notificationDeliveries",
+    "services",
     "messagingSenders",
     "rescheduleRequests",
     "automationSwitches",

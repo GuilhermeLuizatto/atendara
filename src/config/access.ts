@@ -20,7 +20,7 @@ export const MODULE_LABELS: Record<AppModule, string> = {
 // Permissao sem area aqui fica fora da sessao: membros, cobranca e pedidos de
 // titular ainda nao tem tela, e o que nao tem tela nao precisa estar liberado.
 const PERMISSION_MODULE: Partial<Record<string, AppModule>> = {
-  appointment: "agenda", client: "clientes", conversation: "mensagens", transaction: "financeiro",
+  appointment: "agenda", service: "agenda", client: "clientes", conversation: "mensagens", transaction: "financeiro",
   rule: "agente", aiDecision: "agente", notification: "dashboard", organization: "dashboard",
   notificationSettings: "configuracoes", agendaSettings: "dashboard", auditLog: "configuracoes",
 };

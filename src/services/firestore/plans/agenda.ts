@@ -72,6 +72,8 @@ export function planCreateAppointment(
     startsAt: input.startsAt,
     endsAt,
     durationMinutes: input.durationMinutes,
+    serviceId: input.serviceId ?? null,
+    serviceName: input.serviceName ?? null,
     modality: input.modality,
     status: input.status,
     priceInCents: input.priceInCents,

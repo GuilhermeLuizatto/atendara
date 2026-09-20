@@ -21,6 +21,9 @@ const ALL_PERMISSIONS = [...PERMISSIONS] as Permission[];
 
 const READ_ONLY_PERMISSIONS: Permission[] = [
   "organization:read",
+  // Quem ve a agenda precisa ver o catalogo: e ele que diz o que cada
+  // atendimento e, quanto dura e quanto custa.
+  "service:read",
   "member:read",
   "client:read",
   "appointment:read",
@@ -49,6 +52,8 @@ const ASSISTANT_PERMISSIONS: Permission[] = [
 
 const PROFESSIONAL_PERMISSIONS: Permission[] = [
   ...ASSISTANT_PERMISSIONS,
+  // Quem atende define o proprio preco e a propria duracao (decisao de 13/09).
+  "service:manage",
   "automationQueue:read",
   "client:delete",
   "transaction:update",

@@ -19,6 +19,7 @@ import type {
   NotificationDelivery,
   Professional,
   ProfessionId,
+  Service,
   Transaction,
 } from "@/types";
 
@@ -31,6 +32,7 @@ export interface SnapshotParts {
   membership: Membership | null;
   professionals: Professional[];
   clients: Client[];
+  services: Service[];
   appointments: Appointment[];
   conversations: Conversation[];
   messages: Message[];
@@ -47,6 +49,7 @@ export function emptyParts(): SnapshotParts {
     organization: null,
     membership: null,
     professionals: [],
+    services: [],
     clients: [],
     appointments: [],
     conversations: [],
@@ -107,6 +110,10 @@ export function assembleSnapshot(
     organization,
     professionals: parts.professionals,
     clients,
+    // Ordem escolhida por ela; nome como desempate.
+    services: [...parts.services].sort(
+      (a, b) => a.position - b.position || a.name.localeCompare(b.name, "pt-BR"),
+    ),
     appointments: [...parts.appointments].sort((a, b) =>
       a.startsAt.localeCompare(b.startsAt),
     ),

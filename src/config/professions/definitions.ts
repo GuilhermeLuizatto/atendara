@@ -97,6 +97,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       insurancePlans: false,
       recurringByDefault: true,
       sessionPackages: true,
+      serviceCatalog: false,
     },
   },
 
@@ -173,6 +174,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       insurancePlans: true,
       recurringByDefault: true,
       sessionPackages: false,
+      serviceCatalog: false,
     },
   },
 
@@ -248,6 +250,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       insurancePlans: true,
       recurringByDefault: false,
       sessionPackages: false,
+      serviceCatalog: false,
     },
   },
 
@@ -320,6 +323,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       insurancePlans: true,
       recurringByDefault: false,
       sessionPackages: true,
+      serviceCatalog: false,
     },
   },
 
@@ -392,6 +396,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       insurancePlans: false,
       recurringByDefault: true,
       sessionPackages: true,
+      serviceCatalog: false,
     },
   },
 
@@ -463,6 +468,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       insurancePlans: true,
       recurringByDefault: true,
       sessionPackages: true,
+      serviceCatalog: false,
     },
   },
 
@@ -541,6 +547,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       insurancePlans: false,
       recurringByDefault: true,
       sessionPackages: true,
+      serviceCatalog: false,
     },
   },
 
@@ -614,6 +621,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       insurancePlans: false,
       recurringByDefault: true,
       sessionPackages: true,
+      serviceCatalog: false,
     },
   },
 
@@ -692,6 +700,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       insurancePlans: false,
       recurringByDefault: false,
       sessionPackages: false,
+      serviceCatalog: true,
     },
   },
 };

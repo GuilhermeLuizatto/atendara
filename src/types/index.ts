@@ -22,3 +22,4 @@ export * from "./privacy";
 export * from "./profession";
 export * from "./professional";
 export * from "./rules";
+export * from "./service";

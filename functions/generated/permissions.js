@@ -12,6 +12,9 @@ import { PERMISSIONS, PLATFORM_PERMISSIONS, } from "./types.js";
 const ALL_PERMISSIONS = [...PERMISSIONS];
 const READ_ONLY_PERMISSIONS = [
     "organization:read",
+    // Quem ve a agenda precisa ver o catalogo: e ele que diz o que cada
+    // atendimento e, quanto dura e quanto custa.
+    "service:read",
     "member:read",
     "client:read",
     "appointment:read",
@@ -38,6 +41,8 @@ const ASSISTANT_PERMISSIONS = [
 ];
 const PROFESSIONAL_PERMISSIONS = [
     ...ASSISTANT_PERMISSIONS,
+    // Quem atende define o proprio preco e a propria duracao (decisao de 13/09).
+    "service:manage",
     "automationQueue:read",
     "client:delete",
     "transaction:update",

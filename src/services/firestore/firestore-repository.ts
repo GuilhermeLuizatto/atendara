@@ -40,6 +40,7 @@ import {
   type NotificationInput,
   type RepositoryActor,
   type RuleInput,
+  type ServiceInput,
   type TransactionInput,
   type WorkspaceCollection,
   type WorkspaceLoadState,
@@ -84,6 +85,12 @@ import {
   planUpdateRule,
 } from "./plans/rules";
 import {
+  planArchiveService,
+  planCreateService,
+  planDeleteService,
+  planUpdateService,
+} from "./plans/services";
+import {
   SNAPSHOT_PAGE_SIZES,
   generateId,
   generateMessageId,
@@ -116,6 +123,7 @@ type PartName = keyof SnapshotParts;
 const COLLECTION_PARTS: Array<[PagedPart, ConvertedCollection, WorkspaceCollection]> = [
   ["professionals", "professionals", "professionals"],
   ["clients", "clients", "clients"],
+  ["services", "services", "services"],
   ["appointments", "appointments", "appointments"],
   ["conversations", "conversations", "conversations"],
   ["messages", "messages", "messages"],
@@ -675,6 +683,26 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
   }
 
   // --------------------------------------------------------------- regras
+
+  // -------------------------------------------------------- servicos
+
+  async createService(input: ServiceInput): Promise<ID> {
+    const plan = planCreateService(this.context(), input);
+    await this.commit(plan.writes);
+    return plan.result;
+  }
+
+  async updateService(id: ID, input: Partial<ServiceInput>): Promise<void> {
+    await this.commit(planUpdateService(this.context(), id, input).writes);
+  }
+
+  async archiveService(id: ID): Promise<void> {
+    await this.commit(planArchiveService(this.context(), id).writes);
+  }
+
+  async deleteService(id: ID): Promise<void> {
+    await this.commit(planDeleteService(this.context(), id).writes);
+  }
 
   async createRule(input: RuleInput): Promise<ID> {
     const plan = planCreateRule(this.context(), input);

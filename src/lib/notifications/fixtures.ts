@@ -165,6 +165,8 @@ export function appointment(overrides: Partial<Appointment> = {}): Appointment {
     startsAt: APPOINTMENT_START,
     endsAt: "2026-09-11T01:00:00.000Z",
     durationMinutes: 60,
+    serviceId: null,
+    serviceName: null,
     modality: "IN_PERSON",
     status: "SCHEDULED",
     priceInCents: 12_000,

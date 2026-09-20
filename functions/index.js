@@ -11,6 +11,7 @@ import { resolveAccountGate } from "./generated/access-gate.js";
 import { ACCOUNT_CALL_OPTIONS, accountOf, adminOf, initialCredential, parse } from "./platform-auth.js";
 import { assertGrantWindow, auditEntry, gateFields, grantDocument, initialGrantSchema } from "./platform.js";
 import { runAs } from "./service-accounts.js";
+import { seedServices } from "./service-seeds.js";
 import { passwordPolicyError } from "./generated/password-policy.js";
 import { PASSWORD_LENGTH } from "./generated/platform-config.js";
 
@@ -49,6 +50,7 @@ export const registerProfessional = onCall(CONTAS_CALL_OPTIONS, async request =>
   // recusaria o primeiro atendimento. O cliente nao pode cria-lo (as regras
   // exigem papel administrativo), entao ele nasce aqui, junto do resto.
   batch.create(db.doc(paths.document(organizationId, "professionals", user.uid)), { id: user.uid, organizationId, userId: user.uid, displayName: input.displayName, email: input.email, phone: null, profession: input.professionId, licenseNumber: null, specialties: [], avatarUrl: null, active: true, ...stamp });
+  seedServices(batch, { db, organizationId, professionId: input.professionId, stamp });
   const registered = auditEntry({ action: "ACCOUNT_REGISTERED", actorId: request.auth.uid, organizationId, targetUserId: user.uid, details: { professionId: input.professionId, modules: input.modules, initialGrant: grant ? { kind: grant.kind, until: grant.until } : null }, createdAt });
   batch.create(registered.ref, registered.data);
   if (grant) {

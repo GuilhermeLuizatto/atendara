@@ -32,6 +32,8 @@ import type { ID } from "@/types";
 export const SNAPSHOT_PAGE_SIZES = {
   professionals: 50,
   clients: 500,
+  // O catalogo e pequeno por natureza: o teto de 100 esta em SERVICE_LIMITS.
+  services: 100,
   appointments: 500,
   conversations: 200,
   messages: 500,
@@ -90,6 +92,10 @@ export const snapshotQueries: Record<
       orderBy("fullName"),
       limit(count),
     ),
+
+  // A ordem da lista e a que ela escolheu (`position`).
+  services: (db, organizationId, count) =>
+    query(tenantQuery(db, organizationId, "services"), orderBy("position"), limit(count)),
 
   appointments: (db, organizationId, count) =>
     query(

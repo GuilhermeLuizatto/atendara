@@ -34,6 +34,10 @@ export const PERMISSIONS = [
     // porque e prova, e nao dado de cadastro: so acrescenta ou retira registro,
     // nunca apaga o historico.
     "notificationConsent:record",
+    // Catalogo de servicos (E2.1). Separado de `appointment:*` porque mexer no
+    // preco do trabalho nao e o mesmo que marcar um horario.
+    "service:read",
+    "service:manage",
     "appointment:read",
     "appointment:create",
     "appointment:update",

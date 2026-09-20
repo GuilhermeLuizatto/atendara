@@ -91,6 +91,8 @@ function appointment(patch: Partial<Appointment> = {}): Appointment {
     durationMinutes: 50,
     serviceId: null,
     serviceName: null,
+    depositInCents: null,
+    depositOutcome: null,
     modality: "ONLINE",
     status: "COMPLETED",
     priceInCents: 18000,
@@ -109,6 +111,7 @@ function transaction(patch: Partial<Transaction> = {}): Transaction {
   return {
     id: "txn-1",
     organizationId: ORG,
+    appointmentPart: null,
     createdAt: NOW,
     updatedAt: NOW,
     createdBy: null,

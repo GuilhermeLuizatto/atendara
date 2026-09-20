@@ -1,5 +1,14 @@
+import { DEPOSIT_DESCRIPTION_PREFIX, type DepositChoice } from "@/config/deposit";
+import { getProfession } from "@/config/professions";
+import {
+  depositDueDate,
+  partOf,
+  serviceAmountFor,
+  settleDeposit,
+  validateDeposit,
+} from "@/lib/agenda/deposit";
 import { addMinutesISO } from "@/lib/utils/datetime";
-import type { Appointment, AppointmentStatus, ID, Transaction } from "@/types";
+import type { Appointment, AppointmentPart, AppointmentStatus, ID, Transaction } from "@/types";
 
 import { assertPermission } from "../../guards";
 import { findConflict } from "../../aggregates";
@@ -45,6 +54,57 @@ function assertNoConflict(
   }
 }
 
+/** Sinal so existe onde a profissao trabalha com sinal (E2.2). */
+function depositOf(ctx: PlanContext, raw: number | null, priceInCents: number): number | null {
+  const validation = validateDeposit({
+    depositInCents: raw,
+    priceInCents,
+    // A profissao da organizacao decide, nunca um `if` por nome (regra 1).
+    available: getProfession(ctx.snapshot.organization.primaryProfession).features.depositOnBooking,
+  });
+  if (!validation.ok) throw new RepositoryError(validation.error);
+  return validation.value;
+}
+
+function incomeWrite(
+  ctx: PlanContext,
+  input: {
+    appointmentId: ID;
+    part: AppointmentPart;
+    amountInCents: number;
+    dueDate: string;
+    description: string;
+    client: { id: ID; fullName: string };
+    professionalId: ID;
+  },
+): WriteOperation {
+  const id = ctx.newId("transactions");
+  const transaction: Transaction = {
+    id,
+    organizationId: ctx.organizationId,
+    ...stamp(ctx),
+    type: "INCOME",
+    clientId: input.client.id,
+    clientName: input.client.fullName,
+    professionalId: input.professionalId,
+    appointmentId: input.appointmentId,
+    appointmentPart: input.part,
+    description: input.description,
+    amountInCents: input.amountInCents,
+    status: "PENDING",
+    method: null,
+    dueDate: input.dueDate,
+    paidAt: null,
+    gateway: null,
+  };
+  return {
+    op: "set",
+    collection: "transactions",
+    path: docPath(ctx, "transactions", id),
+    data: transaction as unknown as Record<string, unknown>,
+  };
+}
+
 export function planCreateAppointment(
   ctx: PlanContext,
   input: AppointmentInput,
@@ -59,6 +119,8 @@ export function planCreateAppointment(
     startsAt: input.startsAt,
     endsAt,
   });
+
+  const deposit = depositOf(ctx, input.depositInCents ?? null, input.priceInCents);
 
   const id = ctx.newId("appointments");
   const appointment: Appointment = {
@@ -77,6 +139,8 @@ export function planCreateAppointment(
     modality: input.modality,
     status: input.status,
     priceInCents: input.priceInCents,
+    depositInCents: deposit,
+    depositOutcome: null,
     administrativeNotes: input.administrativeNotes,
     origin: "MANUAL",
     confirmedAt: input.status === "CONFIRMED" ? ctx.now : null,
@@ -97,31 +161,33 @@ export function planCreateAppointment(
 
   // Todo atendimento cobrado gera a receita correspondente. E o que mantem o
   // financeiro coerente com a agenda sem lancamento manual duplicado.
-  if (appointment.priceInCents > 0) {
-    const transactionId = ctx.newId("transactions");
-    const transaction: Transaction = {
-      id: transactionId,
-      organizationId: ctx.organizationId,
-      ...stamp(ctx),
-      type: "INCOME",
-      clientId: client.id,
-      clientName: client.fullName,
-      professionalId: professional.id,
-      appointmentId: id,
-      description: `Atendimento de ${client.fullName}`,
-      amountInCents: appointment.priceInCents,
-      status: "PENDING",
-      method: null,
-      dueDate: appointment.startsAt,
-      paidAt: null,
-      gateway: null,
-    };
-    writes.push({
-      op: "set",
-      collection: "transactions",
-      path: docPath(ctx, "transactions", transactionId),
-      data: transaction as unknown as Record<string, unknown>,
-    });
+  //
+  // Com sinal sao DOIS lancamentos: o sinal, que vence na marcacao, e o que
+  // fica a pagar, que vence no atendimento. Somados dao o valor cobrado.
+  const comum = { appointmentId: id, client, professionalId: professional.id };
+  const aPagar = serviceAmountFor(appointment.priceInCents, deposit);
+  if (aPagar > 0) {
+    writes.push(
+      incomeWrite(ctx, {
+        ...comum,
+        part: "SERVICE",
+        amountInCents: aPagar,
+        dueDate: appointment.startsAt,
+        description: `Atendimento de ${client.fullName}`,
+      }),
+    );
+  }
+  if (deposit !== null) {
+    writes.push(
+      incomeWrite(ctx, {
+        ...comum,
+        part: "DEPOSIT",
+        amountInCents: deposit,
+        // O sinal e antecipado: vence antes do atendimento, nao no dia dele.
+        dueDate: depositDueDate(ctx.now, appointment.startsAt),
+        description: `${DEPOSIT_DESCRIPTION_PREFIX} — ${client.fullName}`,
+      }),
+    );
   }
 
   writes.push(
@@ -159,6 +225,18 @@ export function planUpdateAppointment(
 
   const clientName = client?.fullName ?? existing.clientName;
   const priceInCents = input.priceInCents ?? existing.priceInCents;
+  const deposit =
+    input.depositInCents === undefined
+      ? existing.depositInCents
+      : depositOf(ctx, input.depositInCents, priceInCents);
+
+  const ligados = ctx.snapshot.transactions.filter((item) => item.appointmentId === id);
+  const sinalPago = ligados.some((item) => partOf(item) === "DEPOSIT" && item.status === "PAID");
+  if (sinalPago && deposit !== existing.depositInCents) {
+    throw new RepositoryError(
+      "O sinal já foi pago. Devolva o sinal pelo cancelamento antes de mudar o valor.",
+    );
+  }
 
   const writes: WriteOperation[] = [
     {
@@ -170,6 +248,7 @@ export function planUpdateAppointment(
         startsAt,
         endsAt,
         durationMinutes,
+        depositInCents: deposit,
         professionalId,
         professionalName: professional.displayName,
         clientId: client?.id ?? existing.clientId,
@@ -179,22 +258,46 @@ export function planUpdateAppointment(
     },
   ];
 
-  // A receita vinculada acompanha valor e vencimento do atendimento.
-  for (const transaction of ctx.snapshot.transactions) {
-    if (transaction.appointmentId !== id || transaction.status === "PAID") {
-      continue;
-    }
+  // Os lancamentos vinculados acompanham valor e vencimento do atendimento.
+  // O do servico e o que sobra depois do sinal; o do sinal e o sinal.
+  const aPagar = serviceAmountFor(priceInCents, deposit);
+  let temLancamentoDeSinal = false;
+  for (const transaction of ligados) {
+    const parte = partOf(transaction);
+    if (parte === "DEPOSIT") temLancamentoDeSinal = true;
+    if (transaction.status === "PAID") continue;
+
+    // Sinal que deixou de existir vira cobranca cancelada, e nao some: a
+    // trilha do financeiro nao apaga linha.
+    const cai = parte === "DEPOSIT" && deposit === null;
     writes.push({
       op: "update",
       collection: "transactions",
       path: docPath(ctx, "transactions", transaction.id),
-      data: {
-        amountInCents: priceInCents,
-        dueDate: startsAt,
-        clientName,
-        ...touch(ctx),
-      },
+      data: cai
+        ? { status: "CANCELLED", clientName, ...touch(ctx) }
+        : {
+            amountInCents: parte === "DEPOSIT" ? (deposit ?? 0) : aPagar,
+            dueDate: parte === "DEPOSIT" ? transaction.dueDate : startsAt,
+            clientName,
+            ...touch(ctx),
+          },
     });
+  }
+
+  // Sinal pedido depois da marcacao precisa nascer agora.
+  if (deposit !== null && !temLancamentoDeSinal && client) {
+    writes.push(
+      incomeWrite(ctx, {
+        appointmentId: id,
+        client,
+        professionalId,
+        part: "DEPOSIT",
+        amountInCents: deposit,
+        dueDate: depositDueDate(ctx.now, startsAt),
+        description: `${DEPOSIT_DESCRIPTION_PREFIX} — ${clientName}`,
+      }),
+    );
   }
 
   writes.push(
@@ -215,6 +318,7 @@ export function planSetAppointmentStatus(
   id: ID,
   status: AppointmentStatus,
   reason?: string,
+  choice?: DepositChoice | null,
 ): Plan {
   assertPermission(
     ctx.actor,
@@ -227,6 +331,15 @@ export function planSetAppointmentStatus(
       ? (reason ?? "Cancelado pelo profissional.")
       : existing.cancellationReason;
 
+  const ligados = ctx.snapshot.transactions.filter((item) => item.appointmentId === id);
+  const lancamentoDoSinal = ligados.find((item) => partOf(item) === "DEPOSIT");
+  const destino = settleDeposit({
+    status,
+    hasDeposit: existing.depositInCents !== null,
+    depositPaid: lancamentoDoSinal?.status === "PAID",
+    choice: choice ?? null,
+  });
+
   const writes: WriteOperation[] = [
     {
       op: "update",
@@ -237,25 +350,32 @@ export function planSetAppointmentStatus(
         confirmedAt: status === "CONFIRMED" ? ctx.now : existing.confirmedAt,
         cancelledAt: status === "CANCELLED" ? ctx.now : existing.cancelledAt,
         cancellationReason,
+        depositOutcome: destino.outcome ?? existing.depositOutcome,
         ...touch(ctx),
       },
     },
   ];
 
-  if (status === "CANCELLED") {
-    // Cancelamento nao cobra: a receita pendente e cancelada junto.
-    for (const transaction of ctx.snapshot.transactions) {
-      if (transaction.appointmentId !== id || transaction.status === "PAID") {
-        continue;
-      }
-      writes.push({
-        op: "update",
-        collection: "transactions",
-        path: docPath(ctx, "transactions", transaction.id),
-        data: { status: "CANCELLED", ...touch(ctx) },
-      });
-    }
+  // Cancelamento nao cobra: o que ficou a pagar e cancelado junto. O sinal
+  // segue o que `settleDeposit` decidiu — reter, devolver ou cair.
+  for (const transaction of ligados) {
+    const parte = partOf(transaction);
+    const acao = parte === "DEPOSIT" ? destino.deposit : destino.service;
+    if (acao === "UNCHANGED" || acao === "KEEP_PAID") continue;
+    if (acao === "CANCEL" && transaction.status === "PAID") continue;
 
+    writes.push({
+      op: "update",
+      collection: "transactions",
+      path: docPath(ctx, "transactions", transaction.id),
+      data: {
+        status: acao === "REFUND" ? "REFUNDED" : "CANCELLED",
+        ...touch(ctx),
+      },
+    });
+  }
+
+  if (status === "CANCELLED") {
     writes.push(
       notificationWrite(ctx, {
         type: "APPOINTMENT_CANCELLED",
@@ -275,7 +395,9 @@ export function planSetAppointmentStatus(
       actorType: "USER",
       resource: { type: "appointment", id },
       summary: `Atendimento de ${existing.clientName}: ${status}.`,
-      metadata: { status },
+      // O destino do sinal entra na trilha: e dinheiro da cliente mudando de
+      // lugar, e depois alguem vai perguntar quem decidiu o que.
+      metadata: destino.outcome ? { status, deposit: destino.outcome } : { status },
     }),
   );
 

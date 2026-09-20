@@ -1,3 +1,4 @@
+import type { DepositChoice } from "@/config/deposit";
 import type { DispatchSummary } from "@/lib/notifications";
 import type {
   AgendaSettings,
@@ -146,6 +147,11 @@ export interface AppointmentInput {
   /** Servico do catalogo (E2.1). Ausente em profissao sem catalogo. */
   serviceId?: ID | null;
   serviceName?: string | null;
+  /**
+   * Sinal antecipado (E2.2), em centavos. Ausente ou `null` = sem sinal. O
+   * sinal abate: o lancamento do servico nasce pelo valor menos o sinal.
+   */
+  depositInCents?: number | null;
 }
 
 export interface TransactionInput {
@@ -271,10 +277,15 @@ export interface WorkspaceRepository {
 
   createAppointment(input: AppointmentInput): Promise<ID>;
   updateAppointment(id: ID, input: Partial<AppointmentInput>): Promise<void>;
+  /**
+   * `deposit` e a escolha da tela quando um atendimento com sinal PAGO e
+   * cancelado: reter ou devolver. Ausente = reter, que e o padrao do sinal.
+   */
   setAppointmentStatus(
     id: ID,
     status: AppointmentStatus,
     reason?: string,
+    options?: { deposit?: DepositChoice | null },
   ): Promise<void>;
 
   createTransaction(input: TransactionInput): Promise<ID>;

@@ -167,6 +167,8 @@ export function appointment(overrides: Partial<Appointment> = {}): Appointment {
     durationMinutes: 60,
     serviceId: null,
     serviceName: null,
+    depositInCents: null,
+    depositOutcome: null,
     modality: "IN_PERSON",
     status: "SCHEDULED",
     priceInCents: 12_000,

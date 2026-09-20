@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { APPOINTMENT_STATUS_LABELS, MODALITY_LABELS } from "@/config/labels";
+import { validateDeposit } from "@/lib/agenda/deposit";
 import {
   appointmentDefaultsFor,
   bookableServices,
@@ -37,6 +38,8 @@ interface Draft {
   modality: ServiceModality;
   status: AppointmentStatus;
   priceInReais: string;
+  /** Sinal antecipado (E2.2). Vazio = nao pediu sinal. */
+  depositInReais: string;
   administrativeNotes: string;
 }
 
@@ -51,6 +54,13 @@ const EDITABLE_STATUSES: AppointmentStatus[] = [
 
 function centsToInput(cents: number): string {
   return (cents / 100).toFixed(2);
+}
+
+/** Vazio vira `null`: nao digitar nada e o mesmo que nao pedir sinal. */
+function toCents(value: string): number | null {
+  const texto = value.trim();
+  if (!texto) return null;
+  return Math.round(Number(texto.replace(",", ".")) * 100);
 }
 
 function validate(draft: Draft): Errors {
@@ -73,6 +83,20 @@ function validate(draft: Draft): Errors {
   const price = Number(draft.priceInReais.replace(",", "."));
   if (!Number.isFinite(price) || price < 0) {
     errors.priceInReais = "Valor inválido.";
+  }
+
+  // O sinal passa pela mesma regra do repositorio: a tela so adianta a
+  // resposta, nao inventa uma propria.
+  const deposit = toCents(draft.depositInReais);
+  if (deposit !== null && !Number.isFinite(deposit)) {
+    errors.depositInReais = "Sinal inválido.";
+  } else {
+    const validation = validateDeposit({
+      depositInCents: deposit,
+      priceInCents: Math.round(price * 100),
+      available: true,
+    });
+    if (!validation.ok) errors.depositInReais = validation.error;
   }
 
   return errors;
@@ -106,6 +130,8 @@ export function AppointmentForm({
   const clients = data?.clients ?? [];
   const professionals = data?.professionals ?? [];
   // So a profissao com catalogo oferece servico (regra 1: a flag decide).
+  // A profissao decide se existe sinal, nunca um `if` por nome (regra 1).
+  const deposit = profession.features.depositOnBooking;
   const services = profession.features.serviceCatalog
     ? bookableServices(data?.services ?? [])
     : [];
@@ -122,6 +148,10 @@ export function AppointmentForm({
           modality: appointment.modality,
           status: appointment.status,
           priceInReais: centsToInput(appointment.priceInCents),
+          depositInReais:
+            appointment.depositInCents === null
+              ? ""
+              : centsToInput(appointment.depositInCents),
           administrativeNotes: appointment.administrativeNotes ?? "",
         }
       : {
@@ -140,6 +170,9 @@ export function AppointmentForm({
             profession.defaultPriceInCents === null
               ? ""
               : centsToInput(profession.defaultPriceInCents),
+          // Sinal abre vazio sempre: quem pede sinal e ela, atendimento a
+          // atendimento.
+          depositInReais: "",
           administrativeNotes: "",
         },
   );
@@ -190,6 +223,7 @@ export function AppointmentForm({
       priceInCents: Math.round(
         Number(draft.priceInReais.replace(",", ".")) * 100,
       ),
+      ...(deposit ? { depositInCents: toCents(draft.depositInReais) } : {}),
       administrativeNotes: draft.administrativeNotes.trim() || null,
     };
 
@@ -340,6 +374,27 @@ export function AppointmentForm({
               />
             )}
           </Field>
+
+          {deposit ? (
+            <Field
+              label="Sinal (R$)"
+              hint="Abate do valor: o resto fica a pagar no atendimento."
+              error={errors.depositInReais}
+            >
+              {(props) => (
+                <Input
+                  {...props}
+                  type="text"
+                  inputMode="decimal"
+                  value={draft.depositInReais}
+                  onChange={(event) =>
+                    patch({ depositInReais: event.target.value })
+                  }
+                  invalid={Boolean(errors.depositInReais)}
+                />
+              )}
+            </Field>
+          ) : null}
 
           <Field label="Modalidade">
             {(props) => (

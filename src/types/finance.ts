@@ -3,6 +3,9 @@ import type { PrivacyRedactionMark } from "./privacy";
 
 export type TransactionType = "INCOME" | "EXPENSE";
 
+/** Parte do atendimento coberta por um lancamento (E2.2). */
+export type AppointmentPart = "SERVICE" | "DEPOSIT";
+
 export type TransactionStatus =
   "PENDING" | "PAID" | "OVERDUE" | "CANCELLED" | "REFUNDED";
 
@@ -31,6 +34,15 @@ export interface Transaction extends TenantScopedEntity {
   clientName: string | null;
   professionalId: ID | null;
   appointmentId: ID | null;
+  /**
+   * Que parte do atendimento este lancamento cobre (E2.2). `SERVICE` e o que
+   * fica a pagar; `DEPOSIT` e o sinal antecipado. `null` em lancamento que
+   * nao nasce de atendimento.
+   *
+   * Existe porque um atendimento passou a ter DOIS lancamentos: procurar por
+   * `appointmentId` sozinho nao diz mais qual e qual.
+   */
+  appointmentPart: AppointmentPart | null;
   description: string;
   amountInCents: number;
   status: TransactionStatus;

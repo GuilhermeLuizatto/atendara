@@ -30,6 +30,8 @@ function atendimento(patch: Partial<Appointment> = {}): Appointment {
     durationMinutes: 50,
     serviceId: null,
     serviceName: null,
+    depositInCents: null,
+    depositOutcome: null,
     modality: "IN_PERSON",
     status: "SCHEDULED",
     priceInCents: 20_000,

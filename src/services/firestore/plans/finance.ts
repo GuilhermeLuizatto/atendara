@@ -33,6 +33,8 @@ export function planCreateTransaction(
     ...stamp(ctx),
     ...input,
     clientName: client?.fullName ?? null,
+    // Lancamento digitado a mao nao nasce de atendimento (E2.2).
+    appointmentPart: null,
     paidAt: input.status === "PAID" ? ctx.now : null,
     gateway: null,
   };

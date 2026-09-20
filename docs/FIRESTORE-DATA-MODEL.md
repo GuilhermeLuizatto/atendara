@@ -48,6 +48,16 @@ platformRateLimits/{callable_uid}         contador de abuso por usuario (so back
 `messages` e subcolecao porque e a colecao que mais cresce e quase sempre e lida
 por conversa. As demais sao colecoes diretas da organizacao.
 
+`transactions` passou a ter DOIS lancamentos por atendimento quando ha sinal
+(E2.2): `appointmentPart` vale `SERVICE` para o que fica a pagar e `DEPOSIT`
+para o sinal antecipado, e `null` em lancamento que nao nasce de atendimento.
+Lancamento gravado antes da E2.2 nao tem o campo, e `partOf()`
+(`src/lib/agenda/deposit.ts`) le a ausencia como `SERVICE` — sem isso, todo
+atendimento antigo passaria a parecer sem receita. O sinal **abate**: os dois
+somados dao `appointment.priceInCents`, nunca mais que isso. O atendimento
+guarda `depositInCents` e, quando nao acontece, `depositOutcome` (`KEPT` ou
+`REFUNDED`), para a tela dizer "sinal retido" sem varrer a auditoria.
+
 `services` (E2.1) so existe de fato para profissao com
 `features.serviceCatalog` — hoje a Estetica. A colecao nao e criada para as
 demais, e a flag decide a TELA; as Security Rules travam por papel e por

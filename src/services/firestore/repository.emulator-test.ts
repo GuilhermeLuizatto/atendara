@@ -415,4 +415,124 @@ describe("repositorio do Firestore contra o emulador", () => {
     );
     expect(arquivado.services.find((service) => service.id === id)?.enabled).toBe(false);
   });
+
+  it("a profissao sem sinal recusa o valor: a flag decide, e ela vale no servidor", async () => {
+    const client = repository.getSnapshot()!.clients[0];
+
+    await expect(
+      repository.createAppointment({
+        clientId: client.id,
+        professionalId: PROFESSIONAL,
+        startsAt: "2027-05-10T13:00:00.000Z",
+        durationMinutes: 50,
+        modality: "ONLINE",
+        status: "SCHEDULED",
+        priceInCents: 20000,
+        depositInCents: 5000,
+        administrativeNotes: null,
+      }),
+    ).rejects.toThrow(/sinal antecipado/);
+  });
+
+  it("sinal antecipado grava dois lancamentos, e cancelar retem o que foi pago", async () => {
+    // Organizacao propria, de Estetica: o sinal existe pela profissao dela.
+    const ORG_ESTETICA = "org-estetica";
+    const stamp = {
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      createdBy: null,
+      updatedBy: null,
+    };
+    await setDoc(doc(db, paths.organization(ORG_ESTETICA)), {
+      id: ORG_ESTETICA,
+      name: "Estudio de Integracao",
+      primaryProfession: "AESTHETICS",
+      ownerId: "user-2",
+      ...stamp,
+    });
+    await setDoc(doc(db, paths.document(ORG_ESTETICA, "professionals", "prof-2")), {
+      id: "prof-2",
+      organizationId: ORG_ESTETICA,
+      userId: "user-2",
+      displayName: "Esteticista Dois",
+      email: "esteticista@exemplo.test",
+      phone: null,
+      profession: "AESTHETICS",
+      licenseNumber: null,
+      specialties: [],
+      avatarUrl: null,
+      active: true,
+      ...stamp,
+    });
+
+    const estudio = new FirestoreWorkspaceRepository(db, ORG_ESTETICA, "AESTHETICS");
+    estudio.setActor({
+      userId: "user-2",
+      name: "Esteticista Dois",
+      role: "PROFESSIONAL",
+      permissions: permissionsForRole("PROFESSIONAL"),
+    });
+
+    try {
+      await nextSnapshot((snapshot) => snapshot.professionals.length === 1, estudio);
+      const clientId = await estudio.createClient({
+        fullName: "Cliente do Estudio",
+        preferredName: null,
+        email: null,
+        phone: null,
+        status: "ACTIVE",
+        preferredModality: "IN_PERSON",
+        assignedProfessionalId: "prof-2",
+        acquisitionChannel: "OTHER",
+        tags: [],
+        administrativeNotes: null,
+      });
+      await nextSnapshot((snapshot) => snapshot.clients.some((item) => item.id === clientId), estudio);
+
+      const id = await estudio.createAppointment({
+        clientId,
+        professionalId: "prof-2",
+        startsAt: "2027-05-10T13:00:00.000Z",
+        durationMinutes: 60,
+        modality: "IN_PERSON",
+        status: "SCHEDULED",
+        priceInCents: 20000,
+        depositInCents: 5000,
+        administrativeNotes: null,
+      });
+
+      const comOsDois = await nextSnapshot(
+        (snapshot) => snapshot.transactions.filter((item) => item.appointmentId === id).length === 2,
+        estudio,
+      );
+      const ligados = comOsDois.transactions.filter((item) => item.appointmentId === id);
+      const sinal = ligados.find((item) => item.appointmentPart === "DEPOSIT")!;
+      const servico = ligados.find((item) => item.appointmentPart === "SERVICE")!;
+
+      // Centavos inteiros (regra 7), e os dois somam o valor cobrado.
+      expect(sinal.amountInCents).toBe(5000);
+      expect(servico.amountInCents).toBe(15000);
+      const bruto = await getDoc(doc(db, paths.document(ORG_ESTETICA, "transactions", sinal.id)));
+      expect(bruto.get("appointmentPart")).toBe("DEPOSIT");
+      expect(bruto.get("dueDate")).toBeInstanceOf(Timestamp);
+
+      await estudio.updateTransaction(sinal.id, { status: "PAID" });
+      await nextSnapshot(
+        (snapshot) => snapshot.transactions.some((item) => item.id === sinal.id && item.status === "PAID"),
+        estudio,
+      );
+
+      // Cancelar retem o sinal pago e derruba so o que ficou a pagar.
+      await estudio.setAppointmentStatus(id, "CANCELLED", undefined, { deposit: "KEEP" });
+      const depois = await nextSnapshot(
+        (snapshot) => snapshot.transactions.some((item) => item.id === servico.id && item.status === "CANCELLED"),
+        estudio,
+      );
+
+      expect(depois.transactions.find((item) => item.id === sinal.id)?.status).toBe("PAID");
+      expect(depois.appointments.find((item) => item.id === id)?.depositOutcome).toBe("KEPT");
+    } finally {
+      estudio.dispose();
+    }
+  });
 });

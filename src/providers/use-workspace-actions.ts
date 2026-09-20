@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 
+import type { DepositChoice } from "@/config/deposit";
 import {
   RepositoryError,
   type AppointmentInput,
@@ -93,9 +94,10 @@ export function useWorkspaceActions() {
         id: ID,
         status: AppointmentStatus,
         reason?: string,
+        options?: { deposit?: DepositChoice | null },
       ) =>
         run(
-          (repo) => repo.setAppointmentStatus(id, status, reason),
+          (repo) => repo.setAppointmentStatus(id, status, reason, options),
           STATUS_MESSAGES[status],
         ),
 

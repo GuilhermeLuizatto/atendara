@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowUpRight, Bot, CornerUpRight } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { quietActionStyles } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CLASSIFICATION_TONE } from "@/components/ui/tones";
@@ -44,7 +45,7 @@ export function AgentActivity({
           action={
             <Link
               href="/agente"
-              className="text-primary text-xs font-medium hover:underline"
+              className={quietActionStyles("text-primary hover:underline")}
             >
               Ver regras
             </Link>
@@ -145,7 +146,7 @@ export function AgentActivity({
       <CardBody className="border-border border-t py-3">
         <Link
           href="/agente"
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
+          className={quietActionStyles("text-muted-foreground hover:text-foreground gap-1")}
         >
           Auditoria completa das decisões
           <ArrowUpRight className="size-3" aria-hidden strokeWidth={2} />

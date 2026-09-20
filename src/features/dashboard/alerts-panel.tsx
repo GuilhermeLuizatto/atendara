@@ -3,7 +3,7 @@
 import { BellOff, Check, ShieldAlert, TriangleAlert } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, quietActionStyles } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ATTENTION_TONE } from "@/components/ui/tones";
@@ -42,7 +42,7 @@ export function AlertsPanel({
               <button
                 type="button"
                 onClick={() => void markAllNotificationsRead()}
-                className="text-muted-foreground hover:text-foreground text-xs transition-colors"
+                className={quietActionStyles("text-muted-foreground hover:text-foreground")}
               >
                 Marcar como lidos
               </button>

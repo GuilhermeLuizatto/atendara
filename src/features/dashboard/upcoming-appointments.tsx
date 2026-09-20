@@ -5,7 +5,7 @@ import { CalendarRange, Check } from "lucide-react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, quietActionStyles } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { APPOINTMENT_STATUS_TONE } from "@/components/ui/tones";
@@ -35,7 +35,7 @@ export function UpcomingAppointments({
           action={
             <Link
               href="/agenda"
-              className="text-primary text-xs font-medium hover:underline"
+              className={quietActionStyles("text-primary hover:underline")}
             >
               Ver agenda
             </Link>
@@ -118,7 +118,7 @@ export function UpcomingAppointments({
         <CardBody className="border-border border-t py-3">
           <Link
             href="/agenda"
-            className="text-muted-foreground hover:text-foreground text-xs transition-colors"
+            className={quietActionStyles("text-muted-foreground hover:text-foreground")}
           >
             Ver {allTerm(appointmentTerm)}
           </Link>

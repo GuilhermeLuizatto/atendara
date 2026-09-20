@@ -5,6 +5,7 @@ import { Inbox } from "lucide-react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { quietActionStyles } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ATTENTION_TONE, CLASSIFICATION_TONE } from "@/components/ui/tones";
@@ -39,7 +40,7 @@ export function WaitingMessages({
           action={
             <Link
               href="/mensagens"
-              className="text-primary text-xs font-medium hover:underline"
+              className={quietActionStyles("text-primary hover:underline")}
             >
               Abrir caixa de entrada
             </Link>
@@ -127,7 +128,7 @@ export function WaitingMessages({
         <div className="border-border border-t px-5 py-3">
           <Link
             href="/mensagens"
-            className="text-muted-foreground hover:text-foreground text-xs transition-colors"
+            className={quietActionStyles("text-muted-foreground hover:text-foreground")}
           >
             Mais {remaining} conversa{remaining > 1 ? "s" : ""} aguardando
           </Link>

@@ -45,6 +45,7 @@ export const COLLECTION_DATE_FIELDS = {
         "cancelledAt",
     ],
     messagingSenders: [...STAMP_FIELDS],
+    rescheduleRequests: [...STAMP_FIELDS, "holdEndsAt", "offeredAt"],
     automationTasks: [
         ...STAMP_FIELDS,
         "scheduledFor",

@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 const store = vi.hoisted(() => new Map());
-const consultas = vi.hoisted(() => ({ senders: [], clients: [], rules: [] }));
+const consultas = vi.hoisted(() => ({ senders: [], clients: [], rules: [], appointments: [] }));
 
 vi.mock("firebase-admin/app", () => ({ initializeApp: vi.fn() }));
 vi.mock("firebase-admin/functions", () => ({ getFunctions: vi.fn() }));
@@ -24,7 +24,12 @@ vi.mock("firebase-admin/firestore", () => {
     size: lista.length,
     docs: lista.map((entrada) => ({ id: entrada.id, exists: true, data: () => entrada })),
   });
-  const consulta = (lista) => ({ where: () => consulta(lista), limit: () => consulta(lista), get: async () => docsDe(lista) });
+  const consulta = (lista) => ({
+    where: () => consulta(lista),
+    orderBy: () => consulta(lista),
+    limit: () => consulta(lista),
+    get: async () => docsDe(lista),
+  });
   const transaction = {
     get: async (alvo) => (alvo?.path ? snapshot(alvo.path) : alvo.get()),
     set: (ref, data) => store.set(ref.path, data),
@@ -36,7 +41,12 @@ vi.mock("firebase-admin/firestore", () => {
   return {
     getFirestore: () => ({
       doc: (path) => ({ path, get: async () => snapshot(path) }),
-      collection: (path) => (path.endsWith("/aiRules") ? consulta(consultas.rules) : consulta(consultas.clients)),
+      collection: (path) =>
+        path.endsWith("/aiRules")
+          ? consulta(consultas.rules)
+          : path.endsWith("/appointments")
+            ? consulta(consultas.appointments)
+            : consulta(consultas.clients),
       collectionGroup: () => consulta(consultas.senders),
       runTransaction: async (callback) => callback(transaction),
     }),
@@ -152,6 +162,7 @@ beforeEach(() => {
   consultas.senders = [sender()];
   consultas.clients = [];
   consultas.rules = [];
+  consultas.appointments = [];
   process.env.N8N_CALLBACK_SECRET = PONTE;
   process.env.META_APP_SECRET = META;
   store.set(paths.organization(ORG), { id: ORG, primaryProfession: "PSYCHOLOGIST", ownerId: "dono" });
@@ -338,5 +349,139 @@ describe("o que chega", () => {
     expect(store.get(paths.document(ORG, "conversations", resultado.conversationId)).inboundWindowEndsAt).toBe(
       "2026-09-21T12:00:00.000Z",
     );
+  });
+});
+
+describe("remarcacao pela propria pessoa (13.6)", () => {
+  const CONVERSA = "wa-cliente-1";
+  const PEDIDO = {
+    kind: "BUTTON",
+    providerSenderId: SENDER_ID,
+    from: FROM,
+    providerMessageId: "wamid.remarcar",
+    button: "RESCHEDULE",
+    repliedTo: "wamid.lembrete",
+    sentAt: "2026-09-21T11:00:00.000Z",
+  };
+
+  function atendimento(patch = {}) {
+    return {
+      id: "atendimento-1",
+      organizationId: ORG,
+      clientId: "cliente-1",
+      clientName: "Alex Fictício",
+      professionalId: "profissional-1",
+      professionalName: "Sam Fictício",
+      startsAt: "2026-09-25T13:00:00.000Z",
+      endsAt: "2026-09-25T13:50:00.000Z",
+      durationMinutes: 50,
+      modality: "IN_PERSON",
+      status: "SCHEDULED",
+      priceInCents: 20000,
+      administrativeNotes: null,
+      origin: "MANUAL",
+      confirmedAt: null,
+      cancelledAt: null,
+      cancellationReason: null,
+      rescheduledFromId: null,
+      externalCalendar: null,
+      createdAt: "2026-09-01T12:00:00.000Z",
+      createdBy: "membro",
+      updatedAt: "2026-09-01T12:00:00.000Z",
+      updatedBy: "membro",
+      ...patch,
+    };
+  }
+
+  function organizacao(reschedule) {
+    return {
+      id: ORG,
+      primaryProfession: "PSYCHOLOGIST",
+      ownerId: "dono",
+      timezone: "America/Sao_Paulo",
+      settings: {
+        agenda: {
+          workingDays: [1, 2, 3, 4, 5],
+          workdayStart: "08:00",
+          workdayEnd: "12:00",
+          slotIntervalMinutes: 30,
+          defaultModality: "IN_PERSON",
+          allowDoubleBooking: false,
+          ...(reschedule ? { reschedule } : {}),
+        },
+      },
+    };
+  }
+
+  beforeEach(() => {
+    consultas.clients = [{ id: "cliente-1", organizationId: ORG, fullName: "Alex Fictício", phone: `+${FROM}`, notificationConsent: null }];
+    consultas.appointments = [atendimento()];
+    store.set(paths.organization(ORG), organizacao({ enabled: true, minimumNoticeHours: 24, maxReschedulesPerAppointment: 1, offeredSlots: 3, allowProfessionalChange: false, searchWindowDays: 14 }));
+  });
+
+  it("politica desligada: o pedido vira alerta para a equipe, com o motivo escrito", async () => {
+    store.set(paths.organization(ORG), organizacao(null));
+
+    const resultado = await applyInboundEvent(PEDIDO, { clock: () => "2026-09-21T11:00:00.000Z" });
+
+    expect(resultado.outcome).toBe("RESCHEDULE_ESCALATED");
+    expect(resultado.reason).toBe("POLICY_DISABLED");
+    const alerta = store.get(paths.document(ORG, "notifications", "wa-wamidremarcar-remarcacao"));
+    expect(alerta).toMatchObject({ severity: "HIGH", status: "UNREAD" });
+    expect(alerta.body).toContain("não permite remarcação");
+    expect(store.get(paths.document(ORG, "rescheduleRequests", CONVERSA))).toBeUndefined();
+  });
+
+  it("pedido em cima da hora escala, mesmo com a politica ligada", async () => {
+    consultas.appointments = [atendimento({ startsAt: "2026-09-21T13:00:00.000Z", endsAt: "2026-09-21T13:50:00.000Z" })];
+
+    const resultado = await applyInboundEvent(PEDIDO, { clock: () => "2026-09-21T11:00:00.000Z" });
+
+    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_ESCALATED", reason: "TOO_LATE" });
+  });
+
+  it("dentro da politica, oferece horarios e segura a escolha por poucos minutos", async () => {
+    const resultado = await applyInboundEvent(PEDIDO, { clock: () => "2026-09-21T11:00:00.000Z" });
+
+    expect(resultado.outcome).toBe("RESCHEDULE_OFFERED");
+    const pedido = store.get(paths.document(ORG, "rescheduleRequests", CONVERSA));
+    expect(pedido.status).toBe("OFFERED");
+    expect(pedido.slots).toHaveLength(3);
+    expect(pedido.appointmentId).toBe("atendimento-1");
+    // Gravado como Timestamp, como tudo o que e data no banco.
+    expect(pedido.holdEndsAt.toDate().getTime()).toBeGreaterThan(Date.parse("2026-09-21T11:00:00.000Z"));
+  });
+
+  it("escolher um dos horarios grava o atendimento novo, com trilha", async () => {
+    await applyInboundEvent(PEDIDO, { clock: () => "2026-09-21T11:00:00.000Z" });
+    store.set(paths.document(ORG, "appointments", "atendimento-1"), atendimento());
+    const oferecidos = store.get(paths.document(ORG, "rescheduleRequests", CONVERSA)).slots;
+    const comoIso = (valor) => (typeof valor === "string" ? valor : valor.toDate().toISOString());
+
+    const resultado = await applyInboundEvent(
+      { ...PEDIDO, kind: "TEXT", providerMessageId: "wamid.escolha", text: "1", button: undefined },
+      { clock: () => "2026-09-21T11:02:00.000Z" },
+    );
+
+    expect(resultado.outcome).toBe("RESCHEDULE_CONFIRMED");
+    const gravado = store.get(paths.document(ORG, "appointments", "atendimento-1"));
+    expect(comoIso(gravado.startsAt)).toBe(comoIso(oferecidos[0].startsAt));
+    expect(gravado.status).toBe("SCHEDULED");
+    expect(gravado.origin).toBe("CLIENT_SELF_SERVICE");
+    expect(store.get(paths.document(ORG, "rescheduleRequests", CONVERSA)).status).toBe("CONFIRMED");
+    expect(store.get(paths.document(ORG, "auditLogs", "wa-wamidescolha-remarcado")).summary).toContain("própria pessoa");
+  });
+
+  it("reserva vencida nao confirma: o horario voltou a ser de quem quiser", async () => {
+    await applyInboundEvent(PEDIDO, { clock: () => "2026-09-21T11:00:00.000Z" });
+    store.set(paths.document(ORG, "appointments", "atendimento-1"), atendimento());
+
+    const resultado = await applyInboundEvent(
+      { ...PEDIDO, kind: "TEXT", providerMessageId: "wamid.tarde", text: "1", button: undefined },
+      { clock: () => "2026-09-21T11:30:00.000Z" },
+    );
+
+    // Passada a reserva, a escolha nao vale mais e o texto volta a ser texto.
+    expect(resultado.outcome).not.toBe("RESCHEDULE_CONFIRMED");
   });
 });

@@ -456,6 +456,16 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // ------------------------------------------ pedido de remarcacao
+
+      // Os horarios oferecidos e ate quando a escolha esta segurada (13.6).
+      // Mecanismo do backend: o navegador nao oferece, nao segura e nao
+      // confirma. Se ele escrevesse aqui, daria para segurar horario sem
+      // pedido — ou confirmar um que nunca foi oferecido.
+      match /rescheduleRequests/{conversationId} {
+        allow read, write: if false;
+      }
+
       // ------------------------------------------ remetente de canal real
 
       // Quem pode falar pelo numero da organizacao (13.4). A administracao da

@@ -249,6 +249,14 @@ export const PERSONAL_DATA_MAP = {
         },
         onOrganizationDeletion: DELETE,
     },
+    // Pedido de remarcacao em andamento (13.6). Guarda horarios e ids; o texto
+    // da conversa fica em `messages`, e o pedido morre quando a escolha vence.
+    rescheduleRequests: {
+        personalFields: ["clientId"],
+        retention: { kind: "UNDEFINED" },
+        onClientErasure: { action: "PSEUDONYMIZE", fields: { clientId: "CLIENT_ID" } },
+        onOrganizationDeletion: DELETE,
+    },
     // Remetente comprovado de cada canal (13.4). O que ha de pessoal aqui e
     // contato da PROPRIA equipe — numeros de testadores —, nunca de quem e
     // atendido; por isso pedido de titular de dados nao alcanca esta colecao.

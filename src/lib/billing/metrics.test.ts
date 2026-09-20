@@ -20,6 +20,8 @@ function subscription(
     accessUntil: "2026-10-06T00:00:00.000Z",
     cancelAtPeriodEnd: false,
     canceledAt: null,
+    refundedAt: null,
+    refundedPeriodEnd: null,
     gateway: { provider: "STRIPE", customerId: "cus_1", subscriptionId: "sub_1" },
     lastEventAt: null,
     lastEventId: null,

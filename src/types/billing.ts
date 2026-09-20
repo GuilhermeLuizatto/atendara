@@ -71,6 +71,13 @@ export interface PlatformSubscription {
   accessUntil: ISODateString | null;
   cancelAtPeriodEnd: boolean;
   canceledAt: ISODateString | null;
+  /**
+   * Ciclo devolvido ao assinante (S-01). O backend grava os dois juntos no
+   * reembolso total; a tela precisa deles para nao dizer "pagamento pendente"
+   * a quem recebeu o dinheiro de volta.
+   */
+  refundedAt: ISODateString | null;
+  refundedPeriodEnd: ISODateString | null;
   gateway: PlatformGatewayRef;
   /**
    * Instante do ultimo evento do gateway APLICADO a este documento. E o que

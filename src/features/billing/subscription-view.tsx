@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, PageHeader } from "@/components/ui";
 import { APP_NAME } from "@/config/app";
+import { accessSummary } from "@/lib/billing/access-summary";
 import {
   BILLING_INTERVAL_LABELS,
   INVOICE_STATUS_LABELS,
@@ -123,6 +124,11 @@ export function SubscriptionView() {
   const plan = subscription?.planId ? findPlan(subscription.planId) : null;
   const vigente = subscription?.status === "ACTIVE" || subscription?.status === "TRIALING";
 
+  // Quem decide o que a tela diz sobre acesso, teste e devolucao e
+  // `accessSummary`, testada a parte: aqui so se escolhe o texto.
+  const acesso = accessSummary({ subscription, grant, now });
+  const grantEmVigor = grant && isGrantInForce(grant, now.getTime()) ? grant : null;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -130,8 +136,8 @@ export function SubscriptionView() {
         description={`O que você paga pelo uso do ${APP_NAME}. Esta área não se mistura com o financeiro do seu negócio.`}
         actions={
           subscription ? (
-            <Badge tone={STATUS_TONE[subscription.status]} dot>
-              {SUBSCRIPTION_STATUS_LABELS[subscription.status]}
+            <Badge tone={acesso.refunded ? "info" : STATUS_TONE[subscription.status]} dot>
+              {acesso.refunded ? "Cobrança devolvida" : SUBSCRIPTION_STATUS_LABELS[subscription.status]}
             </Badge>
           ) : null
         }
@@ -162,18 +168,21 @@ export function SubscriptionView() {
 
       {/* Concessao da operadora, separada da assinatura: nao gera fatura e nao
           e cobranca. O acesso vale ate a maior data entre as duas. */}
-      {grant && isGrantInForce(grant, now.getTime()) ? (
+      {grantEmVigor ? (
         <Card>
           <CardHeader>
-            <CardTitle>Acesso concedido pela operadora</CardTitle>
+            <CardTitle>{acesso.isTrial ? "Seu teste gratuito" : "Acesso concedido pela operadora"}</CardTitle>
           </CardHeader>
           <CardBody className="space-y-2">
             <p className="text-foreground text-sm">
-              {`A operadora liberou seu acesso até ${formatDate(grant.until)} (${ACCESS_GRANT_KIND_LABELS[grant.kind].toLowerCase()}).`}
+              {acesso.isTrial
+                ? `Seu teste gratuito vai até ${formatDate(grantEmVigor.until)}.`
+                : `A operadora liberou seu acesso até ${formatDate(grantEmVigor.until)} (${ACCESS_GRANT_KIND_LABELS[grantEmVigor.kind].toLowerCase()}).`}
             </p>
             <p className="text-muted-foreground text-sm">
-              Não é cobrança: nenhuma fatura corresponde a este período. Se você assinar, o acesso segue até a data
-              mais distante entre a assinatura e esta concessão.
+              {acesso.isTrial
+                ? "Não é cobrança: o teste não gera fatura. Se você assinar antes do fim, o acesso continua sem interrupção."
+                : "Não é cobrança: nenhuma fatura corresponde a este período. Se você assinar, o acesso segue até a data mais distante entre a assinatura e esta concessão."}
             </p>
           </CardBody>
         </Card>
@@ -197,10 +206,20 @@ export function SubscriptionView() {
                 label={subscription.cancelAtPeriodEnd ? "Encerra em" : "Próxima cobrança"}
                 value={subscription.currentPeriodEnd ? formatDate(subscription.currentPeriodEnd) : "—"}
               />
+              {/* O acesso vale ate a data MAIS DISTANTE entre a assinatura e
+                  a concessao — e e isso que a pessoa precisa ler. Mostrar so a
+                  da assinatura fez a tela dizer "acesso ate 19/09" a quem tinha
+                  teste ate 02/10. */}
               <Detail
                 label="Acesso liberado até"
-                value={subscription.accessUntil ? formatDate(subscription.accessUntil) : "—"}
-                hint="Inclui a tolerância após o fim do ciclo."
+                value={acesso.accessUntil ? formatDate(acesso.accessUntil) : "—"}
+                hint={
+                  acesso.fromGrant
+                    ? acesso.isTrial
+                      ? "Vem do seu teste gratuito, não da assinatura."
+                      : "Vem da concessão da operadora, não da assinatura."
+                    : "Inclui a tolerância após o fim do ciclo."
+                }
               />
             </dl>
           ) : (

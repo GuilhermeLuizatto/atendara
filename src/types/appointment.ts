@@ -32,6 +32,13 @@ export interface Appointment extends TenantScopedEntity {
   startsAt: ISODateString;
   endsAt: ISODateString;
   durationMinutes: number;
+  /**
+   * Servico do catalogo (E2.1), quando a profissao tem catalogo. O NOME vai
+   * junto porque o atendimento e registro do que aconteceu: renomear o servico
+   * depois nao pode reescrever o passado.
+   */
+  serviceId: ID | null;
+  serviceName: string | null;
   modality: ServiceModality;
   status: AppointmentStatus;
   priceInCents: number;

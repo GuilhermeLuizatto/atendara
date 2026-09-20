@@ -367,4 +367,52 @@ describe("repositorio do Firestore contra o emulador", () => {
       missing.dispose();
     }
   });
+
+  it("servico do catalogo vai e volta, e o atendimento guarda o nome", async () => {
+    const id = await repository.createService({
+      name: "Limpeza de pele",
+      description: null,
+      durationMinutes: 60,
+      priceInCents: 12000,
+      enabled: true,
+      returnIntervalDays: 30,
+    });
+
+    const raw = await getDoc(doc(db, paths.document(ORG, "services", id)));
+    // Dinheiro inteiro (regra 7) e ordem propria, gravados como estao.
+    expect(raw.get("priceInCents")).toBe(12000);
+    expect(raw.get("position")).toBe(0);
+
+    const client = repository.getSnapshot()!.clients[0];
+    const appointmentId = await repository.createAppointment({
+      clientId: client.id,
+      professionalId: PROFESSIONAL,
+      startsAt: "2027-04-05T13:00:00.000Z",
+      durationMinutes: 60,
+      serviceId: id,
+      serviceName: "Limpeza de pele",
+      modality: "IN_PERSON",
+      status: "SCHEDULED",
+      priceInCents: 12000,
+      administrativeNotes: null,
+    });
+
+    // Renomear o servico depois nao reescreve o atendimento ja registrado.
+    await repository.updateService(id, { name: "Limpeza de pele profunda" });
+
+    const snapshot = await nextSnapshot((current) =>
+      current.services.some((service) => service.name === "Limpeza de pele profunda"),
+    );
+    expect(
+      snapshot.appointments.find((item) => item.id === appointmentId)?.serviceName,
+    ).toBe("Limpeza de pele");
+
+    // Ja usado: apagar deixaria o atendimento apontando para o nada.
+    await expect(repository.deleteService(id)).rejects.toThrow(/Arquive/);
+    await repository.archiveService(id);
+    const arquivado = await nextSnapshot((current) =>
+      current.services.every((service) => service.archivedAt !== null),
+    );
+    expect(arquivado.services.find((service) => service.id === id)?.enabled).toBe(false);
+  });
 });

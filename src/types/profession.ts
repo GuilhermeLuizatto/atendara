@@ -77,6 +77,15 @@ export interface ProfessionFeatureFlags {
   recurringByDefault: boolean;
   /** Permite pacotes/planos de multiplas sessoes. */
   sessionPackages: boolean;
+  /**
+   * Catalogo de servicos da organizacao, com preco e duracao definidos pela
+   * propria profissional (E2.1).
+   *
+   * Existe como flag, e nao como `if (profissao === "AESTHETICS")`, pela regra
+   * 1 do AGENTS.md: o nucleo nao conhece profissao. Outra profissao que um dia
+   * precise de catalogo liga a flag e pronto — nenhuma tela muda.
+   */
+  serviceCatalog: boolean;
 }
 
 /** Semente de regra de nivel PROFESSION, aplicada ao criar a organizacao. */

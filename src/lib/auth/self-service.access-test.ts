@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 
-import { doc, getDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { TRIAL_DAYS } from "@/config/platform";
@@ -224,6 +224,24 @@ describe("duas contas criadas em sequencia nao se enxergam", () => {
   it("cada uma abre a propria organizacao", async () => {
     const minha = await getDoc(doc(bianca.firestore, paths.organization(biancaOrg)));
     expect(minha.data()).toMatchObject({ primaryProfession: "AESTHETICS" });
+  });
+
+  // E2.1: o catalogo nasce com a organizacao, so onde a flag da profissao
+  // liga, e sem nenhum preco que ela nao tenha escolhido.
+  it("a esteticista nasce com o catalogo; a psicologa, sem catalogo nenhum", async () => {
+    const dela = await getDocs(collection(bianca.firestore, paths.collection(biancaOrg, "services")));
+    expect(dela.empty).toBe(false);
+    for (const servico of dela.docs) {
+      expect(servico.data()).toMatchObject({ priceInCents: null, durationMinutes: null, enabled: false });
+    }
+
+    const daOutra = await getDocs(collection(helena.firestore, paths.collection(helenaOrg, "services")));
+    expect(daOutra.empty).toBe(true);
+
+    // E o catalogo de uma nao chega na outra, como o resto do tenant.
+    await expect(
+      getDocs(collection(helena.firestore, paths.collection(biancaOrg, "services"))),
+    ).rejects.toMatchObject({ code: "permission-denied" });
   });
 
   it("nenhuma das duas administra a plataforma", async () => {

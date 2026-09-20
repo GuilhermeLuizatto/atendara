@@ -85,6 +85,7 @@ export const PROFESSION_DEFINITIONS = {
             insurancePlans: false,
             recurringByDefault: true,
             sessionPackages: true,
+            serviceCatalog: false,
         },
     },
     PSYCHIATRIST: {
@@ -154,6 +155,7 @@ export const PROFESSION_DEFINITIONS = {
             insurancePlans: true,
             recurringByDefault: true,
             sessionPackages: false,
+            serviceCatalog: false,
         },
     },
     DOCTOR: {
@@ -223,6 +225,7 @@ export const PROFESSION_DEFINITIONS = {
             insurancePlans: true,
             recurringByDefault: false,
             sessionPackages: false,
+            serviceCatalog: false,
         },
     },
     DENTIST: {
@@ -288,6 +291,7 @@ export const PROFESSION_DEFINITIONS = {
             insurancePlans: true,
             recurringByDefault: false,
             sessionPackages: true,
+            serviceCatalog: false,
         },
     },
     NUTRITIONIST: {
@@ -353,6 +357,7 @@ export const PROFESSION_DEFINITIONS = {
             insurancePlans: false,
             recurringByDefault: true,
             sessionPackages: true,
+            serviceCatalog: false,
         },
     },
     PHYSIOTHERAPIST: {
@@ -418,6 +423,7 @@ export const PROFESSION_DEFINITIONS = {
             insurancePlans: true,
             recurringByDefault: true,
             sessionPackages: true,
+            serviceCatalog: false,
         },
     },
     THERAPIST: {
@@ -490,6 +496,7 @@ export const PROFESSION_DEFINITIONS = {
             insurancePlans: false,
             recurringByDefault: true,
             sessionPackages: true,
+            serviceCatalog: false,
         },
     },
     PERSONAL_TRAINER: {
@@ -557,6 +564,7 @@ export const PROFESSION_DEFINITIONS = {
             insurancePlans: false,
             recurringByDefault: true,
             sessionPackages: true,
+            serviceCatalog: false,
         },
     },
     AESTHETICS: {
@@ -628,6 +636,7 @@ export const PROFESSION_DEFINITIONS = {
             insurancePlans: false,
             recurringByDefault: false,
             sessionPackages: false,
+            serviceCatalog: true,
         },
     },
 };

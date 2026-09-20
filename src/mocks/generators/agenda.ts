@@ -81,6 +81,8 @@ export function buildAppointments(
         startsAt,
         endsAt: addMinutesISO(startsAt, duration),
         durationMinutes: duration,
+        serviceId: null,
+        serviceName: null,
         modality: client.preferredModality,
         status,
         priceInCents: profession.defaultPriceInCents ?? 0,

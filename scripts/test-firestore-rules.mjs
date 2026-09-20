@@ -99,6 +99,7 @@ try {
       await setDoc(doc(db, paths.document(org, "notifications", "alert")), { organizationId: org, status: "UNREAD", title: "Alerta" });
       await setDoc(doc(db, paths.document(org, "notificationDeliveries", "envio")), { organizationId: org, status: "PLANNED", attempts: 0, sentAt: null, channel: "SMS", event: "APPOINTMENT_REMINDER", bodyHash: "abcdef12", contactHint: "***0000" });
       await setDoc(doc(db, paths.document(org, "privacyRequests", "pedido")), { organizationId: org, type: "CLIENT_EXPORT", subjectId: "example", requestedBy: "a" });
+      await setDoc(doc(db, paths.document(org, "services", "manicure")), { organizationId: org, name: "Manicure", durationMinutes: 60, priceInCents: 5000, enabled: true, position: 0, archivedAt: null });
       await setDoc(doc(db, paths.document(org, "automationSwitches", "organization")), { organizationId: org, enabled: false, reason: "Investigando" });
       await setDoc(doc(db, paths.document(org, "calendarConnections", "a")), { organizationId: org, professionalId: "a", provider: "GOOGLE", status: "CONNECTED", refreshTokenCiphertext: "cifrado" });
       await setDoc(doc(db, paths.document(org, "calendarBusyBlocks", "a")), { organizationId: org, professionalId: "a", blocks: [] });
@@ -189,7 +190,7 @@ try {
   await denied(getDocs(query(collectionGroup(db("restricted"), "messages"), where("organizationId", "==", "org-a"))));
 
   // Listagem cruzada de cada colecao operacional.
-  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "auditLogs"]) {
+  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "services", "auditLogs"]) {
     await denied(getDocs(query(collection(db("a"), paths.collection("org-b", name)), limit(5))));
   }
 
@@ -257,6 +258,24 @@ try {
   await deniedBecause("alerta forjado pelo navegador", setDoc(taskOf("ownerRole", "alerta-forjado"), task({ type: "RAISE_ALERT", status: "SUCCEEDED" })));
   await deniedBecause("trilha forjada pelo navegador", setDoc(taskOf("adminRole", "trilha-forjada"), task({ type: "WRITE_AUDIT", status: "SUCCEEDED" })));
   await deniedBecause("fila sem o modulo de agenda", getDoc(taskOf("restricted", "example")));
+
+  // Catalogo de servicos (E2.1): quem tem a agenda LE; quem atende ou
+  // administra ESCREVE; quem so apoia nao mexe no preco do trabalho.
+  const servicoOf = (uid, id = "manicure") => doc(db(uid), paths.document("org-a", "services", id));
+  const servico = (extra) => ({ organizationId: "org-a", name: "Novo servico", durationMinutes: 30, priceInCents: 4000, enabled: false, position: 1, archivedAt: null, ...extra });
+  await allowed(getDoc(servicoOf("a")));
+  await allowed(getDoc(servicoOf("assistantRole")));
+  await allowed(setDoc(servicoOf("a", "novo-do-profissional"), servico()));
+  await allowed(updateDoc(servicoOf("adminRole"), { priceInCents: 6000 }));
+  await deniedBecause("assistente criando servico", setDoc(servicoOf("assistantRole", "do-assistente"), servico()));
+  await deniedBecause("assistente mudando preco", updateDoc(servicoOf("assistantRole"), { priceInCents: 1 }));
+  await deniedBecause("leitor apagando servico", deleteDoc(servicoOf("viewerRole")));
+  await deniedBecause("catalogo sem o modulo de agenda", getDoc(servicoOf("restricted")));
+  await deniedBecause("servico de outra organizacao", getDoc(doc(db("a"), paths.document("org-b", "services", "manicure"))));
+  await deniedBecause(
+    "servico gravado dentro de outro tenant",
+    setDoc(doc(db("a"), paths.document("org-a", "services", "tenant-trocado")), servico({ organizationId: "org-b" })),
+  );
 
   // Agenda externa (13.7). A conexao guarda token cifrado: ninguem le pelo
   // cliente, nem a propria pessoa. O ocupado, que e so faixa de tempo, abre
@@ -330,7 +349,7 @@ try {
   await denied(getDoc(doc(operator, paths.document("org-a", "members", "a"))));
   await denied(updateDoc(doc(operator, paths.document("org-a", "members", "a")), { role: "OWNER" }));
   await denied(deleteDoc(doc(operator, paths.document("org-a", "members", "restricted"))));
-  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "automationSwitches", "auditLogs"]) {
+  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "automationSwitches", "services", "auditLogs"]) {
     await denied(getDoc(doc(operator, own(name))));
     await denied(setDoc(doc(operator, paths.document("org-a", name, "da-operadora")), { organizationId: "org-a" }));
   }
@@ -571,6 +590,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 341);
+  assert.equal(checks, 354);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

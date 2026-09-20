@@ -43,6 +43,9 @@ export const TENANT_COLLECTIONS = {
     professionals: "professionals",
     members: "members",
     clients: "clients",
+    // Catalogo de servicos da organizacao (E2.1). So existe em profissao com
+    // `features.serviceCatalog`; o caminho, como todos, sai daqui.
+    services: "services",
     appointments: "appointments",
     conversations: "conversations",
     messages: "messages",

@@ -60,6 +60,17 @@ const { paths } = await import("./generated/paths.js");
 const SECRET = "segredo-de-teste-b";
 const ORG = "org-clinica";
 
+/**
+ * Instantes relativos ao relogio de agora.
+ *
+ * Data fixa aqui era uma bomba-relogio: a tarefa nascia com `expiresAt` numa
+ * hora do dia, e a suite passava de manha e falhava a tarde, sem nada ter
+ * mudado no codigo.
+ */
+function em(minutos) {
+  return new Date(Date.now() + minutos * 60_000).toISOString();
+}
+
 /** Uma tarefa de aviso ja entregue ao executor, esperando o resultado. */
 function seedAwaitingTask(patch = {}) {
   const task = {
@@ -69,11 +80,11 @@ function seedAwaitingTask(patch = {}) {
     status: "DISPATCHED",
     attempt: 1,
     maxAttempts: 3,
-    scheduledFor: "2026-09-20T11:00:00.000Z",
-    expiresAt: "2026-09-20T13:00:00.000Z",
+    scheduledFor: em(-60),
+    expiresAt: em(120),
     idempotencyKey: "chave-1",
     appointmentId: "atendimento-1",
-    appointmentStartsAt: "2026-09-20T14:00:00.000Z",
+    appointmentStartsAt: em(180),
     clientId: "cliente-1",
     professionalId: "profissional-1",
     deliveryId: "entrega-1",
@@ -86,14 +97,14 @@ function seedAwaitingTask(patch = {}) {
     dispatchingSince: null,
     completedAt: null,
     history: [
-      { from: null, to: "PLANNED", at: "2026-09-20T10:00:00.000Z", attempt: 1, code: null },
-      { from: "PLANNED", to: "SCHEDULED", at: "2026-09-20T10:00:00.000Z", attempt: 1, code: null },
-      { from: "SCHEDULED", to: "DISPATCHING", at: "2026-09-20T11:00:00.000Z", attempt: 1, code: null },
-      { from: "DISPATCHING", to: "DISPATCHED", at: "2026-09-20T11:00:01.000Z", attempt: 1, code: null },
+      { from: null, to: "PLANNED", at: em(-120), attempt: 1, code: null },
+      { from: "PLANNED", to: "SCHEDULED", at: em(-120), attempt: 1, code: null },
+      { from: "SCHEDULED", to: "DISPATCHING", at: em(-60), attempt: 1, code: null },
+      { from: "DISPATCHING", to: "DISPATCHED", at: em(-59), attempt: 1, code: null },
     ],
-    createdAt: "2026-09-20T10:00:00.000Z",
+    createdAt: em(-120),
     createdBy: null,
-    updatedAt: "2026-09-20T11:00:01.000Z",
+    updatedAt: em(-59),
     updatedBy: null,
     ...patch,
   };
@@ -108,7 +119,7 @@ function seedAwaitingTask(patch = {}) {
     appointmentId: "atendimento-1",
     clientId: "cliente-1",
     professionalId: "profissional-1",
-    scheduledFor: "2026-09-20T11:00:00.000Z",
+    scheduledFor: em(-60),
     status: "SENDING",
     attempts: 0,
     lastAttemptAt: null,
@@ -122,9 +133,9 @@ function seedAwaitingTask(patch = {}) {
     contactHint: "0000",
     sentAt: null,
     cancelledAt: null,
-    createdAt: "2026-09-20T10:00:00.000Z",
+    createdAt: em(-120),
     createdBy: null,
-    updatedAt: "2026-09-20T11:00:00.000Z",
+    updatedAt: em(-60),
     updatedBy: null,
   });
   return task;
@@ -253,7 +264,7 @@ describe("o que a tarefa do banco manda, e nao o corpo do retorno", () => {
   });
 
   it("tarefa ja encerrada nao volta a vida por um retorno", async () => {
-    seedAwaitingTask({ status: "CANCELLED", completedAt: "2026-09-20T11:30:00.000Z", attempt: 1 });
+    seedAwaitingTask({ status: "CANCELLED", completedAt: em(-30), attempt: 1 });
     const res = response();
     await automationCallback(request(payload()), res);
 

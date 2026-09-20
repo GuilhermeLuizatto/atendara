@@ -45,6 +45,7 @@ export const COLLECTION_DATE_FIELDS = {
     "readAt",
     "cancelledAt",
   ],
+  services: [...STAMP_FIELDS, "archivedAt"],
   messagingSenders: [...STAMP_FIELDS],
   rescheduleRequests: [...STAMP_FIELDS, "holdEndsAt", "offeredAt"],
   automationSwitches: [...STAMP_FIELDS, "changedAt"],

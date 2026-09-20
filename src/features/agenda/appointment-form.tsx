@@ -13,6 +13,10 @@ import {
 } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { APPOINTMENT_STATUS_LABELS, MODALITY_LABELS } from "@/config/labels";
+import {
+  appointmentDefaultsFor,
+  bookableServices,
+} from "@/lib/agenda/services";
 import { fromDateAndTime, toDateKey, toTimeValue } from "@/lib/utils/datetime";
 import { byGender, indefiniteTerm, newTerm } from "@/lib/utils/terms";
 import { useWorkspaceActions } from "@/providers/use-workspace-actions";
@@ -23,6 +27,8 @@ import type { Appointment, AppointmentStatus, ServiceModality } from "@/types";
 interface Draft {
   clientId: string;
   professionalId: string;
+  /** Vazio = sem servico do catalogo. A profissao pode nem ter catalogo. */
+  serviceId: string;
   date: string;
   time: string;
   // Texto, como o valor: a profissao pode nao ter duracao padrao, e o campo
@@ -51,11 +57,16 @@ function validate(draft: Draft): Errors {
   const errors: Errors = {};
 
   if (!draft.clientId) errors.clientId = "Selecione quem será atendido.";
-  if (!draft.professionalId) errors.professionalId = "Selecione o profissional.";
+  if (!draft.professionalId)
+    errors.professionalId = "Selecione o profissional.";
   if (!draft.date) errors.date = "Informe a data.";
   if (!draft.time) errors.time = "Informe o horário.";
   const duration = Number(draft.durationMinutes);
-  if (!draft.durationMinutes.trim() || !Number.isFinite(duration) || duration < 5) {
+  if (
+    !draft.durationMinutes.trim() ||
+    !Number.isFinite(duration) ||
+    duration < 5
+  ) {
     errors.durationMinutes = "Duração mínima de 5 minutos.";
   }
 
@@ -94,12 +105,17 @@ export function AppointmentForm({
 
   const clients = data?.clients ?? [];
   const professionals = data?.professionals ?? [];
+  // So a profissao com catalogo oferece servico (regra 1: a flag decide).
+  const services = profession.features.serviceCatalog
+    ? bookableServices(data?.services ?? [])
+    : [];
 
   const [draft, setDraft] = useState<Draft>(() =>
     appointment
       ? {
           clientId: appointment.clientId,
           professionalId: appointment.professionalId,
+          serviceId: appointment.serviceId ?? "",
           date: toDateKey(new Date(appointment.startsAt)),
           time: toTimeValue(appointment.startsAt),
           durationMinutes: String(appointment.durationMinutes),
@@ -111,6 +127,7 @@ export function AppointmentForm({
       : {
           clientId: defaultClientId ?? clients[0]?.id ?? "",
           professionalId: professionals[0]?.id ?? "",
+          serviceId: "",
           date: defaultDate ?? toDateKey(new Date()),
           time: defaultTime ?? "09:00",
           durationMinutes:
@@ -132,6 +149,25 @@ export function AppointmentForm({
   const patch = (changes: Partial<Draft>) =>
     setDraft((current) => ({ ...current, ...changes }));
 
+  /**
+   * Escolher um servico **preenche**, nao trava: duracao e valor continuam
+   * editaveis naquele atendimento sem mexer no catalogo.
+   */
+  function chooseService(serviceId: string) {
+    const defaults = appointmentDefaultsFor(
+      services.find((service) => service.id === serviceId) ?? null,
+    );
+    patch({
+      serviceId,
+      ...(defaults.durationMinutes !== null
+        ? { durationMinutes: String(defaults.durationMinutes) }
+        : {}),
+      ...(defaults.priceInCents !== null
+        ? { priceInReais: centsToInput(defaults.priceInCents) }
+        : {}),
+    });
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
@@ -144,6 +180,11 @@ export function AppointmentForm({
       professionalId: draft.professionalId,
       startsAt: fromDateAndTime(draft.date, draft.time),
       durationMinutes: Number(draft.durationMinutes),
+      serviceId: draft.serviceId || null,
+      // O nome vai junto: renomear o servico depois nao reescreve o passado.
+      serviceName:
+        services.find((service) => service.id === draft.serviceId)?.name ??
+        null,
       modality: draft.modality,
       status: draft.status,
       priceInCents: Math.round(
@@ -182,7 +223,11 @@ export function AppointmentForm({
           <p className="bg-warning-soft text-warning-soft-foreground rounded-lg px-3 py-2 text-sm">
             O agendamento é feito para {indefiniteTerm(terminology.client)} já{" "}
             {byGender(terminology.client, "cadastrado", "cadastrada")}.{" "}
-            <Link href="/clientes" onClick={onClose} className="font-medium underline underline-offset-2">
+            <Link
+              href="/clientes"
+              onClick={onClose}
+              className="font-medium underline underline-offset-2"
+            >
               Cadastrar {terminology.client.singularLower}
             </Link>
           </p>
@@ -211,6 +256,30 @@ export function AppointmentForm({
               )}
             </Field>
           </div>
+
+          {services.length > 0 ? (
+            <div className="sm:col-span-2">
+              <Field
+                label="Serviço"
+                hint="Preenche a duração e o valor. Você pode mudar os dois aqui."
+              >
+                {(props) => (
+                  <Select
+                    {...props}
+                    value={draft.serviceId}
+                    onChange={(event) => chooseService(event.target.value)}
+                  >
+                    <option value="">Sem serviço do catálogo</option>
+                    {services.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+            </div>
+          ) : null}
 
           <Field label="Data" required error={errors.date}>
             {(props) => (

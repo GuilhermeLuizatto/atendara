@@ -22,6 +22,7 @@ organizations/{orgId}
 ├── members/{userId}                     papel e situacao dentro da organizacao
 ├── professionals/{userId}               perfil de quem atende
 ├── clients/{clientId}                   CRM administrativo
+├── services/{serviceId}                 catalogo de servicos (so profissao com a flag)
 ├── appointments/{appointmentId}         agenda
 ├── conversations/{conversationId}       caixa de entrada
 │   └── messages/{messageId}             subcolecao, imutavel
@@ -46,6 +47,15 @@ platformRateLimits/{callable_uid}         contador de abuso por usuario (so back
 
 `messages` e subcolecao porque e a colecao que mais cresce e quase sempre e lida
 por conversa. As demais sao colecoes diretas da organizacao.
+
+`services` (E2.1) so existe de fato para profissao com
+`features.serviceCatalog` — hoje a Estetica. A colecao nao e criada para as
+demais, e a flag decide a TELA; as Security Rules travam por papel e por
+tenant, que e o que elas sabem conferir. Preco em centavos inteiros (regra 7) e
+sempre escolhido pela profissional: nao ha tabela de preco no produto. Servico
+ja usado em atendimento se **arquiva** (`archivedAt`), nunca se apaga — o
+atendimento guarda `serviceId` e `serviceName`, e o nome copiado no ato
+mantem o passado legivel quando o catalogo muda.
 
 As colecoes `platform*` sao a excecao deliberada a "tudo vive sob
 `organizations/`": elas nao pertencem a tenant nenhum, e sim a operadora. Sao a
@@ -157,6 +167,7 @@ Definidas em [`src/services/firestore/queries.ts`](../src/services/firestore/que
 | --------------- | ---------------------- | ------ |
 | `professionals` | `displayName`          | 50   |
 | `clients`       | `fullName`             | 500  |
+| `services`      | `position`             | 100  |
 | `appointments`  | `startsAt` desc        | 500  |
 | `conversations` | `lastMessageAt` desc   | 200  |
 | `messages`      | `sentAt` desc          | 500  |

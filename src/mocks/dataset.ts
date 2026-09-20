@@ -1,4 +1,5 @@
 import { getProfession } from "@/config/professions";
+import { AESTHETICS_SERVICE_SEEDS } from "@/config/services";
 // Importado do arquivo, nao do barril `@/services`: o barril carrega o
 // repositorio, que por sua vez importa este modulo — o ciclo quebraria.
 import type { WorkspaceSnapshot } from "@/services/types";
@@ -80,6 +81,21 @@ export function buildMockDataset(
     organization,
     professionals,
     clients,
+    // Sugestoes sem preco e desligadas, como na organizacao de verdade: a
+    // demonstracao nao inventa valor em reais (decisao de 13/09).
+    services: profession.features.serviceCatalog
+      ? AESTHETICS_SERVICE_SEEDS.map((seed, index) => ({
+          id: `servico-${index + 1}`,
+          organizationId: organization.id,
+          createdAt: organization.createdAt,
+          createdBy: null,
+          updatedAt: organization.createdAt,
+          updatedBy: null,
+          position: index,
+          archivedAt: null,
+          ...seed,
+        }))
+      : [],
     appointments,
     conversations,
     messages,

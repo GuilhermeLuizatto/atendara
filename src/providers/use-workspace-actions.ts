@@ -9,6 +9,7 @@ import {
   type DecisionInput,
   type MessageInput,
   type RuleInput,
+  type ServiceInput,
   type TransactionInput,
   type WorkspaceCollection,
   type WorkspaceRepository,
@@ -71,6 +72,15 @@ export function useWorkspaceActions() {
         run((repo) => repo.updateClient(id, input), "Cadastro atualizado."),
       deleteClient: (id: ID) =>
         run((repo) => repo.deleteClient(id), "Cadastro excluído."),
+
+      createService: (input: ServiceInput) =>
+        run((repo) => repo.createService(input), "Serviço criado."),
+      updateService: (id: ID, input: Partial<ServiceInput>) =>
+        run((repo) => repo.updateService(id, input), "Serviço atualizado."),
+      archiveService: (id: ID) =>
+        run((repo) => repo.archiveService(id), "Serviço arquivado."),
+      deleteService: (id: ID) =>
+        run((repo) => repo.deleteService(id), "Serviço apagado."),
 
       createAppointment: (input: AppointmentInput) =>
         run((repo) => repo.createAppointment(input), "Atendimento agendado."),

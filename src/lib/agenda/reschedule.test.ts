@@ -28,6 +28,8 @@ function atendimento(patch: Partial<Appointment> = {}): Appointment {
     startsAt: "2026-09-25T13:00:00.000Z",
     endsAt: "2026-09-25T13:50:00.000Z",
     durationMinutes: 50,
+    serviceId: null,
+    serviceName: null,
     modality: "IN_PERSON",
     status: "SCHEDULED",
     priceInCents: 20_000,

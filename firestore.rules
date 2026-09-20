@@ -456,6 +456,26 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // ------------------------------------------ catalogo de servicos
+
+      // Servicos da organizacao (E2.1): nome, duracao e preco do trabalho dela.
+      //
+      // LE quem tem a agenda — e o catalogo que explica o que cada atendimento
+      // e e quanto dura. ESCREVE quem atende ou administra, espelhando
+      // `service:read` e `service:manage` em `src/config/permissions.ts`
+      // (regra 8: os dois arquivos mudam juntos).
+      //
+      // A flag `features.serviceCatalog` decide se a TELA aparece; aqui a
+      // trava e de papel e de tenant, que e o que as regras sabem conferir.
+      match /services/{serviceId} {
+        allow read: if moduleAccess(orgId, 'agenda');
+        allow create: if hasRole(orgId, ['OWNER', 'ADMIN', 'PROFESSIONAL'])
+          && belongsToOrg(orgId);
+        allow update: if hasRole(orgId, ['OWNER', 'ADMIN', 'PROFESSIONAL'])
+          && belongsToOrg(orgId);
+        allow delete: if hasRole(orgId, ['OWNER', 'ADMIN', 'PROFESSIONAL']);
+      }
+
       // ------------------------------------------ chave de emergencia
 
       // Liga-desliga da saida de mensagens daquela organizacao (13.9). Quem

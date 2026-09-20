@@ -89,6 +89,8 @@ function appointment(patch: Partial<Appointment> = {}): Appointment {
     startsAt: "2026-09-01T13:00:00.000Z",
     endsAt: "2026-09-01T13:50:00.000Z",
     durationMinutes: 50,
+    serviceId: null,
+    serviceName: null,
     modality: "ONLINE",
     status: "COMPLETED",
     priceInCents: 18000,

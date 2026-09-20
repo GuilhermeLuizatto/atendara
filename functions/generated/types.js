@@ -23,3 +23,4 @@ export * from "./privacy-types.js";
 export * from "./profession.js";
 export * from "./types-professional.js";
 export * from "./types-rules.js";
+export * from "./types-service.js";

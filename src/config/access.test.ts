@@ -30,6 +30,15 @@ describe("Acesso por cadastro", () => {
     expect(accountPermissions(withoutSettings, owner)).not.toContain("auditLog:read");
     expect(accountPermissions(withoutSettings, owner)).not.toContain("notificationSettings:update");
   });
+  // O catalogo (E2.1) vive na agenda: sem esse vinculo a permissao some no
+  // filtro de modulos e a aba nunca aparece, mesmo com o papel certo.
+  it("liga o catalogo de servicos ao modulo da agenda", () => {
+    const comAgenda = { ...account, modules: ["agenda" as const] };
+    expect(accountPermissions(comAgenda)).toContain("service:read");
+    expect(accountPermissions(comAgenda, { role: "PROFESSIONAL", isOrganizationHolder: false })).toContain("service:manage");
+    const semAgenda = { ...account, modules: account.modules.filter(area => area !== "agenda") };
+    expect(accountPermissions(semAgenda)).not.toContain("service:read");
+  });
   it("admin acessa todas as profissoes depois da troca de senha", () => {
     const admin = { ...account, platformRole: "PLATFORM_ADMIN" as const, accessUntil: null, modules: [] };
     expect(canAccessProfession(admin, "DENTIST")).toBe(true);

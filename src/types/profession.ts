@@ -101,6 +101,13 @@ export interface ProfessionFeatureFlags {
    * tambem uma entrada no mapa de dados pessoais e um caminho de eliminacao.
    */
   homeVisitDetails: boolean;
+  /**
+   * Sugestao de retorno pelo intervalo do servico (E2.4).
+   *
+   * A sugestao aparece na TELA e nada e enviado: aviso ao cliente e opt-in com
+   * as travas da regra 11, e quem decide chamar de volta e ela.
+   */
+  maintenanceReminders: boolean;
 }
 
 /** Semente de regra de nivel PROFESSION, aplicada ao criar a organizacao. */

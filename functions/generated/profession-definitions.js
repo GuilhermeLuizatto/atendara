@@ -88,6 +88,7 @@ export const PROFESSION_DEFINITIONS = {
             serviceCatalog: false,
             depositOnBooking: false,
             homeVisitDetails: false,
+            maintenanceReminders: false,
         },
     },
     PSYCHIATRIST: {
@@ -160,6 +161,7 @@ export const PROFESSION_DEFINITIONS = {
             serviceCatalog: false,
             depositOnBooking: false,
             homeVisitDetails: false,
+            maintenanceReminders: false,
         },
     },
     DOCTOR: {
@@ -232,6 +234,7 @@ export const PROFESSION_DEFINITIONS = {
             serviceCatalog: false,
             depositOnBooking: false,
             homeVisitDetails: false,
+            maintenanceReminders: false,
         },
     },
     DENTIST: {
@@ -300,6 +303,7 @@ export const PROFESSION_DEFINITIONS = {
             serviceCatalog: false,
             depositOnBooking: false,
             homeVisitDetails: false,
+            maintenanceReminders: false,
         },
     },
     NUTRITIONIST: {
@@ -368,6 +372,7 @@ export const PROFESSION_DEFINITIONS = {
             serviceCatalog: false,
             depositOnBooking: false,
             homeVisitDetails: false,
+            maintenanceReminders: false,
         },
     },
     PHYSIOTHERAPIST: {
@@ -436,6 +441,7 @@ export const PROFESSION_DEFINITIONS = {
             serviceCatalog: false,
             depositOnBooking: false,
             homeVisitDetails: false,
+            maintenanceReminders: false,
         },
     },
     THERAPIST: {
@@ -511,6 +517,7 @@ export const PROFESSION_DEFINITIONS = {
             serviceCatalog: false,
             depositOnBooking: false,
             homeVisitDetails: false,
+            maintenanceReminders: false,
         },
     },
     PERSONAL_TRAINER: {
@@ -581,6 +588,7 @@ export const PROFESSION_DEFINITIONS = {
             serviceCatalog: false,
             depositOnBooking: false,
             homeVisitDetails: false,
+            maintenanceReminders: false,
         },
     },
     AESTHETICS: {
@@ -655,6 +663,7 @@ export const PROFESSION_DEFINITIONS = {
             serviceCatalog: true,
             depositOnBooking: true,
             homeVisitDetails: true,
+            maintenanceReminders: true,
         },
     },
 };

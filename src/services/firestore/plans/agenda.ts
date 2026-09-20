@@ -1,5 +1,5 @@
 import { DEPOSIT_DESCRIPTION_PREFIX, type DepositChoice } from "@/config/deposit";
-import { HOME_VISIT_ERRORS, TRAVEL_DESCRIPTION_PREFIX } from "@/config/home-visit";
+import { TRAVEL_DESCRIPTION_PREFIX } from "@/config/home-visit";
 import { getProfession } from "@/config/professions";
 import { validateHomeVisit } from "@/lib/agenda/home-visit";
 import { amountForPart, partOf } from "@/lib/agenda/charges";

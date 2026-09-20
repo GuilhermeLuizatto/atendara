@@ -100,6 +100,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       serviceCatalog: false,
       depositOnBooking: false,
       homeVisitDetails: false,
+      maintenanceReminders: false,
     },
   },
 
@@ -179,6 +180,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       serviceCatalog: false,
       depositOnBooking: false,
       homeVisitDetails: false,
+      maintenanceReminders: false,
     },
   },
 
@@ -257,6 +259,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       serviceCatalog: false,
       depositOnBooking: false,
       homeVisitDetails: false,
+      maintenanceReminders: false,
     },
   },
 
@@ -332,6 +335,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       serviceCatalog: false,
       depositOnBooking: false,
       homeVisitDetails: false,
+      maintenanceReminders: false,
     },
   },
 
@@ -407,6 +411,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       serviceCatalog: false,
       depositOnBooking: false,
       homeVisitDetails: false,
+      maintenanceReminders: false,
     },
   },
 
@@ -481,6 +486,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       serviceCatalog: false,
       depositOnBooking: false,
       homeVisitDetails: false,
+      maintenanceReminders: false,
     },
   },
 
@@ -562,6 +568,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       serviceCatalog: false,
       depositOnBooking: false,
       homeVisitDetails: false,
+      maintenanceReminders: false,
     },
   },
 
@@ -638,6 +645,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       serviceCatalog: false,
       depositOnBooking: false,
       homeVisitDetails: false,
+      maintenanceReminders: false,
     },
   },
 
@@ -719,6 +727,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       serviceCatalog: true,
       depositOnBooking: true,
       homeVisitDetails: true,
+      maintenanceReminders: true,
     },
   },
 };

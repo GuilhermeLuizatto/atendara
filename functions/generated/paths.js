@@ -53,6 +53,11 @@ export const TENANT_COLLECTIONS = {
     // Fila de automacao: cada execucao (aviso, alerta, registro na trilha), com
     // estado, tentativa e validade. So o backend le e escreve.
     automationTasks: "automationTasks",
+    // Remetente comprovado de cada canal real (13.4): o numero aprovado na Meta,
+    // o nome de exibicao e a situacao da verificacao. Um documento por canal, com
+    // o proprio canal como id. Escrito SO pela operadora, pelo backend, com
+    // segundo fator e trilha — a organizacao nao declara a si mesma habilitada.
+    messagingSenders: "messagingSenders",
     auditLogs: "auditLogs",
     // Registro de cada pedido de titular de dados atendido pela organizacao.
     // Escrito so pelo backend, junto da exportacao ou da eliminacao.

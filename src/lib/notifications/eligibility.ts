@@ -7,6 +7,7 @@ import type {
   Client,
   ID,
   ISODateString,
+  MessagingSender,
   NotificationDelivery,
   NotificationDispatchStopReason,
   NotificationEligibility,
@@ -25,6 +26,7 @@ import {
 import { contactFor, hasRawContact } from "./contacts";
 import { deliveryKey } from "./delivery";
 import { scheduledTimeFor } from "./schedule";
+import { whatsappMessageFor, type WhatsappMessage } from "./whatsapp";
 import { hashBody, renderTemplate, type TemplateContext } from "./templates";
 
 /**
@@ -54,6 +56,41 @@ export interface EligibilityInput {
   now: ISODateString;
   /** Ids de entregas ja existentes. E o que torna o replanejamento inofensivo. */
   existingDeliveryIds: readonly ID[];
+  /**
+   * Remetente cadastrado pela operadora para o canal (13.4). `null` quando nao
+   * ha cadastro — o que so impede o envio em canal de provedor real.
+   */
+  sender?: MessagingSender | null;
+}
+
+/**
+ * A trava do remetente real (13.4).
+ *
+ * Com provedor simulado nao ha o que conferir: nada sai do processo. Com
+ * provedor de verdade, falar pelo numero de uma clinica exige um cadastro que
+ * **a propria clinica nao escreve** — ele vem da operadora, pelo backend, com
+ * segundo fator e trilha.
+ *
+ * O modo de teste recusa destino fora da lista de testadores **aqui**, e nao no
+ * provedor: a recusa da Meta chegaria depois de a tentativa ja ter sido gasta,
+ * e tentativa recusada conta contra a reputacao do remetente.
+ */
+export function senderProblemFor(input: {
+  providerId: string;
+  sender: MessagingSender | null;
+  channel: OutboundChannel;
+  /** Destino ja normalizado. Ausente no planejamento, presente no envio. */
+  destination?: string | null;
+}): NotificationSkipReason | null {
+  if (input.providerId === "SIMULATED") return null;
+
+  const { sender } = input;
+  if (!sender || sender.channel !== input.channel) return "SENDER_NOT_REGISTERED";
+  if (sender.status !== "APPROVED") return "SENDER_NOT_APPROVED";
+  if (sender.mode === "TEST" && input.destination && !sender.testRecipients.includes(input.destination)) {
+    return "DESTINATION_NOT_IN_TEST_LIST";
+  }
+  return null;
 }
 
 type TemplateInput = Pick<
@@ -106,7 +143,7 @@ function deny(
 function gateProblem(
   rule: NotificationRule,
   event: AppointmentNotificationEvent,
-  input: Pick<EligibilityInput, "organization" | "profession" | "client">,
+  input: Pick<EligibilityInput, "organization" | "profession" | "client" | "sender">,
 ): NotificationSkipReason | null {
   const settings = input.organization.settings.notifications;
 
@@ -117,6 +154,12 @@ function gateProblem(
   if (!settings.verifiedSenderChannels.includes(rule.channel)) {
     return "SENDER_NOT_VERIFIED";
   }
+  const senderProblem = senderProblemFor({
+    providerId: CHANNEL_META[rule.channel].providerId,
+    sender: input.sender ?? null,
+    channel: rule.channel,
+  });
+  if (senderProblem) return senderProblem;
 
   // 2. O que a profissao permite.
   const professionRules = input.profession.notifications;
@@ -216,10 +259,22 @@ export interface SendCheckInput {
    * registro da demonstracao nao guarda esse horario.
    */
   plannedForStartsAt: ISODateString | null;
+  /** Remetente cadastrado pela operadora para o canal (13.4). */
+  sender?: MessagingSender | null;
 }
 
 export type SendCheck =
-  | { ok: true; destination: string; body: string }
+  | {
+      ok: true;
+      destination: string;
+      body: string;
+      /**
+       * Modelo aprovado do WhatsApp, quando o canal e esse (13.4). `null` nos
+       * demais canais — e tambem no WhatsApp enquanto o evento nao tiver
+       * modelo, caso em que nada sai por falta de modelo, e nao por engano.
+       */
+      template: WhatsappMessage | null;
+    }
   | { ok: false; reason: NotificationDispatchStopReason };
 
 function stop(reason: NotificationDispatchStopReason): SendCheck {
@@ -260,16 +315,36 @@ export function composeForSend(input: SendCheckInput): SendCheck {
     client,
     professionalName: input.professionalName,
   };
-  const problem = gateProblem(rule, delivery.event, context);
+  const problem = gateProblem(rule, delivery.event, { ...context, sender: input.sender ?? null });
   if (problem) return stop(problem);
 
   const contact = contactFor(client, rule.channel);
   if (!contact) return stop("INVALID_CONTACT");
 
+  // So aqui existe destino: a lista de testadores do remetente e conferida
+  // contra ele, e nao no planejamento, quando o contato ainda pode mudar.
+  const restricted = senderProblemFor({
+    providerId: CHANNEL_META[rule.channel].providerId,
+    sender: input.sender ?? null,
+    channel: rule.channel,
+    destination: contact.destination,
+  });
+  if (restricted) return stop(restricted);
+
   const rendered = renderFor(rule, delivery.event, context);
   if (!rendered.ok) return stop("TEMPLATE_REJECTED");
 
-  return { ok: true, destination: contact.destination, body: rendered.value };
+  return {
+    ok: true,
+    destination: contact.destination,
+    body: rendered.value,
+    template: whatsappMessageFor({
+      channel: rule.channel,
+      event: delivery.event,
+      disclosure: input.profession.notifications.disclosure,
+      context: templateContext(context),
+    }),
+  };
 }
 
 /**

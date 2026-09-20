@@ -104,6 +104,7 @@ export const PLATFORM_AUDIT_ACTION_LABELS = {
     ACCOUNT_REGISTERED: "Cadastro de profissional",
     ACCOUNT_UPDATED: "Alteração de conta",
     ACCESS_GRANTED: "Concessão de acesso",
+    MESSAGING_SENDER_REGISTERED: "Remetente de canal cadastrado",
     ACCESS_REVOKED: "Revogação de acesso",
     SELF_SERVICE_REGISTERED: "Cadastro aberto pelo profissional",
     TRIAL_STARTED: "Início do teste de 14 dias",
@@ -147,6 +148,9 @@ export const CALLABLE_RATE_LIMITS = {
     selfServiceSignupByAccount: { max: 3, windowSeconds: 3600 },
     selfServiceTrialActivation: { max: 3, windowSeconds: 3600 },
     professionChangeRequest: { max: 3, windowSeconds: 3600 },
+    // Cadastro de remetente e raro e sempre da operadora. O teto existe porque
+    // cada chamada grava na trilha: sessao comprometida nao enche a trilha.
+    messagingSenderRegistration: { max: 10, windowSeconds: 3600 },
 };
 /**
  * Retencao PROVISORIA, em dias, gravada como `expiresAt` para uma futura

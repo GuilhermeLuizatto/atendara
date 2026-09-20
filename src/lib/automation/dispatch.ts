@@ -9,6 +9,7 @@ import type {
   AutomationTask,
   Client,
   ISODateString,
+  MessagingSender,
   NotificationDelivery,
   Organization,
   ProfessionConfig,
@@ -46,6 +47,8 @@ export interface DispatchInput {
   appointment: Appointment | null;
   client: Client | null;
   professionalName: string | null;
+  /** Remetente do canal, cadastrado pela operadora (13.4). */
+  sender: MessagingSender | null;
   now: ISODateString;
 }
 
@@ -163,6 +166,7 @@ export function decideDispatch(input: DispatchInput): DispatchStep {
     professionalName: input.professionalName,
     delivery: input.delivery,
     plannedForStartsAt: task.appointmentStartsAt,
+    sender: input.sender,
   });
   if (!check.ok) return cancel(task, input.delivery, check.reason, now);
 
@@ -185,6 +189,7 @@ export function decideDispatch(input: DispatchInput): DispatchStep {
       organizationId: task.organizationId,
       idempotencyKey: task.idempotencyKey,
       expiresAt: task.expiresAt,
+      template: check.template,
     },
   };
 }

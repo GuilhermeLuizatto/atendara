@@ -8,6 +8,7 @@ import {
   decideCallback,
   isWithinSignatureWindow,
   parseCallbackPayload,
+  progressFields,
   signedMessage,
   type BridgeCallbackPayload,
 } from "./bridge";
@@ -160,5 +161,50 @@ describe("quem pode aplicar o retorno", () => {
       kind: "REJECT",
       why: "DELIVERY_NOT_FOUND",
     });
+  });
+});
+
+describe("progresso do canal real (13.4)", () => {
+  it("entregue e lida nao sao resultado: chegam com a tarefa ja concluida", () => {
+    const concluida = task({ status: "SUCCEEDED" });
+    const enviada = { ...delivery(concluida.deliveryId!), status: "SENT" as const };
+
+    const decision = decideCallback({
+      payload: callback({ progress: "DELIVERED" }),
+      task: concluida,
+      delivery: enviada,
+      now: NOW,
+    });
+
+    expect(decision).toEqual({ kind: "PROGRESS", delivery: enviada, state: "DELIVERED" });
+  });
+
+  it("progresso de aviso que nao saiu e recusado", () => {
+    const concluida = task({ status: "SUCCEEDED" });
+    expect(
+      decideCallback({
+        payload: callback({ progress: "READ" }),
+        task: concluida,
+        delivery: { ...delivery(concluida.deliveryId!), status: "FAILED" },
+        now: NOW,
+      }),
+    ).toEqual({ kind: "REJECT", why: "NOT_AWAITING" });
+  });
+
+  it("progresso com resultado que nao e aceite nao existe, e o formato recusa", () => {
+    expect(parseCallbackPayload({ ...callback({ progress: "DELIVERED" }), outcome: "REJECTED", failureCode: "INVALID_DESTINATION", providerMessageId: null })).toBeNull();
+    expect(parseCallbackPayload({ ...callback(), progress: "ENTREGUE" })).toBeNull();
+    expect(parseCallbackPayload({ ...callback({ progress: "READ" }) })).toMatchObject({ progress: "READ" });
+  });
+
+  it("carimbo so na primeira vez: reentrega nao move horario ja registrado", () => {
+    const enviada = { ...delivery("entrega-1"), status: "SENT" as const, sentAt: NOW };
+    const depois = "2026-09-10T12:30:00.000Z";
+
+    expect(progressFields(enviada, "DELIVERED", depois)).toEqual({ deliveredAt: depois });
+    expect(progressFields({ ...enviada, deliveredAt: NOW }, "DELIVERED", depois)).toEqual({});
+    // Lida implica entregue quando so o segundo aviso chegou.
+    expect(progressFields(enviada, "READ", depois)).toEqual({ deliveredAt: depois, readAt: depois });
+    expect(progressFields({ ...enviada, deliveredAt: NOW, readAt: NOW }, "READ", depois)).toEqual({});
   });
 });

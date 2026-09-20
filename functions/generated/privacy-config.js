@@ -249,6 +249,15 @@ export const PERSONAL_DATA_MAP = {
         },
         onOrganizationDeletion: DELETE,
     },
+    // Remetente comprovado de cada canal (13.4). O que ha de pessoal aqui e
+    // contato da PROPRIA equipe — numeros de testadores —, nunca de quem e
+    // atendido; por isso pedido de titular de dados nao alcanca esta colecao.
+    messagingSenders: {
+        personalFields: ["testRecipients"],
+        retention: { kind: "WHILE_ORGANIZATION_EXISTS" },
+        onClientErasure: { action: "NOT_APPLICABLE" },
+        onOrganizationDeletion: DELETE,
+    },
     automationTasks: {
         // Ids e estado da execucao. Texto, contato e nome nunca sao gravados: o
         // despachante recompoe os dois primeiros no envio e os descarta.

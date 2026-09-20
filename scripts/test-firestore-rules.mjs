@@ -99,6 +99,7 @@ try {
       await setDoc(doc(db, paths.document(org, "notifications", "alert")), { organizationId: org, status: "UNREAD", title: "Alerta" });
       await setDoc(doc(db, paths.document(org, "notificationDeliveries", "envio")), { organizationId: org, status: "PLANNED", attempts: 0, sentAt: null, channel: "SMS", event: "APPOINTMENT_REMINDER", bodyHash: "abcdef12", contactHint: "***0000" });
       await setDoc(doc(db, paths.document(org, "privacyRequests", "pedido")), { organizationId: org, type: "CLIENT_EXPORT", subjectId: "example", requestedBy: "a" });
+      await setDoc(doc(db, paths.document(org, "messagingSenders", "WHATSAPP")), { organizationId: org, channel: "WHATSAPP", providerId: "N8N_BRIDGE", providerSenderId: "123", displayNumber: "+5513999990000", displayName: "Clinica", status: "APPROVED", mode: "TEST", testRecipients: ["+5513999990000"] });
     }
     await setDoc(doc(db, paths.initialPassword("a")), { hash: "test-only" });
     await setDoc(doc(db, paths.document("org-a", "clients", "consentido")), { organizationId: "org-a", fullName: "Alex Ficticio", notificationConsent: recordConsent({ EMAIL: [SEEDED_EMAIL], SMS: [SEEDED_SMS] }) });
@@ -184,7 +185,7 @@ try {
   await denied(getDocs(query(collectionGroup(db("restricted"), "messages"), where("organizationId", "==", "org-a"))));
 
   // Listagem cruzada de cada colecao operacional.
-  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "automationTasks", "auditLogs"]) {
+  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "auditLogs"]) {
     await denied(getDocs(query(collection(db("a"), paths.collection("org-b", name)), limit(5))));
   }
 
@@ -245,6 +246,24 @@ try {
   await deniedBecause("trilha forjada pelo navegador", setDoc(taskOf("adminRole", "trilha-forjada"), task({ type: "WRITE_AUDIT", status: "SUCCEEDED" })));
   await deniedBecause("fila sem o modulo de agenda", getDoc(taskOf("restricted", "example")));
 
+  // Remetente de canal real (13.4): quem administra a organizacao LE — precisa
+  // saber qual numero aparece para quem e atendido —, e NINGUEM escreve pelo
+  // cliente. Se a organizacao escrevesse aqui, ela se declararia habilitada a
+  // falar em nome de qualquer numero, que e exatamente o que o cadastro pela
+  // operadora existe para impedir.
+  const senderOf = (uid) => doc(db(uid), paths.document("org-a", "messagingSenders", "WHATSAPP"));
+  const sender = (extra) => ({ organizationId: "org-a", channel: "WHATSAPP", providerId: "N8N_BRIDGE", providerSenderId: "999", displayNumber: "+5511999990000", displayName: "Forjado", status: "APPROVED", mode: "PRODUCTION", testRecipients: [], ...extra });
+  await allowed(getDoc(senderOf("ownerRole")));
+  await allowed(getDoc(senderOf("adminRole")));
+  await deniedBecause("profissional lendo o remetente", getDoc(senderOf("a")));
+  await deniedBecause("assistente lendo o remetente", getDoc(senderOf("assistantRole")));
+  for (const uid of ["a", "ownerRole", "adminRole"]) {
+    await deniedBecause(`${uid} cadastrando remetente`, setDoc(doc(db(uid), paths.document("org-a", "messagingSenders", "SMS")), sender({ channel: "SMS" })));
+    await deniedBecause(`${uid} aprovando o proprio remetente`, updateDoc(senderOf(uid), { status: "APPROVED", mode: "PRODUCTION" }));
+    await deniedBecause(`${uid} apagando o remetente`, deleteDoc(senderOf(uid)));
+  }
+  await deniedBecause("remetente de outra organizacao", getDoc(doc(db("a"), paths.document("org-b", "messagingSenders", "WHATSAPP"))));
+
   // Sem o modulo de agenda a fila de saida nao abre: todo evento que a alimenta
   // vem de la.
   await denied(getDoc(doc(db("restricted"), paths.document("org-a", "notificationDeliveries", "envio"))));
@@ -276,7 +295,7 @@ try {
   await denied(getDoc(doc(operator, paths.document("org-a", "members", "a"))));
   await denied(updateDoc(doc(operator, paths.document("org-a", "members", "a")), { role: "OWNER" }));
   await denied(deleteDoc(doc(operator, paths.document("org-a", "members", "restricted"))));
-  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "auditLogs"]) {
+  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "auditLogs"]) {
     await denied(getDoc(doc(operator, own(name))));
     await denied(setDoc(doc(operator, paths.document("org-a", name, "da-operadora")), { organizationId: "org-a" }));
   }
@@ -517,6 +536,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 290);
+  assert.equal(checks, 307);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

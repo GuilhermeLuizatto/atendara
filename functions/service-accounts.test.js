@@ -32,6 +32,8 @@ const GROUP_OF_FILE = {
   // A volta da ponte do n8n muda estado de tarefa e grava a trilha do aviso:
   // mesmo alcance do despachante, e nada alem dele.
   "automation-callback.js": "automacao",
+  // Cadastro do remetente e ato da operadora, como concessao e revogacao.
+  "messaging-senders.js": "operadora",
 };
 
 function sourceFileOf(name) {

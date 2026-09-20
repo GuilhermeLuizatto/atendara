@@ -58,6 +58,59 @@ export interface NotificationRule {
   customTemplate: string | null;
 }
 
+/**
+ * Situacao do remetente no provedor. `APPROVED` e o unico estado que deixa
+ * mensagem sair: `PENDING` e verificacao em andamento na Meta e `REJECTED` e
+ * recusa, que exige agir no painel do provedor antes de tentar de novo.
+ */
+export const MESSAGING_SENDER_STATUSES = ["PENDING", "APPROVED", "REJECTED"] as const;
+
+export type MessagingSenderStatus = (typeof MESSAGING_SENDER_STATUSES)[number];
+
+/**
+ * Em `TEST`, o provedor so entrega a numeros cadastrados como testadores, e o
+ * Atendara recusa antes de tentar: o erro do provedor viria tarde demais, e
+ * cada tentativa recusada conta contra a reputacao do remetente.
+ */
+export const MESSAGING_SENDER_MODES = ["TEST", "PRODUCTION"] as const;
+
+export type MessagingSenderMode = (typeof MESSAGING_SENDER_MODES)[number];
+
+/**
+ * Remetente comprovado de um canal real (Fase 3, 13.4).
+ *
+ * Existe porque `verifiedSenderChannels` e uma configuracao da organizacao, e
+ * organizacao nenhuma pode declarar a si mesma habilitada a falar pelo WhatsApp
+ * de outra pessoa. Este documento e escrito so pelo backend, pela operadora,
+ * com segundo fator e trilha, e as Security Rules recusam escrita do cliente.
+ *
+ * **Nao guarda credencial.** O token da Meta vive no Secret Manager; aqui fica
+ * so o que identifica o remetente e o que a Meta respondeu sobre ele.
+ */
+export interface MessagingSender extends TenantScopedEntity {
+  /** Id do documento e o proprio canal: um remetente por canal. */
+  channel: OutboundChannel;
+  /** Quem executa o canal hoje. Espelha `CHANNEL_META[canal].providerId`. */
+  providerId: string;
+  /** `phone_number_id` da Meta, para o WhatsApp. Nao e o numero em si. */
+  providerSenderId: string;
+  /** Numero no formato internacional, so para a operadora conferir na tela. */
+  displayNumber: string;
+  /** Nome aprovado pela Meta, que a pessoa atendida ve na conversa. */
+  displayName: string;
+  status: MessagingSenderStatus;
+  mode: MessagingSenderMode;
+  /**
+   * Destinos que o provedor aceita enquanto `mode` e `TEST`. Vazio em
+   * `PRODUCTION`. Guardar numero de testador aqui e deliberado: sao numeros da
+   * propria equipe, nao de pessoa atendida.
+   */
+  testRecipients: string[];
+  /** Motivo registrado pela operadora no ultimo ato, para a trilha. */
+  lastReason: string | null;
+  privacyRedaction?: PrivacyRedactionMark | null;
+}
+
 export interface OrganizationNotificationSettings {
   /**
    * Trava mestra da organizacao. Desligada, nenhuma regra vale — e o unico
@@ -228,6 +281,14 @@ export interface NotificationDelivery extends TenantScopedEntity {
   /** Ultimos digitos/caracteres do destino, para conferencia sem expor contato. */
   contactHint: string;
   sentAt: ISODateString | null;
+  /**
+   * Carimbos que so canal real produz (13.4). `deliveredAt` e o aparelho da
+   * pessoa confirmando o recebimento; `readAt` e ela tendo aberto — e so chega
+   * quando a propria pessoa mantem a confirmacao de leitura ligada. Nenhum dos
+   * dois muda o estado da entrega: `SENT` ja significa "o provedor aceitou".
+   */
+  deliveredAt: ISODateString | null;
+  readAt: ISODateString | null;
   cancelledAt: ISODateString | null;
   privacyRedaction?: PrivacyRedactionMark | null;
 }
@@ -236,6 +297,15 @@ export interface NotificationDelivery extends TenantScopedEntity {
 export const NOTIFICATION_SKIP_REASONS = [
   "ORGANIZATION_DISABLED",
   "SENDER_NOT_VERIFIED",
+  // Canal real sem cadastro de remetente feito pela operadora (13.4). A
+  // organizacao pode ter marcado o canal como comprovado na propria
+  // configuracao; isso nao basta quando quem entrega e um provedor de verdade.
+  "SENDER_NOT_REGISTERED",
+  // Cadastro existe, mas a Meta ainda nao aprovou — ou recusou — o remetente.
+  "SENDER_NOT_APPROVED",
+  // Remetente em modo de teste: o provedor so entrega a numeros cadastrados
+  // como testadores, e tentar fora da lista so gera recusa.
+  "DESTINATION_NOT_IN_TEST_LIST",
   "NO_RULE_FOR_EVENT",
   "RULE_DISABLED",
   "EVENT_NOT_ALLOWED_FOR_PROFESSION",

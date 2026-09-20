@@ -35,6 +35,16 @@ export function bridgeTaskPayload(request) {
         deliveryId: request.deliveryId,
         destination: request.destination,
         body: request.body,
+        ...(request.template
+            ? {
+                template: {
+                    name: request.template.name,
+                    language: request.template.language,
+                    parameters: request.template.parameters,
+                    buttons: request.template.buttons,
+                },
+            }
+            : {}),
     };
 }
 /**
@@ -51,6 +61,14 @@ export function isWithinSignatureWindow(timestamp, now) {
         return false;
     return Math.abs(Date.parse(now) - sent) <= BRIDGE_SIGNATURE_WINDOW_SECONDS * 1000;
 }
+// ------------------------------------------------------------------ volta
+/**
+ * Progresso do canal real (13.4): o WhatsApp avisa que entregou e, quando a
+ * pessoa permite, que ela leu. Nao e resultado — a tarefa ja terminou quando o
+ * provedor aceitou —, entao progresso nunca muda estado de tarefa nem gasta
+ * tentativa: so carimba a entrega.
+ */
+export const BRIDGE_PROGRESS_STATES = ["DELIVERED", "READ"];
 const OUTCOMES = ["ACCEPTED", "TEMPORARY_FAILURE", "REJECTED"];
 /**
  * Forma do retorno. Valida so o formato; quem confere se ele **pode** ser
@@ -67,6 +85,13 @@ export function parseCallbackPayload(data) {
     const attempt = typeof raw.attempt === "number" && Number.isInteger(raw.attempt) && raw.attempt >= 1 && raw.attempt <= 10 ? raw.attempt : null;
     if (raw.version !== BRIDGE_CONTRACT_VERSION || !taskId || !organizationId || !outcome || attempt === null)
         return null;
+    const progress = BRIDGE_PROGRESS_STATES.find((value) => value === raw.progress) ?? null;
+    if (raw.progress != null && progress === null)
+        return null;
+    // Progresso e sempre de envio aceito: "entregue" depois de "recusado" nao
+    // existe, e aceitar isso deixaria o n8n reescrever a historia da entrega.
+    if (progress && outcome !== "ACCEPTED")
+        return null;
     const providerMessageId = raw.providerMessageId == null ? null : text(raw.providerMessageId, 200);
     if (raw.providerMessageId != null && providerMessageId === null)
         return null;
@@ -81,7 +106,16 @@ export function parseCallbackPayload(data) {
         return null;
     if (outcome !== "ACCEPTED" && failureCode === null)
         return null;
-    return { version: BRIDGE_CONTRACT_VERSION, taskId, organizationId, attempt, outcome, providerMessageId, failureCode };
+    return {
+        version: BRIDGE_CONTRACT_VERSION,
+        taskId,
+        organizationId,
+        attempt,
+        outcome,
+        providerMessageId,
+        failureCode,
+        ...(progress ? { progress } : {}),
+    };
 }
 export function decideCallback(input) {
     const { payload, task, delivery, now } = input;
@@ -89,6 +123,15 @@ export function decideCallback(input) {
         return { kind: "REJECT", why: "NOT_FOUND" };
     if (task.organizationId !== payload.organizationId)
         return { kind: "REJECT", why: "WRONG_ORGANIZATION" };
+    // Progresso chega DEPOIS do resultado, com a tarefa ja concluida: exigir
+    // `DISPATCHED` o recusaria sempre. O que ele exige e uma entrega que saiu.
+    if (payload.progress) {
+        if (!delivery || delivery.id !== task.deliveryId)
+            return { kind: "REJECT", why: "DELIVERY_NOT_FOUND" };
+        if (delivery.status !== "SENT")
+            return { kind: "REJECT", why: "NOT_AWAITING" };
+        return { kind: "PROGRESS", delivery, state: payload.progress };
+    }
     // Terminal com a mesma tentativa e a reentrega do mesmo retorno; com
     // tentativa diferente, e retorno de uma tentativa que ja foi superada.
     if (isTerminalStatus(task.status)) {
@@ -106,4 +149,20 @@ export function decideCallback(input) {
     if (!delivery || delivery.id !== task.deliveryId)
         return { kind: "REJECT", why: "DELIVERY_NOT_FOUND" };
     return { kind: "APPLY", task, delivery };
+}
+/**
+ * O que cada progresso carimba. Idempotente de proposito: a Meta reentrega o
+ * mesmo aviso, e o primeiro instante registrado e o que vale — carimbar de novo
+ * moveria para frente um horario que ja aconteceu.
+ */
+export function progressFields(delivery, state, now) {
+    if (state === "DELIVERED") {
+        return delivery.deliveredAt ? {} : { deliveredAt: now };
+    }
+    // Lida implica entregue: o WhatsApp as vezes entrega os dois avisos juntos, e
+    // as vezes so o segundo chega.
+    return {
+        ...(delivery.deliveredAt ? {} : { deliveredAt: now }),
+        ...(delivery.readAt ? {} : { readAt: now }),
+    };
 }

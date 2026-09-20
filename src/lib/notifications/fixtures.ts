@@ -209,6 +209,8 @@ export function delivery(
     bodyLength: 0,
     contactHint: "***0000",
     sentAt: null,
+    deliveredAt: null,
+    readAt: null,
     cancelledAt: null,
     ...overrides,
   };

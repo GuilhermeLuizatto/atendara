@@ -56,6 +56,17 @@ export interface BridgeTaskPayload {
   deliveryId: ID;
   destination: string;
   body: string;
+  /**
+   * Modelo aprovado do WhatsApp (13.4). Ausente nos canais que aceitam texto.
+   * O n8n monta a chamada a Meta com ele; sem modelo, a Meta so entregaria
+   * dentro da janela de 24 horas, e lembrete nao acontece dentro dela.
+   */
+  template?: {
+    name: string;
+    language: string;
+    parameters: string[];
+    buttons: readonly string[];
+  };
 }
 
 export function bridgeTaskPayload(request: SendRequest): BridgeTaskPayload {
@@ -70,6 +81,16 @@ export function bridgeTaskPayload(request: SendRequest): BridgeTaskPayload {
     deliveryId: request.deliveryId,
     destination: request.destination,
     body: request.body,
+    ...(request.template
+      ? {
+          template: {
+            name: request.template.name,
+            language: request.template.language,
+            parameters: request.template.parameters,
+            buttons: request.template.buttons,
+          },
+        }
+      : {}),
   };
 }
 
@@ -90,6 +111,16 @@ export function isWithinSignatureWindow(timestamp: string, now: ISODateString): 
 
 // ------------------------------------------------------------------ volta
 
+/**
+ * Progresso do canal real (13.4): o WhatsApp avisa que entregou e, quando a
+ * pessoa permite, que ela leu. Nao e resultado — a tarefa ja terminou quando o
+ * provedor aceitou —, entao progresso nunca muda estado de tarefa nem gasta
+ * tentativa: so carimba a entrega.
+ */
+export const BRIDGE_PROGRESS_STATES = ["DELIVERED", "READ"] as const;
+
+export type BridgeProgressState = (typeof BRIDGE_PROGRESS_STATES)[number];
+
 export interface BridgeCallbackPayload {
   version: number;
   taskId: ID;
@@ -98,6 +129,8 @@ export interface BridgeCallbackPayload {
   outcome: DeliveryOutcome;
   providerMessageId: string | null;
   failureCode: DeliveryFailureCode | null;
+  /** Presente so nos avisos de progresso. */
+  progress?: BridgeProgressState;
 }
 
 const OUTCOMES: readonly DeliveryOutcome[] = ["ACCEPTED", "TEMPORARY_FAILURE", "REJECTED"];
@@ -118,6 +151,12 @@ export function parseCallbackPayload(data: unknown): BridgeCallbackPayload | nul
   const attempt = typeof raw.attempt === "number" && Number.isInteger(raw.attempt) && raw.attempt >= 1 && raw.attempt <= 10 ? raw.attempt : null;
   if (raw.version !== BRIDGE_CONTRACT_VERSION || !taskId || !organizationId || !outcome || attempt === null) return null;
 
+  const progress = BRIDGE_PROGRESS_STATES.find((value) => value === raw.progress) ?? null;
+  if (raw.progress != null && progress === null) return null;
+  // Progresso e sempre de envio aceito: "entregue" depois de "recusado" nao
+  // existe, e aceitar isso deixaria o n8n reescrever a historia da entrega.
+  if (progress && outcome !== "ACCEPTED") return null;
+
   const providerMessageId = raw.providerMessageId == null ? null : text(raw.providerMessageId, 200);
   if (raw.providerMessageId != null && providerMessageId === null) return null;
 
@@ -131,12 +170,23 @@ export function parseCallbackPayload(data: unknown): BridgeCallbackPayload | nul
   if (outcome === "ACCEPTED" && failureCode !== null) return null;
   if (outcome !== "ACCEPTED" && failureCode === null) return null;
 
-  return { version: BRIDGE_CONTRACT_VERSION, taskId, organizationId, attempt, outcome, providerMessageId, failureCode };
+  return {
+    version: BRIDGE_CONTRACT_VERSION,
+    taskId,
+    organizationId,
+    attempt,
+    outcome,
+    providerMessageId,
+    failureCode,
+    ...(progress ? { progress } : {}),
+  };
 }
 
 export type CallbackDecision =
   /** Aplicar o resultado a esta tarefa. */
   | { kind: "APPLY"; task: AutomationTask; delivery: NotificationDelivery }
+  /** Carimbar entrega ou leitura, sem tocar no estado da tarefa. */
+  | { kind: "PROGRESS"; delivery: NotificationDelivery; state: BridgeProgressState }
   /**
    * Nada a fazer, e isso NAO e erro: retorno repetido da mesma tentativa, que a
    * fila do n8n reentrega. Responder 200 evita que ele fique repetindo.
@@ -157,6 +207,14 @@ export function decideCallback(input: {
   if (!task || task.id !== payload.taskId) return { kind: "REJECT", why: "NOT_FOUND" };
   if (task.organizationId !== payload.organizationId) return { kind: "REJECT", why: "WRONG_ORGANIZATION" };
 
+  // Progresso chega DEPOIS do resultado, com a tarefa ja concluida: exigir
+  // `DISPATCHED` o recusaria sempre. O que ele exige e uma entrega que saiu.
+  if (payload.progress) {
+    if (!delivery || delivery.id !== task.deliveryId) return { kind: "REJECT", why: "DELIVERY_NOT_FOUND" };
+    if (delivery.status !== "SENT") return { kind: "REJECT", why: "NOT_AWAITING" };
+    return { kind: "PROGRESS", delivery, state: payload.progress };
+  }
+
   // Terminal com a mesma tentativa e a reentrega do mesmo retorno; com
   // tentativa diferente, e retorno de uma tentativa que ja foi superada.
   if (isTerminalStatus(task.status)) {
@@ -173,4 +231,25 @@ export function decideCallback(input: {
   if (!delivery || delivery.id !== task.deliveryId) return { kind: "REJECT", why: "DELIVERY_NOT_FOUND" };
 
   return { kind: "APPLY", task, delivery };
+}
+
+/**
+ * O que cada progresso carimba. Idempotente de proposito: a Meta reentrega o
+ * mesmo aviso, e o primeiro instante registrado e o que vale — carimbar de novo
+ * moveria para frente um horario que ja aconteceu.
+ */
+export function progressFields(
+  delivery: NotificationDelivery,
+  state: BridgeProgressState,
+  now: ISODateString,
+): Partial<NotificationDelivery> {
+  if (state === "DELIVERED") {
+    return delivery.deliveredAt ? {} : { deliveredAt: now };
+  }
+  // Lida implica entregue: o WhatsApp as vezes entrega os dois avisos juntos, e
+  // as vezes so o segundo chega.
+  return {
+    ...(delivery.deliveredAt ? {} : { deliveredAt: now }),
+    ...(delivery.readAt ? {} : { readAt: now }),
+  };
 }

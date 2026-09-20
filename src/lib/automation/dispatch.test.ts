@@ -35,6 +35,7 @@ function dispatchInput(overrides: Partial<DispatchInput> = {}): DispatchInput {
     appointment: appointment(),
     client: client(),
     professionalName: PROFESSIONAL_NAME,
+    sender: null,
     now: REMINDER_AT,
     ...overrides,
   };

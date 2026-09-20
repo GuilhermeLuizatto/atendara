@@ -30,6 +30,9 @@ export const PLATFORM_AUDIT_ACTIONS = [
     "ACCOUNT_REGISTERED",
     "ACCOUNT_UPDATED",
     "ACCESS_GRANTED",
+    // Remetente de canal real cadastrado pela operadora (13.4): e ela quem
+    // carimba que aquele numero pode falar em nome daquela clinica.
+    "MESSAGING_SENDER_REGISTERED",
     "ACCESS_REVOKED",
     // Autocadastro: a pessoa se cadastra sozinha e o teste comeca quando ela
     // confirma o e-mail. Sao dois atos distintos porque acontecem em momentos

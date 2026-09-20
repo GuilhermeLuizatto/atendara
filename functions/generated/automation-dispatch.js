@@ -93,6 +93,7 @@ export function decideDispatch(input) {
         professionalName: input.professionalName,
         delivery: input.delivery,
         plannedForStartsAt: task.appointmentStartsAt,
+        sender: input.sender,
     });
     if (!check.ok)
         return cancel(task, input.delivery, check.reason, now);
@@ -114,6 +115,7 @@ export function decideDispatch(input) {
             organizationId: task.organizationId,
             idempotencyKey: task.idempotencyKey,
             expiresAt: task.expiresAt,
+            template: check.template,
         },
     };
 }

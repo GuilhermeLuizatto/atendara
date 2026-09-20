@@ -89,3 +89,35 @@ chega a uma pessoa.
 - **Não decide nada.** Consentimento, canal, profissão, antecedência e
   disponibilidade são conferidos no servidor do Atendara imediatamente antes de
   a tarefa sair.
+
+---
+
+## O fluxo do WhatsApp (13.4)
+
+`atendara-whatsapp.json` é o mesmo contrato do fluxo fictício, com a chamada
+real da Cloud API no meio. Ele espera três variáveis a mais no `.env`:
+
+```bash
+ATENDARA_PHONE_NUMBER_ID=1236644296208358
+ATENDARA_META_TOKEN=cole-aqui-o-token-da-meta
+```
+
+O `ATENDARA_META_TOKEN` é **segredo**: em produção ele vive no Secret Manager e
+chega ao n8n pela configuração do servidor, nunca por arquivo versionado.
+
+**O que o fluxo faz e o que ele não faz:**
+
+- traduz o modelo aprovado que veio do Atendara (`template`) para o formato de
+  `components` da Meta, e recusa a tarefa que chegar **sem modelo** — fora da
+  janela de 24 horas a Meta só entrega modelo, e lembrete nunca acontece dentro
+  dela;
+- traduz o erro da Meta para um código **nosso** (`INVALID_DESTINATION`,
+  `RATE_LIMITED`, `PROVIDER_UNAVAILABLE`). A mensagem dela costuma repetir o
+  número, que é contato de paciente, e por isso nunca é copiada;
+- **não** escolhe destinatário, texto ou horário: isso o Atendara já decidiu.
+
+⚠️ **Ele não foi exercitado contra a Meta.** Conta comercial não verificada é
+impedida de enviar para números do Brasil (erro **130497**), e a verificação
+exige CNPJ. O que está provado é o contrato, contra o fluxo fictício. Quando
+houver verificação, o teste é: cadastrar o remetente em modo `TEST` com o
+próprio celular na lista, e disparar um lembrete.

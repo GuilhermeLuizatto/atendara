@@ -10,6 +10,7 @@ import {
   decideCallback,
   isWithinSignatureWindow,
   parseCallbackPayload,
+  progressFields,
 } from "./generated/automation-bridge.js";
 import { requeueTask } from "./automation.js";
 import { paths } from "./generated/paths.js";
@@ -65,6 +66,20 @@ export async function applyCallback(payload, deps = {}) {
       : null;
 
     const decision = decideCallback({ payload, task, delivery, now });
+
+    // Entregue e lida nao mexem na tarefa: ela ja terminou quando o provedor
+    // aceitou. Carimbam a entrega, e so na primeira vez que chegam.
+    if (decision.kind === "PROGRESS") {
+      const campos = progressFields(decision.delivery, decision.state, now);
+      if (Object.keys(campos).length > 0) {
+        transaction.set(
+          firestore.doc(paths.document(payload.organizationId, "notificationDeliveries", decision.delivery.id)),
+          toStored("notificationDeliveries", { ...decision.delivery, ...campos, updatedAt: now, updatedBy: null }),
+        );
+      }
+      return { kind: "PROGRESS", state: decision.state };
+    }
+
     if (decision.kind !== "APPLY") return decision;
 
     const done = applyDispatchResult({
@@ -157,9 +172,9 @@ export const automationCallback = onRequest(
         organizationId: parsed.organizationId,
         taskId: parsed.taskId,
         attempt: parsed.attempt,
-        outcome: applied.kind === "APPLIED" ? applied.task.status : applied.why,
+        outcome: applied.kind === "APPLIED" ? applied.task.status : (applied.state ?? applied.why),
       });
-      response.status(200).json({ outcome: applied.kind === "APPLIED" ? applied.task.status : applied.why });
+      response.status(200).json({ outcome: applied.kind === "APPLIED" ? applied.task.status : (applied.state ?? applied.why) });
     } catch (error) {
       // 500 faz o n8n tentar de novo; a idempotencia torna repetir seguro.
       logger.error("automation.callback.failed", { taskId: parsed.taskId, message: String(error) });

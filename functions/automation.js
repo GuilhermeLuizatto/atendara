@@ -361,7 +361,7 @@ export async function runAutomationTask(data, deps = {}) {
 
   const step = await firestore.runTransaction(async (transaction) => {
     const task = stored("automationTasks", await transaction.get(taskRef));
-    const context = { delivery: null, organization: null, appointment: null, client: null, professional: null };
+    const context = { delivery: null, organization: null, appointment: null, client: null, professional: null, sender: null };
 
     if (task && !isTerminalStatus(task.status)) {
       if (task.deliveryId) {
@@ -370,6 +370,12 @@ export async function runAutomationTask(data, deps = {}) {
       context.organization = organizationFrom(await transaction.get(firestore.doc(paths.organization(payload.organizationId))), now);
       if (task.appointmentId) {
         context.appointment = stored("appointments", await transaction.get(scope.doc("appointments", task.appointmentId)));
+      }
+      if (task.channel) {
+        // Quem pode falar pelo numero da organizacao naquele canal. Lido na
+        // MESMA transacao: um remetente revogado entre planejar e enviar para
+        // o envio que ja estava planejado.
+        context.sender = stored("messagingSenders", await transaction.get(scope.doc("messagingSenders", task.channel)));
       }
       if (context.appointment) {
         context.client = stored("clients", await transaction.get(scope.doc("clients", context.appointment.clientId)));
@@ -389,6 +395,7 @@ export async function runAutomationTask(data, deps = {}) {
       appointment: context.appointment,
       client: context.client,
       professionalName: context.professional?.displayName ?? context.appointment?.professionalName ?? null,
+      sender: context.sender,
       now,
     });
 

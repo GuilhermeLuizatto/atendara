@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# Segredo que o emulador le no lugar do Secret Manager (13.3).
+.secret.local
 # ...mas o modelo precisa ser versionado.
 !.env.example
 

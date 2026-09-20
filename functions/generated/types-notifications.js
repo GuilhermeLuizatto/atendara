@@ -12,6 +12,18 @@ export const APPOINTMENT_NOTIFICATION_EVENTS = [
     "APPOINTMENT_CANCELLED",
 ];
 /**
+ * Situacao do remetente no provedor. `APPROVED` e o unico estado que deixa
+ * mensagem sair: `PENDING` e verificacao em andamento na Meta e `REJECTED` e
+ * recusa, que exige agir no painel do provedor antes de tentar de novo.
+ */
+export const MESSAGING_SENDER_STATUSES = ["PENDING", "APPROVED", "REJECTED"];
+/**
+ * Em `TEST`, o provedor so entrega a numeros cadastrados como testadores, e o
+ * Atendara recusa antes de tentar: o erro do provedor viria tarde demais, e
+ * cada tentativa recusada conta contra a reputacao do remetente.
+ */
+export const MESSAGING_SENDER_MODES = ["TEST", "PRODUCTION"];
+/**
  * Quem pos o registro no sistema. `STAFF` e alguem da equipe anotando o que a
  * pessoa autorizou; `SUBJECT` e a propria pessoa, por um caminho do backend
  * (link ou resposta pelo canal). As Security Rules so aceitam `STAFF` com o
@@ -36,6 +48,15 @@ export const DELIVERY_FAILURE_CODES = [
 export const NOTIFICATION_SKIP_REASONS = [
     "ORGANIZATION_DISABLED",
     "SENDER_NOT_VERIFIED",
+    // Canal real sem cadastro de remetente feito pela operadora (13.4). A
+    // organizacao pode ter marcado o canal como comprovado na propria
+    // configuracao; isso nao basta quando quem entrega e um provedor de verdade.
+    "SENDER_NOT_REGISTERED",
+    // Cadastro existe, mas a Meta ainda nao aprovou — ou recusou — o remetente.
+    "SENDER_NOT_APPROVED",
+    // Remetente em modo de teste: o provedor so entrega a numeros cadastrados
+    // como testadores, e tentar fora da lista so gera recusa.
+    "DESTINATION_NOT_IN_TEST_LIST",
     "NO_RULE_FOR_EVENT",
     "RULE_DISABLED",
     "EVENT_NOT_ALLOWED_FOR_PROFESSION",

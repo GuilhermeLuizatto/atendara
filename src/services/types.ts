@@ -2,6 +2,7 @@ import type { DepositChoice } from "@/config/deposit";
 import type { DispatchSummary } from "@/lib/notifications";
 import type {
   AgendaSettings,
+  AIAgentSettings,
   AIDecision,
   AIRule,
   Appointment,
@@ -334,6 +335,7 @@ export interface WorkspaceRepository {
   ): Promise<void>;
   /** Horario de atendimento e padroes da agenda. Exige `agendaSettings:update` (OWNER, ADMIN e o titular). */
   updateAgendaSettings(settings: AgendaSettings): Promise<void>;
+  updateAISettings(settings: AIAgentSettings): Promise<void>;
   /**
    * Executa as entregas vencidas com o provedor simulado e grava o resultado.
    *

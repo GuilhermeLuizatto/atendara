@@ -279,6 +279,46 @@ a automacao, gera alerta `CRITICAL` e aguarda o humano.
 
 ## 7. Rules Engine
 
+### Fase 4 local
+
+O motor `0.3.0` continua determinístico. O classificador normaliza espaços,
+acentos e pontuação, usa limites de palavra e radicais explícitos, e encaminha
+negações, tentativas de instruir o agente e pedidos administrativos distintos
+na mesma mensagem. Esses sinais não constituem uma detecção semântica completa.
+Risco prevalece mesmo se uma configuração de profissão omitir a categoria.
+
+`CONDITION_FIELDS` descreve os tipos, opções e limites do editor de condições.
+O validador recusa operadores incompatíveis, listas vazias e valores fora do
+domínio. Contexto desconhecido não satisfaz nem condições negativas; em
+particular, não conhecer o cliente não equivale a saber que ele não tem saldo
+pendente. O expediente considera também os dias de trabalho, no fuso da
+organização. O estado de um atendimento específico permanece desconhecido no
+fluxo de mensagens: o editor não oferece esse campo para condições novas.
+
+`updateAISettings` usa a permissão já existente `organization:update`
+(OWNER/ADMIN). Ambos os repositórios validam os dados e registram configuração
+e auditoria atomicamente; as Security Rules validam o bloco alterado. O limiar
+fica entre 80% e 100%, e o motor também recusa limiares inválidos. Habilitar o
+agente não concede consentimento nem habilita canal de envio.
+
+O teste em `/agente` executa `decide` apenas em memória, sem exigir uma conversa
+e sem gravar decisão ou mensagem. A assistência na central de mensagens também
+é uma prévia: consulta as permissões e regras atuais e preenche um rascunho
+somente por ação explícita. A resposta revisada segue a porta já existente de
+resposta humana. Decisões operacionais continuam append-only.
+
+`summarizeDecisions` filtra organização, período e profissional, elimina ids
+duplicados e agrega classificação, ação, confiança, latência p95 e aplicações
+por versão de regra. Não retorna trechos de mensagens, nomes de clientes ou
+dados da cobrança da plataforma. A tela informa paginação parcial, falha de
+carga e ausência de dados; confiança não é acurácia e decisão automática não é
+comprovante de entrega. Prévia sem gravação não alimenta esses indicadores.
+
+A integração externa foi adiada por decisão de produto: nenhum provedor,
+segredo ou transferência de mensagens a modelos externos faz parte desta
+entrega. Antes dessa integração, a classificação semântica precisa de avaliação
+com exemplos fictícios em português e controles próprios de custo e privacidade.
+
 Seis niveis de precedencia (`RULE_LEVEL_PRECEDENCE`, menor = maior prioridade):
 
 | Nivel          | Quem define | Editavel |

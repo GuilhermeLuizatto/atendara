@@ -23,6 +23,7 @@ import { formatDateTime } from "@/lib/utils/format";
 import { useWorkspace } from "@/providers/workspace-provider";
 import { useWorkspaceActions } from "@/providers/use-workspace-actions";
 import type { Conversation, Message } from "@/types";
+import { ReplyAssistant } from "./reply-assistant";
 
 export function MessagesView() {
   const { data } = useWorkspace();
@@ -221,6 +222,7 @@ function ConversationPanel({
     .filter((message) => message.conversationId === conversation.id)
     .sort((a, b) => a.sentAt.localeCompare(b.sentAt));
   const canReply = session?.permissions.includes("conversation:reply");
+  const latestMessage = messages.at(-1);
   const change = (
     patch: Partial<
       Pick<
@@ -314,6 +316,9 @@ function ConversationPanel({
           className="border-border space-y-3 border-t p-4"
           onSubmit={submit}
         >
+          {latestMessage?.direction === "INBOUND" && <ReplyAssistant
+            key={`${latestMessage.id}:${conversation.updatedAt}:${data.organization.updatedAt}`}
+            conversation={conversation} message={latestMessage} onUse={setText} />}
           <Field
             label="Resposta do profissional"
             hint="Neste protótipo, a resposta fica somente nesta conversa de demonstração."

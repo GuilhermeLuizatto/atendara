@@ -542,6 +542,16 @@ try {
   // O caminho administrativo nao mudou: ADMIN continua alterando a agenda.
   await allowed(updateDoc(doc(db("adminRole"), orgA()), { "settings.agenda": { workdayStart: "07:00" } }));
 
+  const aiSettings = { enabled: true, displayName: "Dara", autoResponseConfidenceThreshold: 0.8, allowAutonomousReplies: false, quietHoursStart: null, quietHoursEnd: null };
+  await allowed(updateDoc(doc(db("adminRole"), orgA()), { "settings.ai": aiSettings }));
+  await allowed(updateDoc(doc(db("ownerRole"), orgA()), { "settings.ai": { ...aiSettings, quietHoursStart: "22:00", quietHoursEnd: "07:00" } }));
+  await denied(updateDoc(doc(db("a"), orgA()), { "settings.ai": aiSettings }));
+  await denied(updateDoc(doc(db("b"), orgA()), { "settings.ai": aiSettings }));
+  await denied(updateDoc(doc(db("adminRole"), orgA()), { "settings.ai": { ...aiSettings, autoResponseConfidenceThreshold: 0.1 } }));
+  await denied(updateDoc(doc(db("adminRole"), orgA()), { "settings.ai": { ...aiSettings, quietHoursStart: "25:00" } }));
+  await denied(updateDoc(doc(db("adminRole"), orgA()), { "settings.ai": { ...aiSettings, quietHoursStart: "22:00", quietHoursEnd: "22:00" } }));
+  await denied(updateDoc(doc(db("adminRole"), orgA()), { "settings.ai": { ...aiSettings, enabled: "true" } }));
+
   // ------------------------------------------------------- Fase 3, 13.1
   // Consentimento por canal. So se acrescenta ou retira registro, o navegador
   // so registra em nome de quem esta nele, e retirar nao apaga o historico.
@@ -614,6 +624,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 360);
+  assert.equal(checks, 368);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

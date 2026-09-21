@@ -18,6 +18,16 @@ const conversationId = () =>
     )!.id;
 
 describe("fluxos do agente no repositorio", () => {
+  it("salva autorizações com auditoria e usa o novo modo nas próximas mensagens", async () => {
+    const before = repo.getSnapshot();
+    await repo.updateAISettings({ ...before.organization.settings.ai, allowAutonomousReplies: false });
+    expect(repo.getSnapshot().auditLogs).toHaveLength(before.auditLogs.length + 1);
+    await repo.receiveMessage(conversationId(), "Qual o valor?");
+    expect(repo.getSnapshot().decisions[0].action).toBe("SUGGEST_RESPONSE");
+    expect(repo.getSnapshot().messages).toHaveLength(before.messages.length + 1);
+    repo.setActor({ userId: "viewer", name: "Leitor", role: "VIEWER" });
+    await expect(repo.updateAISettings(before.organization.settings.ai)).rejects.toThrow();
+  });
   it("mensagem administrativa gera uma decisao, resposta vinculada e auditoria", async () => {
     const before = repo.getSnapshot();
     const id = await repo.receiveMessage(

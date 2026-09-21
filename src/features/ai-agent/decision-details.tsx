@@ -55,7 +55,7 @@ export function DecisionDetails({ decision }: { decision: DecisionOutcome }) {
         </ol>
       </details>
       <p className="text-muted-foreground text-xs">
-        Motor {decision.engineVersion} · IA simulada
+        Motor {decision.engineVersion} · Classificação local por regras
       </p>
     </div>
   );

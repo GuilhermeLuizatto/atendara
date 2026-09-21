@@ -269,11 +269,25 @@ testes de ponta a ponta.
 | **3A** | Automação interna: fila, HMAC, callback, controle de emergência e n8n local | ✅ |
 | **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco | 🟨 |
 | **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | ⬜ |
-| **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | ⬜ |
+| **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | 🟨 Recursos locais implementados; IA externa pendente |
 | **5** | Produto: equipes, importação administrativa, suporte, cobrança real e planos | 🟨 |
 | **6** | Expansão: portfólio da Estética, marketplace e cobrador dos clientes | ⬜ |
 
 ### Próximas entregas
+
+A Fase 4 local está disponível em `/agente`: autorizações da Dara, editor de
+condições, prévia sem gravação e indicadores por período e profissional. Na
+central de mensagens, a Dara prepara um rascunho administrativo para revisão
+explícita. Somente OWNER/ADMIN alteram as configurações do agente, com trilha
+de auditoria; as permissões existentes das regras e conversas permanecem.
+
+A classificação continua sendo uma heurística local, sem modelo de linguagem:
+trata limites de palavras, variações de espaços e acentos, sinais sensíveis,
+negação e múltiplos pedidos. Ambiguidade encaminha para a equipe. Os indicadores
+mostram a amostra carregada e avisam quando há páginas anteriores; não medem
+acurácia nem comprovam entrega de mensagens. Não há chave, chamada ou cobrança
+de provedor de IA. A escolha do provedor e a avaliação semântica ficam para a
+continuação da Fase 4.
 
 1. Validar a saída do WhatsApp em modo de teste com o número e o destinatário
    autorizados pela Meta.

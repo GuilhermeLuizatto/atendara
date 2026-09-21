@@ -1,9 +1,30 @@
 import { getProfession } from "@/config/professions";
 import { paths } from "@/lib/firebase/paths";
-import type { AgendaSettings } from "@/types";
+import type { AgendaSettings, AIAgentSettings } from "@/types";
+import { validateAISettings } from "@/lib/ai/settings";
+import { RepositoryError } from "../../types";
 
 import { assertPermission, validateAgendaSettings } from "../../guards";
 import { auditWrite, touch, type Plan, type PlanContext } from "../plan";
+
+export function planUpdateAISettings(ctx: PlanContext, settings: AIAgentSettings): Plan {
+  assertPermission(ctx.actor, "organization:update");
+  const errors = validateAISettings(settings);
+  if (errors.length) throw new RepositoryError(errors.join(" "));
+  return {
+    result: undefined,
+    writes: [
+      { op: "update", collection: "organizations", path: paths.organization(ctx.organizationId),
+        data: { "settings.ai": settings, ...touch(ctx) } },
+      auditWrite(ctx, {
+        action: "UPDATE", actorType: "USER",
+        resource: { type: "organization", id: ctx.organizationId },
+        summary: "Autorizações da Dara atualizadas.",
+        metadata: { enabled: settings.enabled, autonomous: settings.allowAutonomousReplies, threshold: settings.autoResponseConfidenceThreshold },
+      }),
+    ],
+  };
+}
 
 /**
  * Horario de atendimento e padroes da agenda.

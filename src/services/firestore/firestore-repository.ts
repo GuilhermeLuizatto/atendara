@@ -19,6 +19,7 @@ import type { DepositChoice } from "@/config/deposit";
 import type { TenantCollection } from "@/lib/firebase/paths";
 import type {
   AgendaSettings,
+  AIAgentSettings,
   Appointment,
   AppointmentStatus,
   Conversation,
@@ -78,7 +79,7 @@ import {
   planReplyToConversation,
   planUpdateConversation,
 } from "./plans/messaging";
-import { planUpdateAgendaSettings } from "./plans/organization";
+import { planUpdateAgendaSettings, planUpdateAISettings } from "./plans/organization";
 import {
   planCreateRule,
   planDeleteRule,
@@ -787,6 +788,10 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
 
   async updateAgendaSettings(settings: AgendaSettings): Promise<void> {
     await this.commit(planUpdateAgendaSettings(this.context(), settings).writes);
+  }
+
+  async updateAISettings(settings: AIAgentSettings): Promise<void> {
+    await this.commit(planUpdateAISettings(this.context(), settings).writes);
   }
 
   /**

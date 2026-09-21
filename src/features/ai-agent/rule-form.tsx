@@ -16,6 +16,8 @@ import {
   type AIRule,
 } from "@/types";
 
+import { ConditionEditor } from "./condition-editor";
+
 export function RuleForm({
   rule,
   onClose,
@@ -319,96 +321,7 @@ export function RuleForm({
             </>
           )}
         </div>
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Condições adicionais</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Modalidade">
-              {(props) => (
-                <Select
-                  {...props}
-                  value={String(
-                    input.conditions.conditions.find(
-                      (c) => c.field === "client.modality",
-                    )?.value ?? "",
-                  )}
-                  onChange={(e) =>
-                    update({
-                      conditions: {
-                        ...input.conditions,
-                        conditions: [
-                          ...input.conditions.conditions.filter(
-                            (c) => c.field !== "client.modality",
-                          ),
-                          ...(e.target.value
-                            ? [
-                                {
-                                  field: "client.modality" as const,
-                                  operator: "EQUALS" as const,
-                                  value: e.target.value,
-                                },
-                              ]
-                            : []),
-                        ],
-                      },
-                    })
-                  }
-                >
-                  <option value="">Qualquer modalidade</option>
-                  <option value="ONLINE">Online</option>
-                  <option value="IN_PERSON">Presencial</option>
-                </Select>
-              )}
-            </Field>
-            <Field label="Dia do recebimento">
-              {(props) => (
-                <Select
-                  {...props}
-                  value={String(
-                    input.conditions.conditions.find(
-                      (c) => c.field === "context.dayOfWeek",
-                    )?.value ?? "",
-                  )}
-                  onChange={(e) =>
-                    update({
-                      conditions: {
-                        ...input.conditions,
-                        conditions: [
-                          ...input.conditions.conditions.filter(
-                            (c) => c.field !== "context.dayOfWeek",
-                          ),
-                          ...(e.target.value !== ""
-                            ? [
-                                {
-                                  field: "context.dayOfWeek" as const,
-                                  operator: "EQUALS" as const,
-                                  value: Number(e.target.value),
-                                },
-                              ]
-                            : []),
-                        ],
-                      },
-                    })
-                  }
-                >
-                  <option value="">Qualquer dia</option>
-                  {[
-                    "Domingo",
-                    "Segunda",
-                    "Terça",
-                    "Quarta",
-                    "Quinta",
-                    "Sexta",
-                    "Sábado",
-                  ].map((day, index) => (
-                    <option key={day} value={index}>
-                      {day}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-          </div>
-        </div>
+        <ConditionEditor value={input.conditions} onChange={(conditions) => update({ conditions })} />
         <details>
           <summary className="text-primary cursor-pointer text-sm">
             Visualizar regra estruturada

@@ -65,11 +65,11 @@ export function decide(request) {
         confidence: classification.confidence,
         clientModality: client?.modality ?? null,
         clientStatus: client?.status ?? null,
-        clientHasOutstandingBalance: client?.hasOutstandingBalance ?? false,
+        clientHasOutstandingBalance: client?.hasOutstandingBalance ?? null,
         appointmentStatus: null,
         dayOfWeek,
         hour,
-        withinBusinessHours: withinWindow(minutes, organization.settings.agenda.workdayStart, organization.settings.agenda.workdayEnd),
+        withinBusinessHours: organization.settings.agenda.workingDays.includes(dayOfWeek) && withinWindow(minutes, organization.settings.agenda.workdayStart, organization.settings.agenda.workdayEnd),
     });
     const scopedRules = rules.filter((rule) => rule.organizationId === organization.id &&
         (rule.professionalId === null ||
@@ -103,10 +103,12 @@ export function decide(request) {
         return escalate(`Conteúdo classificado como ${meta.label.toLowerCase()}: decisão é do profissional.`, "Regra fundamental: somente assunto administrativo pode ser respondido automaticamente.");
     }
     if (classification.intent === "NONE") {
-        return escalate("Intenção não reconhecida com confiança suficiente.", "Regra fundamental: na dúvida, escalar.");
+        return escalate(classification.ambiguous
+            ? "Mensagem com pedidos diferentes, negação ou instruções ambíguas. Revisão humana necessária."
+            : "Intenção não reconhecida com confiança suficiente.", "Regra fundamental: na dúvida, escalar.");
     }
     const threshold = organization.settings.ai.autoResponseConfidenceThreshold;
-    if (classification.confidence < threshold) {
+    if (!Number.isFinite(threshold) || threshold < 0.8 || threshold > 1 || classification.confidence < threshold) {
         return escalate(`Confiança de ${Math.round(classification.confidence * 100)}% abaixo do limite configurado (${Math.round(threshold * 100)}%).`, "Limite de confiança da organização não atingido.");
     }
     // --- Configuracao do agente ---------------------------------------------

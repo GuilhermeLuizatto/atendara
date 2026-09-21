@@ -18,7 +18,7 @@ import { INTENT_TO_CATEGORY, composeResponse } from "./responses";
 export interface DecisionClient {
   modality: ServiceModality | null;
   status: string | null;
-  hasOutstandingBalance: boolean;
+  hasOutstandingBalance: boolean | null;
 }
 
 export interface DecisionRequest {
@@ -119,11 +119,11 @@ export function decide(request: DecisionRequest): DecisionResult {
     confidence: classification.confidence,
     clientModality: client?.modality ?? null,
     clientStatus: client?.status ?? null,
-    clientHasOutstandingBalance: client?.hasOutstandingBalance ?? false,
+    clientHasOutstandingBalance: client?.hasOutstandingBalance ?? null,
     appointmentStatus: null,
     dayOfWeek,
     hour,
-    withinBusinessHours: withinWindow(
+    withinBusinessHours: organization.settings.agenda.workingDays.includes(dayOfWeek) && withinWindow(
       minutes,
       organization.settings.agenda.workdayStart,
       organization.settings.agenda.workdayEnd,
@@ -178,13 +178,15 @@ export function decide(request: DecisionRequest): DecisionResult {
 
   if (classification.intent === "NONE") {
     return escalate(
-      "Intenção não reconhecida com confiança suficiente.",
+      classification.ambiguous
+        ? "Mensagem com pedidos diferentes, negação ou instruções ambíguas. Revisão humana necessária."
+        : "Intenção não reconhecida com confiança suficiente.",
       "Regra fundamental: na dúvida, escalar.",
     );
   }
 
   const threshold = organization.settings.ai.autoResponseConfidenceThreshold;
-  if (classification.confidence < threshold) {
+  if (!Number.isFinite(threshold) || threshold < 0.8 || threshold > 1 || classification.confidence < threshold) {
     return escalate(
       `Confiança de ${Math.round(classification.confidence * 100)}% abaixo do limite configurado (${Math.round(threshold * 100)}%).`,
       "Limite de confiança da organização não atingido.",

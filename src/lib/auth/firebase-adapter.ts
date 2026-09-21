@@ -35,8 +35,39 @@ import { AuthError, SecondFactorRequiredError, type AuthAdapter, type SecondFact
 
 const ACCOUNTS_PAGE_SIZE = 25;
 
+/**
+ * Codigos cuja mensagem foi escrita para quem esta na tela.
+ *
+ * As callables usam `invalid-argument` e `failed-precondition` para dizer o
+ * que a pessoa precisa fazer — "Os Termos e a Politica foram atualizados",
+ * "Esta conta ja esta cadastrada", "Escolha uma das profissoes oferecidas".
+ * `internal` e o contrario: detalhe de servidor, que nao ajuda e pode vazar.
+ */
+const CODIGOS_COM_MENSAGEM_PARA_LER = new Set([
+  "functions/invalid-argument",
+  "functions/failed-precondition",
+  "functions/already-exists",
+  "functions/out-of-range",
+  "functions/resource-exhausted",
+]);
+
+/**
+ * Sem isto a tela troca toda recusa por "tente novamente", e um cadastro
+ * negado por motivo conhecido vira mistério — foi o que aconteceu em
+ * 21/09/2026, quando "Esta conta ja esta cadastrada" chegou como falha
+ * generica e custou horas de investigacao.
+ */
 function callable<Input, Output>(name: string) {
-  return httpsCallable<Input, Output>(getFirebaseFunctions(), name);
+  const invocar = httpsCallable<Input, Output>(getFirebaseFunctions(), name);
+  return async (input: Input) => {
+    try {
+      return await invocar(input);
+    } catch (error) {
+      if (!CODIGOS_COM_MENSAGEM_PARA_LER.has(errorCode(error))) throw error;
+      const mensagem = error instanceof Error ? error.message : "";
+      throw mensagem ? new AuthError(mensagem) : error;
+    }
+  };
 }
 
 function toAuthenticatedUser(user: User): AuthenticatedUser {

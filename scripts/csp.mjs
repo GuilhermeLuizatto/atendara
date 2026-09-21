@@ -33,7 +33,7 @@ export function contentSecurityPolicy({ scriptHashes, projectId, authDomain, reg
   const directives = {
     "default-src": ["'self'"],
     // reCAPTCHA Enterprise e o provedor do App Check.
-    "script-src": ["'self'", ...scriptHashes, "https://www.google.com/recaptcha/", "https://www.gstatic.com/recaptcha/"],
+    "script-src": ["'self'", ...scriptHashes, "https://www.google.com/recaptcha/", "https://www.gstatic.com/recaptcha/", "https://connect.facebook.net"],
     // Estilo inline fica: atributo `style` do React. Nao executa codigo.
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": ["'self'", "data:", "blob:"],
@@ -47,12 +47,17 @@ export function contentSecurityPolicy({ scriptHashes, projectId, authDomain, reg
       "https://securetoken.googleapis.com",
       "https://firebaseappcheck.googleapis.com",
       "https://content-firebaseappcheck.googleapis.com",
+      "https://graph.facebook.com",
+      "https://www.facebook.com",
       "https://www.google.com/recaptcha/",
       ...(projectId ? [`https://${region}-${projectId}.cloudfunctions.net`] : []),
     ],
     "frame-src": [
       "https://www.google.com/recaptcha/",
       "https://recaptcha.google.com/recaptcha/",
+      "https://www.facebook.com",
+      "https://business.facebook.com",
+      "https://staticxx.facebook.com",
       ...(authDomain ? [`https://${authDomain}`] : []),
     ],
     "object-src": ["'none'"],

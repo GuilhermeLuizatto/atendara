@@ -64,9 +64,14 @@ export function SelfServiceForm({
       return;
     }
     setInvalid(null);
+    // Com identidade do Google, nome e e-mail saem dela — nunca do estado
+    // local. `useState` so le o valor inicial, e este formulario ja esta
+    // montado quando a pessoa clica em "Entrar com o Google": os dois campos
+    // nasceriam vazios, a segunda etapa nao os exibe para corrigir, e o
+    // servidor recusaria pelo schema, dizendo "Confira os dados informados".
     onSubmit({
-      displayName: displayName.trim(),
-      email: email.trim().toLowerCase(),
+      displayName: (identity?.displayName ?? displayName).trim(),
+      email: (identity?.email ?? email).trim().toLowerCase(),
       ...(identity ? {} : { password }),
       professionId,
       ...(registration ? { councilRegistration: registration } : {}),

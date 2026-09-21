@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, LogOut, RotateCcw, Settings } from "lucide-react";
+import { ChevronDown, LifeBuoy, LogOut, RotateCcw, Settings } from "lucide-react";
 import { useCallback, useId, useRef, useState } from "react";
 
 import { Avatar } from "@/components/ui/avatar";
@@ -100,6 +100,22 @@ export function UserMenu() {
                 <Settings className="size-4" aria-hidden strokeWidth={1.75} />
                 Configurações
               </Link>
+            </li>
+            {/* Pagina publica, fora do painel. Abrir em outra aba preserva o
+                que a pessoa estava fazendo — e o mesmo padrao dos links legais
+                do cadastro. */}
+            <li>
+              <a
+                href="/suporte"
+                target="_blank"
+                rel="noreferrer"
+                onClick={close}
+                className={ITEM_CLASSES}
+              >
+                <LifeBuoy className="size-4" aria-hidden strokeWidth={1.75} />
+                Ajuda e suporte
+                <span className="sr-only">(abre em outra aba)</span>
+              </a>
             </li>
             {/* O prototipo guarda as alteracoes no navegador; sem uma saida
                 explicita, um experimento ruim ficaria preso para sempre. */}

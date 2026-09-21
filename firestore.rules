@@ -106,6 +106,18 @@ service cloud.firestore {
       return hasRole(orgId, ['OWNER', 'ADMIN', 'PROFESSIONAL']);
     }
 
+    // Endereco do atendimento a domicilio (E2.3). E dado pessoal, entao o
+    // formato e conferido tambem aqui: tela alterada, cliente feito a mao ou
+    // token roubado passam por estas regras do mesmo jeito. Os limites sao os
+    // de HOME_VISIT_LIMITS em src/config/home-visit.ts.
+    function visitAddressOk() {
+      return !('visitAddress' in request.resource.data)
+        || request.resource.data.visitAddress == null
+        || (request.resource.data.visitAddress is string
+            && request.resource.data.visitAddress.size() >= 8
+            && request.resource.data.visitAddress.size() <= 200);
+    }
+
     function isAdmin(orgId) {
       return hasRole(orgId, ['OWNER', 'ADMIN']);
     }
@@ -360,7 +372,8 @@ service cloud.firestore {
 
       match /appointments/{appointmentId} {
         allow read: if moduleAccess(orgId, 'agenda');
-        allow create, update: if moduleAccess(orgId, 'agenda') && canWriteOperational(orgId) && belongsToOrg(orgId);
+        allow create, update: if moduleAccess(orgId, 'agenda') && canWriteOperational(orgId)
+          && belongsToOrg(orgId) && visitAddressOk();
         // Atendimento nao e apagado: e cancelado via update, preservando o
         // historico para o financeiro e para a auditoria.
         allow delete: if false;

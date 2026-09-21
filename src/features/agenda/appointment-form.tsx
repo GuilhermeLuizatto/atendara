@@ -14,6 +14,7 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { APPOINTMENT_STATUS_LABELS, MODALITY_LABELS } from "@/config/labels";
 import { validateDeposit } from "@/lib/agenda/deposit";
+import { validateHomeVisit } from "@/lib/agenda/home-visit";
 import {
   appointmentDefaultsFor,
   bookableServices,
@@ -40,6 +41,9 @@ interface Draft {
   priceInReais: string;
   /** Sinal antecipado (E2.2). Vazio = nao pediu sinal. */
   depositInReais: string;
+  /** Atendimento a domicilio (E2.3). So em modalidade HOME_VISIT. */
+  visitAddress: string;
+  travelFeeInReais: string;
   administrativeNotes: string;
 }
 
@@ -99,6 +103,18 @@ function validate(draft: Draft): Errors {
     if (!validation.ok) errors.depositInReais = validation.error;
   }
 
+  // Endereco e taxa passam pela mesma regra do repositorio.
+  const visita = validateHomeVisit({
+    modality: draft.modality,
+    visitAddress: draft.visitAddress.trim() || null,
+    travelFeeInCents: toCents(draft.travelFeeInReais),
+    available: true,
+  });
+  if (!visita.ok) {
+    if (draft.visitAddress.trim()) errors.visitAddress = visita.error;
+    else errors.travelFeeInReais = visita.error;
+  }
+
   return errors;
 }
 
@@ -152,6 +168,11 @@ export function AppointmentForm({
             appointment.depositInCents === null
               ? ""
               : centsToInput(appointment.depositInCents),
+          visitAddress: appointment.visitAddress ?? "",
+          travelFeeInReais:
+            appointment.travelFeeInCents === null
+              ? ""
+              : centsToInput(appointment.travelFeeInCents),
           administrativeNotes: appointment.administrativeNotes ?? "",
         }
       : {
@@ -173,11 +194,18 @@ export function AppointmentForm({
           // Sinal abre vazio sempre: quem pede sinal e ela, atendimento a
           // atendimento.
           depositInReais: "",
+          visitAddress: "",
+          travelFeeInReais: "",
           administrativeNotes: "",
         },
   );
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
+
+  // Endereco so aparece em domicilio: dado pessoal nao se pede por via das
+  // duvidas, e atendimento presencial nao tem endereco de cliente.
+  const homeVisit =
+    profession.features.homeVisitDetails && draft.modality === "HOME_VISIT";
 
   const patch = (changes: Partial<Draft>) =>
     setDraft((current) => ({ ...current, ...changes }));
@@ -224,6 +252,12 @@ export function AppointmentForm({
         Number(draft.priceInReais.replace(",", ".")) * 100,
       ),
       ...(deposit ? { depositInCents: toCents(draft.depositInReais) } : {}),
+      ...(homeVisit
+        ? {
+            visitAddress: draft.visitAddress.trim() || null,
+            travelFeeInCents: toCents(draft.travelFeeInReais),
+          }
+        : {}),
       administrativeNotes: draft.administrativeNotes.trim() || null,
     };
 
@@ -391,6 +425,50 @@ export function AppointmentForm({
                     patch({ depositInReais: event.target.value })
                   }
                   invalid={Boolean(errors.depositInReais)}
+                />
+              )}
+            </Field>
+          ) : null}
+
+          {homeVisit ? (
+            <div className="sm:col-span-2">
+              <Field
+                label="Endereço do atendimento"
+                hint="Fica só aqui dentro. Nunca vai na mensagem para a cliente."
+                error={errors.visitAddress}
+              >
+                {(props) => (
+                  <Input
+                    {...props}
+                    type="text"
+                    value={draft.visitAddress}
+                    maxLength={200}
+                    onChange={(event) =>
+                      patch({ visitAddress: event.target.value })
+                    }
+                    invalid={Boolean(errors.visitAddress)}
+                  />
+                )}
+              </Field>
+            </div>
+          ) : null}
+
+          {homeVisit ? (
+            <Field
+              label="Taxa de deslocamento (R$)"
+              hint="Entra como lançamento separado no financeiro."
+              error={errors.travelFeeInReais}
+            >
+              {(props) => (
+                <Input
+                  {...props}
+                  type="text"
+                  inputMode="decimal"
+                  value={draft.travelFeeInReais}
+                  onChange={(event) =>
+                    patch({ travelFeeInReais: event.target.value })
+                  }
+                  invalid={Boolean(errors.travelFeeInReais)}
                 />
               )}
             </Field>

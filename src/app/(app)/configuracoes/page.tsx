@@ -13,11 +13,12 @@ import { AuditTrail } from "@/features/settings/audit-trail";
 import { NotificationSettings } from "@/features/settings/notification-settings";
 import { ProfessionChange } from "@/features/settings/profession-change";
 import { ServiceCatalog } from "@/features/settings/service-catalog";
+import { WhatsappEmbeddedSignup } from "@/features/settings/whatsapp-embedded-signup";
 import { formatDate } from "@/lib/utils/format";
 import { useAuth } from "@/providers/auth-provider";
 import { useWorkspace } from "@/providers/workspace-provider";
 
-type Section = "geral" | "servicos" | "avisos" | "auditoria";
+type Section = "geral" | "servicos" | "avisos" | "whatsapp" | "auditoria";
 
 const ID_BASE = "configuracoes";
 
@@ -35,6 +36,7 @@ export default function SettingsPage() {
     { value: "geral", label: "Geral" },
     ...(hasCatalog ? [{ value: "servicos" as const, label: "Serviços" }] : []),
     { value: "avisos", label: "Avisos de atendimento" },
+    { value: "whatsapp", label: "WhatsApp" },
     ...(canReadAudit ? [{ value: "auditoria" as const, label: "Trilha de auditoria" }] : []),
   ];
   // Perder a permissao com a aba aberta nao pode deixar um painel orfao.
@@ -120,6 +122,8 @@ export default function SettingsPage() {
         {active === "servicos" ? data ? <ServiceCatalog /> : <SkeletonCard lines={5} /> : null}
 
         {active === "avisos" ? data ? <NotificationSettings /> : <SkeletonCard lines={6} /> : null}
+
+        {active === "whatsapp" ? <WhatsappEmbeddedSignup /> : null}
 
         {active === "auditoria" ? <AuditTrail /> : null}
       </TabPanel>

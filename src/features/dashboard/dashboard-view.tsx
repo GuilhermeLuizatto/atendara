@@ -11,6 +11,7 @@ import { AgentActivity } from "./agent-activity";
 import { AlertsPanel } from "./alerts-panel";
 import { DashboardHeader } from "./dashboard-header";
 import { KpiRow } from "./kpi-row";
+import { MaintenancePanel } from "./maintenance-panel";
 import { NextAppointment } from "./next-appointment";
 import { UpcomingAppointments } from "./upcoming-appointments";
 import { useDashboard } from "./use-dashboard";
@@ -73,6 +74,7 @@ export function DashboardView() {
             criticalCount={model.criticalAlerts}
             now={model.now}
           />
+          <MaintenancePanel />
           <AgentActivity
             decisions={model.recentDecisions}
             autoResponses={model.autoResponses}

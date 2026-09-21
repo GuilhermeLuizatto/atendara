@@ -1,8 +1,10 @@
 import { DEPOSIT_DESCRIPTION_PREFIX, type DepositChoice } from "@/config/deposit";
+import { TRAVEL_DESCRIPTION_PREFIX } from "@/config/home-visit";
 import { getProfession } from "@/config/professions";
+import { validateHomeVisit } from "@/lib/agenda/home-visit";
+import { amountForPart, partOf } from "@/lib/agenda/charges";
 import {
   depositDueDate,
-  partOf,
   serviceAmountFor,
   settleDeposit,
   validateDeposit,
@@ -105,6 +107,19 @@ function incomeWrite(
   };
 }
 
+/** Endereco e taxa so onde a profissao registra domicilio (E2.3). */
+function homeVisitOf(
+  ctx: PlanContext,
+  input: { modality: Appointment["modality"]; visitAddress: string | null; travelFeeInCents: number | null },
+) {
+  const validation = validateHomeVisit({
+    ...input,
+    available: getProfession(ctx.snapshot.organization.primaryProfession).features.homeVisitDetails,
+  });
+  if (!validation.ok) throw new RepositoryError(validation.error);
+  return validation.value;
+}
+
 export function planCreateAppointment(
   ctx: PlanContext,
   input: AppointmentInput,
@@ -121,6 +136,11 @@ export function planCreateAppointment(
   });
 
   const deposit = depositOf(ctx, input.depositInCents ?? null, input.priceInCents);
+  const visita = homeVisitOf(ctx, {
+    modality: input.modality,
+    visitAddress: input.visitAddress ?? null,
+    travelFeeInCents: input.travelFeeInCents ?? null,
+  });
 
   const id = ctx.newId("appointments");
   const appointment: Appointment = {
@@ -141,6 +161,7 @@ export function planCreateAppointment(
     priceInCents: input.priceInCents,
     depositInCents: deposit,
     depositOutcome: null,
+    ...visita,
     administrativeNotes: input.administrativeNotes,
     origin: "MANUAL",
     confirmedAt: input.status === "CONFIRMED" ? ctx.now : null,
@@ -174,6 +195,17 @@ export function planCreateAppointment(
         amountInCents: aPagar,
         dueDate: appointment.startsAt,
         description: `Atendimento de ${client.fullName}`,
+      }),
+    );
+  }
+  if (visita.travelFeeInCents !== null) {
+    writes.push(
+      incomeWrite(ctx, {
+        ...comum,
+        part: "TRAVEL",
+        amountInCents: visita.travelFeeInCents,
+        dueDate: appointment.startsAt,
+        description: `${TRAVEL_DESCRIPTION_PREFIX} — ${client.fullName}`,
       }),
     );
   }
@@ -230,6 +262,14 @@ export function planUpdateAppointment(
       ? existing.depositInCents
       : depositOf(ctx, input.depositInCents, priceInCents);
 
+  const modality = input.modality ?? existing.modality;
+  const visita = homeVisitOf(ctx, {
+    modality,
+    visitAddress: input.visitAddress === undefined ? existing.visitAddress : input.visitAddress,
+    travelFeeInCents:
+      input.travelFeeInCents === undefined ? existing.travelFeeInCents : input.travelFeeInCents,
+  });
+
   const ligados = ctx.snapshot.transactions.filter((item) => item.appointmentId === id);
   const sinalPago = ligados.some((item) => partOf(item) === "DEPOSIT" && item.status === "PAID");
   if (sinalPago && deposit !== existing.depositInCents) {
@@ -249,6 +289,7 @@ export function planUpdateAppointment(
         endsAt,
         durationMinutes,
         depositInCents: deposit,
+        ...visita,
         professionalId,
         professionalName: professional.displayName,
         clientId: client?.id ?? existing.clientId,
@@ -260,44 +301,65 @@ export function planUpdateAppointment(
 
   // Os lancamentos vinculados acompanham valor e vencimento do atendimento.
   // O do servico e o que sobra depois do sinal; o do sinal e o sinal.
-  const aPagar = serviceAmountFor(priceInCents, deposit);
-  let temLancamentoDeSinal = false;
-  for (const transaction of ligados) {
-    const parte = partOf(transaction);
-    if (parte === "DEPOSIT") temLancamentoDeSinal = true;
-    if (transaction.status === "PAID") continue;
+  const charges = {
+    serviceInCents: serviceAmountFor(priceInCents, deposit),
+    depositInCents: deposit,
+    travelFeeInCents: visita.travelFeeInCents,
+  };
+  const existentes = new Set(ligados.map((transaction) => partOf(transaction)));
 
-    // Sinal que deixou de existir vira cobranca cancelada, e nao some: a
-    // trilha do financeiro nao apaga linha.
-    const cai = parte === "DEPOSIT" && deposit === null;
+  for (const transaction of ligados) {
+    if (transaction.status === "PAID") continue;
+    const parte = partOf(transaction);
+    const valor = amountForPart(parte, charges);
+
+    // Cobranca que deixou de existir vira cancelada, e nao some: a trilha do
+    // financeiro nao apaga linha.
     writes.push({
       op: "update",
       collection: "transactions",
       path: docPath(ctx, "transactions", transaction.id),
-      data: cai
-        ? { status: "CANCELLED", clientName, ...touch(ctx) }
-        : {
-            amountInCents: parte === "DEPOSIT" ? (deposit ?? 0) : aPagar,
-            dueDate: parte === "DEPOSIT" ? transaction.dueDate : startsAt,
-            clientName,
-            ...touch(ctx),
-          },
+      data:
+        valor === null
+          ? { status: "CANCELLED", clientName, ...touch(ctx) }
+          : {
+              amountInCents: valor,
+              // O sinal tem prazo proprio; o resto vence no atendimento.
+              dueDate: parte === "DEPOSIT" ? transaction.dueDate : startsAt,
+              clientName,
+              ...touch(ctx),
+            },
     });
   }
 
-  // Sinal pedido depois da marcacao precisa nascer agora.
-  if (deposit !== null && !temLancamentoDeSinal && client) {
-    writes.push(
-      incomeWrite(ctx, {
-        appointmentId: id,
-        client,
-        professionalId,
-        part: "DEPOSIT",
-        amountInCents: deposit,
-        dueDate: depositDueDate(ctx.now, startsAt),
-        description: `${DEPOSIT_DESCRIPTION_PREFIX} — ${clientName}`,
-      }),
-    );
+  // Sinal ou deslocamento pedidos depois da marcacao precisam nascer agora.
+  if (client) {
+    if (deposit !== null && !existentes.has("DEPOSIT")) {
+      writes.push(
+        incomeWrite(ctx, {
+          appointmentId: id,
+          client,
+          professionalId,
+          part: "DEPOSIT",
+          amountInCents: deposit,
+          dueDate: depositDueDate(ctx.now, startsAt),
+          description: `${DEPOSIT_DESCRIPTION_PREFIX} — ${clientName}`,
+        }),
+      );
+    }
+    if (visita.travelFeeInCents !== null && !existentes.has("TRAVEL")) {
+      writes.push(
+        incomeWrite(ctx, {
+          appointmentId: id,
+          client,
+          professionalId,
+          part: "TRAVEL",
+          amountInCents: visita.travelFeeInCents,
+          dueDate: startsAt,
+          description: `${TRAVEL_DESCRIPTION_PREFIX} — ${clientName}`,
+        }),
+      );
+    }
   }
 
   writes.push(

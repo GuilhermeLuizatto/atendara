@@ -86,6 +86,8 @@ export function buildAppointments(
         // A demonstracao nao inventa sinal: quem pede sinal e ela.
         depositInCents: null,
         depositOutcome: null,
+        visitAddress: null,
+        travelFeeInCents: null,
         modality: client.preferredModality,
         status,
         priceInCents: profession.defaultPriceInCents ?? 0,

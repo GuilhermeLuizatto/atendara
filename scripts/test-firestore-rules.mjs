@@ -277,6 +277,30 @@ try {
     setDoc(doc(db("a"), paths.document("org-a", "services", "tenant-trocado")), servico({ organizationId: "org-b" })),
   );
 
+  // Endereco do atendimento a domicilio (E2.3). E dado pessoal, entao o
+  // formato passa pelas regras tambem: a tela nao e a barreira.
+  const visita = (extra) => ({ organizationId: "org-a", clientId: "cliente-1", professionalId: "a", startsAt: "2027-01-01T13:00:00.000Z", modality: "HOME_VISIT", status: "SCHEDULED", priceInCents: 20000, ...extra });
+  const agendaDe = (uid, id) => doc(db(uid), paths.document("org-a", "appointments", id));
+  await allowed(
+    setDoc(agendaDe("a", "visita-valida"), visita({ visitAddress: "Rua das Flores, 100, apto 2" })),
+  );
+  await allowed(setDoc(agendaDe("a", "visita-sem-endereco"), visita({ visitAddress: null })));
+  await deniedBecause(
+    "endereco curto demais",
+    setDoc(agendaDe("a", "visita-curta"), visita({ visitAddress: "Rua A" })),
+  );
+  await deniedBecause(
+    "endereco longo demais",
+    setDoc(agendaDe("a", "visita-longa"), visita({ visitAddress: "R".repeat(201) })),
+  );
+  await deniedBecause(
+    "endereco que nao e texto",
+    setDoc(agendaDe("a", "visita-numero"), visita({ visitAddress: 12345 })),
+  );
+  await deniedBecause(
+    "endereco invalido chegando por alteracao",
+    updateDoc(agendaDe("a", "visita-valida"), { visitAddress: "curto" }),
+  );
   // Agenda externa (13.7). A conexao guarda token cifrado: ninguem le pelo
   // cliente, nem a propria pessoa. O ocupado, que e so faixa de tempo, abre
   // para quem tem o modulo de agenda.
@@ -590,6 +614,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 354);
+  assert.equal(checks, 360);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

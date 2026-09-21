@@ -4,14 +4,16 @@ import { getProfession } from "@/config/professions";
 import { ruleInputSchema, validateRuleInput } from "@/lib/rules/validation";
 import { decide } from "@/lib/ai/decision-engine";
 import { nextServicePosition, validateService } from "@/lib/agenda/services";
+import { amountForPart, partOf } from "@/lib/agenda/charges";
 import {
   depositDueDate,
-  partOf,
   serviceAmountFor,
   settleDeposit,
   validateDeposit,
 } from "@/lib/agenda/deposit";
 import { DEPOSIT_DESCRIPTION_PREFIX, type DepositChoice } from "@/config/deposit";
+import { TRAVEL_DESCRIPTION_PREFIX } from "@/config/home-visit";
+import { validateHomeVisit } from "@/lib/agenda/home-visit";
 import { decisionInputPreview } from "@/lib/privacy/decision-preview";
 import { buildMockDataset } from "@/mocks";
 import {
@@ -534,6 +536,20 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
 
   // ------------------------------------------------------- atendimentos
 
+  /** Endereco e taxa so onde a profissao registra domicilio (E2.3). */
+  private validateHomeVisit(input: {
+    modality: Appointment["modality"];
+    visitAddress: string | null;
+    travelFeeInCents: number | null;
+  }) {
+    const validation = validateHomeVisit({
+      ...input,
+      available: getProfession(this.snapshot.organization.primaryProfession).features.homeVisitDetails,
+    });
+    if (!validation.ok) throw new RepositoryError(validation.error);
+    return validation.value;
+  }
+
   /** Sinal so existe onde a profissao trabalha com sinal (E2.2). */
   private validateDeposit(raw: number | null, priceInCents: number): number | null {
     const validation = validateDeposit({
@@ -599,6 +615,11 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     }
 
     const deposit = this.validateDeposit(input.depositInCents ?? null, input.priceInCents);
+    const visita = this.validateHomeVisit({
+      modality: input.modality,
+      visitAddress: input.visitAddress ?? null,
+      travelFeeInCents: input.travelFeeInCents ?? null,
+    });
 
     const id = this.nextId("appt");
     const appointment: Appointment = {
@@ -619,6 +640,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       priceInCents: input.priceInCents,
       depositInCents: deposit,
       depositOutcome: null,
+      ...visita,
       administrativeNotes: input.administrativeNotes,
       origin: "MANUAL",
       confirmedAt: input.status === "CONFIRMED" ? now : null,
@@ -643,6 +665,19 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
           amountInCents: aPagar,
           dueDate: appointment.startsAt,
           description: `Atendimento de ${client.fullName}`,
+          client,
+          professionalId: professional.id,
+        }),
+      );
+    }
+    if (visita.travelFeeInCents !== null) {
+      transactions.unshift(
+        this.income(now, {
+          appointmentId: id,
+          part: "TRAVEL",
+          amountInCents: visita.travelFeeInCents,
+          dueDate: appointment.startsAt,
+          description: `${TRAVEL_DESCRIPTION_PREFIX} — ${client.fullName}`,
           client,
           professionalId: professional.id,
         }),
@@ -746,6 +781,13 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
         ? existing.depositInCents
         : this.validateDeposit(input.depositInCents, priceInCents);
 
+    const visita = this.validateHomeVisit({
+      modality: input.modality ?? existing.modality,
+      visitAddress: input.visitAddress === undefined ? existing.visitAddress : input.visitAddress,
+      travelFeeInCents:
+        input.travelFeeInCents === undefined ? existing.travelFeeInCents : input.travelFeeInCents,
+    });
+
     const ligados = this.snapshot.transactions.filter((item) => item.appointmentId === id);
     if (
       deposit !== existing.depositInCents &&
@@ -763,6 +805,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       endsAt,
       durationMinutes,
       depositInCents: deposit,
+      ...visita,
       professionalId,
       professionalName: professional.displayName,
       clientId: client?.id ?? existing.clientId,
@@ -832,40 +875,64 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     deposit: number | null,
     now: ISODateString,
   ): Transaction[] {
-    const aPagar = serviceAmountFor(updated.priceInCents, deposit);
+    const charges = {
+      serviceInCents: serviceAmountFor(updated.priceInCents, deposit),
+      depositInCents: deposit,
+      travelFeeInCents: updated.travelFeeInCents,
+    };
+
     const existentes = this.snapshot.transactions.map((transaction) => {
       if (transaction.appointmentId !== id || transaction.status === "PAID") return transaction;
       const parte = partOf(transaction);
-      if (parte === "DEPOSIT" && deposit === null) {
+      const valor = amountForPart(parte, charges);
+      if (valor === null) {
         return { ...transaction, status: "CANCELLED" as const, clientName: updated.clientName, updatedAt: now };
       }
       return {
         ...transaction,
-        amountInCents: parte === "DEPOSIT" ? (deposit ?? 0) : aPagar,
+        amountInCents: valor,
+        // O sinal tem prazo proprio; o resto vence no atendimento.
         dueDate: parte === "DEPOSIT" ? transaction.dueDate : updated.startsAt,
         clientName: updated.clientName,
         updatedAt: now,
       };
     });
 
-    // Sinal pedido depois da marcacao precisa nascer agora.
-    const jaTem = existentes.some(
-      (transaction) => transaction.appointmentId === id && partOf(transaction) === "DEPOSIT",
+    // Sinal ou deslocamento pedidos depois da marcacao precisam nascer agora.
+    const partes = new Set(
+      existentes.filter((item) => item.appointmentId === id).map((item) => partOf(item)),
     );
-    if (deposit === null || jaTem) return existentes;
+    const client = { id: updated.clientId, fullName: updated.clientName };
+    const novos: Transaction[] = [];
 
-    return [
-      this.income(now, {
-        appointmentId: id,
-        part: "DEPOSIT",
-        amountInCents: deposit,
-        dueDate: depositDueDate(now, updated.startsAt),
-        description: `${DEPOSIT_DESCRIPTION_PREFIX} — ${updated.clientName}`,
-        client: { id: updated.clientId, fullName: updated.clientName },
-        professionalId: updated.professionalId,
-      }),
-      ...existentes,
-    ];
+    if (deposit !== null && !partes.has("DEPOSIT")) {
+      novos.push(
+        this.income(now, {
+          appointmentId: id,
+          part: "DEPOSIT",
+          amountInCents: deposit,
+          dueDate: depositDueDate(now, updated.startsAt),
+          description: `${DEPOSIT_DESCRIPTION_PREFIX} — ${updated.clientName}`,
+          client,
+          professionalId: updated.professionalId,
+        }),
+      );
+    }
+    if (updated.travelFeeInCents !== null && !partes.has("TRAVEL")) {
+      novos.push(
+        this.income(now, {
+          appointmentId: id,
+          part: "TRAVEL",
+          amountInCents: updated.travelFeeInCents,
+          dueDate: updated.startsAt,
+          description: `${TRAVEL_DESCRIPTION_PREFIX} — ${updated.clientName}`,
+          client,
+          professionalId: updated.professionalId,
+        }),
+      );
+    }
+
+    return [...novos, ...existentes];
   }
 
   async setAppointmentStatus(

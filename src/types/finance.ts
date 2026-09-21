@@ -3,8 +3,14 @@ import type { PrivacyRedactionMark } from "./privacy";
 
 export type TransactionType = "INCOME" | "EXPENSE";
 
-/** Parte do atendimento coberta por um lancamento (E2.2). */
-export type AppointmentPart = "SERVICE" | "DEPOSIT";
+/**
+ * Parte do atendimento coberta por um lancamento.
+ *
+ * `SERVICE` e o trabalho, `DEPOSIT` o sinal antecipado (E2.2) e `TRAVEL` a
+ * taxa de deslocamento do atendimento a domicilio (E2.3). Separados de
+ * proposito: no fim do mes ela enxerga quanto ganhou so indo ate a cliente.
+ */
+export type AppointmentPart = "SERVICE" | "DEPOSIT" | "TRAVEL";
 
 export type TransactionStatus =
   "PENDING" | "PAID" | "OVERDUE" | "CANCELLED" | "REFUNDED";

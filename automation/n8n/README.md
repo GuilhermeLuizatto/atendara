@@ -116,8 +116,33 @@ chega ao n8n pela configuração do servidor, nunca por arquivo versionado.
   número, que é contato de paciente, e por isso nunca é copiada;
 - **não** escolhe destinatário, texto ou horário: isso o Atendara já decidiu.
 
-⚠️ **Ele não foi exercitado contra a Meta.** Conta comercial não verificada é
-impedida de enviar para números do Brasil (erro **130497**), e a verificação
-exige CNPJ. O que está provado é o contrato, contra o fluxo fictício. Quando
-houver verificação, o teste é: cadastrar o remetente em modo `TEST` com o
-próprio celular na lista, e disparar um lembrete.
+⚠️ **O fluxo ainda não foi exercitado contra a Meta.** A conta de desenvolvedor
+da Meta pode ser usada em modo de teste por uma pessoa física, com o número de
+teste e destinatários de teste autorizados no painel. Esse caminho não depende
+de domínio nem de CNPJ e é o próximo passo recomendado para validar o contrato.
+
+O modo de teste não equivale à produção: o número de teste é limitado, os
+destinatários precisam ser adicionados à lista da Meta e o token é temporário.
+Para operar um número próprio em produção, a Meta pode exigir verificação da
+empresa, aprovação do remetente e dos modelos de mensagem. Isso deve ser
+tratado depois da validação local.
+
+## Preparação do teste da Meta como pessoa física
+
+1. Crie um aplicativo do tipo **Business** no painel de desenvolvedores da Meta
+   usando sua conta pessoal.
+2. Adicione o produto **WhatsApp** e use o número de teste fornecido pela Meta.
+3. Cadastre o seu celular como destinatário de teste. O celular usado no teste
+   deve estar no formato internacional, por exemplo `+5513999990000`.
+4. Copie o `Phone number ID` e gere um token temporário somente para o teste.
+   Coloque ambos em uma cópia local de `.env.example` chamada `.env` neste
+   diretório. O `.gitignore` já impede o commit desse arquivo.
+5. No Atendara, registre o remetente em modo `TEST` com o mesmo destinatário
+   permitido. O cadastro é uma operação de operadora e exige segundo fator;
+   nenhuma credencial da Meta é salva no Firestore.
+6. Use um modelo aprovado pela Meta. O fluxo recusa tarefas sem modelo porque
+   mensagens fora da janela de 24 horas não podem ser texto livre.
+
+O teste fica pronto quando uma tarefa assinada pelo Atendara chega ao n8n, a
+Cloud API aceita o modelo e o retorno assinado atualiza a tarefa. Ainda não
+publique Functions nem use contatos reais antes de concluir esse teste.

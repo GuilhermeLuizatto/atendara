@@ -94,6 +94,20 @@ export interface ProfessionFeatureFlags {
    * em consultorio de saude, mas quem decide e a tabela, nao o codigo.
    */
   depositOnBooking: boolean;
+  /**
+   * Endereco e taxa de deslocamento no atendimento a domicilio (E2.3).
+   *
+   * O endereco e dado pessoal novo, entao a flag nao liga so uma tela: liga
+   * tambem uma entrada no mapa de dados pessoais e um caminho de eliminacao.
+   */
+  homeVisitDetails: boolean;
+  /**
+   * Sugestao de retorno pelo intervalo do servico (E2.4).
+   *
+   * A sugestao aparece na TELA e nada e enviado: aviso ao cliente e opt-in com
+   * as travas da regra 11, e quem decide chamar de volta e ela.
+   */
+  maintenanceReminders: boolean;
 }
 
 /** Semente de regra de nivel PROFESSION, aplicada ao criar a organizacao. */

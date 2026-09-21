@@ -18,11 +18,13 @@ import {
   CLIENT_STATUS_LABELS,
   MODALITY_LABELS,
 } from "@/config/labels";
+import { maintenanceSuggestions } from "@/lib/agenda/maintenance";
 import {
   formatCurrency,
   formatDate,
   formatDateTime,
   formatPhone,
+  formatShortDate,
 } from "@/lib/utils/format";
 import { byGender, newTerm, noTerm } from "@/lib/utils/terms";
 import { useWorkspaceActions } from "@/providers/use-workspace-actions";
@@ -42,7 +44,7 @@ export function ClientDrawer({
   onEdit: (client: Client) => void;
   onNewAppointment: (client: Client) => void;
 }) {
-  const { data, terminology } = useWorkspace();
+  const { data, terminology, profession } = useWorkspace();
   const { deleteClient } = useWorkspaceActions();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -53,6 +55,20 @@ export function ClientDrawer({
       .sort((a, b) => b.startsAt.localeCompare(a.startsAt))
       .slice(0, HISTORY_LIMIT);
   }, [client, data]);
+
+  // Retorno sugerido pelo intervalo do servico (E2.4). So calcula o que e
+  // desta pessoa, e nao envia nada: quem chama de volta e ela.
+  const retornos = useMemo(() => {
+    if (!client || !data || !profession.features.maintenanceReminders)
+      return [];
+    return maintenanceSuggestions({
+      appointments: data.appointments.filter(
+        (item) => item.clientId === client.id,
+      ),
+      services: data.services,
+      now: new Date(),
+    });
+  }, [client, data, profession.features.maintenanceReminders]);
 
   if (!client) return null;
 
@@ -70,7 +86,11 @@ export function ClientDrawer({
         footer={
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={() => onNewAppointment(client)}>
-              <CalendarPlus className="size-3.5" aria-hidden strokeWidth={1.75} />
+              <CalendarPlus
+                className="size-3.5"
+                aria-hidden
+                strokeWidth={1.75}
+              />
               {newTerm(terminology.appointment)}
             </Button>
             <Button variant="outline" size="sm" onClick={() => onEdit(client)}>
@@ -121,7 +141,9 @@ export function ClientDrawer({
               <Metric
                 label="Em aberto"
                 value={formatCurrency(client.outstandingBalanceInCents)}
-                tone={client.outstandingBalanceInCents > 0 ? "warning" : "default"}
+                tone={
+                  client.outstandingBalanceInCents > 0 ? "warning" : "default"
+                }
               />
               <Metric
                 label="Último"
@@ -163,7 +185,40 @@ export function ClientDrawer({
             </p>
           </Section>
 
-          <Section title={`Histórico de ${terminology.appointment.pluralLower}`}>
+          {retornos.length > 0 ? (
+            <Section title="Hora de voltar">
+              <ul className="divide-border border-border divide-y rounded-lg border">
+                {retornos.map((item) => (
+                  <li
+                    key={item.serviceId}
+                    className="flex items-center justify-between gap-3 px-3 py-2.5"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-foreground truncate text-sm">
+                        {item.serviceName}
+                      </p>
+                      <p className="text-subtle-foreground text-xs">
+                        Última vez em{" "}
+                        {formatShortDate(`${item.lastVisitOn}T12:00:00.000Z`)}
+                      </p>
+                    </div>
+                    <Badge tone={item.status === "DUE" ? "warning" : "neutral"}>
+                      {item.status === "DUE"
+                        ? `${item.daysLate} ${item.daysLate === 1 ? "dia" : "dias"}`
+                        : "a vencer"}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-subtle-foreground mt-2 text-xs leading-relaxed">
+                Sugestão de tela. Nenhuma mensagem é enviada por causa dela.
+              </p>
+            </Section>
+          ) : null}
+
+          <Section
+            title={`Histórico de ${terminology.appointment.pluralLower}`}
+          >
             {history.length === 0 ? (
               <p className="text-muted-foreground text-sm">
                 {noTerm(terminology.appointment)}{" "}

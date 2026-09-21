@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { APPOINTMENT_STATUS_TONE } from "@/components/ui/tones";
 import { APPOINTMENT_STATUS_LABELS, MODALITY_LABELS } from "@/config/labels";
-import { asksAboutDeposit, partOf } from "@/lib/agenda/deposit";
+import { partOf } from "@/lib/agenda/charges";
+import { asksAboutDeposit } from "@/lib/agenda/deposit";
 import { dayLabel, toDateKey } from "@/lib/utils/datetime";
 import { formatCurrency, formatPhone, formatTime } from "@/lib/utils/format";
 import { useWorkspaceActions } from "@/providers/use-workspace-actions";
@@ -154,6 +155,15 @@ export function AppointmentDrawer({
               label="Valor"
               value={formatCurrency(appointment.priceInCents)}
             />
+            {appointment.travelFeeInCents !== null ? (
+              <Row
+                label="Deslocamento"
+                value={formatCurrency(appointment.travelFeeInCents)}
+              />
+            ) : null}
+            {appointment.visitAddress ? (
+              <Row label="Endereço" value={appointment.visitAddress} />
+            ) : null}
             {appointment.depositInCents !== null ? (
               <Row
                 label="Sinal"

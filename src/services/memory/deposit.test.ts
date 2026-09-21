@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { partOf } from "@/lib/agenda/deposit";
+import { partOf } from "@/lib/agenda/charges";
 import type { Transaction } from "@/types";
 
 import { MemoryWorkspaceRepository } from "./memory-repository";

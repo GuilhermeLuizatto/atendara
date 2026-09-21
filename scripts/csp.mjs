@@ -32,8 +32,10 @@ export function scriptHash(content) {
 export function contentSecurityPolicy({ scriptHashes, projectId, authDomain, region = "southamerica-east1" }) {
   const directives = {
     "default-src": ["'self'"],
-    // reCAPTCHA Enterprise e o provedor do App Check.
-    "script-src": ["'self'", ...scriptHashes, "https://www.google.com/recaptcha/", "https://www.gstatic.com/recaptcha/", "https://connect.facebook.net"],
+    // reCAPTCHA Enterprise e o provedor do App Check. `apis.google.com` e o
+    // gapi: o login com Google carrega `js/api.js` para montar o iframe de
+    // autenticacao, e sem ele o botao falha antes de abrir a janela.
+    "script-src": ["'self'", ...scriptHashes, "https://apis.google.com", "https://www.google.com/recaptcha/", "https://www.gstatic.com/recaptcha/", "https://connect.facebook.net"],
     // Estilo inline fica: atributo `style` do React. Nao executa codigo.
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": ["'self'", "data:", "blob:"],
@@ -53,6 +55,9 @@ export function contentSecurityPolicy({ scriptHashes, projectId, authDomain, reg
       ...(projectId ? [`https://${region}-${projectId}.cloudfunctions.net`] : []),
     ],
     "frame-src": [
+      // O gapi monta um iframe de relay em apis.google.com antes de chegar ao
+      // de `authDomain`; os dois precisam estar liberados.
+      "https://apis.google.com",
       "https://www.google.com/recaptcha/",
       "https://recaptcha.google.com/recaptcha/",
       "https://www.facebook.com",

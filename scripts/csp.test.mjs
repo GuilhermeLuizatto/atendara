@@ -48,6 +48,24 @@ describe("CSP do export estatico", () => {
     expect(contentSecurityPolicyProblems(loose)).toContain("script-src permite execucao inline");
   });
 
+  /**
+   * Em 21/09/2026 o botao "Entrar com o Google" parou por falta desta origem.
+   * O erro nao aparece na tela: o navegador recusa o script, o SDK rejeita e a
+   * pagina mostra "Nao foi possivel entrar com o Google" — que parece problema
+   * do Google, e nao da nossa politica.
+   */
+  it("libera o gapi, sem o qual o login com Google nao abre", () => {
+    const policy = contentSecurityPolicy({ scriptHashes: [], ...options });
+    const directive = (name) => policy.split("; ").find((part) => part.startsWith(`${name} `));
+
+    expect(directive("script-src"), "o Firebase Auth carrega apis.google.com/js/api.js").toContain(
+      "https://apis.google.com",
+    );
+    expect(directive("frame-src"), "o gapi monta um iframe de relay em apis.google.com").toContain(
+      "https://apis.google.com",
+    );
+  });
+
   it("restringe conexoes ao Firebase do projeto, sem curinga", () => {
     const policy = contentSecurityPolicy({ scriptHashes: [], ...options });
     const connect = policy.split("; ").find((part) => part.startsWith("connect-src"));

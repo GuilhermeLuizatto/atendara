@@ -10,6 +10,9 @@
 export function evaluateCondition(condition, context) {
     const actual = context[condition.field];
     const expected = condition.value;
+    // Ausência de contexto não é evidência de que uma condição negativa vale.
+    if (actual === null || actual === undefined)
+        return false;
     switch (condition.operator) {
         case "EQUALS":
             return actual === expected;

@@ -269,11 +269,34 @@ testes de ponta a ponta.
 | **3A** | Automação interna: fila, HMAC, callback, controle de emergência e n8n local | ✅ |
 | **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco | 🟨 |
 | **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | ⬜ |
-| **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | ⬜ |
+| **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | 🟨 Gemini ativo para organizações de teste; expansão e analytics pendentes |
 | **5** | Produto: equipes, importação administrativa, suporte, cobrança real e planos | 🟨 |
 | **6** | Expansão: portfólio da Estética, marketplace e cobrador dos clientes | ⬜ |
 
 ### Próximas entregas
+
+A Fase 4 local está disponível em `/agente`: autorizações da Dara, editor de
+condições, prévia sem gravação e indicadores por período e profissional. Na
+central de mensagens, a Dara prepara um rascunho administrativo para revisão
+explícita. Somente OWNER/ADMIN alteram as configurações do agente, com trilha
+de auditoria; as permissões existentes das regras e conversas permanecem.
+
+A classificação local continua sendo a primeira e principal camada: trata
+limites de palavras, variações de espaços e acentos, sinais sensíveis, negação
+e múltiplos pedidos, e um `POSSIBLE_RISK` detectado localmente nunca é
+sobrescrito por resultado externo. Sobre essa base, a classificação semântica
+com Gemini (`gemini-3.1-flash-lite`) está ativa em produção, mas restrita por
+allowlist explícita (`GEMINI_ORGANIZATION_IDS`) a um conjunto de organizações
+de teste — nenhum tenant real está habilitado ainda. A chave fica no Secret
+Manager, vinculada apenas a `previewAI` e `inboundWebhook`, com nível pago
+confirmado manualmente (`GEMINI_PAID_TIER_CONFIRMED`). Qualquer falha ou
+timeout do Gemini degrada para `UNKNOWN`, que sempre escala para um humano —
+a chamada externa nunca decide sozinha. A avaliação automatizada
+(`npm run evaluate:gemini`) roda contra os fixtures de segurança antes de
+qualquer expansão da lista de organizações. Os indicadores continuam mostrando
+a amostra carregada e avisando quando há páginas anteriores; não medem
+acurácia nem comprovam entrega de mensagens — isso, junto da expansão para
+tenants reais, fica para a continuação da Fase 4.
 
 1. Validar a saída do WhatsApp em modo de teste com o número e o destinatário
    autorizados pela Meta.
@@ -288,10 +311,11 @@ testes de ponta a ponta.
    suporte. O cobrador de clientes só começa após decisão contábil, jurídica e
    de gateway sobre split, responsabilidade fiscal e consentimento.
 
-Planos e billing da plataforma continuam em modo de testes. Equipes,
-marketplace, cobrança de clientes e IA externa ainda não estão liberados para
-produção. O sistema continua sem dados reais e sem afirmar conformidade com a
-LGPD.
+Planos e billing da plataforma continuam em modo de testes. A IA externa
+(Gemini) está ativa em produção apenas para organizações de teste, sob
+allowlist explícita; equipes, marketplace, cobrança de clientes e IA externa
+para tenants reais ainda não estão liberados. O sistema continua sem dados
+reais e sem afirmar conformidade com a LGPD.
 
 ---
 

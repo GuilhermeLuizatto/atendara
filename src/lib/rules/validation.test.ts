@@ -18,6 +18,17 @@ function input() {
 }
 
 describe("regras estruturadas", () => {
+  it.each([
+    { field: "context.hour", operator: "GREATER_THAN", value: 25 },
+    { field: "context.dayOfWeek", operator: "EQUALS", value: 1.5 },
+    { field: "client.hasOutstandingBalance", operator: "EQUALS", value: "false" },
+    { field: "message.channel", operator: "LESS_THAN", value: "WHATSAPP" },
+    { field: "message.channel", operator: "IN", value: [] },
+    { field: "message.channel", operator: "EQUALS", value: ["WHATSAPP"] },
+    { field: "message.channel", operator: "EQUALS", value: "canal inexistente" },
+  ])("recusa condição incompatível: $field/$operator", (condition) => {
+    expect(validateRuleInput({ ...input(), conditions: { combinator: "AND", conditions: [condition] } }).valid).toBe(false);
+  });
   it("extrai centavos e duracao de texto livre", () => {
     expect(input().actions[0].payload).toMatchObject({
       priceInCents: 18000,

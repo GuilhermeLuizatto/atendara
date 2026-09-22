@@ -140,6 +140,7 @@ export { planAppointmentNotices, dispatchAutomationTask } from "./automation.js"
 export { automationCallback } from "./automation-callback.js";
 export { registerMessagingSender } from "./messaging-senders.js";
 export { inboundWebhook } from "./inbound.js";
+export { previewAI } from "./ai-preview.js";
 export { startCalendarConnection, googleOAuthCallback, disconnectCalendar, calendarBusyCallback } from "./calendar.js";
 export {
   setOrganizationAutomationSwitch,

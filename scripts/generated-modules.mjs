@@ -23,6 +23,7 @@ export const SOURCES = [
   ["src/types/privacy.ts", "privacy-types"],
   ["src/config/privacy.ts", "privacy-config"],
   ["src/lib/privacy/redaction.ts", "privacy-redaction"],
+  ["src/lib/privacy/decision-preview.ts", "privacy-decision-preview"],
 
   // Fila de automacao (Fase 3, 13.2): o despachante confere as MESMAS travas
   // de `eligibility.ts` que a tela mostra.
@@ -73,6 +74,9 @@ export const SOURCES = [
   ["src/lib/automation/inbound.ts", "automation-inbound"],
   ["src/lib/ai/decision-engine.ts", "decision-engine"],
   ["src/lib/ai/classify.ts", "classify"],
+  ["src/lib/ai/semantic.ts", "ai-semantic"],
+  ["src/config/ai-provider.ts", "ai-provider-config"],
+  ["src/config/system-rules.ts", "system-rules-config"],
   ["src/lib/ai/responses.ts", "ai-responses"],
   ["src/config/permissions.ts", "permissions"],
   ["src/config/labels.ts", "labels-config"],

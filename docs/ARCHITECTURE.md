@@ -279,9 +279,10 @@ a automacao, gera alerta `CRITICAL` e aguarda o humano.
 
 ## 7. Rules Engine
 
-### Fase 4 local
+### Fase 4: regras e interpretação com Gemini
 
-O motor `0.3.0` continua determinístico. O classificador normaliza espaços,
+O motor `0.4.0` mantém a decisão determinística e aceita classificação semântica
+validada no backend. O classificador local normaliza espaços,
 acentos e pontuação, usa limites de palavra e radicais explícitos, e encaminha
 negações, tentativas de instruir o agente e pedidos administrativos distintos
 na mesma mensagem. Esses sinais não constituem uma detecção semântica completa.
@@ -301,9 +302,13 @@ e auditoria atomicamente; as Security Rules validam o bloco alterado. O limiar
 fica entre 80% e 100%, e o motor também recusa limiares inválidos. Habilitar o
 agente não concede consentimento nem habilita canal de envio.
 
-O teste em `/agente` executa `decide` apenas em memória, sem exigir uma conversa
-e sem gravar decisão ou mensagem. A assistência na central de mensagens também
-é uma prévia: consulta as permissões e regras atuais e preenche um rascunho
+O teste em `/agente` executa `decide` em memória por padrão. A opção
+“Interpretar com Gemini” chama `previewAI`, com autenticação, App Check,
+assinatura vigente, módulo habilitado e permissão de resposta. Organização,
+profissão, permissões e regras vêm do servidor. O simulador aceita contexto
+fictício; a assistência recebe apenas ids e lê mensagem e conversa dentro do
+tenant da conta. Nenhuma prévia grava decisão ou mensagem. A assistência
+consulta as permissões e regras atuais e preenche um rascunho
 somente por ação explícita. A resposta revisada segue a porta já existente de
 resposta humana. Decisões operacionais continuam append-only.
 
@@ -314,10 +319,59 @@ dados da cobrança da plataforma. A tela informa paginação parcial, falha de
 carga e ausência de dados; confiança não é acurácia e decisão automática não é
 comprovante de entrega. Prévia sem gravação não alimenta esses indicadores.
 
-A integração externa foi adiada por decisão de produto: nenhum provedor,
-segredo ou transferência de mensagens a modelos externos faz parte desta
-entrega. Antes dessa integração, a classificação semântica precisa de avaliação
-com exemplos fictícios em português e controles próprios de custo e privacidade.
+**Gemini no servidor.** `functions/gemini.js` chama a API `generateContent` do
+`gemini-3.1-flash-lite`, sem SDK adicional, ferramentas, histórico de conversa
+ou acesso ao banco pelo modelo. O retorno contém somente categoria, intenção,
+confiança e ambiguidade, em JSON validado estritamente. A resposta ao cliente
+continua sendo composta com informação cadastrada e regra autorizadora; texto
+livre gerado pelo modelo não vira resposta. Um parecer externo nunca retira
+risco, sensibilidade ou ambiguidade encontrados localmente. Falha, cota
+esgotada, resposta truncada, bloqueada ou inválida encaminham ao humano.
+
+A entrada de mensagens consulta o modelo fora da transação do Firestore e
+reavalia o estado atual antes de registrar a decisão. Reentregas já gravadas
+não consultam novamente; duas entregas simultâneas ainda podem consumir duas
+inferências, mas a transação mantém uma única decisão. Nenhum envio externo
+foi acrescentado: classificação não comprova elegibilidade nem entrega.
+`aiDecisions.classifier` registra modelo, versão do prompt, estado, tokens e
+latência, sem texto livre; é protegido contra pseudonimização.
+
+**Custo e privacidade.** Texto limitado a 4.000 caracteres, saída a 512 tokens,
+tempo de espera a 12 segundos, sem repetição automática da chamada. Cotas
+transacionais: 200 tentativas por organização e 2.000 globais por janela de
+24 horas; prévia limitada a 20 chamadas por usuário por minuto. Usam a coleção
+existente `platformRateLimits`, com TTL, sem armazenar mensagens. O modelo
+recebe somente a mensagem e a taxonomia; e-mail, telefone, CPF e links são
+reduzidos por padrões. Isso não anonimiza texto livre: nomes e informações
+sensíveis não reconhecidas localmente ainda podem estar presentes.
+
+**Ativação.** Integração desligada por padrão. A operadora configura nas
+Functions `GEMINI_ENABLED=true`, `GEMINI_ORGANIZATION_IDS` com os ids liberados
+(separados por vírgula, sem curinga) e `GEMINI_PAID_TIER_CONFIRMED=true` somente
+depois de verificar que o projeto Google usa a modalidade paga. Essa variável
+é uma declaração operacional, não uma consulta de faturamento. Pela
+[política de preços do Google](https://ai.google.dev/gemini-api/docs/pricing),
+a modalidade gratuita pode usar conteúdo para melhorar produtos; a paga não.
+A liberação do tenant deve considerar essa transferência de texto ao Google.
+
+`GEMINI_API_KEY` fica no Secret Manager, vinculado a `previewAI` e
+`inboundWebhook`, com acesso da conta `fn-automacao`. Nunca usar
+`NEXT_PUBLIC_GEMINI_API_KEY` nem gravar a chave no repositório. No emulador,
+usar `functions/.secret.local` (ignorado pelo Git). Exemplo de configuração
+não secreta: `functions/.env.example`. Antes da publicação, gerar as Functions
+e executar `npm run verify`. Criar o segredo antes de publicar as duas
+Functions; o deploy automático do site não publica Functions. Para desligar,
+remover o tenant da lista ou definir `GEMINI_ENABLED=false` e republicar.
+
+**Avaliação antes de liberar mensagens reais.** `npm run evaluate:gemini`
+executa 20 exemplos fictícios em português com uma chave disponibilizada no
+ambiente e confirmação de modalidade paga. É uma avaliação paga explícita,
+separada dos testes automáticos sem rede. Exige ao menos 90% de concordância,
+zero falhas de API, zero falso administrativo nos casos que exigem humano e
+zero risco perdido. O conjunto pequeno é uma barreira inicial, não comprova
+acurácia em produção. Guardar o resultado agregado com modelo e versão do
+prompt antes de habilitar um tenant. Sem credencial real, os testes locais
+validam a integração e as travas, mas não a qualidade do modelo.
 
 Seis niveis de precedencia (`RULE_LEVEL_PRECEDENCE`, menor = maior prioridade):
 

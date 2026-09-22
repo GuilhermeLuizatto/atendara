@@ -4,6 +4,7 @@ import { buildEvaluationContext } from "@/lib/rules/context";
 import { resolvePrecedence } from "@/lib/rules/precedence";
 import type {
   AIRule,
+  AIDecision,
   AttentionLevel,
   DecisionOutcome,
   Organization,
@@ -13,6 +14,7 @@ import type {
 } from "@/types";
 
 import { classifyMessage, type ClassificationResult } from "./classify";
+import { mergeClassification } from "./semantic";
 import { INTENT_TO_CATEGORY, composeResponse } from "./responses";
 
 export interface DecisionClient {
@@ -32,6 +34,8 @@ export interface DecisionRequest {
   professionalId: string | null;
   permissions: readonly Permission[];
   humanHandoff?: boolean;
+  /** Somente o backend fornece o parecer validado do provedor externo. */
+  semanticClassification?: ClassificationResult;
 }
 
 export interface DecisionTrace {
@@ -46,7 +50,7 @@ export interface DecisionStep {
   detail: string;
 }
 
-export type DecisionResult = DecisionOutcome & { trace: DecisionTrace };
+export type DecisionResult = DecisionOutcome & { trace: DecisionTrace; classifier?: AIDecision["classifier"] };
 
 function attentionFor(
   classification: ClassificationResult["classification"],
@@ -85,7 +89,10 @@ export function decide(request: DecisionRequest): DecisionResult {
     request;
 
   const steps: DecisionStep[] = [];
-  const classification = classifyMessage(text, profession);
+  const local = classifyMessage(text, profession);
+  const classification = request.semanticClassification
+    ? mergeClassification(local, request.semanticClassification, profession)
+    : local;
   const meta = classificationMeta(classification.classification);
   const attention = attentionFor(classification.classification);
 
@@ -99,17 +106,17 @@ export function decide(request: DecisionRequest): DecisionResult {
     }`,
   });
 
-  const local = new Intl.DateTimeFormat("en-GB", {
+  const localTime = new Intl.DateTimeFormat("en-GB", {
     timeZone: organization.timezone,
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
     weekday: "short",
   }).formatToParts(now);
-  const hour = Number(local.find((part) => part.type === "hour")?.value);
-  const minute = Number(local.find((part) => part.type === "minute")?.value);
+  const hour = Number(localTime.find((part) => part.type === "hour")?.value);
+  const minute = Number(localTime.find((part) => part.type === "minute")?.value);
   const dayOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(
-    local.find((part) => part.type === "weekday")?.value ?? "",
+    localTime.find((part) => part.type === "weekday")?.value ?? "",
   );
   const minutes = hour * 60 + minute;
   const context = buildEvaluationContext({

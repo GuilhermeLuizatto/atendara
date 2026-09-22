@@ -132,6 +132,9 @@ export const PLATFORM_AUDIT_ACTION_LABELS = {
  * mais de um contador, e cada um aparece nesta tabela com nome proprio.
  */
 export const CALLABLE_RATE_LIMITS = {
+    aiPreview: { max: 20, windowSeconds: 60 },
+    geminiOrganization: { max: 200, windowSeconds: 86400 },
+    geminiGlobal: { max: 2000, windowSeconds: 86400 },
     createSubscriptionCheckout: { max: 5, windowSeconds: 600 },
     openBillingPortal: { max: 10, windowSeconds: 600 },
     cancelPlatformSubscription: { max: 3, windowSeconds: 600 },

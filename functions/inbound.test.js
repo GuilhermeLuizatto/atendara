@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * A entrada de mensagens (13.5), sem emulador e sem rede.
@@ -13,6 +13,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const store = vi.hoisted(() => new Map());
 const consultas = vi.hoisted(() => ({ senders: [], clients: [], rules: [], appointments: [] }));
+const gemini = vi.hoisted(() => ({ generate: vi.fn(), reserve: vi.fn() }));
+vi.mock("./rate-limit.js", () => ({ consumeRateLimit: gemini.reserve }));
 
 vi.mock("firebase-admin/app", () => ({ initializeApp: vi.fn() }));
 vi.mock("firebase-admin/functions", () => ({ getFunctions: vi.fn() }));
@@ -166,6 +168,51 @@ beforeEach(() => {
   process.env.N8N_CALLBACK_SECRET = PONTE;
   process.env.META_APP_SECRET = META;
   store.set(paths.organization(ORG), { id: ORG, primaryProfession: "PSYCHOLOGIST", ownerId: "dono" });
+});
+
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+
+describe("interpretação semântica na entrada", () => {
+  function enableGemini() {
+    vi.stubEnv("GEMINI_ENABLED", "true");
+    vi.stubEnv("GEMINI_ORGANIZATION_IDS", ORG);
+    vi.stubEnv("GEMINI_PAID_TIER_CONFIRMED", "true");
+    vi.stubEnv("GEMINI_API_KEY", "fake-unit-key");
+    gemini.generate.mockReset();
+    gemini.reserve.mockReset();
+    vi.stubGlobal("fetch", gemini.generate);
+  }
+  it("grava parecer e metadados uma vez e não consulta novamente na reentrega", async () => {
+    enableGemini();
+    gemini.generate.mockResolvedValue({ ok: true, text: async () => JSON.stringify({
+      candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify({
+        classification: "POSSIBLE_RISK", confidence: 0.96, intent: "NONE", ambiguous: false,
+      }) }] } }], usageMetadata: { promptTokenCount: 250, candidatesTokenCount: 40 },
+    }) });
+    const event = evento({ text: "Já deixei as cartas de despedida e hoje vou acabar com tudo." });
+    await applyInboundEvent(event);
+    const decisions = [...store.entries()].filter(([key]) => key.includes("/aiDecisions/"));
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0][1]).toMatchObject({ classification: "POSSIBLE_RISK", attention: "CRITICAL",
+      action: "ESCALATE_TO_PROFESSIONAL", inputPreview: "", classifier: { status: "SUCCEEDED", model: "gemini-3.1-flash-lite" } });
+    await applyInboundEvent(event);
+    expect(gemini.generate).toHaveBeenCalledTimes(1);
+  });
+  it("falha do Gemini encaminha ao humano, sem resposta automática local", async () => {
+    enableGemini();
+    gemini.generate.mockRejectedValue(new Error("rede indisponível"));
+    await applyInboundEvent(evento({ text: "Qual o valor da consulta?" }));
+    const decision = [...store.entries()].find(([key]) => key.includes("/aiDecisions/"))[1];
+    expect(decision).toMatchObject({ classification: "UNKNOWN", action: "ESCALATE_TO_PROFESSIONAL", classifier: { status: "UNAVAILABLE" } });
+  });
+  it("risco lexical não sai para o provedor", async () => {
+    enableGemini();
+    await applyInboundEvent(evento({ text: "Quero morrer." }));
+    expect(gemini.generate).not.toHaveBeenCalled();
+    const decision = [...store.entries()].find(([key]) => key.includes("/aiDecisions/"))[1];
+    expect(decision.classifier.status).toBe("LOCAL_GUARD");
+    expect(decision.attention).toBe("CRITICAL");
+  });
 });
 
 describe("as duas assinaturas", () => {

@@ -29,6 +29,9 @@ import { ROLE_PERMISSIONS } from "./generated/permissions.js";
 import { paths } from "./generated/paths.js";
 import { verifyBridgeSignature } from "./n8n-bridge.js";
 import { runAs } from "./service-accounts.js";
+import { classifyWithGemini, geminiEnabledFor } from "./gemini.js";
+import { materializeSeededRules } from "./generated/system-rules-config.js";
+import { decisionInputPreview } from "./generated/privacy-decision-preview.js";
 
 /**
  * A mensagem que chega (Fase 3, 13.5).
@@ -47,7 +50,7 @@ import { runAs } from "./service-accounts.js";
  */
 
 const REGION = "southamerica-east1";
-const SECRETS = ["N8N_CALLBACK_SECRET", "META_APP_SECRET"];
+const SECRETS = ["N8N_CALLBACK_SECRET", "META_APP_SECRET", "GEMINI_API_KEY"];
 
 const db = () => getFirestore();
 
@@ -124,6 +127,29 @@ export async function applyInboundEvent(event, deps = {}) {
   // desconhecido conversa com a clinica sem virar cadastro sozinho.
   const conversationId = client ? `wa-${client.id}` : `wa-anonimo-${phone ?? "sem-numero"}`;
   const messageId = inboundMessageId(event.providerMessageId);
+
+  // Rede fora da transação: uma repetição do Firestore não pode cobrar outra inferência.
+  // O estado e as travas são lidos novamente dentro da transação antes da decisão.
+  let semantic = null;
+  let semanticProfession = null;
+  if (event.kind === "TEXT" && geminiEnabledFor(organizationId)) {
+    const [orgSnapshot, previousSnapshot, existingSnapshot] = await Promise.all([
+      firestore.doc(paths.organization(organizationId)).get(),
+      scope.doc("conversations", conversationId).get(),
+      scope.doc("messages", messageId).get(),
+    ]);
+    const org = stored("organizations", orgSnapshot);
+    const previous = stored("conversations", previousSnapshot);
+    const kind = decideInbound({ event, knownProviderMessageIds: existingSnapshot.exists ? [event.providerMessageId] : [],
+      lastInboundAt: previous?.lastMessageAt ?? null }).kind;
+    if (kind === "CLASSIFY" && org && !org.deletion && isProfessionId(org.primaryProfession) &&
+      !previous?.escalated && !/^\s*\d+\s*$/.test(event.text)) {
+      semanticProfession = org.primaryProfession;
+      const organization = withOrganizationDefaults(org, organizationId, org.primaryProfession, now);
+      semantic = await classifyWithGemini({ text: event.text, profession: getProfession(org.primaryProfession),
+        organizationId, enabled: organization.settings.ai.enabled });
+    }
+  }
 
   return firestore.runTransaction(async (transaction) => {
     const conversation = stored("conversations", await transaction.get(scope.doc("conversations", conversationId)));
@@ -310,13 +336,17 @@ export async function applyInboundEvent(event, deps = {}) {
 
       if (profession) {
         const organization = withOrganizationDefaults(rawOrganization, organizationId, rawOrganization.primaryProfession, now);
+        const seeds = materializeSeededRules(organizationId, profession, now);
+        const seedIds = new Set(seeds.map((rule) => rule.id));
         const decided = decide({
           text: event.text,
           profession,
           organization,
-          rules,
+          rules: [...seeds, ...rules.filter((rule) => !seedIds.has(rule.id))],
           channel: "WHATSAPP",
-          client: client ? { modality: client.modality ?? null, status: client.status ?? null, hasOutstandingBalance: false } : null,
+          client: client ? { modality: client.preferredModality ?? null, status: client.status ?? null, hasOutstandingBalance: null } : null,
+          humanHandoff: conversation?.escalated === true,
+          semanticClassification: semantic && semanticProfession === rawOrganization.primaryProfession ? semantic.classification : undefined,
           now: new Date(now),
           professionalId: conversation?.professionalId ?? null,
           // A automacao age com as permissoes da propria organizacao, nunca com
@@ -334,7 +364,7 @@ export async function applyInboundEvent(event, deps = {}) {
             messageId,
             clientId: client?.id ?? null,
             professionalId: conversation?.professionalId ?? null,
-            inputPreview: preview(event.text),
+            inputPreview: decisionInputPreview(event.text, profession.sensitiveDataProfile),
             classification: decided.trace.classification.classification,
             confidence: decided.trace.classification.confidence,
             appliedRules: decided.appliedRules ?? [],
@@ -345,7 +375,8 @@ export async function applyInboundEvent(event, deps = {}) {
             escalated: decided.escalated ?? decided.action === "ESCALATE_TO_PROFESSIONAL",
             engineVersion: decided.engineVersion ?? "13.5",
             decidedAt: now,
-            latencyMs: 0,
+            latencyMs: semantic?.metadata.latencyMs ?? 0,
+            ...(semantic ? { classifier: semantic.metadata } : {}),
             createdAt: now,
             createdBy: null,
             updatedAt: now,

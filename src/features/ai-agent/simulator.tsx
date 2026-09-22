@@ -4,7 +4,9 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
-import { decide, type DecisionResult } from "@/lib/ai/decision-engine";
+import { type DecisionResult } from "@/lib/ai/decision-engine";
+import { previewDecision } from "@/services/ai/preview";
+import { isDemoMode } from "@/lib/firebase/config";
 import { useWorkspace } from "@/providers/workspace-provider";
 import { CLIENT_STATUS_LABELS, MODALITY_LABELS } from "@/config/labels";
 import { fromDateAndTime } from "@/lib/utils/datetime";
@@ -22,39 +24,73 @@ export function Simulator() {
   const [status, setStatus] = useState("");
   const [balance, setBalance] = useState("");
   const [decision, setDecision] = useState<DecisionResult | null>(null);
+  const [useGemini, setUseGemini] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   if (!data) return null;
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
-    setDecision(
-      decide({
-        text,
-        profession,
-        organization: data.organization,
-        rules: data.rules,
-        channel,
-        client: {
-          modality: (modality || null) as ServiceModality | null,
-          status: status || null,
-          hasOutstandingBalance: balance === "" ? null : balance === "true",
-        },
-        now: at
-          ? new Date(fromDateAndTime(at.slice(0, 10), at.slice(11)))
-          : new Date(),
-        professionalId: professionalId || session?.professionalId || null,
-        permissions: session?.permissions ?? [],
-        humanHandoff: handoff,
-      }),
-    );
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setDecision(null);
+    try {
+      setDecision(
+        await previewDecision(
+          {
+            text,
+            profession,
+            organization: data.organization,
+            rules: data.rules,
+            channel,
+            client: {
+              modality: (modality || null) as ServiceModality | null,
+              status: status || null,
+              hasOutstandingBalance: balance === "" ? null : balance === "true",
+            },
+            now: at
+              ? new Date(fromDateAndTime(at.slice(0, 10), at.slice(11)))
+              : new Date(),
+            professionalId: professionalId || session?.professionalId || null,
+            permissions: session?.permissions ?? [],
+            humanHandoff: handoff,
+          },
+          useGemini,
+        ),
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Não foi possível avaliar a mensagem.",
+      );
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card className="space-y-4 p-5">
         <h2 className="font-semibold">Testar Dara</h2>
         <p className="text-muted-foreground text-sm">
-          Prévia local com as regras e permissões atuais. Não envia mensagens,
-          altera conversas ou grava decisões. Use exemplos fictícios.
+          Prévia com as regras e permissões atuais. Não envia respostas, altera
+          conversas ou grava decisões. Use exemplos fictícios.
         </p>
         <form onSubmit={submit} className="space-y-4">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={useGemini}
+              disabled={isDemoMode || busy}
+              onChange={(event) => setUseGemini(event.target.checked)}
+            />
+            Interpretar com Gemini
+          </label>
+          <p className="text-muted-foreground text-xs">
+            {isDemoMode
+              ? "Demonstração: avaliação por regras locais."
+              : "Ao selecionar, o texto poderá ser processado pelo Google se a integração estiver ativa. Use apenas exemplos fictícios neste teste."}
+          </p>
           <Field label="Profissional">
             {(props) => (
               <Select
@@ -185,8 +221,13 @@ export function Simulator() {
               />
             )}
           </Field>
-          <Button type="submit" disabled={!text.trim()}>
-            Avaliar sem enviar
+          {error && (
+            <p role="alert" className="text-danger text-sm">
+              {error}
+            </p>
+          )}
+          <Button type="submit" disabled={!text.trim() || busy}>
+            {busy ? "Avaliando…" : "Avaliar mensagem"}
           </Button>
         </form>
       </Card>

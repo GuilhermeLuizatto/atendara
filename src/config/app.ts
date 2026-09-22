@@ -24,7 +24,7 @@ export const APP_DESCRIPTION =
  * que a logica de classificacao ou de precedencia mudar, para que decisoes
  * antigas continuem interpretaveis.
  */
-export const AI_ENGINE_VERSION = "0.3.0";
+export const AI_ENGINE_VERSION = "0.4.0";
 
 /** Confianca minima padrao para resposta automatica. */
 export const DEFAULT_CONFIDENCE_THRESHOLD = 0.8;

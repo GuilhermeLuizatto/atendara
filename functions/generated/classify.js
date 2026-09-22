@@ -285,5 +285,6 @@ export function classifyMessage(text, profession) {
         confidence: 0.32,
         intent: "NONE",
         matchedTerms: [],
+        ambiguous,
     };
 }

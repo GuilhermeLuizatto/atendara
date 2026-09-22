@@ -340,5 +340,6 @@ export function classifyMessage(
     confidence: 0.32,
     intent: "NONE",
     matchedTerms: [],
+    ambiguous,
   };
 }

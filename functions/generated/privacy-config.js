@@ -78,6 +78,7 @@ export const APPEND_ONLY_PROTECTED_FIELDS = {
         "decidedAt",
         "evaluatedAt",
         "latencyMs",
+        "classifier",
         "createdAt",
         "createdBy",
     ],

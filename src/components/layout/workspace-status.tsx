@@ -24,6 +24,7 @@ const COLLECTION_LABELS: Record<WorkspaceCollection, string> = {
   decisions: "decisões do agente",
   notifications: "alertas",
   notificationDeliveries: "fila de avisos",
+  automationTasks: "fila de automações",
   auditLogs: "trilha de auditoria",
 };
 

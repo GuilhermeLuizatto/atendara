@@ -93,3 +93,15 @@ export const AUTOMATION_QUEUE_STOP_LABELS = {
     DELIVERY_NOT_FOUND: "O registro do aviso não foi encontrado.",
 };
 export const AUTOMATION_ALERT_TITLE = "Aviso não enviado";
+export const AUTOMATION_STATUS_LABELS = {
+    PLANNED: "Planejada",
+    SCHEDULED: "Agendada",
+    DISPATCHING: "Em execução",
+    DISPATCHED: "Aguardando retorno",
+    SUCCEEDED: "Concluída",
+    FAILED: "Falhou",
+    CANCELLED: "Cancelada",
+    EXPIRED: "Vencida",
+};
+/** Lotes limitados evitam uma execução longa bloquear as próximas verificações. */
+export const AUTOMATION_EXPIRY_SCAN = { schedule: "every 5 minutes", batchSize: 100, maxBatches: 10 };

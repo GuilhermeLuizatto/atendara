@@ -42,6 +42,7 @@ export const SNAPSHOT_PAGE_SIZES = {
   aiDecisions: 200,
   notifications: 100,
   notificationDeliveries: 200,
+  automationTasks: 100,
   auditLogs: 200,
 } as const;
 
@@ -166,6 +167,8 @@ export const snapshotQueries: Record<
       orderBy("occurredAt", "desc"),
       limit(count),
     ),
+  automationTasks: (db, organizationId, count) =>
+    query(tenantQuery(db, organizationId, "automationTasks"), orderBy("createdAt", "desc"), limit(count)),
 };
 
 /** Id gerado pelo Firestore, sem ida ao servidor. */

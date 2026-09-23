@@ -13,6 +13,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { permissionsForRole } from "@/config/permissions";
 import { messagePath, paths } from "@/lib/firebase/paths";
+import { toFirestoreData } from "@/lib/firebase/converters";
+import { plannedReminder } from "@/lib/automation/fixtures";
 import type { WorkspaceSnapshot } from "@/services/types";
 
 import { FirestoreWorkspaceRepository } from "./firestore-repository";
@@ -128,6 +130,31 @@ afterAll(async () => {
 });
 
 describe("repositorio do Firestore contra o emulador", () => {
+  it("fila paginada preserva datas, histórico e isolamento da organização", async () => {
+    const { task } = plannedReminder();
+    for (let index = 1; index <= 3; index += 1) {
+      await setDoc(doc(db, paths.document(ORG, "automationTasks", `queue-${index}`)), toFirestoreData("automationTasks", {
+        ...task, organizationId: ORG, createdAt: `2026-09-2${index}T12:00:00.000Z`,
+      }));
+    }
+    await setDoc(doc(db, paths.document("other-queue-org", "automationTasks", "foreign")), toFirestoreData("automationTasks", {
+      ...task, organizationId: "other-queue-org", createdAt: "2026-09-30T12:00:00.000Z",
+    }));
+    const paged = new FirestoreWorkspaceRepository(db, ORG, "PSYCHOLOGIST", { pageSizes: { automationTasks: 2 } });
+    try {
+      const first = await nextSnapshot((snapshot) => snapshot.automationTasks.length === 2, paged);
+      expect(first.automationTasks.map((item) => item.id)).toEqual(["queue-3", "queue-2"]);
+      expect(first.pagination?.automationTasks?.hasMore).toBe(true);
+      expect(first.automationTasks[0].expiresAt).toBe(task.expiresAt);
+      expect(first.automationTasks[0].history).toEqual(task.history);
+      await paged.loadMore("automationTasks");
+      const full = await nextSnapshot((snapshot) => snapshot.automationTasks.length === 3, paged);
+      expect(full.automationTasks.every((item) => item.organizationId === ORG)).toBe(true);
+      expect(full.pagination?.automationTasks?.hasMore ?? false).toBe(false);
+    } finally {
+      paged.dispose();
+    }
+  });
   it("carrega a organizacao completando os padroes do produto", () => {
     const snapshot = repository.getSnapshot()!;
 

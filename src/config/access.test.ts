@@ -17,13 +17,20 @@ const OUT_OF_SESSION_RESOURCES = [
   "billing",
   "privacy",
   "platformAdmin",
-  // 13.9: as regras e as callables existem, o painel da fila ainda nao.
-  "automationQueue",
+  // As ações de reenvio e chave de emergência ainda não têm controles na tela.
   "automationTask",
   "automationSwitch",
 ];
 const account: AccountAccess = { userId: "user", email: PLATFORM_ADMIN_EMAIL, displayName: "Teste", platformRole: "PROFESSIONAL", professionId: "PSYCHOLOGIST", organizationId: "org-a", modules: [...APP_MODULES], status: "ACTIVE", subscriptionStatus: "ACTIVE", accessUntil: "2099-01-01T00:00:00Z", mustChangePassword: false, createdAt: "2026-01-01T00:00:00Z" };
 describe("Acesso por cadastro", () => {
+  it("fila acompanha módulo de agenda e papel, sem liberar escrita", () => {
+    for (const role of ROLES) {
+      const permissions = accountPermissions(account, { role, isOrganizationHolder: false });
+      expect(permissions.includes("automationQueue:read")).toBe(["OWNER", "ADMIN", "PROFESSIONAL"].includes(role));
+      expect(permissions).not.toContain("automationTask:retry");
+    }
+    expect(accountPermissions({ ...account, modules: ["configuracoes"] })).not.toContain("automationQueue:read");
+  });
   it("nao concede administracao pelo email", () => expect(isPlatformAdmin(account)).toBe(false));
   it("restringe o profissional a profissao liberada", () => {
     expect(canAccessProfession(account, "PSYCHOLOGIST")).toBe(true);

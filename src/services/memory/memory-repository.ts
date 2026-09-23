@@ -190,7 +190,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       now,
     );
 
-    return { ...snapshot, transactions, clients };
+    return { ...snapshot, automationTasks: snapshot.automationTasks ?? [], transactions, clients };
   }
 
   private audit(input: AuditInput, at: ISODateString): AuditLog {

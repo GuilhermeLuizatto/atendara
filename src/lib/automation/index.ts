@@ -9,4 +9,5 @@ export * from "./appointment-changes";
 export * from "./bridge";
 export * from "./dispatch";
 export * from "./effects";
+export * from "./expiry";
 export * from "./tasks";

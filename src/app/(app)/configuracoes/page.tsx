@@ -10,6 +10,7 @@ import { isPlatformAdmin, MODULE_LABELS } from "@/config/access";
 import { ROLE_LABELS } from "@/config/permissions";
 import { AgendaSettingsForm } from "@/features/settings/agenda-settings-form";
 import { AuditTrail } from "@/features/settings/audit-trail";
+import { AutomationQueue } from "@/features/automation/automation-queue";
 import { NotificationSettings } from "@/features/settings/notification-settings";
 import { ProfessionChange } from "@/features/settings/profession-change";
 import { ServiceCatalog } from "@/features/settings/service-catalog";
@@ -18,7 +19,7 @@ import { formatDate } from "@/lib/utils/format";
 import { useAuth } from "@/providers/auth-provider";
 import { useWorkspace } from "@/providers/workspace-provider";
 
-type Section = "geral" | "servicos" | "avisos" | "whatsapp" | "auditoria";
+type Section = "geral" | "servicos" | "avisos" | "whatsapp" | "auditoria" | "fila";
 
 const ID_BASE = "configuracoes";
 
@@ -37,6 +38,7 @@ export default function SettingsPage() {
     ...(hasCatalog ? [{ value: "servicos" as const, label: "Serviços" }] : []),
     { value: "avisos", label: "Avisos de atendimento" },
     { value: "whatsapp", label: "WhatsApp" },
+    ...(session?.permissions.includes("automationQueue:read") ? [{ value: "fila" as const, label: "Fila de automações" }] : []),
     ...(canReadAudit ? [{ value: "auditoria" as const, label: "Trilha de auditoria" }] : []),
   ];
   // Perder a permissao com a aba aberta nao pode deixar um painel orfao.
@@ -126,6 +128,7 @@ export default function SettingsPage() {
         {active === "whatsapp" ? <WhatsappEmbeddedSignup /> : null}
 
         {active === "auditoria" ? <AuditTrail /> : null}
+        {active === "fila" ? <AutomationQueue /> : null}
       </TabPanel>
     </div>
   );

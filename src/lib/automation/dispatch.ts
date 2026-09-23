@@ -16,10 +16,10 @@ import type {
 } from "@/types";
 
 import { alertEffect, auditEffect, type InternalEffect } from "./effects";
+import { expireWaitingTask } from "./expiry";
 import { outboundBlock, switchRetryAt, type AutomationSwitch } from "./emergency";
 import {
   isLeaseStale,
-  isTaskExpired,
   isTerminalStatus,
   queueEnqueueAt,
   transitionTask,
@@ -135,19 +135,8 @@ export function decideDispatch(input: DispatchInput): DispatchStep {
     return cancel(task, input.delivery, "NO_EXECUTOR", now);
   }
 
-  if (isTaskExpired(task, now)) {
-    const expired = transitionTask(task, "EXPIRED", {
-      at: now,
-      code: "TASK_EXPIRED",
-      patch: { stopReason: "TASK_EXPIRED" },
-    });
-    return {
-      kind: "STOP",
-      task: expired,
-      delivery: cancelledDelivery(input.delivery, now),
-      effects: [auditEffect(expired, now), alertEffect(expired, now)],
-    };
-  }
+  const expired = expireWaitingTask(task, input.delivery, now);
+  if (expired) return { kind: "STOP", ...expired };
 
   if (Date.parse(task.scheduledFor) - DISPATCH_CLOCK_SKEW_SECONDS * 1000 > Date.parse(now)) {
     return { kind: "REQUEUE", task, at: queueEnqueueAt(task, now) };

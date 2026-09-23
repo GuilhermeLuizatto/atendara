@@ -140,3 +140,17 @@ export const AUTOMATION_QUEUE_STOP_LABELS: Record<AutomationQueueStopReason, str
 };
 
 export const AUTOMATION_ALERT_TITLE = "Aviso não enviado";
+
+export const AUTOMATION_STATUS_LABELS: Record<AutomationTaskStatus, string> = {
+  PLANNED: "Planejada",
+  SCHEDULED: "Agendada",
+  DISPATCHING: "Em execução",
+  DISPATCHED: "Aguardando retorno",
+  SUCCEEDED: "Concluída",
+  FAILED: "Falhou",
+  CANCELLED: "Cancelada",
+  EXPIRED: "Vencida",
+};
+
+/** Lotes limitados evitam uma execução longa bloquear as próximas verificações. */
+export const AUTOMATION_EXPIRY_SCAN = { schedule: "every 5 minutes", batchSize: 100, maxBatches: 10 } as const;

@@ -31,7 +31,7 @@ organizations/{orgId}
 ├── aiDecisions/{decisionId}             append-only
 ├── notifications/{notificationId}       alertas DENTRO do painel
 ├── notificationDeliveries/{deliveryId}  fila de saida dos avisos ao cliente (so backend escreve)
-├── automationTasks/{taskId}             fila de automacao (so backend le e escreve)
+├── automationTasks/{taskId}             fila de automacao (painel autorizado le; so backend escreve)
 ├── auditLogs/{logId}                    append-only (so o backend pseudonimiza)
 └── privacyRequests/{requestId}          pedidos de titulares atendidos (so backend)
 

@@ -788,3 +788,28 @@ recebida e nao transforma aceite em entrega. Por isso: so as rotas de webhook
 expostas, editor fora da internet publica, administrador com segundo fator,
 execucao bem-sucedida nao guardada e revogacao dos tokens como corte de
 emergencia. A automacao acrescenta duas rotas HTTP publicas ao produto.
+
+### Painel operacional e vencimento independente da fila
+
+Em Configurações → Fila de automações, OWNER, ADMIN e PROFESSIONAL com módulo
+agenda consultam `automationTasks`. O snapshot vem por páginas de 100 registros,
+ordenados pela criação; filtros e indicadores descrevem somente a amostra
+carregada. Nenhum controle da tela escreve na fila ou repete um envio. Falhas
+na leitura aparecem como indisponibilidade, não como uma fila vazia.
+
+`expireAutomationTasksEveryFiveMinutes` roda a cada cinco minutos com a conta
+`automacao`. A consulta de grupo usa o índice `status + expiresAt` e só encontra
+PLANNED/SCHEDULED vencidas. Cada transação relê tarefa e organização, recusa
+organização ausente/em exclusão, encerra a tarefa e grava entrega cancelada,
+alerta DASHBOARD e auditoria juntos. Execuções concorrentes são idempotentes.
+A rotina processa até 1.000 tarefas por ciclo em lotes de 100; ao atingir o teto,
+registra aviso de acúmulo. Falhas por documento são reportadas e repetidas.
+
+DISPATCHING e DISPATCHED não viram EXPIRED: um envio em curso pode ter saído.
+O painel destaca execução interrompida e retorno após a validade sem inventar
+um resultado ou reenviar. O acompanhamento desses retornos continua dependendo
+do despachante/callback e da conferência operacional.
+
+Publicação: aguardar o índice pronto e publicar a nova function separadamente.
+O fluxo atual de Hosting não publica functions; atualizar apenas a interface
+não ativa o agendamento. Este recurso independe da publicação do app na Meta.

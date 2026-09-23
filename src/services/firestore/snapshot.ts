@@ -9,6 +9,7 @@ import type {
   AIRule,
   Appointment,
   AuditLog,
+  AutomationTask,
   Client,
   Conversation,
   ID,
@@ -41,6 +42,7 @@ export interface SnapshotParts {
   aiDecisions: AIDecision[];
   notifications: Notification[];
   notificationDeliveries: NotificationDelivery[];
+  automationTasks: AutomationTask[];
   auditLogs: AuditLog[];
 }
 
@@ -59,6 +61,7 @@ export function emptyParts(): SnapshotParts {
     aiDecisions: [],
     notifications: [],
     notificationDeliveries: [],
+    automationTasks: [],
     auditLogs: [],
   };
 }
@@ -135,6 +138,7 @@ export function assembleSnapshot(
     decisions: parts.aiDecisions,
     notifications: parts.notifications,
     notificationDeliveries: parts.notificationDeliveries,
+    automationTasks: parts.automationTasks,
     auditLogs: parts.auditLogs,
     membership: parts.membership,
     pagination,

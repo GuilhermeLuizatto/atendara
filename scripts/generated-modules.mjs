@@ -68,6 +68,7 @@ export const SOURCES = [
   ["src/lib/notifications/providers/n8n-bridge.ts", "notifications-providers-n8n-bridge"],
   ["src/lib/notifications/providers/types.ts", "notifications-providers-types"],
   ["src/lib/automation/index.ts", "automation"],
+  ["src/lib/automation/expiry.ts", "automation-expiry"],
   ["src/lib/automation/appointment-changes.ts", "automation-appointment-changes"],
   ["src/lib/automation/bridge.ts", "automation-bridge"],
   ["src/lib/automation/emergency.ts", "automation-emergency"],

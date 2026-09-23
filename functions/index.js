@@ -138,6 +138,7 @@ export {
 // executa no horario, conferindo as travas de novo. O navegador so le a fila.
 export { planAppointmentNotices, dispatchAutomationTask } from "./automation.js";
 export { automationCallback } from "./automation-callback.js";
+export { expireAutomationTasksEveryFiveMinutes } from "./automation-expiry.js";
 export { registerMessagingSender } from "./messaging-senders.js";
 export { inboundWebhook } from "./inbound.js";
 export { previewAI } from "./ai-preview.js";

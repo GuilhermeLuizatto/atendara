@@ -304,7 +304,11 @@ tenants reais, fica para a continuação da Fase 4.
    tenant, classificação, escalonamento e opt-out.
 3. Colocar o n8n em ambiente HTTPS controlado, com rotação dos segredos e
    monitoramento antes de qualquer piloto.
-4. Implementar o painel operacional da fila e os alertas de tarefa vencida.
+4. Painel operacional implementado em **Configurações → Fila de automações**:
+   filtros, tentativas, histórico e indicação de tarefas que precisam de atenção.
+   A rotina de vencimento gera alerta interno e auditoria sem depender do executor.
+   Para ativá-la, publicar o índice de `automationTasks` e a function
+   `expireAutomationTasksEveryFiveMinutes`; validar em ambiente de teste antes do piloto.
 5. Avaliar remarcação e Google Calendar como frentes independentes, sem esperar
    o domínio. O domínio entra quando a frente de e-mail for iniciada.
 6. Depois do piloto, priorizar equipes, importação de dados administrativos e

@@ -9,6 +9,7 @@ import type {
   AppointmentStatus,
   AuditAction,
   AuditLog,
+  AutomationTask,
   Client,
   Conversation,
   ID,
@@ -39,6 +40,7 @@ export type WorkspaceCollection =
   | "decisions"
   | "notifications"
   | "notificationDeliveries"
+  | "automationTasks"
   | "auditLogs";
 
 export interface CollectionPage {
@@ -93,6 +95,8 @@ export interface WorkspaceSnapshot {
   notifications: Notification[];
   /** Fila de saida dos avisos ao cliente. Vazia enquanto nada for configurado. */
   notificationDeliveries: NotificationDelivery[];
+  /** Histórico da fila, somente leitura; pode estar paginado. */
+  automationTasks: AutomationTask[];
   auditLogs: AuditLog[];
   /**
    * Vinculo de quem usa o painel, lido de `members/{uid}` — o mesmo documento

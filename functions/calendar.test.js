@@ -1,19 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/**
- * A conexao com a agenda externa (13.7), sem emulador e sem rede.
- *
- * O que estes testes protegem: o token de atualizacao nunca sai em resposta,
- * `code` devolvido por outra pessoa nao vira conexao de ninguem, desconectar
- * apaga o material cifrado mesmo quando o Google falha, e o que volta do Google
- * entra so como faixa de tempo.
- */
-
 const store = vi.hoisted(() => new Map());
-const rede = vi.hoisted(() => ({ calls: [], responses: [] }));
-
+const network = vi.hoisted(() => ({ calls: [], responses: [] }));
 vi.mock("firebase-admin/app", () => ({ initializeApp: vi.fn() }));
-vi.mock("firebase-functions/logger", () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
+vi.mock("firebase-functions/logger", () => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
 vi.mock("firebase-functions/v2/https", () => ({
   onCall: (options, handler) => Object.assign(handler, { options }),
   onRequest: (options, handler) => Object.assign(handler, { options }),
@@ -25,19 +19,19 @@ vi.mock("firebase-functions/v2/https", () => ({
   },
 }));
 vi.mock("firebase-admin/firestore", () => {
-  const snapshot = (path) => ({ id: path.split("/").pop(), exists: store.has(path), data: () => store.get(path) });
+  const snapshot = (path) => ({
+    id: path.split("/").pop(),
+    exists: store.has(path),
+    data: () => store.get(path),
+  });
   return {
     getFirestore: () => ({
-      doc: (path) => ({
-        path,
-        get: async () => snapshot(path),
-        set: async (data) => store.set(path, data),
-      }),
+      doc: (path) => ({ path, get: async () => snapshot(path) }),
       runTransaction: async (callback) =>
         callback({
           get: async (ref) => snapshot(ref.path),
           set: (ref, data) => store.set(ref.path, data),
-          create: (ref, data) => store.set(ref.path, data),
+          delete: (ref) => store.delete(ref.path),
         }),
     }),
     Timestamp: class Timestamp {
@@ -50,227 +44,442 @@ vi.mock("firebase-admin/firestore", () => {
       toDate() {
         return this.date;
       }
-      toMillis() {
-        return this.date.getTime();
-      }
     },
   };
 });
 vi.mock("./rate-limit.js", () => ({ consumeRateLimit: vi.fn(async () => {}) }));
 vi.mock("./kms.js", () => ({
-  encryptSecret: vi.fn(async (texto) => `cifrado(${texto})`),
-  decryptSecret: vi.fn(async (texto) => String(texto).replace(/^cifrado\((.*)\)$/, "$1")),
+  encryptSecret: vi.fn(async (value) => `cipher(${value})`),
+  decryptSecret: vi.fn(async (value) =>
+    String(value).replace(/^cipher\((.*)\)$/, "$1"),
+  ),
 }));
 
-const calendario = await import("./calendar.js");
+const calendar = await import("./calendar.js");
 const { paths } = await import("./generated/paths.js");
-const { BRIDGE_SIGNATURE_HEADER, BRIDGE_TIMESTAMP_HEADER } = await import("./generated/automation-bridge.js");
-const { signBridgeMessage } = await import("./n8n-bridge.js");
-
-const ORG = "org-clinica";
-const PROFISSIONAL = "profissional-1";
-const ESTADO = "segredo-do-estado";
-const PONTE = "segredo-da-ponte";
-
-beforeEach(() => {
-  store.clear();
-  rede.calls = [];
-  rede.responses = [];
-  process.env.CALENDAR_STATE_SECRET = ESTADO;
-  process.env.GOOGLE_OAUTH_CLIENT_SECRET = "segredo-do-app";
-  process.env.GOOGLE_OAUTH_CLIENT_ID = "id-do-app.apps.googleusercontent.com";
-  process.env.CALENDAR_REDIRECT_URL = "https://southamerica-east1-atendo-a3481.cloudfunctions.net/googleOAuthCallback";
-  process.env.N8N_CALLBACK_SECRET = PONTE;
-  store.set(paths.account(PROFISSIONAL), { id: PROFISSIONAL, organizationId: ORG, status: "ACTIVE" });
-  vi.stubGlobal("fetch", async (url, init) => {
-    rede.calls.push({ url: String(url), init });
-    const resposta = rede.responses.shift() ?? { ok: true, body: {} };
-    return { ok: resposta.ok, status: resposta.ok ? 200 : 400, json: async () => resposta.body, text: async () => "" };
-  });
-});
-
-function chamada(uid, data) {
-  return { auth: { uid, token: { firebase: { sign_in_provider: "password" } } }, data };
-}
-
-function resposta() {
-  const enviado = { status: null, body: null };
+const { GOOGLE_CALENDAR_SCOPES } =
+  await import("./generated/calendar-config.js");
+const { fromStored } = await import("./firestore-dates.js");
+const ORG = "org-calendar";
+const USER = "user-owner";
+const PROFILE = "profile-not-the-uid";
+const SECRET = "state-secret-for-tests";
+const connectionPath = paths.document(ORG, "calendarConnections", PROFILE);
+const busyPath = paths.document(ORG, "calendarBusyBlocks", PROFILE);
+const call = () => ({ auth: { uid: USER }, data: { professionalId: PROFILE } });
+const validTokens = {
+  refresh_token: "private-refresh",
+  access_token: "private-access",
+  scope: GOOGLE_CALENDAR_SCOPES.join(" "),
+};
+const freeBusy = {
+  calendars: {
+    primary: {
+      busy: [
+        {
+          start: "2026-09-25T12:00:00Z",
+          end: "2026-09-25T13:00:00Z",
+          summary: "Private event",
+          attendees: ["private@example.test"],
+        },
+      ],
+    },
+  },
+};
+function response() {
   return {
-    enviado,
+    code: null,
+    body: null,
     status(code) {
-      enviado.status = code;
+      this.code = code;
       return this;
     },
     send(body) {
-      enviado.body = body;
+      this.body = body;
       return this;
     },
     json(body) {
-      enviado.body = body;
+      this.body = body;
       return this;
     },
   };
 }
-
-describe("pedir para conectar", () => {
-  it("devolve o endereco do Google com os escopos minimos e o estado assinado", async () => {
-    const { url } = await calendario.startCalendarConnection(chamada(PROFISSIONAL, { professionalId: PROFISSIONAL }));
-    const endereco = new URL(url);
-
-    expect(endereco.origin + endereco.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
-    expect(endereco.searchParams.get("scope")).toBe(
-      "https://www.googleapis.com/auth/calendar.app.created https://www.googleapis.com/auth/calendar.freebusy",
-    );
-    expect(endereco.searchParams.get("access_type")).toBe("offline");
-    expect(calendario.readState(ESTADO, endereco.searchParams.get("state"))).toMatchObject({
-      organizationId: ORG,
-      professionalId: PROFISSIONAL,
-    });
-  });
-
-  it("ninguem conecta a agenda de outra pessoa", async () => {
-    await expect(
-      calendario.startCalendarConnection(chamada(PROFISSIONAL, { professionalId: "outra-pessoa" })),
-    ).rejects.toMatchObject({ code: "permission-denied" });
-  });
-
-  it("estado assinado vence, e estado adulterado nao vale", () => {
-    const estado = calendario.signState(ESTADO, { organizationId: ORG, professionalId: PROFISSIONAL, at: Date.now() });
-
-    expect(calendario.readState(ESTADO, estado)).toBeTruthy();
-    expect(calendario.readState("outro-segredo", estado)).toBeNull();
-    expect(calendario.readState(ESTADO, estado, Date.now() + 20 * 60_000)).toBeNull();
-    expect(calendario.readState(ESTADO, `${estado}x`)).toBeNull();
-    expect(calendario.readState(ESTADO, undefined)).toBeNull();
-  });
-});
-
-describe("a volta do Google", () => {
-  function pedido(query) {
-    return { method: "GET", query };
-  }
-
-  it("code com estado valido vira conexao, com o token cifrado — e so cifrado", async () => {
-    const estado = calendario.signState(ESTADO, { organizationId: ORG, professionalId: PROFISSIONAL, at: Date.now() });
-    rede.responses = [{ ok: true, body: { refresh_token: "token-de-atualizacao", access_token: "curto" } }];
-    const res = resposta();
-
-    await calendario.googleOAuthCallback(pedido({ state: estado, code: "codigo-do-google" }), res);
-
-    expect(res.enviado.status).toBe(200);
-    const conexao = store.get(paths.document(ORG, "calendarConnections", PROFISSIONAL));
-    expect(conexao.status).toBe("CONNECTED");
-    expect(conexao.refreshTokenCiphertext).toBe("cifrado(token-de-atualizacao)");
-    // O valor claro nao foi gravado em lugar nenhum.
-    expect(JSON.stringify([...store.values()])).not.toContain('"token-de-atualizacao"');
-  });
-
-  it("estado invalido nao vira conexao de ninguem", async () => {
-    const res = resposta();
-    await calendario.googleOAuthCallback(pedido({ state: "forjado", code: "codigo" }), res);
-
-    expect(res.enviado.status).toBe(400);
-    expect(store.get(paths.document(ORG, "calendarConnections", PROFISSIONAL))).toBeUndefined();
-  });
-
-  it("sem token de atualizacao nao ha conexao: uma hora de agenda e um silencio depois", async () => {
-    const estado = calendario.signState(ESTADO, { organizationId: ORG, professionalId: PROFISSIONAL, at: Date.now() });
-    rede.responses = [{ ok: true, body: { access_token: "curto" } }];
-    const res = resposta();
-
-    await calendario.googleOAuthCallback(pedido({ state: estado, code: "codigo" }), res);
-
-    expect(res.enviado.status).toBe(400);
-    expect(store.get(paths.document(ORG, "calendarConnections", PROFISSIONAL))).toBeUndefined();
-  });
-});
-
-describe("desconectar", () => {
-  beforeEach(() => {
-    store.set(paths.document(ORG, "calendarConnections", PROFISSIONAL), {
-      id: PROFISSIONAL,
-      organizationId: ORG,
-      professionalId: PROFISSIONAL,
-      provider: "GOOGLE",
-      status: "CONNECTED",
-      refreshTokenCiphertext: "cifrado(token-de-atualizacao)",
-      scopes: [],
-      calendarId: "agenda-atendara",
-      lastSyncAt: null,
-      lastError: null,
-    });
-  });
-
-  it("revoga no Google e apaga o material cifrado", async () => {
-    await calendario.disconnectCalendar(chamada(PROFISSIONAL, { professionalId: PROFISSIONAL }));
-
-    const conexao = store.get(paths.document(ORG, "calendarConnections", PROFISSIONAL));
-    expect(conexao.status).toBe("REVOKED");
-    expect(conexao.refreshTokenCiphertext).toBeNull();
-    expect(conexao.calendarId).toBeNull();
-    expect(rede.calls.some((call) => call.url.includes("oauth2.googleapis.com/revoke"))).toBe(true);
-  });
-
-  it("Google fora do ar nao impede o apagamento — o que nao pode sobrar e o material", async () => {
-    vi.stubGlobal("fetch", async () => {
-      throw new Error("ECONNREFUSED");
-    });
-
-    await calendario.disconnectCalendar(chamada(PROFISSIONAL, { professionalId: PROFISSIONAL }));
-
-    expect(store.get(paths.document(ORG, "calendarConnections", PROFISSIONAL)).refreshTokenCiphertext).toBeNull();
-  });
-
-  it("ninguem desconecta a agenda de outra pessoa", async () => {
-    await expect(
-      calendario.disconnectCalendar(chamada(PROFISSIONAL, { professionalId: "outra-pessoa" })),
-    ).rejects.toMatchObject({ code: "permission-denied" });
-  });
-});
-
-describe("o ocupado que volta pelo n8n", () => {
-  function pedido(corpo, { secret = PONTE, timestamp = new Date().toISOString() } = {}) {
-    const headers = {
-      [BRIDGE_TIMESTAMP_HEADER]: timestamp,
-      [BRIDGE_SIGNATURE_HEADER]: signBridgeMessage(secret, timestamp, corpo),
-    };
-    return { method: "POST", rawBody: Buffer.from(corpo, "utf8"), get: (nome) => headers[nome.toLowerCase()] };
-  }
-
-  const corpo = JSON.stringify({
+async function begin() {
+  return new URL(
+    (await calendar.startCalendarConnection(call())).url,
+  ).searchParams.get("state");
+}
+async function callback(state, code = "google-code") {
+  const result = response();
+  await calendar.googleOAuthCallback(
+    { method: "GET", query: { state, code } },
+    result,
+  );
+  return result;
+}
+function seedConnected() {
+  store.set(connectionPath, {
+    id: PROFILE,
     organizationId: ORG,
-    professionalId: PROFISSIONAL,
-    freeBusy: {
-      calendars: {
-        primary: {
-          busy: [{ start: "2026-09-25T12:00:00Z", end: "2026-09-25T13:00:00Z", summary: "Dentista", attendees: ["x@y.com"] }],
+    professionalId: PROFILE,
+    status: "CONNECTED",
+    generation: "generation-1",
+    refreshTokenCiphertext: "cipher(private-refresh)",
+    scopes: GOOGLE_CALENDAR_SCOPES,
+    lastError: null,
+  });
+}
+function queueBusy(body = freeBusy) {
+  network.responses.push(
+    { ok: true, body: { access_token: "private-access" } },
+    { ok: true, body },
+  );
+}
+beforeEach(() => {
+  store.clear();
+  network.calls = [];
+  network.responses = [];
+  process.env.CALENDAR_STATE_SECRET = SECRET;
+  process.env.GOOGLE_OAUTH_CLIENT_SECRET = "test-client-secret";
+  process.env.GOOGLE_OAUTH_CLIENT_ID = "test-client.apps.googleusercontent.com";
+  process.env.CALENDAR_REDIRECT_URL =
+    "https://example.test/googleOAuthCallback";
+  process.env.CALENDAR_KMS_KEY = "test-key";
+  store.set(paths.account(USER), {
+    organizationId: ORG,
+    status: "ACTIVE",
+    platformRole: "PROFESSIONAL",
+    professionId: "psychologist",
+    subscriptionStatus: "ACTIVE",
+    accessUntil: "2099-01-01T00:00:00Z",
+    modules: ["agenda"],
+    mustChangePassword: false,
+  });
+  store.set(paths.organization(ORG), { ownerId: USER });
+  store.set(paths.document(ORG, "members", USER), {
+    status: "ACTIVE",
+    role: "PROFESSIONAL",
+  });
+  store.set(paths.document(ORG, "professionals", PROFILE), {
+    userId: USER,
+    active: true,
+  });
+  vi.stubGlobal("fetch", async (url, init) => {
+    network.calls.push({ url: String(url), init });
+    const next = network.responses.shift() ?? { ok: true, body: {} };
+    if (next.before) await next.before();
+    return {
+      ok: next.ok,
+      status: next.status ?? (next.ok ? 200 : 400),
+      json: async () => next.body,
+    };
+  });
+});
+
+describe("autorização própria e estado OAuth", () => {
+  it("pede apenas livre/ocupado e identifica o perfil vinculado, mesmo com ID diferente do usuário", async () => {
+    const url = new URL((await calendar.startCalendarConnection(call())).url);
+    expect(url.origin).toBe("https://accounts.google.com");
+    expect(url.searchParams.get("scope")).toBe(
+      "https://www.googleapis.com/auth/calendar.freebusy",
+    );
+    expect(url.searchParams.get("access_type")).toBe("offline");
+    expect(
+      calendar.readState(SECRET, url.searchParams.get("state")),
+    ).toMatchObject({
+      organizationId: ORG,
+      professionalId: PROFILE,
+      userId: USER,
+    });
+    expect(store.get(connectionPath).pendingOAuth.claimed).toBe(false);
+  });
+  it.each([
+    [
+      "conta vencida",
+      () =>
+        Object.assign(store.get(paths.account(USER)), {
+          accessUntil: "2000-01-01",
+        }),
+    ],
+    [
+      "sem agenda",
+      () => Object.assign(store.get(paths.account(USER)), { modules: [] }),
+    ],
+    [
+      "troca obrigatória de senha",
+      () =>
+        Object.assign(store.get(paths.account(USER)), {
+          mustChangePassword: true,
+        }),
+    ],
+    [
+      "operadora",
+      () =>
+        Object.assign(store.get(paths.account(USER)), {
+          platformRole: "PLATFORM_ADMIN",
+        }),
+    ],
+    ["sem organização", () => store.delete(paths.organization(ORG))],
+    [
+      "membro inativo",
+      () =>
+        Object.assign(store.get(paths.document(ORG, "members", USER)), {
+          status: "INACTIVE",
+        }),
+    ],
+    [
+      "perfil alheio",
+      () =>
+        Object.assign(
+          store.get(paths.document(ORG, "professionals", PROFILE)),
+          { userId: "another-user" },
+        ),
+    ],
+    [
+      "outro tenant",
+      () =>
+        Object.assign(store.get(paths.account(USER)), {
+          organizationId: "another-org",
+        }),
+    ],
+  ])(
+    "recusa %s para conectar, consultar e atualizar",
+    async (_label, change) => {
+      change();
+      for (const handler of [
+        calendar.startCalendarConnection,
+        calendar.getCalendarConnection,
+        calendar.refreshCalendarBusy,
+      ]) {
+        await expect(handler(call())).rejects.toMatchObject({
+          code: "permission-denied",
+        });
+      }
+      expect(network.calls).toHaveLength(0);
+    },
+  );
+  it("recusa estado adulterado, futuro, vencido, incompleto, caminho e segmentos extras", async () => {
+    const state = await begin();
+    const payload = calendar.readState(SECRET, state);
+    expect(calendar.readState("wrong", state)).toBeNull();
+    expect(calendar.readState(SECRET, `${state}.extra`)).toBeNull();
+    expect(
+      calendar.readState(SECRET, `${state.split(".")[0]}.é`.repeat(43)),
+    ).toBeNull();
+    expect(calendar.readState(SECRET, state, payload.at + 600_000)).toBeNull();
+    for (const patch of [
+      { at: Date.now() + 60_000 },
+      { nonce: undefined },
+      { professionalId: "a/b" },
+    ]) {
+      expect(
+        calendar.readState(
+          SECRET,
+          calendar.signState(SECRET, { ...payload, ...patch }),
+        ),
+      ).toBeNull();
+    }
+  });
+});
+
+describe("retorno Google", () => {
+  it("cifra a credencial, rejeita repetição e só devolve campos públicos na consulta", async () => {
+    const state = await begin();
+    network.responses.push({ ok: true, body: validTokens });
+    expect((await callback(state)).code).toBe(200);
+    expect(store.get(connectionPath).refreshTokenCiphertext).toBe(
+      "cipher(private-refresh)",
+    );
+    expect(JSON.stringify([...store.values()])).not.toContain(
+      '"private-refresh"',
+    );
+    const publicData = await calendar.getCalendarConnection(call());
+    expect(publicData.status).toBe("CONNECTED");
+    expect(JSON.stringify(publicData)).not.toMatch(
+      /cipher|private|nonce|pendingOAuth|generation/,
+    );
+    expect((await callback(state)).code).toBe(400);
+    expect(network.calls).toHaveLength(1);
+  });
+  it("uma segunda tentativa invalida a primeira e cancelar consome o estado", async () => {
+    const first = await begin();
+    const second = await begin();
+    expect((await callback(first)).code).toBe(400);
+    expect((await callback(second, null)).code).toBe(400);
+    expect((await callback(second)).code).toBe(400);
+    expect(network.calls).toHaveLength(0);
+  });
+  it.each([
+    { access_token: "short", scope: GOOGLE_CALENDAR_SCOPES.join(" ") },
+    { refresh_token: "private-refresh", scope: "unrelated" },
+    { refresh_token: "private-refresh" },
+  ])("não conecta sem refresh token e escopo concedido: %j", async (body) => {
+    const state = await begin();
+    network.responses.push({ ok: true, body });
+    expect((await callback(state)).code).toBe(400);
+    expect(store.get(connectionPath).status).toBe("REVOKED");
+  });
+  it("perder o vínculo enquanto a troca de token está em voo impede salvar a conexão", async () => {
+    const state = await begin();
+    network.responses.push({
+      ok: true,
+      body: validTokens,
+      before: () => store.delete(paths.document(ORG, "members", USER)),
+    });
+    expect((await callback(state)).code).toBe(400);
+    expect(store.get(connectionPath).refreshTokenCiphertext).toBeUndefined();
+  });
+  it("desconectar durante OAuth invalida o retorno em voo", async () => {
+    const state = await begin();
+    network.responses.push({
+      ok: true,
+      body: validTokens,
+      before: () => calendar.disconnectCalendar(call()),
+    });
+    expect((await callback(state)).code).toBe(400);
+    expect(store.get(connectionPath).status).toBe("REVOKED");
+    expect(store.get(connectionPath).refreshTokenCiphertext).toBeNull();
+  });
+});
+
+describe("consulta manual e desconexão", () => {
+  beforeEach(seedConnected);
+  it("conexão anterior ao contrato atual exige nova autorização e não expõe ocupado legado", async () => {
+    delete store.get(connectionPath).generation;
+    store.set(busyPath, { blocks: [], readAt: new Date().toISOString() });
+    expect(await calendar.getCalendarConnection(call())).toMatchObject({ status: "ERROR", lastError: "RECONNECT_REQUIRED", snapshot: null });
+  });
+  it("consulta só primary por 30 dias, grava faixas e não devolve tokens", async () => {
+    queueBusy();
+    expect(await calendar.refreshCalendarBusy(call())).toEqual({ blocks: 1 });
+    const request = JSON.parse(network.calls[1].init.body);
+    expect(request.items).toEqual([{ id: "primary" }]);
+    expect(Date.parse(request.timeMax) - Date.parse(request.timeMin)).toBe(
+      30 * 86_400_000,
+    );
+    expect(
+      network.calls.every(({ init }) => init.signal instanceof AbortSignal),
+    ).toBe(true);
+    const publicData = await calendar.getCalendarConnection(call());
+    expect(publicData.snapshot.blocks).toEqual([
+      {
+        startsAt: "2026-09-25T12:00:00.000Z",
+        endsAt: "2026-09-25T13:00:00.000Z",
+      },
+    ]);
+    expect(JSON.stringify(publicData)).not.toMatch(
+      /Private|example.test|private-access|private-refresh/,
+    );
+  });
+  it("agenda livre é uma leitura bem-sucedida com zero intervalos", async () => {
+    queueBusy({ calendars: { primary: { busy: [] } } });
+    expect(await calendar.refreshCalendarBusy(call())).toEqual({ blocks: 0 });
+    expect(
+      (await calendar.getCalendarConnection(call())).snapshot.blocks,
+    ).toEqual([]);
+  });
+  it.each([
+    {},
+    { calendars: {} },
+    { calendars: { primary: { errors: [{ reason: "notFound" }], busy: [] } } },
+    {
+      calendars: { primary: { busy: [{ start: "invalid", end: "invalid" }] } },
+    },
+  ])(
+    "falha parcial não vira agenda livre nem atualiza leitura anterior: %j",
+    async (body) => {
+      queueBusy();
+      await calendar.refreshCalendarBusy(call());
+      const previous = store.get(busyPath);
+      queueBusy(body);
+      await expect(calendar.refreshCalendarBusy(call())).rejects.toMatchObject({
+        code: "unavailable",
+      });
+      expect(store.get(busyPath)).toEqual(previous);
+      expect((await calendar.getCalendarConnection(call())).lastError).toBe(
+        "UNAVAILABLE",
+      );
+    },
+  );
+  it("invalid_grant exige reconexão", async () => {
+    network.responses.push({ ok: false, body: { error: "invalid_grant" } });
+    await expect(calendar.refreshCalendarBusy(call())).rejects.toMatchObject({
+      code: "unavailable",
+    });
+    expect(store.get(connectionPath)).toMatchObject({
+      status: "ERROR",
+      lastError: "RECONNECT_REQUIRED",
+    });
+  });
+  it("uma leitura atrasada não vence uma consulta mais recente", async () => {
+    network.responses.push(
+      { ok: true, body: { access_token: "short" } },
+      {
+        ok: true,
+        body: freeBusy,
+        before: async () => {
+          queueBusy({ calendars: { primary: { busy: [] } } });
+          await calendar.refreshCalendarBusy(call());
         },
       },
-    },
+    );
+    await expect(calendar.refreshCalendarBusy(call())).rejects.toMatchObject({
+      code: "aborted",
+    });
+    expect(store.get(busyPath).blocks).toEqual([]);
   });
-
-  it("grava so faixa de tempo: titulo e convidado nao entram", async () => {
-    const res = resposta();
-    await calendario.calendarBusyCallback(pedido(corpo), res);
-
-    expect(res.enviado).toMatchObject({ status: 200, body: { blocks: 1 } });
-    const gravado = store.get(paths.document(ORG, "calendarBusyBlocks", PROFISSIONAL));
-    expect(gravado.blocks).toHaveLength(1);
-    expect(JSON.stringify(gravado)).not.toContain("Dentista");
-    expect(JSON.stringify(gravado)).not.toContain("y.com");
+  it("desconectar durante consulta impede recolocar horários no banco", async () => {
+    network.responses.push(
+      { ok: true, body: { access_token: "short" } },
+      {
+        ok: true,
+        body: freeBusy,
+        before: () => calendar.disconnectCalendar(call()),
+      },
+    );
+    await expect(calendar.refreshCalendarBusy(call())).rejects.toMatchObject({
+      code: "aborted",
+    });
+    expect(store.has(busyPath)).toBe(false);
+    expect(store.get(connectionPath).status).toBe("REVOKED");
   });
-
-  it("sem a assinatura do n8n nao grava nada", async () => {
-    const res = resposta();
-    await calendario.calendarBusyCallback(pedido(corpo, { secret: "errado" }), res);
-
-    expect(res.enviado.status).toBe(401);
-    expect(store.get(paths.document(ORG, "calendarBusyBlocks", PROFISSIONAL))).toBeUndefined();
+  it("remove ocupado e credencial mesmo sem Google; assinatura vencida permite desconectar", async () => {
+    store.set(busyPath, { blocks: [] });
+    Object.assign(store.get(paths.account(USER)), {
+      accessUntil: "2000-01-01",
+    });
+    vi.stubGlobal("fetch", async () => {
+      throw new Error("offline with private token");
+    });
+    expect(await calendar.disconnectCalendar(call())).toEqual({
+      status: "REVOKED",
+      revokedAtGoogle: false,
+    });
+    expect(store.has(busyPath)).toBe(false);
+    expect(store.get(connectionPath)).toMatchObject({
+      refreshTokenCiphertext: null,
+      pendingOAuth: null,
+      pendingRead: null,
+    });
   });
-
-  it("corpo sem organizacao ou sem profissional e recusado", async () => {
-    const res = resposta();
-    await calendario.calendarBusyCallback(pedido(JSON.stringify({ freeBusy: {} })), res);
-    expect(res.enviado.status).toBe(400);
+  it("reconectar apaga a leitura da conta anterior", async () => {
+    queueBusy();
+    await calendar.refreshCalendarBusy(call());
+    const previous = fromStored(
+      "calendarConnections",
+      PROFILE,
+      store.get(connectionPath),
+    );
+    const state = await begin();
+    network.responses.push({ ok: true, body: validTokens });
+    expect((await callback(state)).code).toBe(200);
+    expect(store.get(connectionPath).generation).not.toBe(previous.generation);
+    expect(store.has(busyPath)).toBe(false);
+  });
+  it("rota legada não aceita ocupado sem pedido correlacionado", async () => {
+    const result = response();
+    await calendar.calendarBusyCallback({}, result);
+    expect(result.code).toBe(410);
+    expect(store.has(busyPath)).toBe(false);
   });
 });

@@ -83,5 +83,19 @@ export function parseBusyBlocks(data) {
 export function isBusySnapshotFresh(readAt, now) {
     if (!readAt)
         return false;
-    return Date.parse(now) - Date.parse(readAt) <= CALENDAR_BUSY_STALE_MINUTES * 60_000;
+    const age = Date.parse(now) - Date.parse(readAt);
+    return age >= 0 && age <= CALENDAR_BUSY_STALE_MINUTES * 60_000;
+}
+/** Erro parcial do Google não é prova de agenda livre. */
+export function parsePrimaryBusy(data) {
+    if (!data || typeof data !== "object")
+        return null;
+    const calendars = data.calendars;
+    const primary = calendars?.primary;
+    if (!primary || (primary.errors !== undefined && (!Array.isArray(primary.errors) || primary.errors.length > 0)))
+        return null;
+    if (!Array.isArray(primary.busy))
+        return null;
+    const blocks = parseBusyBlocks({ calendars: { primary } });
+    return blocks.length === primary.busy.length ? blocks : null;
 }

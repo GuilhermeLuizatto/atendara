@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { CALENDAR_BUSY_STALE_MINUTES, GOOGLE_CALENDAR_SCOPES } from "@/config/calendar";
 import type { Appointment } from "@/types";
 
-import { calendarEventFor, decideCalendarSync, isBusySnapshotFresh, parseBusyBlocks } from "./calendar";
+import { calendarEventFor, decideCalendarSync, isBusySnapshotFresh, parseBusyBlocks, parsePrimaryBusy } from "./calendar";
 
 const ATENDIMENTO: Pick<Appointment, "startsAt" | "endsAt" | "clientName" | "status"> = {
   startsAt: "2026-09-25T13:00:00.000Z",
@@ -40,9 +40,8 @@ describe("o que o evento pode dizer", () => {
     }
   });
 
-  it("os escopos sao os dois mais fechados que resolvem o problema", () => {
+  it("a consulta manual pede apenas livre/ocupado", () => {
     expect(GOOGLE_CALENDAR_SCOPES).toEqual([
-      "https://www.googleapis.com/auth/calendar.app.created",
       "https://www.googleapis.com/auth/calendar.freebusy",
     ]);
     // Pedir `calendar` inteiro seria pedir a agenda pessoal de quem atende.
@@ -128,5 +127,22 @@ describe("o ocupado lido ainda serve?", () => {
     expect(isBusySnapshotFresh(recente, agora)).toBe(true);
     expect(isBusySnapshotFresh(velha, agora)).toBe(false);
     expect(isBusySnapshotFresh(null, agora)).toBe(false);
+    expect(isBusySnapshotFresh("2026-09-26T12:00:00Z", agora)).toBe(false);
+    expect(isBusySnapshotFresh("inválida", agora)).toBe(false);
+  });
+});
+
+describe("consulta completa da agenda principal", () => {
+  it("distingue agenda vazia de resposta ausente ou com erro parcial", () => {
+    expect(parsePrimaryBusy({ calendars: { primary: { busy: [] } } })).toEqual([]);
+    for (const value of [null, {}, { calendars: {} }, { calendars: { primary: { busy: [], errors: [{ reason: "notFound" }] } } }]) {
+      expect(parsePrimaryBusy(value)).toBeNull();
+    }
+  });
+  it("um único intervalo inválido invalida toda a leitura", () => {
+    expect(parsePrimaryBusy({ calendars: { primary: { busy: [
+      { start: "2026-09-25T12:00:00Z", end: "2026-09-25T13:00:00Z" },
+      { start: "inválido", end: "inválido" },
+    ] } } })).toBeNull();
   });
 });

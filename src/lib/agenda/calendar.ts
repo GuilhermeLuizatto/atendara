@@ -120,5 +120,17 @@ export function parseBusyBlocks(data: unknown): BusyBlock[] {
  */
 export function isBusySnapshotFresh(readAt: ISODateString | null, now: ISODateString): boolean {
   if (!readAt) return false;
-  return Date.parse(now) - Date.parse(readAt) <= CALENDAR_BUSY_STALE_MINUTES * 60_000;
+  const age = Date.parse(now) - Date.parse(readAt);
+  return age >= 0 && age <= CALENDAR_BUSY_STALE_MINUTES * 60_000;
+}
+
+/** Erro parcial do Google não é prova de agenda livre. */
+export function parsePrimaryBusy(data: unknown): BusyBlock[] | null {
+  if (!data || typeof data !== "object") return null;
+  const calendars = (data as { calendars?: Record<string, unknown> }).calendars;
+  const primary = calendars?.primary as { errors?: unknown; busy?: unknown } | undefined;
+  if (!primary || (primary.errors !== undefined && (!Array.isArray(primary.errors) || primary.errors.length > 0))) return null;
+  if (!Array.isArray(primary.busy)) return null;
+  const blocks = parseBusyBlocks({ calendars: { primary } });
+  return blocks.length === primary.busy.length ? blocks : null;
 }

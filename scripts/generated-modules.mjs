@@ -10,6 +10,7 @@ export const SOURCES = [
   ["src/lib/firebase/paths.ts", "paths"],
   ["src/lib/firebase/date-fields.ts", "date-fields"],
   ["src/types/access.ts", "access"],
+  ["src/config/access.ts", "access-policy"],
   ["src/types/profession.ts", "profession"],
   ["src/config/billing.ts", "billing-config"],
   ["src/lib/billing/policy.ts", "billing-policy"],

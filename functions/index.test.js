@@ -220,7 +220,7 @@ describe("Pontos de escrita da validade e atestado do aplicativo", () => {
     // Varre o codigo do backend: um terceiro caminho, mesmo bem-intencionado,
     // quebra a regra 10 do AGENTS.md e precisa aparecer aqui.
     const writers = readdirSync(new URL(".", import.meta.url))
-      .filter(name => name.endsWith(".js") && !name.endsWith(".test.js"))
+      .filter(name => name.endsWith(".js") && !name.endsWith(".test.js") && !name.endsWith(".emulator-test.js"))
       .filter(name => /\b(subscriptionStatus|accessUntil|accessUntilMs)\s*:/.test(readFileSync(new URL(name, import.meta.url), "utf8")));
     // `self-service.js` entrou na lista com a A.2: o teste de 14 dias e
     // concessao registrada de tipo `TRIAL`, com prazo fixo, uma por
@@ -234,7 +234,7 @@ describe("Pontos de escrita da validade e atestado do aplicativo", () => {
     // abandonado — poderia esquecer um campo, e a que esquece seria descoberta
     // tarde. Quem apaga chama `eraseOrganization`; quem redige mora aqui.
     const redigem = readdirSync(new URL(".", import.meta.url))
-      .filter(name => name.endsWith(".js") && !name.endsWith(".test.js"))
+      .filter(name => name.endsWith(".js") && !name.endsWith(".test.js") && !name.endsWith(".emulator-test.js"))
       .filter(name => /redactionPatch\(|pseudonymizeCollection\(|deleteRecursively\(/.test(readFileSync(new URL(name, import.meta.url), "utf8")));
     expect(redigem.sort()).toEqual(["privacy.js"]);
   });

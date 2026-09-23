@@ -142,7 +142,7 @@ export { expireAutomationTasksEveryFiveMinutes } from "./automation-expiry.js";
 export { registerMessagingSender } from "./messaging-senders.js";
 export { inboundWebhook } from "./inbound.js";
 export { previewAI } from "./ai-preview.js";
-export { startCalendarConnection, googleOAuthCallback, disconnectCalendar, calendarBusyCallback } from "./calendar.js";
+export { startCalendarConnection, googleOAuthCallback, disconnectCalendar, calendarBusyCallback, getCalendarConnection, refreshCalendarBusy } from "./calendar.js";
 export {
   setOrganizationAutomationSwitch,
   setGlobalAutomationSwitch,

@@ -653,8 +653,17 @@ Firestore — backup, arquivo baixado, gateway, provedores — nao sao alcancada
 > Tasks e despachante), nao publicada. A ponte com o n8n e os canais reais nao
 > existem: o despachante executa com o provedor simulado.
 
-WhatsApp, Google Calendar e e-mail sao executados por um n8n em servidor
-proprio. O n8n **executa**; quem **decide** e o Atendara.
+WhatsApp, escrita de eventos Google Calendar e e-mail têm execução prevista em
+n8n próprio. O n8n **executa**; quem **decide** é o Atendara.
+
+**Primeira entrega da 3C:** a consulta manual de livre/ocupado é uma exceção
+deliberada: `refreshCalendarBusy` chama a API Google diretamente no backend.
+Isso permite validar a integração enquanto a 3B e o executor externo estão em
+espera, sem entregar credenciais a outro serviço. Ela lê somente a agenda
+principal por 30 dias, não cria eventos nem interfere na agenda manual.
+Atualização automática e integração com remarcação ainda não estão ativadas.
+O contrato HTTP legado `calendarBusyCallback` responde 410: não há tarefa
+correlacionada que legitime uma escrita externa de ocupado.
 
 ```text
 Atendara (painel)
@@ -666,7 +675,8 @@ Firestore + Cloud Functions                              <- decide tudo
 organizations/{orgId}/automationTasks   (+ Cloud Tasks no horario exato)
     |
     +-- confirmar, lembrar, cancelar, oferecer horario --> n8n --> WhatsApp, e-mail
-    +-- criar/editar/apagar evento, ler ocupado ---------> n8n --> Google Calendar
+    +-- criar/editar/apagar evento (futuro) -------------> n8n --> Google Calendar
+    +-- consulta manual de ocupado --------------------> Google Calendar (backend)
     +-- processar mensagem recebida   <-- n8n repassa o corpo bruto
     +-- gerar alerta ------------------- dentro do Atendara
     +-- registrar auditoria ------------ dentro do Atendara
@@ -760,11 +770,19 @@ e pelo retorno.
 
 - **Um numero de WhatsApp por organizacao.** Quem fala com o paciente e a
   propria organizacao (regra 12).
-- **Google Calendar: enviar e ler so ocupado.** O Atendara escreve numa agenda
+- **Google Calendar: enviar e ler só ocupado.** A escrita futura será numa agenda
   secundaria criada por ele, com texto limitado pelo grau de exposicao (perfil
   `HIGH`: sem nome e sem tipo de atendimento), e le da agenda principal so inicio
   e fim dos blocos ocupados. Nenhum titulo ou convidado de terceiro entra no
   banco, e nao existem duas fontes da verdade.
+  Hoje o OAuth pede apenas `calendar.freebusy`; escrita exigirá nova autorização
+  para `calendar.app.created`. O estado assinado é consumido uma única vez no
+  Firestore, com vínculo e acesso revalidados na conclusão. Desconectar apaga
+  credencial, pedido pendente e ocupado antes de chamar a revogação Google.
+  Cada conexão tem uma geração e cada consulta tem um identificador: respostas
+  antigas não sobrescrevem leituras recentes nem restauram uma conexão apagada.
+  Falhas, inclusive erros por agenda em HTTP 200, preservam a leitura anterior
+  sem renovar sua validade. A tela marca esse resultado como indisponível.
 - **E-mail: Amazon SES em `sa-east-1`, com dominio proprio.** Subdominio de
   envio com SPF, DKIM e DMARC; remetente com o nome da organizacao; descadastro
   que retira o consentimento com registro. Devolucao chega pelo SNS e tem a

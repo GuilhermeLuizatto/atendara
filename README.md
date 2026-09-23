@@ -267,8 +267,8 @@ testes de ponta a ponta.
 | **1** | Operação: dashboard, agenda, CRM, financeiro, mensagens, regras e simulador | ✅ |
 | **2** | Persistência: Firestore, RBAC, auditoria, notificações e isolamento entre tenants | ✅ |
 | **3A** | Automação interna: fila, HMAC, callback, controle de emergência e n8n local | ✅ |
-| **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco | 🟨 |
-| **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | ⬜ |
+| **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco | ⏸️ Em espera; validação externa pendente |
+| **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | 🟨 Conexão Google e consulta manual implementadas; ativação real pendente |
 | **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | 🟨 Gemini ativo para organizações de teste; expansão e analytics pendentes |
 | **5** | Produto: equipes, importação administrativa, suporte, cobrança real e planos | 🟨 |
 | **6** | Expansão: portfólio da Estética, marketplace e cobrador dos clientes | ⬜ |
@@ -309,8 +309,13 @@ tenants reais, fica para a continuação da Fase 4.
    A rotina de vencimento gera alerta interno e auditoria sem depender do executor.
    Para ativá-la, publicar o índice de `automationTasks` e a function
    `expireAutomationTasksEveryFiveMinutes`; validar em ambiente de teste antes do piloto.
-5. Avaliar remarcação e Google Calendar como frentes independentes, sem esperar
-   o domínio. O domínio entra quando a frente de e-mail for iniciada.
+5. Google Calendar em **Configurações → Google Calendar**: conexão própria,
+   desconexão e consulta manual de livre/ocupado da agenda principal por 30 dias.
+   A ativação depende de OAuth, KMS, publicação das functions e teste autorizado
+   com uma conta Google; seguir [o roteiro](docs/GOOGLE-CALENDAR.md).
+   Escrita de eventos, atualização automática, bloqueio de horários, remarcação,
+   e-mail e monitoramento continuam pendentes. A 3B fica em espera enquanto
+   esta primeira frente da 3C é validada.
 6. Depois do piloto, priorizar equipes, importação de dados administrativos e
    suporte. O cobrador de clientes só começa após decisão contábil, jurídica e
    de gateway sobre split, responsabilidade fiscal e consentimento.

@@ -10,19 +10,10 @@ import type { AppointmentDisclosureLevel } from "@/types";
  */
 
 /**
- * Escopos pedidos ao profissional. Os dois mais fechados que resolvem o
- * problema:
- *
- * - `calendar.app.created` cria uma agenda secundária "Atendara" e deixa mexer
- *   **só nos eventos dela** — o Atendara nunca alcança a agenda pessoal;
- * - `calendar.freebusy` lê **livre e ocupado**, sem título, convidado ou
- *   descrição de evento nenhum.
- *
- * Pedir `calendar` inteiro seria pedir a agenda da pessoa para marcar horário
- * da clínica.
+ * Esta entrega consulta apenas livre/ocupado da agenda principal. A escrita
+ * futura na agenda secundária exigirá novo consentimento para app.created.
  */
 export const GOOGLE_CALENDAR_SCOPES = [
-  "https://www.googleapis.com/auth/calendar.app.created",
   "https://www.googleapis.com/auth/calendar.freebusy",
 ] as const;
 
@@ -54,7 +45,7 @@ export const CALENDAR_PRIVATE_EVENT_TITLE = "Atendimento";
 export const CALENDAR_BUSY_WINDOW_DAYS = 30;
 
 /**
- * De quanto em quanto tempo o ocupado externo é relido.
+ * Intervalo reservado para a futura atualização automática (a atual é manual).
  *
  * O bloco lido fica velho entre uma leitura e outra — um compromisso marcado no
  * Google agora só aparece na próxima. Por isso a oferta de horários da 13.6

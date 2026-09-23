@@ -77,4 +77,5 @@ next-env.d.ts
 /docs/*
 !/docs/ARCHITECTURE.md
 !/docs/FIRESTORE-DATA-MODEL.md
+!/docs/GOOGLE-CALENDAR.md
 /scripts/render-report.mjs

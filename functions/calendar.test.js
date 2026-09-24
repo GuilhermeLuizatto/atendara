@@ -301,6 +301,45 @@ describe("retorno Google", () => {
     expect((await callback(state)).code).toBe(400);
     expect(network.calls).toHaveLength(1);
   });
+  it("falha do KMS registra etapa e status, sem token nem código", async () => {
+    const logger = await import("firebase-functions/logger");
+    const { encryptSecret } = await import("./kms.js");
+    encryptSecret.mockRejectedValueOnce(
+      Object.assign(new Error("KMS recusou a operação (403)."), {
+        name: "KmsError",
+        status: 403,
+      }),
+    );
+    const state = await begin();
+    network.responses.push({ ok: true, body: validTokens });
+    expect((await callback(state)).code).toBe(500);
+    expect(logger.warn).toHaveBeenLastCalledWith("calendar.oauth.failed", {
+      outcome: "PROVIDER_ERROR",
+      stage: "encrypt",
+      errorName: "KmsError",
+      status: 403,
+    });
+    expect(JSON.stringify(logger.warn.mock.calls)).not.toMatch(
+      /private|google-code/,
+    );
+    expect(store.get(connectionPath).status).toBe("REVOKED");
+  });
+  it("recusa do Google registra só o código curto do OAuth", async () => {
+    const logger = await import("firebase-functions/logger");
+    const state = await begin();
+    network.responses.push({
+      ok: false,
+      status: 401,
+      body: { error: "invalid_client", error_description: "google-code eco" },
+    });
+    expect((await callback(state)).code).toBe(400);
+    expect(logger.warn).toHaveBeenLastCalledWith("calendar.oauth.rejected", {
+      status: 401,
+      error: "invalid_client",
+      refreshToken: false,
+      scopeGranted: false,
+    });
+  });
   it("uma segunda tentativa invalida a primeira e cancelar consome o estado", async () => {
     const first = await begin();
     const second = await begin();

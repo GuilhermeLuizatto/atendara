@@ -13,8 +13,16 @@ marcados. O evento diz só o que o grau de exposição da profissão permite
 Desconectar apaga a agenda "Atendara" do Google. Conexões anteriores a esta
 entrega continuam lendo ocupado e pedem reconexão para escrever.
 
-Não há atualização automática do ocupado, bloqueio na agenda do Atendara ou
-remarcação integrada. Ativada em produção e testada com conta real em
+**Ocupado automático (frente 2 da 3C, 24/09):** a rotina
+`refreshCalendarBusyEvery30Minutes` lê o ocupado de toda agenda conectada a cada
+30 minutos, com a mesma conferência de vínculo e acesso da consulta manual. Na
+agenda do painel, a faixa "Ocupado no Google" aparece quando a vista mostra uma
+pessoa só (filtrada ou a única da organização), e o formulário do atendimento
+avisa quando o horário cruza um compromisso — **avisa e deixa marcar**, por
+decisão do titular. Leitura velha ou fora do período lido não é tratada como
+horário livre: o formulário diz que não dá para conferir.
+
+Não há bloqueio rígido nem remarcação integrada. Ativada em produção e testada com conta real em
 24/09/2026 — resultado na seção "Teste real de 24/09/2026".
 
 ## Configuração do ambiente de teste

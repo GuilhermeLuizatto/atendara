@@ -135,6 +135,7 @@ const COLLECTION_PARTS: Array<[PagedPart, ConvertedCollection, WorkspaceCollecti
   ["notifications", "notifications", "notifications"],
   ["notificationDeliveries", "notificationDeliveries", "notificationDeliveries"],
   ["automationTasks", "automationTasks", "automationTasks"],
+  ["calendarBusyBlocks", "calendarBusyBlocks", "calendarBusy"],
   ["auditLogs", "auditLogs", "auditLogs"],
 ];
 

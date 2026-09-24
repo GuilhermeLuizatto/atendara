@@ -43,10 +43,30 @@ vi.mock("firebase-admin/firestore", () => {
         .map(snapshot),
     }),
   });
+  // Grupo de coleções: qualquer `organizations/{org}/{nome}/{id}`.
+  const group = (name, filters = [], after = null) => ({
+    where: (field, op, value) => group(name, [...filters, { field, op, value }], after),
+    orderBy: () => group(name, filters, after),
+    limit: () => group(name, filters, after),
+    startAfter: (document) => group(name, filters, document.ref.path),
+    get: async () => ({
+      docs: [...store.keys()]
+        .filter((key) => key.split("/").length === 4 && key.split("/")[2] === name)
+        .filter((key) => filters.every(({ field, value }) => store.get(key)[field] === value))
+        .sort()
+        .filter((key) => !after || key > after)
+        .map((key) => ({
+          ...snapshot(key),
+          ref: { path: key, parent: { parent: { id: key.split("/")[1] } } },
+        })),
+    }),
+  });
   return {
+    FieldPath: { documentId: () => "__name__" },
     getFirestore: () => ({
       doc: (path) => ({ path, get: async () => snapshot(path) }),
       collection: (path) => query(path),
+      collectionGroup: (name) => group(name),
       batch: () => ({
         create: (ref, data) => store.set(ref.path, data),
         commit: async () => {},
@@ -653,6 +673,54 @@ describe("consulta manual e desconexão", () => {
     expect((await callback(state)).code).toBe(200);
     expect(store.get(connectionPath).generation).not.toBe(previous.generation);
     expect(store.has(busyPath)).toBe(false);
+  });
+  it("rotina de 30 minutos lê toda agenda conectada e pula quem não pode", async () => {
+    seedConnected();
+    // Segunda organização, com a assinatura vencida: não é lida.
+    const OTHER = "org-vencida";
+    const otherUser = "user-vencido";
+    store.set(paths.account(otherUser), {
+      ...store.get(paths.account(USER)),
+      organizationId: OTHER,
+      accessUntil: "2000-01-01T00:00:00Z",
+    });
+    store.set(paths.organization(OTHER), { ownerId: otherUser });
+    store.set(paths.document(OTHER, "members", otherUser), { status: "ACTIVE", role: "PROFESSIONAL" });
+    store.set(paths.document(OTHER, "professionals", "perfil-vencido"), { userId: otherUser, active: true });
+    store.set(paths.document(OTHER, "calendarConnections", "perfil-vencido"), {
+      ...store.get(connectionPath),
+      organizationId: OTHER,
+      professionalId: "perfil-vencido",
+    });
+    // Desconectada: nem entra na consulta.
+    store.set(paths.document(OTHER, "calendarConnections", "revogada"), { status: "REVOKED" });
+
+    queueBusy();
+    const result = await calendar.refreshAllCalendars({
+      client: { clientId: "id", clientSecret: "segredo" },
+    });
+    expect(result).toEqual({ read: 1, skipped: 1, reconnect: 0, failed: 0, configured: true });
+    expect(store.get(busyPath).blocks).toHaveLength(1);
+    expect(JSON.stringify(store.get(busyPath))).not.toMatch(/Private event|private@example/);
+    expect(store.has(paths.document(OTHER, "calendarBusyBlocks", "perfil-vencido"))).toBe(false);
+  });
+  it("rotina: autorização revogada põe a conexão em reconexão sem apagar a leitura anterior", async () => {
+    seedConnected();
+    queueBusy();
+    await calendar.refreshCalendarBusy(call());
+    const before = store.get(busyPath);
+    network.responses.push({ ok: false, status: 400, body: { error: "invalid_grant" } });
+    const result = await calendar.refreshAllCalendars({
+      client: { clientId: "id", clientSecret: "segredo" },
+    });
+    expect(result).toMatchObject({ read: 0, reconnect: 1 });
+    expect(store.get(connectionPath)).toMatchObject({ status: "ERROR", lastError: "RECONNECT_REQUIRED" });
+    expect(store.get(busyPath)).toBe(before);
+  });
+  it("rotina sem configuração não chama o Google", async () => {
+    seedConnected();
+    expect(await calendar.refreshAllCalendars({ client: null })).toMatchObject({ configured: false });
+    expect(network.calls).toHaveLength(0);
   });
   it("rota legada não aceita ocupado sem pedido correlacionado", async () => {
     const result = response();

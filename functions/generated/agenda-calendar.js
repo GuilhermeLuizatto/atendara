@@ -86,6 +86,18 @@ export function isBusySnapshotFresh(readAt, now) {
     const age = Date.parse(now) - Date.parse(readAt);
     return age >= -CALENDAR_CLOCK_SKEW_MINUTES * 60_000 && age <= CALENDAR_BUSY_STALE_MINUTES * 60_000;
 }
+export function busyConflicts(input) {
+    const snapshot = input.snapshots.find((item) => item.professionalId === input.professionalId);
+    if (!snapshot)
+        return { status: "ABSENT", conflicts: [] };
+    const start = Date.parse(input.startsAt);
+    const end = Date.parse(input.endsAt);
+    const conflicts = snapshot.blocks.filter((block) => Date.parse(block.startsAt) < end && Date.parse(block.endsAt) > start);
+    // Fora do período lido também não é prova de nada.
+    const covered = Date.parse(snapshot.timeMin) <= start && Date.parse(snapshot.timeMax) >= end;
+    const fresh = isBusySnapshotFresh(snapshot.readAt, input.now) && covered;
+    return { status: fresh ? "FRESH" : "STALE", conflicts };
+}
 /** Erro parcial do Google não é prova de agenda livre. */
 export function parsePrimaryBusy(data) {
     if (!data || typeof data !== "object")

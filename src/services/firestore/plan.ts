@@ -103,7 +103,7 @@ export function touch(ctx: PlanContext) {
 
 // ---------------------------------------------------------------- buscas
 
-export function requireClient(ctx: PlanContext, id: ID): Client {
+export function requireClient(ctx: PlanContext, id: ID | null): Client {
   const client = ctx.snapshot.clients.find((item) => item.id === id);
   if (!client) throw new RepositoryError("Cadastro não encontrado.");
   return client;

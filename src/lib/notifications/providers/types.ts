@@ -6,6 +6,8 @@ export interface SendRequest {
   channel: OutboundChannel;
   /** Destino ja normalizado. O provedor nao normaliza nada. */
   destination: string;
+  /** Phone Number ID do remetente aprovado, necessário para o WhatsApp. */
+  providerSenderId?: string;
   body: string;
   /** Numero da tentativa, comecando em 1. */
   attempt: number;

@@ -10,6 +10,7 @@ import {
   consentAct,
   consentRecord,
   organization,
+  reminderRule,
 } from "@/lib/notifications/fixtures";
 import { SIMULATED_DESTINATIONS, createSimulatedProvider } from "@/lib/notifications/providers";
 
@@ -60,6 +61,48 @@ describe("no horario", () => {
     const stored = JSON.stringify([step.task, step.delivery]);
     expect(stored).not.toContain(FICTITIOUS.phone);
     expect(stored).not.toContain(step.request.body);
+  });
+
+  it("a tarefa de WhatsApp leva ao n8n o Phone Number ID validado do remetente", () => {
+    const { task, delivery } = plannedReminder();
+    const org = organization({
+      verifiedSenderChannels: ["WHATSAPP"],
+      rules: [reminderRule({ channel: "WHATSAPP" })],
+    });
+    const step = decideDispatch(
+      dispatchInput({
+        task: transitionTask(task, "SCHEDULED", { at: ANCHOR }),
+        delivery: { ...delivery, channel: "WHATSAPP", providerId: "N8N_BRIDGE" },
+        organization: org,
+        profession: getProfession(org.primaryProfession),
+        client: client(),
+        sender: {
+          id: "WHATSAPP",
+          organizationId: org.id,
+          channel: "WHATSAPP",
+          providerId: "N8N_BRIDGE",
+          providerSenderId: "1236644296208358",
+          displayNumber: "+5513999990000",
+          displayName: "Estúdio Exemplo",
+          status: "APPROVED",
+          mode: "TEST",
+          testRecipients: [FICTITIOUS.phone],
+          lastReason: "Remetente de teste autorizado.",
+          createdAt: ANCHOR,
+          createdBy: "operadora",
+          updatedAt: ANCHOR,
+          updatedBy: "operadora",
+        },
+      }),
+    );
+
+    expect(step.kind).toBe("SEND");
+    if (step.kind !== "SEND") return;
+    expect(step.request).toMatchObject({
+      channel: "WHATSAPP",
+      providerSenderId: "1236644296208358",
+      template: { name: expect.any(String), language: expect.any(String) },
+    });
   });
 
   it("aceito vira SUCCEEDED, com a entrega enviada e a trilha no mesmo resultado", async () => {

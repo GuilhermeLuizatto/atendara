@@ -312,6 +312,12 @@ export const PERSONAL_DATA_MAP = {
         onClientErasure: { action: "NOT_APPLICABLE" },
         onOrganizationDeletion: DELETE,
     },
+    whatsappConnections: {
+        personalFields: ["displayNumber", "displayName"],
+        retention: { kind: "WHILE_ORGANIZATION_EXISTS" },
+        onClientErasure: { action: "NOT_APPLICABLE" },
+        onOrganizationDeletion: DELETE,
+    },
     automationTasks: {
         // Ids e estado da execucao. Texto, contato e nome nunca sao gravados: o
         // despachante recompoe os dois primeiros no envio e os descarta.

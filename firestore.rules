@@ -558,6 +558,12 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Resultado da validacao do Embedded Signup. O backend e a unica
+      // escritora e nenhum segredo da Meta fica nesta colecao.
+      match /whatsappConnections/{connectionId} {
+        allow read, write: if false;
+      }
+
       // ------------------------------------------- fila de automacao
 
       // Cada execucao da automacao — aviso, alerta, registro na trilha —, com

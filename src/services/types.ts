@@ -200,7 +200,7 @@ export interface RuleInput {
 
 export interface MessageInput {
   conversationId: ID;
-  clientId: ID;
+  clientId: ID | null;
   direction: Message["direction"];
   authorType: Message["authorType"];
   authorName: string;

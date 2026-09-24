@@ -4,7 +4,7 @@ import { DEFAULT_RESCHEDULE_POLICY, RESCHEDULE_HOLD_MINUTES } from "@/config/res
 import type { Appointment } from "@/types";
 
 import type { AvailabilityInput } from "./availability";
-import { confirmReschedule, decideReschedule, policyOf } from "./reschedule";
+import { confirmReschedule, decideReschedule, policyOf, selfServiceReschedulesOf } from "./reschedule";
 
 const AGORA = "2026-09-21T11:00:00.000Z";
 
@@ -177,5 +177,51 @@ describe("confirmar o horario escolhido", () => {
       now: "2026-09-21T11:11:00.000Z",
     });
     expect(confirmacao).toEqual({ kind: "RETRY", reason: "HOLD_EXPIRED" });
+  });
+
+  it("atendimento cancelado depois da oferta nao volta a existir pela escolha", () => {
+    const confirmacao = confirmReschedule({
+      appointment: atendimento({ status: "CANCELLED" }),
+      chosen: escolhido,
+      busy: [],
+      bufferMinutes: 10,
+      holdEndsAt: reservaAte,
+      now: AGORA,
+    });
+    expect(confirmacao).toEqual({ kind: "ESCALATE", reason: "APPOINTMENT_NOT_ACTIVE" });
+  });
+
+  it("atendimento alterado pela equipe depois da oferta vai para a equipe", () => {
+    const confirmacao = confirmReschedule({
+      appointment: atendimento({ updatedAt: "2026-09-21T11:05:00.000Z" }),
+      chosen: escolhido,
+      busy: [],
+      bufferMinutes: 10,
+      holdEndsAt: reservaAte,
+      offeredAt: AGORA,
+      now: "2026-09-21T11:06:00.000Z",
+    });
+    expect(confirmacao).toEqual({ kind: "ESCALATE", reason: "APPOINTMENT_CHANGED" });
+  });
+
+  it("cada remarcacao confirmada conta para o limite da politica", () => {
+    const primeira = confirmReschedule({
+      appointment: atendimento(),
+      chosen: escolhido,
+      busy: [],
+      bufferMinutes: 10,
+      holdEndsAt: reservaAte,
+      now: AGORA,
+    });
+    if (primeira.kind !== "CONFIRM") throw new Error(primeira.kind);
+    expect(primeira.appointment.selfServiceReschedules).toBe(1);
+    expect(selfServiceReschedulesOf(primeira.appointment)).toBe(1);
+
+    const segunda = decidir({
+      policy: policyOf({ enabled: true, maxReschedulesPerAppointment: 1, minimumNoticeHours: 0 }),
+      appointment: primeira.appointment,
+      previousReschedules: selfServiceReschedulesOf(primeira.appointment),
+    });
+    expect(segunda).toEqual({ kind: "ESCALATE", reason: "LIMIT_REACHED" });
   });
 });

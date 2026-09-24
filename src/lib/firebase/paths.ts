@@ -82,6 +82,8 @@ export const TENANT_COLLECTIONS = {
   // o proprio canal como id. Escrito SO pela operadora, pelo backend, com
   // segundo fator e trilha — a organizacao nao declara a si mesma habilitada.
   messagingSenders: "messagingSenders",
+  // Resultado da validacao do Embedded Signup; nunca guarda credencial.
+  whatsappConnections: "whatsappConnections",
   auditLogs: "auditLogs",
   // Registro de cada pedido de titular de dados atendido pela organizacao.
   // Escrito so pelo backend, junto da exportacao ou da eliminacao.

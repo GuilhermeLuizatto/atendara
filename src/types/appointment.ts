@@ -80,6 +80,12 @@ export interface Appointment extends TenantScopedEntity {
   cancellationReason: string | null;
   /** Preenchido quando este atendimento substitui outro remarcado. */
   rescheduledFromId: ID | null;
+  /**
+   * Quantas vezes a própria pessoa remarcou este atendimento pelo canal (13.6).
+   * A remarcação muda o horário no mesmo documento, então sem este contador o
+   * limite da política nunca seria alcançado. Ausente vale zero.
+   */
+  selfServiceReschedules?: number;
   externalCalendar: ExternalCalendarRef | null;
   /** Titular eliminado: horario e valor ficam, quem foi atendido nao. */
   privacyRedaction?: PrivacyRedactionMark | null;

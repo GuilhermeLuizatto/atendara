@@ -1,8 +1,8 @@
 # Embedded Signup da Meta
 
 Esta etapa prepara a conexão do WhatsApp Business existente com a Plataforma
-do WhatsApp Business. O protótipo não envia mensagens e não troca o código de
-autorização no navegador.
+do WhatsApp Business. A interface entrega o código temporário à Function
+autenticada, que valida a conta e o número sem persistir a credencial da Meta.
 
 ## O que já está preparado
 
@@ -11,6 +11,7 @@ autorização no navegador.
   configurados;
 - abertura do `FB.login` com `whatsapp_embedded_signup`;
 - tratamento de cancelamento e autorização recebida;
+- validação server-side da WABA, do número e da inscrição para receber eventos;
 - CSP com os domínios necessários;
 - nenhum token ou código de autorização salvo em `localStorage`, Firestore ou
   no bundle como segredo.
@@ -33,20 +34,27 @@ Depois de alterar `.env.local`, reinicie o servidor do Next.js. Abra
 **Configurações → WhatsApp** e use **Conectar com a Meta**. A conexão somente
 será iniciada quando os dois primeiros valores existirem.
 
-## O que ainda depende das Functions
+## Limite atual da etapa
 
-O retorno do Meta contém um código de autorização temporário. A próxima etapa
-de backend deve:
+A Function `completeWhatsappEmbeddedSignup` troca o código no servidor, valida o
+WABA e o número, inscreve o WABA no app para receber eventos e grava somente os
+identificadores, nome/número exibidos, estado e auditoria no tenant.
 
-1. receber esse código por um endpoint HTTPS autenticado;
-2. trocá-lo no servidor, sem expô-lo ao cliente;
-3. obter e validar o WABA, o número e as permissões retornadas;
-4. guardar somente os identificadores e referências necessárias no tenant;
-5. registrar a auditoria append-only da conexão;
-6. assinar o webhook de mensagens e status.
+Isso ainda não aprova o remetente em `messagingSenders` e não habilita envio
+real. A aprovação continua sendo um ato separado da operadora, com segundo
+fator. O cadastro só pode aprovar o mesmo Phone Number ID e o mesmo número
+exibido que foram validados pelo Embedded Signup. Também não há cobrança de
+conversa nesta etapa.
 
-Até essa etapa, a interface apenas confirma que a Meta respondeu. Não existe
-envio de mensagem, cobrança de conversa ou persistência de credencial.
+Para enviar pela Cloud API, o n8n usa separadamente uma credencial de usuário
+do sistema da Meta, com acesso mínimo aos ativos necessários. O identificador
+do número segue na tarefa assinada de cada organização; o token nunca é
+armazenado no Firestore, no navegador ou no JSON versionado do fluxo.
+
+No ambiente das Functions, configure `META_APP_ID`, `META_APP_SECRET` (Secret
+Manager) e, opcionalmente, `META_GRAPH_VERSION`. O app id pode ser igual ao
+valor público usado no frontend; o app secret nunca deve ir para `.env.local`
+do navegador.
 
 ## Produção
 
@@ -54,3 +62,9 @@ Antes de publicar o fluxo, a Meta ainda exigirá uma URL pública HTTPS, domíni
 configurado, política de privacidade e a configuração de permissões/revisão do
 app. O domínio não é necessário para desenvolver a tela local, mas é necessário
 para completar o callback e o webhook de produção.
+
+O código e os testes automatizados não substituem a homologação ponta a ponta:
+é preciso validar um envio com remetente e destinatário de teste autorizados,
+validar o webhook de entrada e só então configurar n8n HTTPS, rotação de
+segredos e monitoramento para o piloto. A aprovação jurídica do texto de
+consentimento também continua sendo um bloqueio para envio a clientes reais.

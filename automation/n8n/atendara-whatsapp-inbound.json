@@ -1,0 +1,203 @@
+{
+  "name": "Atendara — WhatsApp entrada Meta (13.5)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "atendara-whatsapp-inbound",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "9d4104c0-1000-4a00-8000-000000000001",
+      "name": "Verificação da Meta",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-520, -160],
+      "webhookId": "9d4104c0-1000-4a00-8000-000000000001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query ?? {};\nconst mode = query['hub.mode'];\nconst token = query['hub.verify_token'];\nconst challenge = query['hub.challenge'];\nconst expected = $env.ATENDARA_META_VERIFY_TOKEN ?? '';\nconst valid = Boolean(expected) && mode === 'subscribe' && token === expected && typeof challenge === 'string' && challenge.length > 0;\nreturn [{ json: { valid, challenge: valid ? challenge : '' } }];"
+      },
+      "id": "9d4104c0-1000-4a00-8000-000000000002",
+      "name": "Conferir token de verificação",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-280, -160]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "version": 2 },
+          "conditions": [
+            {
+              "id": "meta-verification-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9d4104c0-1000-4a00-8000-000000000003",
+      "name": "Token confere?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-40, -160]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $('Conferir token de verificação').first().json.challenge }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "9d4104c0-1000-4a00-8000-000000000004",
+      "name": "Devolver desafio à Meta",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [220, -240]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Verificação recusada.",
+        "options": { "responseCode": 403 }
+      },
+      "id": "9d4104c0-1000-4a00-8000-000000000005",
+      "name": "Recusar verificação",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [220, -80]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "atendara-whatsapp-inbound",
+        "responseMode": "responseNode",
+        "options": { "rawBody": true }
+      },
+      "id": "9d4104c0-1000-4a00-8000-000000000006",
+      "name": "Evento recebido da Meta",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-520, 200],
+      "webhookId": "9d4104c0-1000-4a00-8000-000000000006"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { createHmac } = require('crypto');\nconst item = $input.first();\nconst encoded = item.binary?.data?.data;\nif (typeof encoded !== 'string') throw new Error('RAW_BODY_UNAVAILABLE');\nconst rawBody = Buffer.from(encoded, 'base64').toString('utf8');\nconst headers = item.json.headers ?? {};\nconst metaSignature = headers['x-hub-signature-256'] ?? headers['X-Hub-Signature-256'] ?? '';\nif (!/^sha256=[a-f0-9]{64}$/i.test(String(metaSignature))) throw new Error('META_SIGNATURE_HEADER_MISSING');\nconst timestamp = new Date().toISOString();\nconst secret = $env.ATENDARA_CALLBACK_SECRET ?? '';\nconst url = $env.ATENDARA_INBOUND_CALLBACK_URL ?? '';\nif (!secret || !url) throw new Error('INBOUND_BRIDGE_NOT_CONFIGURED');\nconst bridgeSignature = createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');\nreturn [{ json: { rawBody, metaSignature, timestamp, bridgeSignature, url } }];"
+      },
+      "id": "9d4104c0-1000-4a00-8000-000000000007",
+      "name": "Preservar corpo e assinar repasse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-280, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type", "value": "application/json" },
+            { "name": "x-hub-signature-256", "value": "={{ $json.metaSignature }}" },
+            { "name": "x-atendara-timestamp", "value": "={{ $json.timestamp }}" },
+            { "name": "x-atendara-signature", "value": "={{ $json.bridgeSignature }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.rawBody }}",
+        "options": {
+          "timeout": 10000,
+          "response": { "response": { "neverError": true, "fullResponse": true } }
+        }
+      },
+      "id": "9d4104c0-1000-4a00-8000-000000000008",
+      "name": "Repassar ao Atendara",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-40, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "version": 2 },
+          "conditions": [
+            {
+              "id": "backend-accepted",
+              "leftValue": "={{ $json.statusCode >= 200 && $json.statusCode < 300 }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9d4104c0-1000-4a00-8000-000000000009",
+      "name": "Backend aceitou?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [200, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ received: true }) }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "9d4104c0-1000-4a00-8000-000000000010",
+      "name": "Confirmar recebimento à Meta",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [460, 120]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ received: false }) }}",
+        "options": { "responseCode": 503 }
+      },
+      "id": "9d4104c0-1000-4a00-8000-000000000011",
+      "name": "Pedir nova tentativa à Meta",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [460, 280]
+    }
+  ],
+  "connections": {
+    "Verificação da Meta": { "main": [[{ "node": "Conferir token de verificação", "type": "main", "index": 0 }]] },
+    "Conferir token de verificação": { "main": [[{ "node": "Token confere?", "type": "main", "index": 0 }]] },
+    "Token confere?": {
+      "main": [
+        [{ "node": "Devolver desafio à Meta", "type": "main", "index": 0 }],
+        [{ "node": "Recusar verificação", "type": "main", "index": 0 }]
+      ]
+    },
+    "Evento recebido da Meta": { "main": [[{ "node": "Preservar corpo e assinar repasse", "type": "main", "index": 0 }]] },
+    "Preservar corpo e assinar repasse": { "main": [[{ "node": "Repassar ao Atendara", "type": "main", "index": 0 }]] },
+    "Repassar ao Atendara": { "main": [[{ "node": "Backend aceitou?", "type": "main", "index": 0 }]] },
+    "Backend aceitou?": {
+      "main": [
+        [{ "node": "Confirmar recebimento à Meta", "type": "main", "index": 0 }],
+        [{ "node": "Pedir nova tentativa à Meta", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "atendara": "Entrada Meta -> n8n -> inboundWebhook. O App Secret e validado apenas no Atendara; nao configure no n8n."
+  }
+}

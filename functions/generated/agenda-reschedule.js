@@ -26,6 +26,12 @@ export function decideReschedule(input) {
         return { kind: "ESCALATE", reason: "NO_SLOTS" };
     return { kind: "OFFER", appointment, slots, holdEndsAt: rescheduleHoldEndsAt(now) };
 }
+/** Remarcações já feitas pela própria pessoa, contando o formato anterior ao contador. */
+export function selfServiceReschedulesOf(appointment) {
+    if (!appointment)
+        return 0;
+    return appointment.selfServiceReschedules ?? (appointment.rescheduledFromId ? 1 : 0);
+}
 /**
  * A confirmação, já dentro da transação que grava.
  *
@@ -33,6 +39,13 @@ export function decideReschedule(input) {
  * exatamente a janela em que dois atendimentos caem no mesmo horário.
  */
 export function confirmReschedule(input) {
+    const { appointment } = input;
+    if (appointment.status !== "SCHEDULED" && appointment.status !== "CONFIRMED") {
+        return { kind: "ESCALATE", reason: "APPOINTMENT_NOT_ACTIVE" };
+    }
+    if (input.offeredAt && Date.parse(appointment.updatedAt) > Date.parse(input.offeredAt)) {
+        return { kind: "ESCALATE", reason: "APPOINTMENT_CHANGED" };
+    }
     if (Date.parse(input.now) > Date.parse(input.holdEndsAt))
         return { kind: "RETRY", reason: "HOLD_EXPIRED" };
     // O próprio atendimento não bloqueia o horário novo: ele está saindo do antigo.
@@ -49,6 +62,7 @@ export function confirmReschedule(input) {
             status: "SCHEDULED",
             confirmedAt: null,
             rescheduledFromId: input.rescheduledFromId ?? input.appointment.rescheduledFromId,
+            selfServiceReschedules: selfServiceReschedulesOf(input.appointment) + 1,
             // Quem mexeu na agenda foi a propria pessoa, e a origem registra isso.
             origin: "CLIENT_SELF_SERVICE",
             updatedAt: input.now,

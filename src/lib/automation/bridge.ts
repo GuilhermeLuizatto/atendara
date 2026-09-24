@@ -53,6 +53,8 @@ export interface BridgeTaskPayload {
   idempotencyKey: string;
   expiresAt: ISODateString;
   channel: SendRequest["channel"];
+  /** Phone Number ID validado para este tenant; não é um segredo. */
+  providerSenderId?: string;
   deliveryId: ID;
   destination: string;
   body: string;
@@ -78,6 +80,7 @@ export function bridgeTaskPayload(request: SendRequest): BridgeTaskPayload {
     idempotencyKey: request.idempotencyKey,
     expiresAt: request.expiresAt,
     channel: request.channel,
+    ...(request.providerSenderId ? { providerSenderId: request.providerSenderId } : {}),
     deliveryId: request.deliveryId,
     destination: request.destination,
     body: request.body,

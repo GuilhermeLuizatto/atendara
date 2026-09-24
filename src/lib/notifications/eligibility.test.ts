@@ -8,6 +8,7 @@ import {
   type AppointmentNotificationEvent,
   type ChannelConsentRecord,
   type NotificationRule,
+  type MessagingSender,
   type Organization,
 } from "@/types";
 
@@ -40,6 +41,26 @@ function input(overrides: Partial<EligibilityInput> = {}): EligibilityInput {
     ...(overrides.organization && !overrides.profession
       ? { profession: getProfession(overrides.organization.primaryProfession) }
       : {}),
+  };
+}
+
+function approvedWhatsappSender(organizationId: string): MessagingSender {
+  return {
+    id: "WHATSAPP",
+    organizationId,
+    channel: "WHATSAPP",
+    providerId: "N8N_BRIDGE",
+    providerSenderId: "1236644296208358",
+    displayNumber: "+5513999990000",
+    displayName: "Estúdio Exemplo",
+    status: "APPROVED",
+    mode: "TEST",
+    testRecipients: ["+5500900000000"],
+    lastReason: "Remetente de teste autorizado.",
+    createdAt: ANCHOR,
+    createdBy: "operadora",
+    updatedAt: ANCHOR,
+    updatedBy: "operadora",
   };
 }
 
@@ -283,6 +304,7 @@ describe("registro completo do consentimento, por canal", () => {
       );
       const rule = reminderRule({ channel });
       const org = organization({ verifiedSenderChannels: [channel], rules: [rule] });
+      const sender = channel === "WHATSAPP" ? approvedWhatsappSender(org.id) : null;
       const variants: Array<[unknown, string]> = [
         [undefined, "CHANNEL_NOT_CONSENTED"],
         [[consentRecord({ withdrawn: consentAct() })], "CONSENT_REVOKED"],
@@ -293,14 +315,14 @@ describe("registro completo do consentimento, por canal", () => {
       for (const [history, reason] of variants) {
         const channels = history ? { ...others, [channel]: history } : others;
         const subject = client({ notificationConsent: consent(channels) });
-        expect(evaluateRule(rule, input({ organization: org, client: subject })), `${channel} ${reason}`).toEqual({
+        expect(evaluateRule(rule, input({ organization: org, client: subject, sender })), `${channel} ${reason}`).toEqual({
           eligible: false,
           reason,
         });
       }
 
       const complete = client({ notificationConsent: consent({ ...others, [channel]: [consentRecord()] }) });
-      expect(evaluateRule(rule, input({ organization: org, client: complete })), channel).toMatchObject({
+      expect(evaluateRule(rule, input({ organization: org, client: complete, sender })), channel).toMatchObject({
         eligible: true,
       });
     }

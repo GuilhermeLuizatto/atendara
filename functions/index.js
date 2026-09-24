@@ -140,6 +140,7 @@ export { planAppointmentNotices, planCalendarEvents, dispatchAutomationTask } fr
 export { automationCallback } from "./automation-callback.js";
 export { expireAutomationTasksEveryFiveMinutes } from "./automation-expiry.js";
 export { registerMessagingSender } from "./messaging-senders.js";
+export { completeWhatsappEmbeddedSignup } from "./whatsapp-signup.js";
 export { inboundWebhook } from "./inbound.js";
 export { previewAI } from "./ai-preview.js";
 export {

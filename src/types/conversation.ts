@@ -15,7 +15,7 @@ export type MessageAuthorType =
 export type AttentionLevel = "NORMAL" | "ATTENTION" | "HIGH" | "CRITICAL";
 
 export interface Conversation extends TenantScopedEntity {
-  clientId: ID;
+  clientId: ID | null;
   clientName: string;
   professionalId: ID | null;
   channel: MessageChannel;
@@ -25,6 +25,8 @@ export interface Conversation extends TenantScopedEntity {
   lastClassification: MessageClassificationId | null;
   lastMessagePreview: string;
   lastMessageAt: ISODateString;
+  lastInboundAt?: ISODateString;
+  inboundWindowEndsAt?: ISODateString;
   unreadCount: number;
   /** True quando o agente parou de atuar e aguarda o profissional. */
   escalated: boolean;
@@ -33,7 +35,8 @@ export interface Conversation extends TenantScopedEntity {
 
 export interface Message extends TenantScopedEntity {
   conversationId: ID;
-  clientId: ID;
+  clientId: ID | null;
+  providerMessageId?: string;
   direction: MessageDirection;
   authorType: MessageAuthorType;
   authorName: string;

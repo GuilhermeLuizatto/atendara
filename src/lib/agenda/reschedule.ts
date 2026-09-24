@@ -60,11 +60,19 @@ export function decideReschedule(input: {
   return { kind: "OFFER", appointment, slots, holdEndsAt: rescheduleHoldEndsAt(now) };
 }
 
+/** Remarcações já feitas pela própria pessoa, contando o formato anterior ao contador. */
+export function selfServiceReschedulesOf(appointment: Appointment | null): number {
+  if (!appointment) return 0;
+  return appointment.selfServiceReschedules ?? (appointment.rescheduledFromId ? 1 : 0);
+}
+
 export type RescheduleConfirmation =
   /** Gravar: o atendimento muda de horário e o pedido se encerra. */
   | { kind: "CONFIRM"; appointment: Appointment }
   /** O horário foi ocupado no meio do caminho, ou a reserva venceu. */
-  | { kind: "RETRY"; reason: "SLOT_TAKEN" | "HOLD_EXPIRED" };
+  | { kind: "RETRY"; reason: "SLOT_TAKEN" | "HOLD_EXPIRED" }
+  /** A equipe cancelou ou mudou o atendimento depois da oferta: a decisão é dela. */
+  | { kind: "ESCALATE"; reason: "APPOINTMENT_NOT_ACTIVE" | "APPOINTMENT_CHANGED" };
 
 /**
  * A confirmação, já dentro da transação que grava.
@@ -78,10 +86,22 @@ export function confirmReschedule(input: {
   busy: readonly BusyBlock[];
   bufferMinutes: number;
   holdEndsAt: ISODateString;
+  /**
+   * Quando os horários foram oferecidos. Atendimento alterado depois disso não
+   * é o mesmo sobre o qual a pessoa escolheu.
+   */
+  offeredAt?: ISODateString | null;
   now: ISODateString;
   /** Id do novo atendimento, quando a organização prefere criar outro. */
   rescheduledFromId?: ID | null;
 }): RescheduleConfirmation {
+  const { appointment } = input;
+  if (appointment.status !== "SCHEDULED" && appointment.status !== "CONFIRMED") {
+    return { kind: "ESCALATE", reason: "APPOINTMENT_NOT_ACTIVE" };
+  }
+  if (input.offeredAt && Date.parse(appointment.updatedAt) > Date.parse(input.offeredAt)) {
+    return { kind: "ESCALATE", reason: "APPOINTMENT_CHANGED" };
+  }
   if (Date.parse(input.now) > Date.parse(input.holdEndsAt)) return { kind: "RETRY", reason: "HOLD_EXPIRED" };
 
   // O próprio atendimento não bloqueia o horário novo: ele está saindo do antigo.
@@ -100,6 +120,7 @@ export function confirmReschedule(input: {
       status: "SCHEDULED",
       confirmedAt: null,
       rescheduledFromId: input.rescheduledFromId ?? input.appointment.rescheduledFromId,
+      selfServiceReschedules: selfServiceReschedulesOf(input.appointment) + 1,
       // Quem mexeu na agenda foi a propria pessoa, e a origem registra isso.
       origin: "CLIENT_SELF_SERVICE",
       updatedAt: input.now,

@@ -36,9 +36,8 @@ export interface ChannelMeta {
    * - `SIMULATED`: nenhuma mensagem sai do processo — resultado deterministico,
    *   nenhuma conexao aberta.
    * - `N8N_BRIDGE` (13.3): a tarefa vai assinada ao n8n, que executa o canal
-   *   real. **Nenhum canal usa este valor ainda**, e trocar um deles e uma
-   *   linha que aparece no diff — e que so funciona com os segredos da ponte
-   *   configurados no Secret Manager.
+   *   real. O canal ainda exige remetente aprovado, configuração externa e
+   *   todas as travas de consentimento e emergência.
    */
   providerId: "SIMULATED" | "N8N_BRIDGE";
   /** Limite de caracteres do corpo. Deriva do canal, nao do gosto do texto. */
@@ -78,10 +77,10 @@ export const CHANNEL_META: Record<OutboundChannel, ChannelMeta> = {
   WHATSAPP: {
     label: "WhatsApp",
     contactField: "phone",
-    providerId: "SIMULATED",
+    providerId: "N8N_BRIDGE",
     maxBodyLength: 400,
     activationRequirement:
-      "Número aprovado na API oficial do WhatsApp Business e modelo de mensagem homologado pela Meta.",
+      "Conta da Meta conectada, remetente aprovado, modelo homologado e saída segura do n8n configurada.",
     consentIntermediary: "pelo WhatsApp, serviço da Meta",
   },
 };

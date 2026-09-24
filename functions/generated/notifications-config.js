@@ -19,9 +19,9 @@ export const CHANNEL_META = {
     WHATSAPP: {
         label: "WhatsApp",
         contactField: "phone",
-        providerId: "SIMULATED",
+        providerId: "N8N_BRIDGE",
         maxBodyLength: 400,
-        activationRequirement: "Número aprovado na API oficial do WhatsApp Business e modelo de mensagem homologado pela Meta.",
+        activationRequirement: "Conta da Meta conectada, remetente aprovado, modelo homologado e saída segura do n8n configurada.",
         consentIntermediary: "pelo WhatsApp, serviço da Meta",
     },
 };

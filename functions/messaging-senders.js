@@ -52,6 +52,12 @@ const schema = z
     path: ["testRecipients"],
   });
 
+export function whatsappConnectionMatchesSender(connection, input) {
+  if (connection?.status !== "VALIDATED" || connection.phoneNumberId !== input.providerSenderId) return false;
+  const connectedNumber = String(connection.displayNumber ?? "").replace(/\D/g, "");
+  return connectedNumber.length > 0 && connectedNumber === input.displayNumber.replace(/\D/g, "");
+}
+
 /**
  * Grava o remetente e a trilha juntos. Canal simulado e recusado de proposito:
  * cadastrar remetente para canal que nao sai do processo daria a impressao de
@@ -74,6 +80,14 @@ export const registerMessagingSender = onCall(OPERADORA_CALL_OPTIONS, async (req
   await firestore.runTransaction(async (transaction) => {
     const organization = await transaction.get(firestore.doc(paths.organization(input.organizationId)));
     if (!organization.exists) throw new HttpsError("not-found", "Organização não encontrada.");
+
+    if (input.channel === "WHATSAPP") {
+      const connectionRef = firestore.doc(paths.document(input.organizationId, "whatsappConnections", "WHATSAPP"));
+      const connection = (await transaction.get(connectionRef)).data();
+      if (!whatsappConnectionMatchesSender(connection, input)) {
+        throw new HttpsError("failed-precondition", "Conecte e valide este número da Meta antes de aprová-lo como remetente.");
+      }
+    }
 
     const existing = (await transaction.get(ref)).data() ?? null;
     const audit = auditEntry({

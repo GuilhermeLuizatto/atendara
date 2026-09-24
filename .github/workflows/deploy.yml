@@ -99,6 +99,12 @@ jobs:
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
           NEXT_PUBLIC_APP_CHECK_SITE_KEY: ${{ secrets.NEXT_PUBLIC_APP_CHECK_SITE_KEY }}
+          # Embedded Signup da Meta. Ao contrario da configuracao do Firebase,
+          # estes NAO sao exigidos: vazios, `isMetaEmbeddedSignupConfigured()`
+          # devolve falso e a tela de WhatsApp diz o que falta, em vez de
+          # quebrar. Exigir aqui travaria todo deploy ate a Meta estar pronta.
+          NEXT_PUBLIC_META_APP_ID: ${{ secrets.NEXT_PUBLIC_META_APP_ID }}
+          NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID: ${{ secrets.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID }}
         run: npm run build
 
       # Ultima linha de defesa antes de publicar: recusa bundle com verificador

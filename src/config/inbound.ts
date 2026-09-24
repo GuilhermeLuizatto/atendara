@@ -32,7 +32,7 @@ export const INBOUND_OPT_OUT_TERMS: readonly string[] = ["SAIR", "PARAR", "CANCE
 export const INBOUND_PREVIEW_LENGTH = 140;
 
 /** Texto registrado quando a própria pessoa confirma pelo botão. */
-export const INBOUND_CONFIRMATION_NOTE = "Confirmado pela própria pessoa, pelo WhatsApp.";
+export const INBOUND_CONFIRMATION_NOTE = "Pedido de confirmação recebido da própria pessoa, pelo WhatsApp, para conferência da equipe.";
 
 /** Texto registrado quando a própria pessoa retira o consentimento. */
 export const INBOUND_OPT_OUT_NOTE = "Consentimento retirado pela própria pessoa, pelo WhatsApp.";

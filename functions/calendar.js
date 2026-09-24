@@ -169,6 +169,8 @@ export const googleOAuthCallback = onRequest(
       return response
         .status(400)
         .send("Pedido de conexão inválido ou vencido.");
+    // Sem a etapa, uma falha em produção não se distingue entre Google, KMS e banco.
+    let stage = "claim";
     try {
       // Uma autorização só pode ser consumida uma vez, mesmo com retornos simultâneos.
       await calendarTransaction(context, (tx, ref, connection) => {
@@ -190,6 +192,7 @@ export const googleOAuthCallback = onRequest(
           .status(400)
           .send("Conexão cancelada. Volte ao Atendara para tentar novamente.");
       }
+      stage = "exchange";
       const exchange = await requestGoogle(TOKEN_URL, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -210,13 +213,28 @@ export const googleOAuthCallback = onRequest(
         !tokens.refresh_token ||
         !GOOGLE_CALENDAR_SCOPES.every((scope) => scopes.includes(scope))
       ) {
+        logger.warn("calendar.oauth.rejected", {
+          status: exchange.status,
+          // Só o código curto do OAuth: a descrição livre pode repetir o pedido.
+          error:
+            typeof tokens.error === "string" &&
+            /^[a-z_]{1,40}$/.test(tokens.error)
+              ? tokens.error
+              : null,
+          refreshToken: typeof tokens.refresh_token === "string",
+          scopeGranted: GOOGLE_CALENDAR_SCOPES.every((scope) =>
+            scopes.includes(scope),
+          ),
+        });
         return response
           .status(400)
           .send(
             "Autorize a consulta de horários no Google e tente conectar novamente.",
           );
       }
+      stage = "encrypt";
       const ciphertext = await encryptSecret(tokens.refresh_token);
+      stage = "save";
       await calendarTransaction(context, (tx, ref, connection) => {
         if (
           !matchesPending(connection, context) ||
@@ -250,6 +268,9 @@ export const googleOAuthCallback = onRequest(
       // Códigos e tokens podem aparecer em erros HTTP: o registro não recebe o erro bruto.
       logger.warn("calendar.oauth.failed", {
         outcome: error instanceof HttpsError ? error.code : "PROVIDER_ERROR",
+        stage,
+        errorName: typeof error?.name === "string" ? error.name : null,
+        status: Number.isInteger(error?.status) ? error.status : null,
       });
       return response
         .status(error instanceof HttpsError ? 400 : 500)

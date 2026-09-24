@@ -47,7 +47,7 @@ export const calendarService = {
   refresh: (professionalId: string) =>
     call<{ blocks: number }>("refreshCalendarBusy", professionalId),
   disconnect: (professionalId: string) =>
-    call<{ status: "REVOKED"; revokedAtGoogle: boolean }>(
+    call<{ status: "REVOKED"; revokedAtGoogle: boolean; calendarDeleted: boolean }>(
       "disconnectCalendar",
       professionalId,
     ),

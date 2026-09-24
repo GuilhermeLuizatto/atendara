@@ -11,7 +11,7 @@ function cancelledDelivery(delivery, at) {
         ? { ...delivery, status: "CANCELLED", cancelledAt: at, nextAttemptAt: null, updatedAt: at, updatedBy: null }
         : null;
 }
-function cancel(task, delivery, reason, at) {
+export function cancel(task, delivery, reason, at) {
     const cancelled = transitionTask(task, "CANCELLED", { at, code: reason, patch: { stopReason: reason } });
     return {
         kind: "STOP",
@@ -20,7 +20,12 @@ function cancel(task, delivery, reason, at) {
         effects: [auditEffect(cancelled, at)],
     };
 }
-export function decideDispatch(input) {
+/**
+ * O que vale para todo tipo executado pela Cloud Tasks: tarefa e tentativa
+ * certas, execucao em andamento, vencimento, horario e chave de emergencia.
+ * `CONTINUE` devolve a tarefa pronta para as travas proprias de cada tipo.
+ */
+export function guardDispatch(input) {
     const { payload, task, now } = input;
     if (!task || task.id !== payload.taskId || task.organizationId !== payload.organizationId) {
         return { kind: "IGNORE", why: "NOT_FOUND" };
@@ -78,6 +83,14 @@ export function decideDispatch(input) {
     });
     if (blocked)
         return { kind: "REQUEUE", task, at: switchRetryAt(now) };
+    return { kind: "CONTINUE", task };
+}
+export function decideDispatch(input) {
+    const guarded = guardDispatch(input);
+    if (guarded.kind !== "CONTINUE")
+        return guarded;
+    const { task } = guarded;
+    const { now } = input;
     if (!input.delivery)
         return cancel(task, null, "DELIVERY_NOT_FOUND", now);
     if (!input.organization || !input.profession) {

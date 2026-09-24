@@ -13,6 +13,9 @@ export const AUTOMATION_TASK_TYPES = [
     "PROCESS_INBOUND_MESSAGE",
     "RAISE_ALERT",
     "WRITE_AUDIT",
+    // Reflexo de um atendimento na agenda "Atendara" do Google (3C). Nao e aviso:
+    // nao tem canal, entrega nem pessoa atendida como destino.
+    "SYNC_CALENDAR_EVENT",
 ];
 export const AUTOMATION_TASK_STATUSES = [
     "PLANNED",
@@ -29,4 +32,6 @@ export const AUTOMATION_QUEUE_STOP_REASONS = [
     "TASK_EXPIRED",
     "NO_EXECUTOR",
     "DELIVERY_NOT_FOUND",
+    // A conexao com o Google caiu, foi trocada ou perdeu o vinculo com quem atende.
+    "CALENDAR_NOT_CONNECTED",
 ];

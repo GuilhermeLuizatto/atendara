@@ -22,14 +22,19 @@ export interface AutomationTaskMeta {
    * fora seriam prova que uma credencial vazada consegue forjar.
    */
   executor: AutomationExecutor;
+  /** Titulo do alerta no painel quando a tarefa falha ou vence. */
+  alertTitle: string;
 }
 
 export const AUTOMATION_TASK_META: Record<AutomationTaskType, AutomationTaskMeta> = {
-  CONFIRM_APPOINTMENT: { label: "Aviso de confirmação", executor: "EXTERNAL" },
-  SEND_REMINDER: { label: "Lembrete", executor: "EXTERNAL" },
-  PROCESS_INBOUND_MESSAGE: { label: "Mensagem recebida", executor: "INTERNAL" },
-  RAISE_ALERT: { label: "Alerta para a equipe", executor: "INTERNAL" },
-  WRITE_AUDIT: { label: "Registro na trilha", executor: "INTERNAL" },
+  CONFIRM_APPOINTMENT: { label: "Aviso de confirmação", executor: "EXTERNAL", alertTitle: "Aviso não enviado" },
+  SEND_REMINDER: { label: "Lembrete", executor: "EXTERNAL", alertTitle: "Aviso não enviado" },
+  PROCESS_INBOUND_MESSAGE: { label: "Mensagem recebida", executor: "INTERNAL", alertTitle: "Mensagem não processada" },
+  RAISE_ALERT: { label: "Alerta para a equipe", executor: "INTERNAL", alertTitle: "Alerta não registrado" },
+  WRITE_AUDIT: { label: "Registro na trilha", executor: "INTERNAL", alertTitle: "Registro não gravado" },
+  // Executor de fora do Atendara — o Google —, chamado pelo backend enquanto
+  // nao ha n8n em producao. Passa pela mesma fila, trilha e chave de emergencia.
+  SYNC_CALENDAR_EVENT: { label: "Agenda Google", executor: "EXTERNAL", alertTitle: "Agenda Google não atualizada" },
 };
 
 /**
@@ -137,9 +142,14 @@ export const AUTOMATION_QUEUE_STOP_LABELS: Record<AutomationQueueStopReason, str
   TASK_EXPIRED: "A tarefa venceu antes de ser executada.",
   NO_EXECUTOR: "Não há executor para este tipo de tarefa.",
   DELIVERY_NOT_FOUND: "O registro do aviso não foi encontrado.",
+  CALENDAR_NOT_CONNECTED: "A agenda Google de quem atende não está conectada.",
 };
 
-export const AUTOMATION_ALERT_TITLE = "Aviso não enviado";
+/**
+ * Validade de uma sincronizacao com a agenda Google. Passado isso a tarefa vence
+ * com alerta: o Google pode estar mostrando um horario que ja nao vale.
+ */
+export const CALENDAR_SYNC_VALIDITY_MINUTES = 1_440;
 
 export const AUTOMATION_STATUS_LABELS: Record<AutomationTaskStatus, string> = {
   PLANNED: "Planejada",

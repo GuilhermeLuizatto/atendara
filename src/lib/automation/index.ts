@@ -7,6 +7,7 @@
  */
 export * from "./appointment-changes";
 export * from "./bridge";
+export * from "./calendar-sync";
 export * from "./dispatch";
 export * from "./effects";
 export * from "./expiry";

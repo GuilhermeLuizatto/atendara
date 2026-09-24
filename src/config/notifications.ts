@@ -328,6 +328,8 @@ export const DELIVERY_FAILURE_LABELS: Record<DeliveryFailureCode, string> = {
   SENDER_NOT_ALLOWED: "Remetente não autorizado",
   ATTEMPTS_EXHAUSTED: "Tentativas esgotadas",
   DISPATCH_INTERRUPTED: "Envio interrompido sem confirmação",
+  CALENDAR_RECONNECT_REQUIRED: "A autorização do Google expirou ou foi revogada",
+  CALENDAR_NOT_PROVISIONED: "A agenda Atendara não existe no Google",
 };
 
 export const NOTIFICATION_DISPATCH_STOP_LABELS: Record<NotificationDispatchOnlyStopReason, string> = {

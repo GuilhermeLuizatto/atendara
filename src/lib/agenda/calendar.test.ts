@@ -40,9 +40,10 @@ describe("o que o evento pode dizer", () => {
     }
   });
 
-  it("a consulta manual pede apenas livre/ocupado", () => {
+  it("pede livre/ocupado e escrita só na agenda criada pelo Atendara", () => {
     expect(GOOGLE_CALENDAR_SCOPES).toEqual([
       "https://www.googleapis.com/auth/calendar.freebusy",
+      "https://www.googleapis.com/auth/calendar.app.created",
     ]);
     // Pedir `calendar` inteiro seria pedir a agenda pessoal de quem atende.
     expect(GOOGLE_CALENDAR_SCOPES).not.toContain("https://www.googleapis.com/auth/calendar");

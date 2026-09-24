@@ -656,12 +656,17 @@ Firestore — backup, arquivo baixado, gateway, provedores — nao sao alcancada
 WhatsApp, escrita de eventos Google Calendar e e-mail têm execução prevista em
 n8n próprio. O n8n **executa**; quem **decide** é o Atendara.
 
-**Primeira entrega da 3C:** a consulta manual de livre/ocupado é uma exceção
-deliberada: `refreshCalendarBusy` chama a API Google diretamente no backend.
-Isso permite validar a integração enquanto a 3B e o executor externo estão em
-espera, sem entregar credenciais a outro serviço. Ela lê somente a agenda
-principal por 30 dias, não cria eventos nem interfere na agenda manual.
-Atualização automática e integração com remarcação ainda não estão ativadas.
+**Exceção da 3C ao n8n:** o Google Calendar é executado pelo próprio backend
+enquanto a 3B e o n8n de produção estão em espera (decisão do titular, 24/09),
+sem entregar credenciais a outro serviço. A consulta manual de livre/ocupado
+(`refreshCalendarBusy`) lê só a agenda principal por 30 dias. A escrita de
+eventos passa pela fila: o gatilho `planCalendarEvents` cria uma tarefa
+`SYNC_CALENDAR_EVENT` por atendimento e profissional, e o despachante, na hora de
+executar, lê o atendimento atual e grava ou apaga o evento na agenda "Atendara"
+(`functions/calendar-google.js`). A decisão continua em
+`src/lib/automation/calendar-sync.ts`; trocar o executor pelo n8n é trocar só
+esse passo. Atualização automática do ocupado e integração com remarcação ainda
+não estão ativadas.
 O contrato HTTP legado `calendarBusyCallback` responde 410: não há tarefa
 correlacionada que legitime uma escrita externa de ocupado.
 
@@ -675,7 +680,7 @@ Firestore + Cloud Functions                              <- decide tudo
 organizations/{orgId}/automationTasks   (+ Cloud Tasks no horario exato)
     |
     +-- confirmar, lembrar, cancelar, oferecer horario --> n8n --> WhatsApp, e-mail
-    +-- criar/editar/apagar evento (futuro) -------------> n8n --> Google Calendar
+    +-- acertar evento na agenda "Atendara" -----------> Google Calendar (backend)
     +-- consulta manual de ocupado --------------------> Google Calendar (backend)
     +-- processar mensagem recebida   <-- n8n repassa o corpo bruto
     +-- gerar alerta ------------------- dentro do Atendara
@@ -770,13 +775,17 @@ e pelo retorno.
 
 - **Um numero de WhatsApp por organizacao.** Quem fala com o paciente e a
   propria organizacao (regra 12).
-- **Google Calendar: enviar e ler só ocupado.** A escrita futura será numa agenda
-  secundaria criada por ele, com texto limitado pelo grau de exposicao (perfil
-  `HIGH`: sem nome e sem tipo de atendimento), e le da agenda principal so inicio
-  e fim dos blocos ocupados. Nenhum titulo ou convidado de terceiro entra no
-  banco, e nao existem duas fontes da verdade.
-  Hoje o OAuth pede apenas `calendar.freebusy`; escrita exigirá nova autorização
-  para `calendar.app.created`. O estado assinado é consumido uma única vez no
+- **Google Calendar: enviar e ler só ocupado.** A escrita é numa agenda
+  secundaria, "Atendara", criada pelo próprio Atendara, com texto limitado pelo
+  grau de exposicao da profissão (`TIME_ONLY`: só "Atendimento" e o horário), e
+  le da agenda principal so inicio e fim dos blocos ocupados. Nenhum titulo ou
+  convidado de terceiro entra no banco, e nao existem duas fontes da verdade.
+  O OAuth pede `calendar.freebusy` e `calendar.app.created` — este só alcança a
+  agenda que o Atendara criou. O id do evento é derivado do atendimento, então
+  repetir a tarefa não duplica evento. Desconectar apaga a agenda "Atendara";
+  conexão apagada por outro caminho (exclusão da organização) dispara
+  `cleanupDeletedCalendarConnection`, que apaga a agenda e revoga a credencial.
+  O estado assinado é consumido uma única vez no
   Firestore, com vínculo e acesso revalidados na conclusão. Desconectar apaga
   credencial, pedido pendente e ocupado antes de chamar a revogação Google.
   Cada conexão tem uma geração e cada consulta tem um identificador: respostas

@@ -16,12 +16,12 @@ export function calendarData(snapshot, collection = "calendarConnections") {
     : null;
 }
 
-/** Revalida dentro da transação: perder o vínculo durante o OAuth invalida a volta. */
-export async function checkCalendarOwner(
-  transaction,
-  context,
-  { disconnect = false } = {},
-) {
+/**
+ * Quem é dono da conexão ainda pode usá-la? Lido na transação de quem chama.
+ * `disconnect` só exige o vínculo: desconectar continua permitido depois do
+ * vencimento da assinatura.
+ */
+export async function calendarOwnerAllowed(transaction, context, { disconnect = false } = {}) {
   const db = getFirestore();
   const account = (
     await transaction.get(db.doc(paths.account(context.userId)))
@@ -51,18 +51,21 @@ export async function checkCalendarOwner(
     !!organization &&
     member?.status === "ACTIVE" &&
     professional?.userId === context.userId;
-  // Desconectar continua permitido após o vencimento da assinatura.
-  if (
-    !owns ||
-    (!disconnect &&
-      (!hasActiveAccess(account) ||
-        !account.modules?.includes("agenda") ||
-        !professional.active ||
-        !permissionsForMembership(
-          member.role,
-          organization.ownerId === context.userId,
-        ).includes("appointment:read")))
-  ) {
+  return (
+    owns &&
+    (disconnect ||
+      (hasActiveAccess(account) &&
+        !!account.modules?.includes("agenda") &&
+        !!professional.active &&
+        permissionsForMembership(member.role, organization.ownerId === context.userId).includes(
+          "appointment:read",
+        )))
+  );
+}
+
+/** Revalida dentro da transação: perder o vínculo durante o OAuth invalida a volta. */
+export async function checkCalendarOwner(transaction, context, options = {}) {
+  if (!(await calendarOwnerAllowed(transaction, context, options))) {
     throw new HttpsError(
       "permission-denied",
       "Conecte somente a sua agenda, com acesso ativo ao Atendara.",

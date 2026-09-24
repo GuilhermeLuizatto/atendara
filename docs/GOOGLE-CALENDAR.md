@@ -1,10 +1,20 @@
-# Google Calendar — primeira entrega da fase 3C
+# Google Calendar — fase 3C
 
 Implementado: cada profissional conecta a própria conta, consulta manualmente
-os próximos 30 dias da agenda principal e desconecta. Entram apenas início e
-fim dos intervalos ocupados. Nenhum evento ou contato é criado, alterado ou
-enviado. Não há atualização automática, bloqueio na agenda do Atendara ou
-remarcação nesta entrega. Ativada em produção e testada com conta real em
+os próximos 30 dias da agenda principal e desconecta. Da agenda principal
+entram apenas início e fim dos intervalos ocupados.
+
+**Escrita (frente 1 da 3C, 24/09):** os atendimentos do profissional aparecem
+numa agenda separada, "Atendara", criada na conta dele ao conectar. Criar,
+remarcar, cancelar ou trocar o profissional de um atendimento acerta o evento
+pela fila (`SYNC_CALENDAR_EVENT`); ao conectar, vão os atendimentos futuros já
+marcados. O evento diz só o que o grau de exposição da profissão permite
+(`calendarEventFor`), com descrição sempre vazia e visibilidade privada.
+Desconectar apaga a agenda "Atendara" do Google. Conexões anteriores a esta
+entrega continuam lendo ocupado e pedem reconexão para escrever.
+
+Não há atualização automática do ocupado, bloqueio na agenda do Atendara ou
+remarcação integrada. Ativada em produção e testada com conta real em
 24/09/2026 — resultado na seção "Teste real de 24/09/2026".
 
 ## Configuração do ambiente de teste
@@ -16,6 +26,9 @@ remarcação nesta entrega. Ativada em produção e testada com conta real em
    "app não verificado" (segue-se em Avançado) e limita a 100 usuários.
 2. Criar um cliente OAuth do tipo aplicação Web. Cadastrar como URI de retorno
    a URL HTTPS exata da function `googleOAuthCallback` em `southamerica-east1`.
+   O escopo `calendar.app.created` é sensível: o app não verificado limita a
+   100 usuários e mostra o aviso de app não verificado. A verificação do app no
+   Google precisa acontecer antes do piloto aberto.
 3. Nas variáveis das Functions (`functions/.env.<project-id>`), preencher
    `GOOGLE_OAUTH_CLIENT_ID`, `CALENDAR_REDIRECT_URL` e `CALENDAR_KMS_KEY`
    (nome completo da CryptoKey: `projects/.../locations/.../keyRings/.../cryptoKeys/...`).
@@ -30,8 +43,9 @@ remarcação nesta entrega. Ativada em produção e testada com conta real em
 6. Gerar os módulos com `node scripts/build-functions.mjs`, executar
    `npm run verify` e `npm run test:repository`. Publicar em ambiente controlado
    `startCalendarConnection`, `googleOAuthCallback`, `getCalendarConnection`,
-   `refreshCalendarBusy`, `disconnectCalendar` e `calendarBusyCallback`, além
-   do painel. A última fecha o contrato legado que aceitava ocupado sem pedido.
+   `refreshCalendarBusy`, `disconnectCalendar`, `calendarBusyCallback`,
+   `planCalendarEvents`, `dispatchAutomationTask` (passa a usar o segredo do
+   cliente OAuth) e `cleanupDeletedCalendarConnection`, além do painel. A última fecha o contrato legado que aceitava ocupado sem pedido.
    **Functions antes do painel:** o merge na `main` publica o site, e um painel
    que chama `getCalendarConnection` sem a function no ar mostra erro na aba.
    O `.env.<project-id>` usado na publicação precisa repetir as variáveis já em

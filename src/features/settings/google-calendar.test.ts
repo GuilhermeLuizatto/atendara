@@ -8,6 +8,7 @@ const NOW = "2026-09-25T12:00:00.000Z";
 const connection: CalendarConnectionView = {
   configured: true,
   status: "CONNECTED",
+  writeEnabled: true,
   lastError: null,
   connectedAt: NOW,
   snapshot: {
@@ -56,5 +57,11 @@ describe("situação da agenda Google", () => {
         snapshot: null,
       }),
     ).toContain("Conecte sua conta Google novamente");
+  });
+  it("diz se os atendimentos estão indo para a agenda Atendara", () => {
+    expect(render(connection)).toContain("sendo enviados à agenda Atendara");
+    const antiga = render({ ...connection, writeEnabled: false });
+    expect(antiga).toContain("Reconecte para enviar seus atendimentos");
+    expect(antiga).toContain("A consulta de ocupado continua funcionando");
   });
 });

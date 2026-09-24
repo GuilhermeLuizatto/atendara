@@ -64,9 +64,16 @@ export function GoogleCalendar({ professionalId }: { professionalId: string }) {
           setAuthorization(null);
           setConfirmDisconnect(false);
           setNotice(
-            result.revokedAtGoogle
-              ? "Agenda desconectada e horários removidos do Atendara."
-              : "Acesso removido do Atendara. O Google não confirmou a revogação; remova também o acesso em sua Conta Google.",
+            [
+              result.revokedAtGoogle
+                ? "Agenda desconectada e horários removidos do Atendara."
+                : "Acesso removido do Atendara. O Google não confirmou a revogação; remova também o acesso em sua Conta Google.",
+              result.calendarDeleted
+                ? ""
+                : "A agenda Atendara pode ter ficado no seu Google; apague-a nas configurações do Google Agenda.",
+            ]
+              .filter(Boolean)
+              .join(" "),
           );
         }
         const value = await calendarService.get(professionalId);
@@ -104,8 +111,14 @@ export function GoogleCalendar({ professionalId }: { professionalId: string }) {
           convidados ou descrições.
         </p>
         <p className="text-muted-foreground text-sm">
-          A atualização é manual. Esta etapa ainda não cria eventos no Google
-          nem bloqueia horários na agenda do Atendara.
+          Seus atendimentos aparecem numa agenda separada, chamada Atendara, no
+          seu Google. O evento mostra o horário e, conforme a sua profissão, o
+          nome de quem é atendido — nunca observações ou valores. O Atendara não
+          altera nenhum outro evento seu.
+        </p>
+        <p className="text-muted-foreground text-sm">
+          A consulta de ocupado é manual e ainda não bloqueia horários na agenda
+          do Atendara.
         </p>
         {error ? (
           <p role="alert" className="text-danger text-sm">
@@ -147,9 +160,11 @@ export function GoogleCalendar({ professionalId }: { professionalId: string }) {
           </Button>
           {connection?.configured && !authorizationUrl ? (
             <Button disabled={busy} onClick={() => void act("connect")}>
-              {connection.status === "CONNECTED"
-                ? "Trocar conta Google"
-                : "Conectar Google Calendar"}
+              {connection.status !== "CONNECTED"
+                ? "Conectar Google Calendar"
+                : connection.writeEnabled
+                  ? "Trocar conta Google"
+                  : "Reconectar Google Calendar"}
             </Button>
           ) : null}
           {connection?.status === "CONNECTED" ? (
@@ -174,9 +189,9 @@ export function GoogleCalendar({ professionalId }: { professionalId: string }) {
         {authorizationUrl ? (
           <div className="bg-surface-muted space-y-3 rounded-lg p-4 text-sm">
             <p>
-              Abra o Google, escolha sua conta e autorize a consulta. Depois
-              volte aqui e clique em Verificar conexão. Este link vale por
-              alguns minutos.
+              Abra o Google, escolha sua conta e autorize a consulta de
+              horários e a agenda Atendara. Depois volte aqui e clique em
+              Verificar conexão. Este link vale por alguns minutos.
             </p>
             <a
               className={buttonStyles()}
@@ -194,7 +209,7 @@ export function GoogleCalendar({ professionalId }: { professionalId: string }) {
             if (!busy) setConfirmDisconnect(false);
           }}
           title="Desconectar agenda Google?"
-          description="O acesso e os horários consultados serão removidos do Atendara. Seus eventos no Google serão preservados."
+          description="O acesso e os horários consultados serão removidos do Atendara, e a agenda Atendara será apagada do seu Google. Seus outros eventos no Google serão preservados."
         >
           <div className="flex justify-end gap-2 p-5">
             <Button
@@ -251,6 +266,13 @@ export function CalendarConnectionDetails({
           {connection.lastError === "RECONNECT_REQUIRED"
             ? "Conecte sua conta Google novamente para continuar."
             : "A última consulta falhou. Os horários anteriores não comprovam disponibilidade atual."}
+        </p>
+      ) : null}
+      {connection.status === "CONNECTED" ? (
+        <p className={connection.writeEnabled ? "text-muted-foreground" : "text-danger"}>
+          {connection.writeEnabled
+            ? "Seus atendimentos estão sendo enviados à agenda Atendara no Google."
+            : "Reconecte para enviar seus atendimentos à agenda Atendara no Google. A consulta de ocupado continua funcionando."}
         </p>
       ) : null}
       {connection.status === "CONNECTED" && !snapshot ? (

@@ -72,6 +72,7 @@ export const SOURCES = [
   ["src/lib/automation/expiry.ts", "automation-expiry"],
   ["src/lib/automation/appointment-changes.ts", "automation-appointment-changes"],
   ["src/lib/automation/bridge.ts", "automation-bridge"],
+  ["src/lib/automation/calendar-sync.ts", "automation-calendar-sync"],
   ["src/lib/automation/emergency.ts", "automation-emergency"],
   ["src/lib/automation/inbound.ts", "automation-inbound"],
   ["src/lib/ai/decision-engine.ts", "decision-engine"],

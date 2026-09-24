@@ -1,6 +1,5 @@
 import {
   AUTOMATION_ACTOR_NAME,
-  AUTOMATION_ALERT_TITLE,
   AUTOMATION_QUEUE_STOP_LABELS,
   AUTOMATION_TASK_META,
 } from "@/config/automation";
@@ -62,7 +61,29 @@ function failureLabel(task: AutomationTask): string {
   return label.charAt(0).toLowerCase() + label.slice(1);
 }
 
+/**
+ * A agenda Google nao "envia" nada a ninguem: o texto fala de atualizar a
+ * agenda, para a trilha nao sugerir que uma mensagem saiu.
+ */
+function calendarSummary(task: AutomationTask): string {
+  switch (task.status) {
+    case "SUCCEEDED":
+      return "Agenda Google atualizada.";
+    case "SCHEDULED":
+      return `Agenda Google: a tentativa ${task.attempt - 1} falhou (${failureLabel(task)}); nova tentativa agendada.`;
+    case "FAILED":
+      return `Agenda Google não atualizada: ${failureLabel(task)}.`;
+    case "CANCELLED":
+      return `Atualização da agenda Google cancelada. ${task.stopReason ? stopReasonLabel(task.stopReason) : ""}`.trim();
+    case "EXPIRED":
+      return "Atualização da agenda Google venceu sem ser feita.";
+    default:
+      return `Agenda Google: ${task.status}.`;
+  }
+}
+
 export function auditSummary(task: AutomationTask): string {
+  if (task.type === "SYNC_CALENDAR_EVENT") return calendarSummary(task);
   switch (task.status) {
     case "SUCCEEDED":
       return task.channel && CHANNEL_META[task.channel].providerId === "SIMULATED"
@@ -122,6 +143,14 @@ export function auditEffect(source: AutomationTask, at: ISODateString): Internal
 
 function alertCause(task: AutomationTask): string {
   if (task.status === "EXPIRED") return AUTOMATION_QUEUE_STOP_LABELS.TASK_EXPIRED;
+  if (task.type === "SYNC_CALENDAR_EVENT") {
+    const label = task.failureCode ? DELIVERY_FAILURE_LABELS[task.failureCode] : "Falha sem código";
+    if (task.failureCode === "CALENDAR_RECONNECT_REQUIRED" || task.failureCode === "CALENDAR_NOT_PROVISIONED") {
+      return `${label}. Reconecte a agenda em Configurações → Google Calendar.`;
+    }
+    // Repetir e inofensivo aqui: o evento tem id derivado do atendimento.
+    return `${label}. Reenvie pela fila de automações para acertar a agenda.`;
+  }
   if (task.failureCode === "DISPATCH_INTERRUPTED") {
     return "A execução foi interrompida sem confirmação. Confira com a pessoa antes de repetir: a mensagem pode ter saído.";
   }
@@ -145,8 +174,11 @@ export function alertEffect(source: AutomationTask, at: ISODateString): Internal
     type: "AUTOMATION_FAILURE",
     priority: "ATTENTION",
     status: "UNREAD",
-    title: AUTOMATION_ALERT_TITLE,
-    body: `${subject(source)}${when} não saiu. ${alertCause(source)}`,
+    title: AUTOMATION_TASK_META[source.type].alertTitle,
+    body:
+      source.type === "SYNC_CALENDAR_EVENT"
+        ? `A agenda Google${when} não foi atualizada. ${alertCause(source)}`
+        : `${subject(source)}${when} não saiu. ${alertCause(source)}`,
     professionalId: source.professionalId,
     target: source.appointmentId ? { type: "appointment", id: source.appointmentId } : null,
     channels: ["DASHBOARD"],

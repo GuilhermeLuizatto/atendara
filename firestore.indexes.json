@@ -221,6 +221,16 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "messagingSenders",
+      "fieldPath": "providerSenderId",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION" },
+        { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
       "collectionGroup": "platformRateLimits",
       "fieldPath": "expiresAt",
       "ttl": true,

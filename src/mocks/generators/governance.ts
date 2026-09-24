@@ -227,7 +227,7 @@ export function buildNotifications(
 
   // Toda decisao escalada vira notificacao: e o canal pelo qual a IA trabalha
   // PARA o profissional, e nao apenas no lugar dele.
-  const nameOf = (clientId: string) =>
+  const nameOf = (clientId: string | null) =>
     clients.find((client) => client.id === clientId)?.fullName ?? "Contato";
 
   for (const decision of decisions.filter((d) => d.escalated)) {

@@ -190,7 +190,7 @@ try {
   await denied(getDocs(query(collectionGroup(db("restricted"), "messages"), where("organizationId", "==", "org-a"))));
 
   // Listagem cruzada de cada colecao operacional.
-  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "services", "auditLogs"]) {
+  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "whatsappConnections", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "services", "auditLogs"]) {
     await denied(getDocs(query(collection(db("a"), paths.collection("org-b", name)), limit(5))));
   }
 
@@ -342,6 +342,11 @@ try {
   }
   await deniedBecause("remetente de outra organizacao", getDoc(doc(db("a"), paths.document("org-b", "messagingSenders", "WHATSAPP"))));
 
+  const whatsappConnection = doc(db("ownerRole"), paths.document("org-a", "whatsappConnections", "WHATSAPP"));
+  await deniedBecause("titular lendo a conexão do WhatsApp", getDoc(whatsappConnection));
+  await deniedBecause("titular escrevendo a conexão do WhatsApp", setDoc(whatsappConnection, { organizationId: "org-a", status: "VALIDATED" }));
+  await deniedBecause("titular apagando a conexão do WhatsApp", deleteDoc(whatsappConnection));
+
   // Sem o modulo de agenda a fila de saida nao abre: todo evento que a alimenta
   // vem de la.
   await denied(getDoc(doc(db("restricted"), paths.document("org-a", "notificationDeliveries", "envio"))));
@@ -373,7 +378,7 @@ try {
   await denied(getDoc(doc(operator, paths.document("org-a", "members", "a"))));
   await denied(updateDoc(doc(operator, paths.document("org-a", "members", "a")), { role: "OWNER" }));
   await denied(deleteDoc(doc(operator, paths.document("org-a", "members", "restricted"))));
-  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "automationSwitches", "services", "auditLogs"]) {
+  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "whatsappConnections", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "automationSwitches", "services", "auditLogs"]) {
     await denied(getDoc(doc(operator, own(name))));
     await denied(setDoc(doc(operator, paths.document("org-a", name, "da-operadora")), { organizationId: "org-a" }));
   }

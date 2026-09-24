@@ -32,7 +32,7 @@ export interface AppliedRuleRef {
 export interface AIDecision extends TenantScopedEntity {
   conversationId: ID;
   messageId: ID;
-  clientId: ID;
+  clientId: ID | null;
   professionalId: ID | null;
   /** Texto avaliado. Truncado; nao substitui a mensagem original. */
   inputPreview: string;

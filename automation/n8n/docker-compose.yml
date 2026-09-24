@@ -5,8 +5,8 @@
 # outra instalacao.
 #
 # Isto NAO e a VPS. Aqui nao existe HTTPS, nao existe backup e nao existe
-# credencial da Meta: e um n8n descartavel para exercitar o contrato com o
-# provedor ficticio. O endurecimento da VPS de verdade e a H.8.
+# credencial da Meta obrigatoria: sem token, use o provedor ficticio. O token
+# opcional e so para homologacao autorizada. O endurecimento da VPS e a H.8.
 name: atendara-n8n-local
 
 services:
@@ -31,6 +31,12 @@ services:
       # Para onde o resultado volta. Emulador de functions da maquina, ou a
       # URL da function no projeto de testes.
       - ATENDARA_CALLBACK_URL=${ATENDARA_CALLBACK_URL}
+      # Entrada Meta -> Atendara. O callback secret deve ser o mesmo valor
+      # configurado como N8N_CALLBACK_SECRET no Secret Manager das Functions.
+      - ATENDARA_META_VERIFY_TOKEN=${ATENDARA_META_VERIFY_TOKEN}
+      - ATENDARA_INBOUND_CALLBACK_URL=${ATENDARA_INBOUND_CALLBACK_URL}
+      # O fluxo real lê esta variável; sem repassá-la, preencher o .env não basta.
+      - ATENDARA_META_TOKEN=${ATENDARA_META_TOKEN:-}
       # Nada de execucao bem-sucedida guardada: o corpo da tarefa tem contato de
       # paciente, e historico de execucao no n8n seria uma copia dele fora do
       # Firestore. So o que falhou fica, e por pouco tempo.

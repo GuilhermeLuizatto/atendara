@@ -58,6 +58,7 @@ export function foldInbound(text: string): string {
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .trim()
+    .replace(/\s+/g, " ")
     .toUpperCase();
 }
 
@@ -68,15 +69,16 @@ export function foldInbound(text: string): string {
  * errada.
  */
 export function normalizeInboundPhone(value: string): string | null {
+  if (!/^\+?[\d\s()-]+$/.test(value)) return null;
   const digits = value.replace(/\D/g, "");
-  if (digits.length < 8 || digits.length > 15) return null;
+  if (!/^[1-9]\d{7,14}$/.test(digits)) return null;
   return `+${digits}`;
 }
 
 /**
  * Lê o corpo do webhook da Meta. Tudo o que não for mensagem de texto ou
- * resposta de botão é descartado em silêncio: status de entrega já volta pela
- * rota do resultado (13.4), e o resto não tem tratamento.
+ * resposta de botão é ignorado. O aceite da API não comprova entrega: eventos
+ * de status precisam de tratamento próprio, separado das mensagens recebidas.
  */
 export function parseInboundPayload(data: unknown): InboundEvent[] {
   if (typeof data !== "object" || data === null) return [];
@@ -93,25 +95,51 @@ export function parseInboundPayload(data: unknown): InboundEvent[] {
         | { metadata?: { phone_number_id?: unknown }; messages?: unknown }
         | undefined;
       const providerSenderId = value?.metadata?.phone_number_id;
-      if (typeof providerSenderId !== "string" || !Array.isArray(value?.messages)) continue;
+      if (
+        typeof providerSenderId !== "string" ||
+        !Array.isArray(value?.messages)
+      )
+        continue;
 
       for (const message of value.messages) {
+        if (typeof message !== "object" || message === null) continue;
         const raw = message as Record<string, unknown>;
         const from = typeof raw.from === "string" ? raw.from : null;
         const id = typeof raw.id === "string" ? raw.id : null;
-        const seconds = Number(raw.timestamp);
-        if (!from || !id || !Number.isFinite(seconds)) continue;
-        const sentAt = new Date(seconds * 1000).toISOString();
+        const seconds =
+          typeof raw.timestamp === "string" && /^\d+$/.test(raw.timestamp)
+            ? Number(raw.timestamp)
+            : NaN;
+        const instant = new Date(seconds * 1000);
+        if (
+          !from ||
+          !normalizeInboundPhone(from) ||
+          !id ||
+          !/^[\x21-\x7e]{1,256}$/.test(id) ||
+          !Number.isSafeInteger(seconds) ||
+          seconds <= 0 ||
+          !Number.isFinite(instant.getTime())
+        )
+          continue;
+        const sentAt = instant.toISOString();
 
         if (raw.type === "text") {
           const text = (raw.text as { body?: unknown })?.body;
           if (typeof text !== "string" || !text.trim()) continue;
-          events.push({ kind: "TEXT", providerSenderId, from, providerMessageId: id, text: text.trim(), sentAt });
+          events.push({
+            kind: "TEXT",
+            providerSenderId,
+            from,
+            providerMessageId: id,
+            text: text.trim(),
+            sentAt,
+          });
           continue;
         }
 
         if (raw.type === "button") {
-          const payload = (raw.button as { payload?: unknown; text?: unknown })?.payload;
+          const payload = (raw.button as { payload?: unknown; text?: unknown })
+            ?.payload;
           const label = (raw.button as { text?: unknown })?.text;
           const button = BUTTONS[foldInbound(String(payload ?? label ?? ""))];
           if (!button) continue;
@@ -134,10 +162,15 @@ export function parseInboundPayload(data: unknown): InboundEvent[] {
 
 /** A janela em que o WhatsApp aceita texto livre, aberta pela pessoa. */
 export function inboundWindowEndsAt(sentAt: ISODateString): ISODateString {
-  return new Date(Date.parse(sentAt) + INBOUND_WINDOW_HOURS * 3_600_000).toISOString();
+  return new Date(
+    Date.parse(sentAt) + INBOUND_WINDOW_HOURS * 3_600_000,
+  ).toISOString();
 }
 
-export function isWithinInboundWindow(windowEndsAt: ISODateString | null, now: ISODateString): boolean {
+export function isWithinInboundWindow(
+  windowEndsAt: ISODateString | null,
+  now: ISODateString,
+): boolean {
   return windowEndsAt !== null && Date.parse(now) < Date.parse(windowEndsAt);
 }
 
@@ -175,14 +208,19 @@ export function decideInbound(input: {
   // A Meta reentrega o mesmo webhook quando não recebe 200 a tempo. Sem esta
   // trava, uma reentrega viraria segunda mensagem, segunda decisão e segunda
   // resposta automática.
-  if (knownProviderMessageIds.includes(event.providerMessageId)) return { kind: "DUPLICATE" };
-
-  if (event.kind === "BUTTON") {
-    return event.button === "CONFIRM" ? { kind: "CONFIRM" } : { kind: "RESCHEDULE" };
-  }
+  if (knownProviderMessageIds.includes(event.providerMessageId))
+    return { kind: "DUPLICATE" };
 
   // Pedido de saída vale mesmo atrasado: quem pediu para parar pediu.
-  if (isOptOut(event.text)) return { kind: "OPT_OUT" };
+  if (event.kind === "TEXT" && isOptOut(event.text)) return { kind: "OPT_OUT" };
+
+  if (event.kind === "BUTTON") {
+    if (lastInboundAt && Date.parse(event.sentAt) < Date.parse(lastInboundAt))
+      return { kind: "OUT_OF_ORDER" };
+    return event.button === "CONFIRM"
+      ? { kind: "CONFIRM" }
+      : { kind: "RESCHEDULE" };
+  }
 
   if (lastInboundAt && Date.parse(event.sentAt) < Date.parse(lastInboundAt)) {
     return { kind: "OUT_OF_ORDER" };
@@ -192,5 +230,7 @@ export function decideInbound(input: {
 
 /** Identidade estável da mensagem recebida, derivada do id da Meta. */
 export function inboundMessageId(providerMessageId: string): ID {
-  return `wa-${providerMessageId.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 96)}`;
+  // A codificação preserva a identidade: retirar pontuação ou truncar fundiria
+  // mensagens diferentes, descartando uma delas como reentrega.
+  return `wa-${encodeURIComponent(providerMessageId)}`;
 }

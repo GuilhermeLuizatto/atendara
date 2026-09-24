@@ -32,6 +32,7 @@ export function bridgeTaskPayload(request) {
         idempotencyKey: request.idempotencyKey,
         expiresAt: request.expiresAt,
         channel: request.channel,
+        ...(request.providerSenderId ? { providerSenderId: request.providerSenderId } : {}),
         deliveryId: request.deliveryId,
         destination: request.destination,
         body: request.body,

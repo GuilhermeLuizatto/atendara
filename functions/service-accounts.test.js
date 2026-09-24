@@ -34,6 +34,7 @@ const GROUP_OF_FILE = {
   "automation-callback.js": "automacao",
   // Cadastro do remetente e ato da operadora, como concessao e revogacao.
   "messaging-senders.js": "operadora",
+  "whatsapp-signup.js": "automacao",
   // A entrada grava mensagem, conversa e decisao do tenant: mesmo alcance da
   // fila que a alimenta.
   "inbound.js": "automacao",

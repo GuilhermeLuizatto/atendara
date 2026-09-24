@@ -23,6 +23,7 @@ export const SOURCES = [
   ["src/types/privacy.ts", "privacy-types"],
   ["src/config/privacy.ts", "privacy-config"],
   ["src/lib/privacy/redaction.ts", "privacy-redaction"],
+  ["src/lib/privacy/decision-preview.ts", "privacy-decision-preview"],
 
   // Fila de automacao (Fase 3, 13.2): o despachante confere as MESMAS travas
   // de `eligibility.ts` que a tela mostra.

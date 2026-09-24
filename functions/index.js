@@ -139,6 +139,7 @@ export {
 export { planAppointmentNotices, dispatchAutomationTask } from "./automation.js";
 export { automationCallback } from "./automation-callback.js";
 export { registerMessagingSender } from "./messaging-senders.js";
+export { completeWhatsappEmbeddedSignup } from "./whatsapp-signup.js";
 export { inboundWebhook } from "./inbound.js";
 export { startCalendarConnection, googleOAuthCallback, disconnectCalendar, calendarBusyCallback } from "./calendar.js";
 export {

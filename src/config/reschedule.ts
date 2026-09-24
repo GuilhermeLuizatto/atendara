@@ -51,7 +51,12 @@ export const RESCHEDULE_REFUSAL_REASONS = [
   "LIMIT_REACHED",
   "APPOINTMENT_NOT_FOUND",
   "APPOINTMENT_NOT_ACTIVE",
+  // A equipe mexeu no atendimento entre a oferta e a escolha: a escolha da
+  // pessoa foi feita sobre um atendimento que não existe mais daquele jeito.
+  "APPOINTMENT_CHANGED",
   "NO_SLOTS",
+  "SLOT_TAKEN",
+  "HOLD_EXPIRED",
 ] as const;
 
 export type RescheduleRefusalReason = (typeof RESCHEDULE_REFUSAL_REASONS)[number];
@@ -63,7 +68,10 @@ export const RESCHEDULE_REFUSAL_LABELS: Record<RescheduleRefusalReason, string> 
   LIMIT_REACHED: "Este atendimento já atingiu o limite de remarcações.",
   APPOINTMENT_NOT_FOUND: "Não há atendimento futuro para remarcar.",
   APPOINTMENT_NOT_ACTIVE: "O atendimento não está mais ativo.",
+  APPOINTMENT_CHANGED: "O atendimento foi alterado pela equipe depois que os horários foram oferecidos.",
   NO_SLOTS: "Não há horário livre dentro da janela de busca.",
+  SLOT_TAKEN: "O horário escolhido pela pessoa foi ocupado antes da confirmação.",
+  HOLD_EXPIRED: "A pessoa escolheu depois que a reserva do horário venceu.",
 };
 
 export function rescheduleHoldEndsAt(now: ISODateString): ISODateString {

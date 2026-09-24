@@ -62,12 +62,19 @@ describe("a tarefa que vai para o n8n", () => {
       organizationId: "org-1",
       idempotencyKey: "chave-1",
       expiresAt: "2026-09-20T13:00:00.000Z",
+      providerSenderId: "1236644296208358",
     });
 
     expect(Object.keys(payload).sort()).toEqual(
-      ["attempt", "body", "channel", "deliveryId", "destination", "expiresAt", "idempotencyKey", "organizationId", "taskId", "version"],
+      ["attempt", "body", "channel", "deliveryId", "destination", "expiresAt", "idempotencyKey", "organizationId", "providerSenderId", "taskId", "version"],
     );
-    expect(payload).toMatchObject({ taskId: "tarefa-1", organizationId: "org-1", attempt: 2, idempotencyKey: "chave-1" });
+    expect(payload).toMatchObject({
+      taskId: "tarefa-1",
+      organizationId: "org-1",
+      attempt: 2,
+      idempotencyKey: "chave-1",
+      providerSenderId: "1236644296208358",
+    });
   });
 
   it("assina horario e corpo juntos: so um dos dois deixaria pedido antigo valer para sempre", () => {

@@ -1866,7 +1866,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     return conversation;
   }
 
-  private requireClient(id: ID): Client {
+  private requireClient(id: ID | null): Client {
     const client = this.snapshot.clients.find((item) => item.id === id);
     if (!client) throw new RepositoryError("Cadastro não encontrado.");
     return client;

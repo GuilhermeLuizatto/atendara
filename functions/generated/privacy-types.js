@@ -47,6 +47,7 @@ export const ORGANIZATION_EXPORT_SECTIONS = [
     "notificationDeliveries",
     "services",
     "messagingSenders",
+    "whatsappConnections",
     "rescheduleRequests",
     "automationSwitches",
     "calendarConnections",

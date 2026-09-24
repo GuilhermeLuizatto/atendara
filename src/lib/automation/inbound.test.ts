@@ -26,7 +26,10 @@ function webhook(message: Record<string, unknown>) {
             field: "messages",
             value: {
               messaging_product: "whatsapp",
-              metadata: { display_phone_number: "15551876897", phone_number_id: SENDER },
+              metadata: {
+                display_phone_number: "15551876897",
+                phone_number_id: SENDER,
+              },
               contacts: [{ profile: { name: "Alex" }, wa_id: FROM }],
               messages: [message],
             },
@@ -46,6 +49,24 @@ const TEXTO = webhook({
 });
 
 describe("ler o corpo do webhook", () => {
+  it("um item nulo ou data inválida não descarta a mensagem válida do mesmo lote", () => {
+    const data = structuredClone(TEXTO);
+    const messages = data.entry[0].changes[0].value.messages;
+    messages.unshift(null as unknown as Record<string, unknown>, {
+      ...messages[0],
+      timestamp: "99999999999999999",
+    });
+    expect(parseInboundPayload(data)).toHaveLength(1);
+  });
+
+  it.each([null, "", "-1", "Infinity", "1.5"])(
+    "recusa timestamp %s sem inventar data",
+    (timestamp) => {
+      const data = structuredClone(TEXTO);
+      data.entry[0].changes[0].value.messages[0].timestamp = timestamp;
+      expect(parseInboundPayload(data)).toEqual([]);
+    },
+  );
   it("separa mensagem de texto, com o remetente e o instante", () => {
     expect(parseInboundPayload(TEXTO)).toEqual([
       {
@@ -62,22 +83,69 @@ describe("ler o corpo do webhook", () => {
   it("reconhece o botao pelo payload ou pelo texto, com ou sem acento", () => {
     for (const button of [{ payload: "CONFIRMAR" }, { text: "Confirmar" }]) {
       const [evento] = parseInboundPayload(
-        webhook({ from: FROM, id: "wamid.1", timestamp: "1789881830", type: "button", button, context: { id: "wamid.0" } }),
+        webhook({
+          from: FROM,
+          id: "wamid.1",
+          timestamp: "1789881830",
+          type: "button",
+          button,
+          context: { id: "wamid.0" },
+        }),
       );
-      expect(evento).toMatchObject({ kind: "BUTTON", button: "CONFIRM", repliedTo: "wamid.0" });
+      expect(evento).toMatchObject({
+        kind: "BUTTON",
+        button: "CONFIRM",
+        repliedTo: "wamid.0",
+      });
     }
 
     const [remarcar] = parseInboundPayload(
-      webhook({ from: FROM, id: "wamid.2", timestamp: "1789881830", type: "button", button: { payload: "REMARCAR" } }),
+      webhook({
+        from: FROM,
+        id: "wamid.2",
+        timestamp: "1789881830",
+        type: "button",
+        button: { payload: "REMARCAR" },
+      }),
     );
-    expect(remarcar).toMatchObject({ kind: "BUTTON", button: "RESCHEDULE", repliedTo: null });
+    expect(remarcar).toMatchObject({
+      kind: "BUTTON",
+      button: "RESCHEDULE",
+      repliedTo: null,
+    });
   });
 
   it("descarta em silencio o que nao sabe tratar, sem quebrar", () => {
-    expect(parseInboundPayload(webhook({ from: FROM, id: "w", timestamp: "1", type: "image", image: {} }))).toEqual([]);
-    expect(parseInboundPayload(webhook({ from: FROM, id: "w", timestamp: "1", type: "text", text: { body: "   " } }))).toEqual([]);
-    expect(parseInboundPayload({ entry: [{ changes: [{ value: { metadata: {} } }] }] })).toEqual([]);
-    expect(parseInboundPayload({ object: "whatsapp_business_account" })).toEqual([]);
+    expect(
+      parseInboundPayload(
+        webhook({
+          from: FROM,
+          id: "w",
+          timestamp: "1",
+          type: "image",
+          image: {},
+        }),
+      ),
+    ).toEqual([]);
+    expect(
+      parseInboundPayload(
+        webhook({
+          from: FROM,
+          id: "w",
+          timestamp: "1",
+          type: "text",
+          text: { body: "   " },
+        }),
+      ),
+    ).toEqual([]);
+    expect(
+      parseInboundPayload({
+        entry: [{ changes: [{ value: { metadata: {} } }] }],
+      }),
+    ).toEqual([]);
+    expect(
+      parseInboundPayload({ object: "whatsapp_business_account" }),
+    ).toEqual([]);
     expect(parseInboundPayload("{}")).toEqual([]);
     expect(parseInboundPayload(null)).toEqual([]);
   });
@@ -91,7 +159,9 @@ describe("ler o corpo do webhook", () => {
             {
               value: {
                 metadata: { phone_number_id: SENDER },
-                statuses: [{ id: "wamid.x", status: "delivered", recipient_id: FROM }],
+                statuses: [
+                  { id: "wamid.x", status: "delivered", recipient_id: FROM },
+                ],
               },
             },
           ],
@@ -109,6 +179,8 @@ describe("o telefone", () => {
   });
 
   it("o que nao parece telefone nao encontra ninguem — melhor do que encontrar a pessoa errada", () => {
+    expect(normalizeInboundPhone("abc5513999990000")).toBeNull();
+    expect(normalizeInboundPhone("0000000000")).toBeNull();
     expect(normalizeInboundPhone("123")).toBeNull();
     expect(normalizeInboundPhone("")).toBeNull();
     expect(normalizeInboundPhone("1".repeat(16))).toBeNull();
@@ -117,7 +189,14 @@ describe("o telefone", () => {
 
 describe("pedido de saida", () => {
   it("vale em qualquer capitalizacao e com acento", () => {
-    for (const texto of ["sair", "SAIR", "Parar", " PARAR ", "não quero receber"]) {
+    for (const texto of [
+      "sair",
+      "SAIR",
+      "Parar",
+      " PARAR ",
+      "não quero receber",
+      "não   quero\nreceber",
+    ]) {
       expect(isOptOut(texto), texto).toBe(true);
     }
   });
@@ -143,14 +222,24 @@ describe("o que fazer com o que chegou", () => {
   };
 
   it("reentrega da Meta nao vira segunda mensagem, segunda decisao nem segunda resposta", () => {
-    expect(decideInbound({ event: base, knownProviderMessageIds: ["wamid.novo"], lastInboundAt: null })).toEqual({
+    expect(
+      decideInbound({
+        event: base,
+        knownProviderMessageIds: ["wamid.novo"],
+        lastInboundAt: null,
+      }),
+    ).toEqual({
       kind: "DUPLICATE",
     });
   });
 
   it("mensagem atrasada e gravada, mas nao manda na conversa", () => {
     expect(
-      decideInbound({ event: base, knownProviderMessageIds: [], lastInboundAt: "2026-09-20T12:30:00.000Z" }),
+      decideInbound({
+        event: base,
+        knownProviderMessageIds: [],
+        lastInboundAt: "2026-09-20T12:30:00.000Z",
+      }),
     ).toEqual({ kind: "OUT_OF_ORDER" });
   });
 
@@ -175,16 +264,41 @@ describe("o que fazer com o que chegou", () => {
       sentAt: base.sentAt,
     });
 
-    expect(decideInbound({ event: botao("CONFIRM"), knownProviderMessageIds: [], lastInboundAt: null })).toEqual({
+    expect(
+      decideInbound({
+        event: botao("CONFIRM"),
+        knownProviderMessageIds: [],
+        lastInboundAt: null,
+      }),
+    ).toEqual({
       kind: "CONFIRM",
     });
-    expect(decideInbound({ event: botao("RESCHEDULE"), knownProviderMessageIds: [], lastInboundAt: null })).toEqual({
+    expect(
+      decideInbound({
+        event: botao("RESCHEDULE"),
+        knownProviderMessageIds: [],
+        lastInboundAt: null,
+      }),
+    ).toEqual({
       kind: "RESCHEDULE",
     });
+    expect(
+      decideInbound({
+        event: botao("CONFIRM"),
+        knownProviderMessageIds: [],
+        lastInboundAt: "2026-09-20T13:00:00.000Z",
+      }),
+    ).toEqual({ kind: "OUT_OF_ORDER" });
   });
 
   it("texto comum vai ao motor de decisao", () => {
-    expect(decideInbound({ event: base, knownProviderMessageIds: [], lastInboundAt: "2026-09-20T11:00:00.000Z" })).toEqual({
+    expect(
+      decideInbound({
+        event: base,
+        knownProviderMessageIds: [],
+        lastInboundAt: "2026-09-20T11:00:00.000Z",
+      }),
+    ).toEqual({
       kind: "CLASSIFY",
     });
   });
@@ -201,8 +315,18 @@ describe("a janela de 24 horas", () => {
 });
 
 describe("a identidade da mensagem", () => {
+  it("preserva diferenças de pontuação e sufixos longos", () => {
+    expect(inboundMessageId("wamid.a/b")).not.toBe(
+      inboundMessageId("wamid.ab"),
+    );
+    expect(inboundMessageId("a".repeat(100) + "1")).not.toBe(
+      inboundMessageId("a".repeat(100) + "2"),
+    );
+  });
   it("deriva do id da Meta, sem caractere que estrague caminho de documento", () => {
-    expect(inboundMessageId("wamid.HBgNNTU=")).toBe("wa-wamidHBgNNTU");
-    expect(inboundMessageId("../outro/caminho")).toBe("wa-outrocaminho");
+    expect(inboundMessageId("wamid.HBgNNTU=")).toBe("wa-wamid.HBgNNTU%3D");
+    expect(inboundMessageId("../outro/caminho")).toBe(
+      "wa-..%2Foutro%2Fcaminho",
+    );
   });
 });

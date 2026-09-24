@@ -119,6 +119,9 @@ export function decideDispatch(input) {
             deliveryId: input.delivery.id,
             channel: input.delivery.channel,
             destination: check.destination,
+            ...(input.delivery.channel === "WHATSAPP" && input.sender?.providerSenderId
+                ? { providerSenderId: input.sender.providerSenderId }
+                : {}),
             body: check.body,
             attempt: task.attempt,
             taskId: task.id,

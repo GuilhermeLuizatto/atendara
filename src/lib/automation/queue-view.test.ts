@@ -34,11 +34,12 @@ describe("leitura operacional da fila", () => {
       taskNeedsAttention(make("cancelada", { status: "CANCELLED" }), now),
     ).toBe(false);
   });
-  it("separa avisos de tarefas internas e combina os três filtros", () => {
+  it("separa avisos de tarefas internas e da agenda Google, e combina os três filtros", () => {
     const rows = [
       make("sms", { status: "FAILED", channel: "SMS" }),
       make("email", { status: "FAILED", channel: "EMAIL" }),
       make("trilha", { type: "WRITE_AUDIT", status: "SUCCEEDED" }),
+      make("agenda", { type: "SYNC_CALENDAR_EVENT", status: "SUCCEEDED", channel: null, deliveryId: null }),
     ];
     expect(
       filterQueue(
@@ -48,7 +49,8 @@ describe("leitura operacional da fila", () => {
       ).map((item) => item.id),
     ).toEqual(["sms"]);
     expect(filterQueue(rows, { ...all, type: "NOTICES" }, now)).toHaveLength(2);
-    expect(filterQueue(rows, all, now)).toHaveLength(3);
+    expect(filterQueue(rows, all, now)).toHaveLength(4);
+    expect(filterQueue(rows, { ...all, type: "SYNC_CALENDAR_EVENT" }, now).map((item) => item.id)).toEqual(["agenda"]);
   });
   it("traz problemas antes do histórico e não modifica a lista original", () => {
     const rows = [

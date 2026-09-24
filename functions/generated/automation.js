@@ -8,6 +8,7 @@
  */
 export * from "./automation-appointment-changes.js";
 export * from "./automation-bridge.js";
+export * from "./automation-calendar-sync.js";
 export * from "./automation-dispatch.js";
 export * from "./automation-effects.js";
 export * from "./automation-expiry.js";

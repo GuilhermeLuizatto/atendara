@@ -8,12 +8,13 @@
  * indisponível, e mais nada.
  */
 /**
- * Esta entrega consulta apenas livre/ocupado da agenda principal. A escrita
- * futura na agenda secundária exigirá novo consentimento para app.created.
+ * Livre/ocupado da agenda principal e, para escrever, só a agenda que o próprio
+ * Atendara cria (`app.created`): o Atendara nunca enxerga nem altera outro
+ * evento do profissional.
  */
-export const GOOGLE_CALENDAR_SCOPES = [
-    "https://www.googleapis.com/auth/calendar.freebusy",
-];
+export const GOOGLE_CALENDAR_FREEBUSY_SCOPE = "https://www.googleapis.com/auth/calendar.freebusy";
+export const GOOGLE_CALENDAR_WRITE_SCOPE = "https://www.googleapis.com/auth/calendar.app.created";
+export const GOOGLE_CALENDAR_SCOPES = [GOOGLE_CALENDAR_FREEBUSY_SCOPE, GOOGLE_CALENDAR_WRITE_SCOPE];
 export const GOOGLE_CALENDAR_NAME = "Atendara";
 /**
  * O que o evento no Google pode dizer, por grau de exposição da profissão.

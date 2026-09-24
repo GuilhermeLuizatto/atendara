@@ -1,8 +1,26 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import * as logger from "firebase-functions/logger";
+import { onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { z } from "zod";
-import { toStored } from "./firestore-dates.js";
+import { getFirestore } from "firebase-admin/firestore";
+import { requeueTask } from "./automation.js";
+import {
+  accessTokenFor,
+  calendarExists,
+  createAtendaraCalendar,
+  deleteAtendaraCalendar,
+  requestGoogle,
+  ReconnectRequiredError,
+  TOKEN_URL,
+} from "./calendar-google.js";
+import { fromStored, toStored } from "./firestore-dates.js";
+import {
+  canWriteCalendar,
+  planCalendarBackfill,
+  queueEnqueueAt,
+} from "./generated/automation.js";
+import { paths } from "./generated/paths.js";
 import {
   GOOGLE_CALENDAR_SCOPES,
   CALENDAR_BUSY_WINDOW_DAYS,
@@ -25,7 +43,6 @@ const CALL_OPTIONS = {
   secrets: SECRETS,
   ...runAs("automacao"),
 };
-const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const STATE_WINDOW_MS = 600_000;
 const id = z
   .string()
@@ -42,8 +59,9 @@ const stateSchema = z
     at: z.number().int(),
   })
   .strict();
-const requestGoogle = (url, init) =>
-  fetch(url, { ...init, signal: AbortSignal.timeout(15_000) });
+/** Atendimentos enviados ao Google na conexão; o resto chega pelas próximas mudanças. */
+const BACKFILL_LIMIT = 300;
+const DEFAULT_TIME_ZONE = "America/Sao_Paulo";
 
 export function signState(secret, payload) {
   const body = Buffer.from(JSON.stringify(payload), "utf8").toString(
@@ -148,6 +166,72 @@ function matchesPending(connection, payload) {
   );
 }
 
+/**
+ * A agenda "Atendara" desta conexão. Na volta de uma autorização caída, a
+ * agenda anterior é reaproveitada se ainda existir — senão o Google ficaria com
+ * duas. Falha aqui não impede conectar: a leitura de ocupado continua, e a tela
+ * pede reconexão para escrever.
+ */
+async function provisionCalendar({ context, accessToken, previousCalendarId }) {
+  if (typeof accessToken !== "string" || !accessToken) return null;
+  try {
+    if (previousCalendarId && (await calendarExists({ accessToken, calendarId: previousCalendarId }))) {
+      return previousCalendarId;
+    }
+    const organization = (await getFirestore().doc(paths.organization(context.organizationId)).get()).data();
+    return await createAtendaraCalendar({
+      accessToken,
+      timeZone: typeof organization?.timezone === "string" ? organization.timezone : DEFAULT_TIME_ZONE,
+    });
+  } catch (error) {
+    logger.warn("calendar.provision.failed", {
+      errorName: typeof error?.name === "string" ? error.name : null,
+      status: Number.isInteger(error?.status) ? error.status : null,
+    });
+    return null;
+  }
+}
+
+/**
+ * Os atendimentos de hoje em diante vão para a agenda recém-conectada. Falhar
+ * aqui não desfaz a conexão: cada mudança seguinte no atendimento acerta o
+ * Google pela fila.
+ */
+async function backfillCalendar(context) {
+  const firestore = getFirestore();
+  const now = new Date().toISOString();
+  try {
+    const snapshot = await firestore
+      .collection(paths.collection(context.organizationId, "appointments"))
+      .where("professionalId", "==", context.professionalId)
+      .where("startsAt", ">=", new Date(now))
+      .orderBy("startsAt")
+      .limit(BACKFILL_LIMIT)
+      .get();
+    const tasks = planCalendarBackfill({
+      organizationId: context.organizationId,
+      professionalId: context.professionalId,
+      appointments: snapshot.docs.map((document) => fromStored("appointments", document.id, document.data())),
+      waiting: [],
+      at: now,
+    });
+    const batch = firestore.batch();
+    for (const task of tasks) {
+      batch.create(
+        firestore.doc(paths.document(context.organizationId, "automationTasks", task.id)),
+        toStored("automationTasks", task),
+      );
+    }
+    await batch.commit();
+    for (const task of tasks) await requeueTask(task, queueEnqueueAt(task, now));
+    logger.info("calendar.backfill", { organizationId: context.organizationId, queued: tasks.length });
+  } catch (error) {
+    logger.warn("calendar.backfill.failed", {
+      errorName: typeof error?.name === "string" ? error.name : null,
+    });
+  }
+}
+
 export const googleOAuthCallback = onRequest(
   {
     region: "southamerica-east1",
@@ -173,7 +257,7 @@ export const googleOAuthCallback = onRequest(
     let stage = "claim";
     try {
       // Uma autorização só pode ser consumida uma vez, mesmo com retornos simultâneos.
-      await calendarTransaction(context, (tx, ref, connection) => {
+      const previousCalendarId = await calendarTransaction(context, (tx, ref, connection) => {
         if (
           !matchesPending(connection, context) ||
           connection.pendingOAuth.claimed
@@ -186,6 +270,8 @@ export const googleOAuthCallback = onRequest(
         writeConnection(tx, ref, context, connection, {
           pendingOAuth: { ...connection.pendingOAuth, claimed: true },
         });
+        // Só sobrevive a queda de autorização (ERROR); desconectar apaga a agenda.
+        return connection.calendarId ?? null;
       });
       if (typeof request.query.code !== "string" || !request.query.code) {
         return response
@@ -229,9 +315,15 @@ export const googleOAuthCallback = onRequest(
         return response
           .status(400)
           .send(
-            "Autorize a consulta de horários no Google e tente conectar novamente.",
+            "Autorize a consulta de horários e a agenda Atendara no Google e tente conectar novamente.",
           );
       }
+      stage = "calendar";
+      const calendarId = await provisionCalendar({
+        context,
+        accessToken: tokens.access_token,
+        previousCalendarId,
+      });
       stage = "encrypt";
       const ciphertext = await encryptSecret(tokens.refresh_token);
       stage = "save";
@@ -250,7 +342,7 @@ export const googleOAuthCallback = onRequest(
           generation: randomUUID(),
           refreshTokenCiphertext: ciphertext,
           scopes: [...GOOGLE_CALENDAR_SCOPES],
-          calendarId: null,
+          calendarId,
           pendingOAuth: null,
           pendingRead: null,
           lastSyncAt: null,
@@ -259,6 +351,8 @@ export const googleOAuthCallback = onRequest(
         });
         tx.delete(calendarRef(context, "calendarBusyBlocks"));
       });
+      stage = "backfill";
+      if (calendarId) await backfillCalendar(context);
       return response
         .status(200)
         .send(
@@ -303,6 +397,8 @@ export const getCalendarConnection = onCall(CALL_OPTIONS, async (request) => {
     return {
       configured,
       status: legacy ? "ERROR" : connection?.status ?? "REVOKED",
+      // Conexões anteriores à escrita só leem ocupado até a próxima autorização.
+      writeEnabled: !legacy && canWriteCalendar(connection ? { ...connection, scopes: connection.scopes ?? [] } : null),
       lastError: legacy ? "RECONNECT_REQUIRED" : connection?.lastError ?? null,
       connectedAt: connection?.connectedAt ?? null,
       snapshot:
@@ -326,7 +422,7 @@ export const disconnectCalendar = onCall(CALL_OPTIONS, async (request) => {
     ...parse(connectSchema, request.data),
   };
   await consumeRateLimit(context.userId, "calendarDisconnect");
-  const ciphertext = await calendarTransaction(
+  const previous = await calendarTransaction(
     context,
     (tx, ref, connection) => {
       // Apaga antes da rede: uma resposta atrasada nunca restaura uma conexão revogada.
@@ -343,29 +439,85 @@ export const disconnectCalendar = onCall(CALL_OPTIONS, async (request) => {
         scopes: [],
       });
       tx.delete(calendarRef(context, "calendarBusyBlocks"));
-      return connection?.refreshTokenCiphertext;
+      return {
+        ciphertext: connection?.refreshTokenCiphertext ?? null,
+        calendarId: connection?.calendarId ?? null,
+      };
     },
     { disconnect: true },
   );
-  let revokedAtGoogle = !ciphertext;
-  if (ciphertext) {
-    try {
-      const token = await decryptSecret(ciphertext);
-      const result = await requestGoogle(
-        "https://oauth2.googleapis.com/revoke",
-        {
-          method: "POST",
-          headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ token }).toString(),
-        },
-      );
-      revokedAtGoogle = result.ok;
-    } catch {
-      logger.warn("calendar.revoke.failed", { outcome: "PROVIDER_ERROR" });
-    }
-  }
-  return { status: "REVOKED", revokedAtGoogle };
+  const { ciphertext } = previous;
+  // Decisão do titular (24/09): sem sincronização, a agenda "Atendara" não
+  // fica no Google com nome de cliente que ninguém mais atualiza.
+  const calendarDeleted = previous.calendarId
+    ? await removeAtendaraCalendar(ciphertext, previous.calendarId)
+    : true;
+  const revokedAtGoogle = ciphertext ? await revokeAtGoogle(ciphertext) : true;
+  return { status: "REVOKED", revokedAtGoogle, calendarDeleted };
 });
+
+/** Revoga a credencial no Google. `false` quando o Google não confirmou. */
+export async function revokeAtGoogle(ciphertext) {
+  try {
+    const token = await decryptSecret(ciphertext);
+    const result = await requestGoogle("https://oauth2.googleapis.com/revoke", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token }).toString(),
+    });
+    return result.ok;
+  } catch {
+    logger.warn("calendar.revoke.failed", { outcome: "PROVIDER_ERROR" });
+    return false;
+  }
+}
+
+/**
+ * Conexão apagada sem passar pela desconexão — exclusão da organização, pela
+ * rotina de fim de teste ou a pedido. Quem apaga roda como outra conta, sem
+ * acesso à chave nem ao segredo do Google; este gatilho, com os dois, apaga a
+ * agenda "Atendara" e revoga a credencial com o que o documento tinha.
+ */
+export const cleanupDeletedCalendarConnection = onDocumentDeleted(
+  {
+    document: paths.document("{organizationId}", "calendarConnections", "{professionalId}"),
+    region: "southamerica-east1",
+    maxInstances: 2,
+    secrets: ["GOOGLE_OAUTH_CLIENT_SECRET"],
+    ...runAs("automacao"),
+  },
+  async (event) => {
+    const data = event.data?.data();
+    const ciphertext = typeof data?.refreshTokenCiphertext === "string" ? data.refreshTokenCiphertext : null;
+    if (!ciphertext) return;
+    const calendarDeleted = data.calendarId ? await removeAtendaraCalendar(ciphertext, data.calendarId) : true;
+    const revokedAtGoogle = await revokeAtGoogle(ciphertext);
+    logger.info("calendar.cleanup", {
+      organizationId: event.params.organizationId,
+      calendarDeleted,
+      revokedAtGoogle,
+    });
+  },
+);
+
+/**
+ * Apaga a agenda "Atendara" com a credencial que está saindo. Sem credencial
+ * ou sem resposta do Google, a tela orienta apagar pela Conta Google.
+ */
+export async function removeAtendaraCalendar(ciphertext, calendarId, deps = {}) {
+  if (!ciphertext || !calendarId) return false;
+  try {
+    const accessToken = await accessTokenFor(ciphertext, deps);
+    await deleteAtendaraCalendar({ accessToken, calendarId }, deps.fetchImpl);
+    return true;
+  } catch (error) {
+    logger.warn("calendar.delete_calendar.failed", {
+      errorName: typeof error?.name === "string" ? error.name : null,
+      status: Number.isInteger(error?.status) ? error.status : null,
+    });
+    return false;
+  }
+}
 
 export const refreshCalendarBusy = onCall(CALL_OPTIONS, async (request) => {
   const context = {
@@ -395,31 +547,21 @@ export const refreshCalendarBusy = onCall(CALL_OPTIONS, async (request) => {
   });
   let failure = "UNAVAILABLE";
   try {
-    const refreshToken = await decryptSecret(original.refreshTokenCiphertext);
-    const renewed = await requestGoogle(TOKEN_URL, {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        refresh_token: refreshToken,
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        grant_type: "refresh_token",
-      }).toString(),
-    });
-    const token = await renewed.json();
-    if (token.error === "invalid_grant") failure = "RECONNECT_REQUIRED";
-    if (
-      !renewed.ok ||
-      typeof token.access_token !== "string" ||
-      !token.access_token
-    )
-      throw new Error("TOKEN_UNAVAILABLE");
+    let accessToken;
+    try {
+      accessToken = await accessTokenFor(original.refreshTokenCiphertext, {
+        client: { clientId: config.clientId, clientSecret: config.clientSecret },
+      });
+    } catch (error) {
+      if (error instanceof ReconnectRequiredError) failure = "RECONNECT_REQUIRED";
+      throw error;
+    }
     const result = await requestGoogle(
       "https://www.googleapis.com/calendar/v3/freeBusy",
       {
         method: "POST",
         headers: {
-          authorization: `Bearer ${token.access_token}`,
+          authorization: `Bearer ${accessToken}`,
           "content-type": "application/json",
         },
         body: JSON.stringify({ timeMin, timeMax, items: [{ id: "primary" }] }),

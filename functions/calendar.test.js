@@ -24,9 +24,33 @@ vi.mock("firebase-admin/firestore", () => {
     exists: store.has(path),
     data: () => store.get(path),
   });
+  const asDate = (value) => (value && typeof value.toDate === "function" ? value.toDate() : new Date(value));
+  // Consulta mínima: filhos diretos da coleção, igualdade e ">=" em data.
+  const query = (path, filters = [], max = Infinity) => ({
+    where: (field, op, value) => query(path, [...filters, { field, op, value }], max),
+    orderBy: () => query(path, filters, max),
+    limit: (count) => query(path, filters, count),
+    get: async () => ({
+      docs: [...store.keys()]
+        .filter((key) => key.startsWith(`${path}/`) && !key.slice(path.length + 1).includes("/"))
+        .filter((key) =>
+          filters.every(({ field, op, value }) => {
+            const actual = store.get(key)[field];
+            return op === "==" ? actual === value : asDate(actual) >= asDate(value);
+          }),
+        )
+        .slice(0, max)
+        .map(snapshot),
+    }),
+  });
   return {
     getFirestore: () => ({
       doc: (path) => ({ path, get: async () => snapshot(path) }),
+      collection: (path) => query(path),
+      batch: () => ({
+        create: (ref, data) => store.set(ref.path, data),
+        commit: async () => {},
+      }),
       runTransaction: async (callback) =>
         callback({
           get: async (ref) => snapshot(ref.path),
@@ -48,6 +72,12 @@ vi.mock("firebase-admin/firestore", () => {
   };
 });
 vi.mock("./rate-limit.js", () => ({ consumeRateLimit: vi.fn(async () => {}) }));
+const queued = vi.hoisted(() => []);
+vi.mock("./automation.js", () => ({
+  requeueTask: vi.fn(async (task) => {
+    queued.push(task.id);
+  }),
+}));
 vi.mock("./kms.js", () => ({
   encryptSecret: vi.fn(async (value) => `cipher(${value})`),
   decryptSecret: vi.fn(async (value) =>
@@ -137,6 +167,7 @@ function queueBusy(body = freeBusy) {
 }
 beforeEach(() => {
   store.clear();
+  queued.length = 0;
   network.calls = [];
   network.responses = [];
   process.env.CALENDAR_STATE_SECRET = SECRET;
@@ -177,11 +208,11 @@ beforeEach(() => {
 });
 
 describe("autorização própria e estado OAuth", () => {
-  it("pede apenas livre/ocupado e identifica o perfil vinculado, mesmo com ID diferente do usuário", async () => {
+  it("pede livre/ocupado e a agenda própria, e identifica o perfil vinculado, mesmo com ID diferente do usuário", async () => {
     const url = new URL((await calendar.startCalendarConnection(call())).url);
     expect(url.origin).toBe("https://accounts.google.com");
     expect(url.searchParams.get("scope")).toBe(
-      "https://www.googleapis.com/auth/calendar.freebusy",
+      "https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.app.created",
     );
     expect(url.searchParams.get("access_type")).toBe("offline");
     expect(
@@ -285,7 +316,10 @@ describe("autorização própria e estado OAuth", () => {
 describe("retorno Google", () => {
   it("cifra a credencial, rejeita repetição e só devolve campos públicos na consulta", async () => {
     const state = await begin();
-    network.responses.push({ ok: true, body: validTokens });
+    network.responses.push(
+      { ok: true, body: validTokens },
+      { ok: true, body: { id: "agenda-atendara" } },
+    );
     expect((await callback(state)).code).toBe(200);
     expect(store.get(connectionPath).refreshTokenCiphertext).toBe(
       "cipher(private-refresh)",
@@ -299,7 +333,82 @@ describe("retorno Google", () => {
       /cipher|private|nonce|pendingOAuth|generation/,
     );
     expect((await callback(state)).code).toBe(400);
-    expect(network.calls).toHaveLength(1);
+    expect(network.calls).toHaveLength(2);
+  });
+  it("cria a agenda Atendara no fuso da organização e envia os atendimentos futuros", async () => {
+    store.set(paths.organization(ORG), { ownerId: USER, timezone: "America/Manaus" });
+    const future = (id, overrides = {}) =>
+      store.set(paths.document(ORG, "appointments", id), {
+        professionalId: PROFILE,
+        clientName: "Pessoa Fictícia",
+        startsAt: "2099-01-10T12:00:00.000Z",
+        endsAt: "2099-01-10T13:00:00.000Z",
+        status: "SCHEDULED",
+        ...overrides,
+      });
+    future("futuro");
+    future("cancelado", { status: "CANCELLED" });
+    future("passado", { startsAt: "2000-01-10T12:00:00.000Z" });
+    future("de-outro", { professionalId: "outro-perfil" });
+
+    const state = await begin();
+    network.responses.push(
+      { ok: true, body: validTokens },
+      { ok: true, body: { id: "agenda-atendara" } },
+    );
+    expect((await callback(state)).code).toBe(200);
+
+    const created = network.calls[1];
+    expect(created.url).toBe("https://www.googleapis.com/calendar/v3/calendars");
+    expect(JSON.parse(created.init.body)).toEqual({ summary: "Atendara", timeZone: "America/Manaus" });
+    expect(store.get(connectionPath)).toMatchObject({
+      calendarId: "agenda-atendara",
+      scopes: GOOGLE_CALENDAR_SCOPES,
+    });
+    expect(queued).toHaveLength(1);
+    const task = store.get(paths.document(ORG, "automationTasks", queued[0]));
+    expect(task).toMatchObject({
+      type: "SYNC_CALENDAR_EVENT",
+      appointmentId: "futuro",
+      professionalId: PROFILE,
+      clientId: null,
+    });
+    const publicData = await calendar.getCalendarConnection(call());
+    expect(publicData.writeEnabled).toBe(true);
+    expect(JSON.stringify(publicData)).not.toContain("agenda-atendara");
+  });
+  it("sem a permissão da agenda própria, não conecta", async () => {
+    const state = await begin();
+    network.responses.push({
+      ok: true,
+      body: { ...validTokens, scope: "https://www.googleapis.com/auth/calendar.freebusy" },
+    });
+    expect((await callback(state)).code).toBe(400);
+    expect(store.get(connectionPath).status).toBe("REVOKED");
+  });
+  it("reconectar depois de autorização caída reaproveita a agenda que ainda existe", async () => {
+    seedConnected();
+    Object.assign(store.get(connectionPath), { status: "ERROR", calendarId: "agenda-anterior" });
+    const state = await begin();
+    network.responses.push(
+      { ok: true, body: validTokens },
+      { ok: true, body: { id: "agenda-anterior" } },
+    );
+    expect((await callback(state)).code).toBe(200);
+    expect(network.calls[1]).toMatchObject({
+      url: "https://www.googleapis.com/calendar/v3/calendars/agenda-anterior",
+      init: { method: "GET" },
+    });
+    expect(network.calls).toHaveLength(2);
+    expect(store.get(connectionPath).calendarId).toBe("agenda-anterior");
+  });
+  it("sem conseguir criar a agenda, conecta só para ler e a tela pede reconexão para escrever", async () => {
+    const state = await begin();
+    network.responses.push({ ok: true, body: validTokens }, { ok: false, status: 500, body: {} });
+    expect((await callback(state)).code).toBe(200);
+    expect(store.get(connectionPath)).toMatchObject({ status: "CONNECTED", calendarId: null });
+    expect((await calendar.getCalendarConnection(call())).writeEnabled).toBe(false);
+    expect(queued).toHaveLength(0);
   });
   it("falha do KMS registra etapa e status, sem token nem código", async () => {
     const logger = await import("firebase-functions/logger");
@@ -493,6 +602,7 @@ describe("consulta manual e desconexão", () => {
     expect(await calendar.disconnectCalendar(call())).toEqual({
       status: "REVOKED",
       revokedAtGoogle: false,
+      calendarDeleted: true,
     });
     expect(store.has(busyPath)).toBe(false);
     expect(store.get(connectionPath)).toMatchObject({
@@ -500,6 +610,35 @@ describe("consulta manual e desconexão", () => {
       pendingOAuth: null,
       pendingRead: null,
     });
+  });
+  it("desconectar apaga a agenda Atendara antes de revogar a credencial", async () => {
+    seedConnected();
+    store.get(connectionPath).calendarId = "agenda-atendara";
+    network.responses.push(
+      { ok: true, body: { access_token: "short" } },
+      { ok: true, body: {} },
+      { ok: true, body: {} },
+    );
+    expect(await calendar.disconnectCalendar(call())).toEqual({
+      status: "REVOKED",
+      revokedAtGoogle: true,
+      calendarDeleted: true,
+    });
+    expect(network.calls.map((item) => [item.init.method, item.url])).toEqual([
+      ["POST", "https://oauth2.googleapis.com/token"],
+      ["DELETE", "https://www.googleapis.com/calendar/v3/calendars/agenda-atendara"],
+      ["POST", "https://oauth2.googleapis.com/revoke"],
+    ]);
+    expect(store.get(connectionPath)).toMatchObject({ calendarId: null, refreshTokenCiphertext: null });
+  });
+  it("conexão anterior à escrita continua lendo ocupado, mas não escreve", async () => {
+    seedConnected();
+    Object.assign(store.get(connectionPath), {
+      scopes: ["https://www.googleapis.com/auth/calendar.freebusy"],
+      calendarId: null,
+    });
+    const publicData = await calendar.getCalendarConnection(call());
+    expect(publicData).toMatchObject({ status: "CONNECTED", writeEnabled: false });
   });
   it("reconectar apaga a leitura da conta anterior", async () => {
     queueBusy();

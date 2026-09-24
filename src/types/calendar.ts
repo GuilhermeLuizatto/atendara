@@ -4,6 +4,8 @@ import type { BusyBlock } from "@/lib/agenda/availability";
 export interface CalendarConnectionView {
   configured: boolean;
   status: "CONNECTED" | "REVOKED" | "ERROR";
+  /** Os atendimentos estão indo para a agenda "Atendara" no Google. */
+  writeEnabled: boolean;
   connectedAt: string | null;
   lastError: "UNAVAILABLE" | "RECONNECT_REQUIRED" | null;
   snapshot: {

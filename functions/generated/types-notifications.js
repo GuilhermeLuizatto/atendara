@@ -43,6 +43,9 @@ export const DELIVERY_FAILURE_CODES = [
     // A execucao morreu depois de adquirir a tarefa e antes de gravar o
     // resultado. Nao ganha nova tentativa: o envio pode ter saido.
     "DISPATCH_INTERRUPTED",
+    // Agenda Google (3C): a autorizacao caiu, ou a agenda "Atendara" nao existe.
+    "CALENDAR_RECONNECT_REQUIRED",
+    "CALENDAR_NOT_PROVISIONED",
 ];
 /** Por que um evento da agenda nao produziu envio. */
 export const NOTIFICATION_SKIP_REASONS = [

@@ -270,7 +270,9 @@ export const PERSONAL_DATA_MAP = {
     },
     // Conexao com a agenda externa (13.7). O que ha de pessoal e de quem ATENDE,
     // nao de quem e atendido: por isso pedido de titular de dados nao alcanca.
-    // O token cifrado sai inteiro na desconexao, nao na pseudonimizacao.
+    // O token cifrado sai inteiro na desconexao, nao na pseudonimizacao. Apagar
+    // o documento (exclusao da organizacao) dispara a limpeza no Google: a agenda
+    // "Atendara" some e a credencial e revogada.
     calendarConnections: {
         personalFields: ["professionalId"],
         retention: { kind: "WHILE_ORGANIZATION_EXISTS" },

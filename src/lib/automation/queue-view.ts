@@ -36,7 +36,8 @@ export function filterQueue(
             : task.status === filter.status)) &&
         (filter.type === "ALL" ||
           (filter.type === "NOTICES"
-            ? AUTOMATION_TASK_META[task.type].executor === "EXTERNAL"
+            ? // A agenda Google tambem e externa, mas nao tem canal: nao e aviso.
+              AUTOMATION_TASK_META[task.type].executor === "EXTERNAL" && task.channel !== null
             : task.type === filter.type)) &&
         (filter.channel === "ALL" || task.channel === filter.channel),
     )

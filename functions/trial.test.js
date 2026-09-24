@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -44,6 +45,32 @@ const conta = (userId, extra = {}) => ({
 });
 const auditWrites = () => mock.writes.filter(write => write.path.startsWith("platformAuditLogs/"));
 
+/**
+ * O emulador responde sem indice composto; producao recusa com
+ * FAILED_PRECONDITION. Foi assim que `eraseAbandonedTrialsDaily` falhou todo
+ * dia de 18 a 24/09/2026 com todos os testes verdes.
+ *
+ * Reproduz a exigencia do Firestore para igualdades seguidas de UM campo em
+ * intervalo, sem `orderBy`: as igualdades primeiro, em qualquer ordem, depois o
+ * campo do intervalo, tudo crescente e nada a mais — um indice com campos
+ * sobrando depois do intervalo nao serve, e era esse o engano.
+ */
+const INDICES = JSON.parse(readFileSync(new URL("../firestore.indexes.json", import.meta.url), "utf8")).indexes;
+function indiceDeclarado(consulta) {
+  const colecao = consulta[0].path.split("/").pop();
+  const igualdades = new Set(consulta.filter(filtro => filtro.op === "==").map(filtro => filtro.field));
+  const intervalos = new Set(consulta.filter(filtro => filtro.op !== "==").map(filtro => filtro.field));
+  expect(intervalos.size).toBe(1);
+  const [intervalo] = intervalos;
+  return INDICES.some(indice => {
+    if (indice.collectionGroup !== colecao || indice.queryScope !== "COLLECTION") return false;
+    if (indice.fields.length !== igualdades.size + 1) return false;
+    if (indice.fields.some(campo => campo.order !== "ASCENDING")) return false;
+    const prefixo = indice.fields.slice(0, -1).map(campo => campo.fieldPath);
+    return prefixo.every(campo => igualdades.has(campo)) && indice.fields.at(-1).fieldPath === intervalo;
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks(); mock.contas = []; mock.writes = []; mock.consulta = []; mock.documentos.clear();
   mock.commit.mockResolvedValue(undefined); mock.apagar.mockResolvedValue({ requestId: "pedido", counts: {} });
@@ -67,6 +94,11 @@ describe("Fim do teste de 14 dias", () => {
       { path: paths.accounts(), field: "accessUntilMs", op: ">", value: 0 },
       { path: paths.accounts(), field: "accessUntilMs", op: "<=", value: NOW },
     ]);
+  });
+
+  it("tem indice composto declarado para a consulta", async () => {
+    await closeExpiredTrials(NOW);
+    expect(indiceDeclarado(mock.consulta)).toBe(true);
   });
 
   it("marca o inicio da retencao e registra, sem tocar na validade", async () => {
@@ -125,6 +157,11 @@ describe("Apagamento do cadastro abandonado", () => {
       { path: paths.accounts(), field: "blockedSince", op: "<=", value: limite },
     ]);
     expect(mock.apagar).not.toHaveBeenCalled();
+  });
+
+  it("tem indice composto declarado para a consulta", async () => {
+    await eraseAbandonedTrials(NOW);
+    expect(indiceDeclarado(mock.consulta)).toBe(true);
   });
 
   it("apaga pelo mesmo caminho do titular, com a conta dele saindo por ultimo", async () => {

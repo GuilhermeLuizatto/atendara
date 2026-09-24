@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CALENDAR_BUSY_STALE_MINUTES, GOOGLE_CALENDAR_SCOPES } from "@/config/calendar";
+import { CALENDAR_BUSY_STALE_MINUTES, CALENDAR_CLOCK_SKEW_MINUTES, GOOGLE_CALENDAR_SCOPES } from "@/config/calendar";
 import type { Appointment } from "@/types";
 
 import { calendarEventFor, decideCalendarSync, isBusySnapshotFresh, parseBusyBlocks, parsePrimaryBusy } from "./calendar";
@@ -129,6 +129,14 @@ describe("o ocupado lido ainda serve?", () => {
     expect(isBusySnapshotFresh(null, agora)).toBe(false);
     expect(isBusySnapshotFresh("2026-09-26T12:00:00Z", agora)).toBe(false);
     expect(isBusySnapshotFresh("inválida", agora)).toBe(false);
+  });
+
+  it("leitura segundos à frente do relógio da tela vale; muito à frente, não", () => {
+    const logoAposOTique = new Date(Date.parse(agora) + 40_000).toISOString();
+    const muitoAFrente = new Date(Date.parse(agora) + (CALENDAR_CLOCK_SKEW_MINUTES + 1) * 60_000).toISOString();
+
+    expect(isBusySnapshotFresh(logoAposOTique, agora)).toBe(true);
+    expect(isBusySnapshotFresh(muitoAFrente, agora)).toBe(false);
   });
 });
 

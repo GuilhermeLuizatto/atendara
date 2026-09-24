@@ -45,5 +45,11 @@ export const CALENDAR_BUSY_WINDOW_DAYS = 30;
 export const CALENDAR_REFRESH_MINUTES = 30;
 /** Depois disso, o ocupado lido é velho demais para segurar uma oferta. */
 export const CALENDAR_BUSY_STALE_MINUTES = 120;
+/**
+ * Folga para leitura "à frente" do relógio de quem confere: o painel avança o
+ * relógio a cada minuto e o navegador pode estar um pouco atrás do servidor.
+ * Sem ela, a leitura recém-feita aparece como desatualizada.
+ */
+export const CALENDAR_CLOCK_SKEW_MINUTES = 5;
 export const CALENDAR_CONNECTION_STATUSES = ["CONNECTED", "REVOKED", "ERROR"];
 export const CALENDAR_SYNC_ACTIONS = ["CREATE", "UPDATE", "DELETE", "NONE"];

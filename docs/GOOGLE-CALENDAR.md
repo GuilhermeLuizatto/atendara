@@ -4,12 +4,16 @@ Implementado: cada profissional conecta a própria conta, consulta manualmente
 os próximos 30 dias da agenda principal e desconecta. Entram apenas início e
 fim dos intervalos ocupados. Nenhum evento ou contato é criado, alterado ou
 enviado. Não há atualização automática, bloqueio na agenda do Atendara ou
-remarcação nesta entrega. A integração ainda precisa de ativação e teste real.
+remarcação nesta entrega. Ativada em produção e testada com conta real em
+24/09/2026 — resultado na seção "Teste real de 24/09/2026".
 
 ## Configuração do ambiente de teste
 
 1. Habilitar Google Calendar API no projeto Google Cloud e configurar a tela
-   de consentimento OAuth. Em modo de teste, cadastrar a conta que autorizará.
+   de consentimento OAuth. **Não voltar a tela para "teste" num projeto que já
+   está em produção:** ela é a mesma do login com Google do painel, e só contas
+   testadoras conseguiriam entrar. Em produção sem verificação, o Google mostra
+   "app não verificado" (segue-se em Avançado) e limita a 100 usuários.
 2. Criar um cliente OAuth do tipo aplicação Web. Cadastrar como URI de retorno
    a URL HTTPS exata da function `googleOAuthCallback` em `southamerica-east1`.
 3. Nas variáveis das Functions (`functions/.env.<project-id>`), preencher
@@ -18,7 +22,9 @@ remarcação nesta entrega. A integração ainda precisa de ativação e teste r
 4. Guardar `GOOGLE_OAUTH_CLIENT_SECRET` e `CALENDAR_STATE_SECRET` no Secret
    Manager. O segundo deve ser aleatório e forte, separado de outros segredos.
    No emulador, usar `.secret.local`; nunca `NEXT_PUBLIC_*` ou arquivos versionados.
-5. Habilitar Cloud KMS e criar uma chave simétrica. Dar à conta `fn-automacao`
+5. Habilitar Cloud KMS e criar uma chave simétrica, na mesma região das
+   Functions (em produção: keyring `atendara`, chave `google-calendar-tokens`,
+   rotação de 90 dias). Dar à conta `fn-automacao`
    acesso de criptografia/descriptografia **somente nessa chave**, além do
    acesso aos dois segredos. O material OAuth é cifrado antes de ser persistido.
 6. Gerar os módulos com `node scripts/build-functions.mjs`, executar
@@ -26,6 +32,10 @@ remarcação nesta entrega. A integração ainda precisa de ativação e teste r
    `startCalendarConnection`, `googleOAuthCallback`, `getCalendarConnection`,
    `refreshCalendarBusy`, `disconnectCalendar` e `calendarBusyCallback`, além
    do painel. A última fecha o contrato legado que aceitava ocupado sem pedido.
+   **Functions antes do painel:** o merge na `main` publica o site, e um painel
+   que chama `getCalendarConnection` sem a function no ar mostra erro na aba.
+   O `.env.<project-id>` usado na publicação precisa repetir as variáveis já em
+   produção (por exemplo `GEMINI_*`), senão elas somem das functions publicadas.
 7. Confirmar o App Check do painel. O callback OAuth é público com estado
    assinado e nonce de uso único; as demais operações exigem autenticação e
    App Check. Não são necessárias novas permissões de leitura no Firestore.
@@ -55,6 +65,38 @@ remarcação nesta entrega. A integração ainda precisa de ativação e teste r
 O resultado automatizado com respostas fictícias não substitui este teste real.
 Segredos, conta OAuth e autorização do titular são requisitos de ativação, não
 evidência de que o teste já passou. A fase 3C permanece em andamento.
+
+## Teste real de 24/09/2026
+
+Produção (`atendo-a3481`), organização de teste "teste" (Estética), agenda
+principal de uma conta Google do titular, compromisso fictício com título,
+descrição e local marcados para detectar vazamento.
+
+| Passo | Resultado |
+|---|---|
+| 1–2. Conectar e verificar | Passou depois de duas correções (abaixo) |
+| 3. Consultar com o compromisso | Passou: 1 intervalo, 26/09 14:00–15:30, sem título |
+| Conferência no Firestore | `calendarBusyBlocks` só com `startsAt`/`endsAt` em UTC; `calendarConnections` só com `refreshTokenCiphertext` do KMS e escopo `calendar.freebusy` |
+| 4. Remover e consultar | Passou: "não continha horários ocupados. Isso não confirma que a agenda continua livre" |
+| 5. Revogar no Google e consultar | Passou: "Reconexão necessária", sem exibir a leitura antiga |
+| 6. Reconectar e desconectar | Passou: reconexão apagou a leitura anterior; desconexão confirmou a revogação no Google, zerou a credencial e apagou `calendarBusyBlocks` |
+| 7. Outra pessoa, outro tenant, operadora | **Não testado em produção.** Coberto pelos testes automatizados; a aba não aparece para administrador da plataforma |
+
+Defeitos achados e corrigidos no caminho:
+
+- **Token do KMS no caminho errado** (`functions/kms.js`): o pedido ao servidor
+  de metadados ia para `instance/service-account/token`, que responde 404; o
+  certo é `instance/service-accounts/default/token`. Todo teste simulava o KMS,
+  por isso só apareceu em produção. `functions/kms.test.js` fixa o caminho.
+- **Registro sem etapa:** a falha do retorno OAuth só dizia `PROVIDER_ERROR`. O
+  registro passou a levar etapa, nome do erro e status HTTP, sem token, código
+  ou corpo de resposta — foi o que achou o defeito acima.
+- **"Leitura desatualizada" logo após consultar:** o relógio do painel avança a
+  cada minuto e recusava leitura segundos à frente dele. Folga de
+  `CALENDAR_CLOCK_SKEW_MINUTES` (5 min).
+
+Em aberto: a mensagem de reconexão chega à tela com o sufixo `[503]`, que não está
+no texto enviado pelo servidor; a origem no navegador ainda não foi confirmada.
 
 ## Limites e continuidade
 

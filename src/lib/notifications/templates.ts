@@ -70,7 +70,8 @@ function fold(text: string): string {
     .toLowerCase();
 }
 
-function hasForbiddenTerm(text: string): boolean {
+/** A mesma barreira de vocabulario vale para aviso e para resposta na conversa. */
+export function hasForbiddenTerm(text: string): boolean {
   const folded = fold(text);
   return FORBIDDEN_TEMPLATE_TERMS.some((term) => folded.includes(term));
 }

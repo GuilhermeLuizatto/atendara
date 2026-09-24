@@ -21,7 +21,8 @@ function fold(text) {
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase();
 }
-function hasForbiddenTerm(text) {
+/** A mesma barreira de vocabulario vale para aviso e para resposta na conversa. */
+export function hasForbiddenTerm(text) {
     const folded = fold(text);
     return FORBIDDEN_TEMPLATE_TERMS.some((term) => folded.includes(term));
 }

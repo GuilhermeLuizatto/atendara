@@ -33,6 +33,23 @@ describe("texto de consentimento dos avisos", () => {
     expect(text).not.toContain("quem atende");
   });
 
+  it("cita as respostas da assistente a pedidos de remarcacao, na versao que as introduziu", () => {
+    // Opcao A de 24/09: a resposta e aviso, entao quem autoriza precisa le-la.
+    for (const profession of listAllProfessions()) {
+      const text = consentStatement({
+        organizationName: "Clinica Exemplo",
+        channels: profession.notifications.allowedChannels,
+        events: profession.notifications.allowedEvents,
+        disclosure: profession.notifications.disclosure,
+      }).paragraphs.join(" ");
+
+      expect(text, profession.id).toContain("horários livres quando você pedir para remarcar");
+      expect(text, profession.id).toContain("confirmação do horário remarcado");
+      expect(text, profession.id).toContain("aviso de que o pedido de remarcação foi para a equipe");
+    }
+    expect(NOTIFICATION_CONSENT_TEXT_VERSION).toBe("2026-09-24-rascunho");
+  });
+
   it("promete exatamente o grau de exposicao da profissao", () => {
     const base = { organizationName: "X", channels: ["EMAIL"] as const, events: ["APPOINTMENT_REMINDER"] as const };
     const onlyTime = consentStatement({ ...base, disclosure: "TIME_ONLY" }).paragraphs.join(" ");

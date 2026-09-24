@@ -11,7 +11,7 @@ import {
 } from "@/lib/notifications";
 import type {
   Appointment,
-  AppointmentNotificationEvent,
+  AgendaNoticeEvent,
   ID,
   ISODateString,
   NotificationDelivery,
@@ -33,7 +33,7 @@ import type { WorkspaceSnapshot } from "./types";
 function eligibilityInput(
   snapshot: WorkspaceSnapshot,
   appointment: Appointment,
-  event: AppointmentNotificationEvent,
+  event: AgendaNoticeEvent,
   now: ISODateString,
 ): EligibilityInput | null {
   const client = snapshot.clients.find((item) => item.id === appointment.clientId);
@@ -64,7 +64,7 @@ function eligibilityInput(
 export function planForAppointmentEvent(
   snapshot: WorkspaceSnapshot,
   appointment: Appointment,
-  event: AppointmentNotificationEvent,
+  event: AgendaNoticeEvent,
   now: ISODateString,
 ): NotificationPlan {
   const input = eligibilityInput(snapshot, appointment, event, now);

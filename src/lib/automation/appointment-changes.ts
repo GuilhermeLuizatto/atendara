@@ -6,7 +6,7 @@ import {
 } from "@/lib/notifications/planner";
 import type {
   Appointment,
-  AppointmentNotificationEvent,
+  AgendaNoticeEvent,
   AppointmentStatus,
   AutomationStopReason,
   AutomationTask,
@@ -73,11 +73,11 @@ const INACTIVE: readonly AppointmentStatus[] = ["CANCELLED", "NO_SHOW"];
 export function appointmentNoticeEvents(
   before: Appointment | null,
   after: Appointment | null,
-): AppointmentNotificationEvent[] {
+): AgendaNoticeEvent[] {
   if (!after) return [];
   if (!before) return ["APPOINTMENT_SCHEDULED", "APPOINTMENT_REMINDER"];
 
-  const events: AppointmentNotificationEvent[] = [];
+  const events: AgendaNoticeEvent[] = [];
   if (after.status === "CONFIRMED" && before.status !== "CONFIRMED") {
     events.push("APPOINTMENT_CONFIRMED");
   }

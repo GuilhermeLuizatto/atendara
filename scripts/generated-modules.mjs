@@ -62,6 +62,8 @@ export const SOURCES = [
   ["src/lib/notifications/planner.ts", "notifications-planner"],
   ["src/lib/notifications/schedule.ts", "notifications-schedule"],
   ["src/lib/notifications/templates.ts", "notifications-templates"],
+  ["src/lib/notifications/replies.ts", "notifications-replies"],
+  ["src/config/assistant.ts", "assistant-config"],
   ["src/lib/notifications/whatsapp.ts", "notifications-whatsapp"],
   ["src/config/whatsapp.ts", "whatsapp-config"],
   ["src/lib/notifications/providers/index.ts", "notifications-providers"],

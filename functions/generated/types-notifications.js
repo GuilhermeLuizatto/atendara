@@ -4,13 +4,35 @@
  * `Notification`, nao envio — e nao precisa de consentimento nem de contato.
  */
 export const OUTBOUND_CHANNELS = ["EMAIL", "SMS", "WHATSAPP"];
-/** Eventos da agenda que podem gerar aviso ao cliente. */
-export const APPOINTMENT_NOTIFICATION_EVENTS = [
+/** Mudancas da agenda que podem gerar aviso ao cliente. */
+export const AGENDA_NOTICE_EVENTS = [
     "APPOINTMENT_SCHEDULED",
     "APPOINTMENT_REMINDER",
     "APPOINTMENT_CONFIRMED",
     "APPOINTMENT_CANCELLED",
 ];
+/**
+ * Respostas da assistente a um pedido que a propria pessoa fez pelo canal.
+ *
+ * **Sao avisos como os outros** (decisao do titular, 24/09): passam pelas
+ * mesmas travas da regra 11 — regra habilitada, remetente, profissao,
+ * consentimento que nomeie o canal e contato. O que muda e o gatilho: nenhuma
+ * mudanca da agenda as planeja; so a conversa, e so dentro da janela que a
+ * pessoa abriu.
+ */
+export const CONVERSATION_REPLY_EVENTS = [
+    "RESCHEDULE_OFFERED",
+    "RESCHEDULE_CONFIRMED",
+    "RESCHEDULE_HANDED_OFF",
+];
+/** Tudo o que uma regra de aviso pode autorizar. */
+export const APPOINTMENT_NOTIFICATION_EVENTS = [
+    ...AGENDA_NOTICE_EVENTS,
+    ...CONVERSATION_REPLY_EVENTS,
+];
+export function isConversationReplyEvent(event) {
+    return CONVERSATION_REPLY_EVENTS.includes(event);
+}
 /**
  * Situacao do remetente no provedor. `APPROVED` e o unico estado que deixa
  * mensagem sair: `PENDING` e verificacao em andamento na Meta e `REJECTED` e
@@ -74,6 +96,15 @@ export const NOTIFICATION_SKIP_REASONS = [
     "SCHEDULE_IN_THE_PAST",
     "ALREADY_PLANNED",
     "TEMPLATE_REJECTED",
+    // Respostas na conversa: sem cadastro identificado nao ha consentimento a
+    // conferir, e resposta nao sai para "quem quer que seja" daquele numero.
+    "CLIENT_NOT_IDENTIFIED",
+    // Conversa assumida por gente ou marcada como critica: automacao se cala.
+    "CONVERSATION_WITH_HUMAN",
+    // Fora das 24 horas que a pessoa abriu, a Meta so aceita modelo aprovado.
+    "REPLY_WINDOW_CLOSED",
+    // A resposta perdeu o sentido: oferta de horario cuja reserva ja venceu.
+    "REPLY_EXPIRED",
 ];
 /**
  * Por que um aviso ja planejado nao foi enviado. Alem das travas do

@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { PROFESSION_DEFINITIONS } from "@/config/professions/definitions";
 import {
-  APPOINTMENT_NOTIFICATION_EVENTS,
+  AGENDA_NOTICE_EVENTS,
+  isConversationReplyEvent,
   PROFESSION_IDS,
 } from "@/types";
 import { CHANNEL_META } from "@/config/notifications";
@@ -99,7 +100,8 @@ describe("modelos das profissoes", () => {
         ...allowedChannels.map((channel) => CHANNEL_META[channel].maxBodyLength),
       );
 
-      for (const event of allowedEvents) {
+      // Resposta na conversa tem texto proprio, sem profissao (replies.test.ts).
+      for (const event of allowedEvents.filter((item) => !isConversationReplyEvent(item))) {
         const result = renderTemplate(templates[event], context, {
           disclosure,
           maxBodyLength,
@@ -115,7 +117,7 @@ describe("modelos das profissoes", () => {
       if (profession.sensitiveDataProfile !== "HIGH") continue;
 
       expect(profession.notifications.disclosure).toBe("TIME_ONLY");
-      for (const event of APPOINTMENT_NOTIFICATION_EVENTS) {
+      for (const event of AGENDA_NOTICE_EVENTS) {
         expect(profession.notifications.templates[event]).not.toContain(
           "{{serviceTerm}}",
         );

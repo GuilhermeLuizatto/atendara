@@ -21,6 +21,8 @@ import type { AIRule } from "@/types";
 import { RuleForm } from "./rule-form";
 import { Simulator } from "./simulator";
 import { DecisionDetails } from "./decision-details";
+import { AgentSettings } from "./agent-settings";
+import { AnalyticsPanel } from "./analytics-panel";
 
 export function AgentView() {
   const { data } = useWorkspace();
@@ -44,7 +46,7 @@ function AgentSkeleton() {
 function AgentWorkspace() {
   const { data, session, repository } = useWorkspace();
   const actions = useWorkspaceActions();
-  const [tab, setTab] = useState<"rules" | "simulator" | "audit">("rules");
+  const [tab, setTab] = useState<"rules" | "simulator" | "audit" | "settings" | "analytics">("rules");
   const [editing, setEditing] = useState<AIRule | "new" | null>(null);
   const [deleting, setDeleting] = useState<AIRule | null>(null);
   if (!data) return <AgentSkeleton />;
@@ -71,7 +73,7 @@ function AgentWorkspace() {
       <PageHeader
         title={AI_ASSISTANT_NAME}
         description="Sua assistente de IA para a rotina administrativa. Configure as regras e acompanhe cada decisão. Você mantém o controle."
-        actions={<Badge tone="info">IA simulada</Badge>}
+        actions={<Badge tone="info">Processamento local</Badge>}
       />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs
@@ -80,6 +82,8 @@ function AgentWorkspace() {
           value={tab}
           onChange={setTab}
           options={[
+            { value: "settings", label: "Autorizações" },
+            { value: "analytics", label: "Indicadores" },
             { value: "rules", label: "Regras", count: data.rules.length },
             { value: "simulator", label: `Testar ${AI_ASSISTANT_NAME}` },
             {
@@ -97,6 +101,8 @@ function AgentWorkspace() {
         )}
       </div>
       <TabPanel idBase="agente" value={tab} className="space-y-5">
+      {tab === "settings" && <AgentSettings key={JSON.stringify(data.organization.settings.ai)} initial={data.organization.settings.ai} />}
+      {tab === "analytics" && <AnalyticsPanel />}
       {tab === "rules" &&
         groups.map((group) => (
           <section key={group.title} className="space-y-3">
@@ -178,7 +184,7 @@ function AgentWorkspace() {
             title="Nenhuma decisão registrada"
             description={
               repository?.mode === "memory"
-                ? "Use Testar para simular uma mensagem; a decisão aparece aqui."
+                ? "As decisões das conversas de demonstração aparecem aqui. A prévia em Testar não grava registros."
                 : "Cada mensagem avaliada pelo agente deixa uma decisão aqui. Sem canal de mensagens integrado, a lista fica vazia até lá."
             }
           />

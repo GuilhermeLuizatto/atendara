@@ -23,7 +23,7 @@ export interface ContextSource {
   confidence: number;
   clientModality: ServiceModality | null;
   clientStatus: string | null;
-  clientHasOutstandingBalance: boolean;
+  clientHasOutstandingBalance: boolean | null;
   appointmentStatus: string | null;
   /** Momento avaliado, ja convertido para dia da semana e hora locais. */
   dayOfWeek: number;

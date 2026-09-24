@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { classificationMeta } from "@/config/classifications";
 import { AI_ACTION_LABELS, RULE_LEVEL_LABELS } from "@/config/labels";
-import type { DecisionOutcome } from "@/types";
+import type { AIDecision, DecisionOutcome } from "@/types";
 import { formatDateTime } from "@/lib/utils/format";
 
 const OUTCOMES = {
@@ -11,7 +11,11 @@ const OUTCOMES = {
   DISABLED: "Desativada",
 };
 
-export function DecisionDetails({ decision }: { decision: DecisionOutcome }) {
+export function DecisionDetails({
+  decision,
+}: {
+  decision: DecisionOutcome & { classifier?: AIDecision["classifier"] };
+}) {
   return (
     <div className="space-y-4 text-sm">
       {"evaluatedAt" in decision &&
@@ -55,7 +59,12 @@ export function DecisionDetails({ decision }: { decision: DecisionOutcome }) {
         </ol>
       </details>
       <p className="text-muted-foreground text-xs">
-        Motor {decision.engineVersion} · IA simulada
+        Motor {decision.engineVersion} ·{" "}
+        {decision.classifier?.status === "SUCCEEDED"
+          ? `Interpretação por Gemini (${decision.classifier.model})`
+          : decision.classifier?.provider === "GEMINI"
+            ? "Gemini sem resultado válido; revisão humana necessária"
+            : "Classificação local por regras"}
       </p>
     </div>
   );

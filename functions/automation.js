@@ -5,14 +5,24 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onTaskDispatched } from "firebase-functions/v2/tasks";
 import { z } from "zod";
 
+import { accessTokenFor, reconcileEvent, syncResultFrom } from "./calendar-google.js";
+import { calendarOwnerAllowed } from "./calendar-store.js";
 import { fromStored, toStored } from "./firestore-dates.js";
 import {
+  applyCalendarResult,
+  calendarFingerprint,
+  calendarSyncKey,
   completeDispatch,
+  decideCalendarDispatch,
   decideDispatch,
   dispatchPayloadFor,
   handoffDispatch,
   isTerminalStatus,
+  isWaitingStatus,
+  newCalendarSyncTask,
+  noticeTaskId,
   planAppointmentChange,
+  planCalendarSync,
   queueEnqueueAt,
   queueTaskName,
   transitionTask,
@@ -249,6 +259,211 @@ export const planAppointmentNotices = onDocumentWritten(
   },
 );
 
+// --------------------------------------------------------- agenda Google
+
+/** A conexão sem o token: o planejamento e o despacho não precisam dele. */
+function writeConnectionFrom(snapshot) {
+  const connection = stored("calendarConnections", snapshot);
+  return connection ? { ...connection, scopes: connection.scopes ?? [] } : null;
+}
+
+/**
+ * Planeja o reflexo de um atendimento na agenda "Atendara" do Google (3C).
+ * Lê na mesma transação a organização, as tarefas do atendimento e a conexão
+ * de quem atendia e de quem atende; grava só tarefas.
+ */
+export async function planCalendarChange(change, deps = {}) {
+  const { enqueue = enqueueDispatch, clock = () => new Date().toISOString() } = deps;
+  const { organizationId, appointmentId, before, after, changedAt } = change;
+  const firestore = db();
+  const scope = tenant(firestore, organizationId);
+
+  const planned = await firestore.runTransaction(async (transaction) => {
+    const organization = organizationFrom(
+      await transaction.get(firestore.doc(paths.organization(organizationId))),
+      changedAt,
+    );
+    if (!organization) return [];
+    const tasks = (await transaction.get(scope.ofAppointment("automationTasks", appointmentId))).docs.map(
+      (document) => stored("automationTasks", document),
+    );
+    const connections = {};
+    for (const professionalId of new Set([before?.professionalId, after?.professionalId])) {
+      if (!professionalId) continue;
+      connections[professionalId] = writeConnectionFrom(
+        await transaction.get(scope.doc("calendarConnections", professionalId)),
+      );
+    }
+    const created = planCalendarSync({
+      organizationId,
+      appointmentId,
+      before,
+      after,
+      connections,
+      tasks,
+      at: changedAt,
+    });
+    for (const task of created) {
+      transaction.create(scope.doc("automationTasks", task.id), toStored("automationTasks", task));
+    }
+    return created;
+  });
+
+  for (const task of planned) await scheduleTask(task, { enqueue, clock });
+  return { queued: planned.map((task) => task.id) };
+}
+
+export const planCalendarEvents = onDocumentWritten(
+  {
+    document: paths.document("{organizationId}", "appointments", "{appointmentId}"),
+    region: REGION,
+    maxInstances: 5,
+    ...runAs("automacao"),
+    // Separado dos avisos: uma falha aqui não segura lembrete, e vice-versa.
+    retry: true,
+  },
+  async (event) => {
+    if (Date.now() - Date.parse(event.time) > PLANNING_EVENT_MAX_AGE_MINUTES * 60_000) {
+      logger.warn("calendar.plan.stale_event", { eventId: event.id });
+      return;
+    }
+    const { organizationId, appointmentId } = event.params;
+    const changedAt = event.data?.after?.exists
+      ? event.data.after.updateTime.toDate().toISOString()
+      : new Date(event.time).toISOString();
+    const result = await planCalendarChange({
+      organizationId,
+      appointmentId,
+      before: stored("appointments", event.data?.before),
+      after: stored("appointments", event.data?.after),
+      changedAt,
+    });
+    logger.info("calendar.plan", { organizationId, appointmentId, queued: result.queued.length });
+  },
+);
+
+/**
+ * Lê, na transação que adquire a tarefa de agenda, o que ela precisa conferir.
+ * O token cifrado sai daqui só para a memória desta execução.
+ */
+async function calendarContext(transaction, firestore, scope, payload, task, now) {
+  const organization = organizationFrom(
+    await transaction.get(firestore.doc(paths.organization(payload.organizationId))),
+    now,
+  );
+  const appointment = task.appointmentId
+    ? stored("appointments", await transaction.get(scope.doc("appointments", task.appointmentId)))
+    : null;
+  const connection = task.professionalId
+    ? writeConnectionFrom(await transaction.get(scope.doc("calendarConnections", task.professionalId)))
+    : null;
+  const professional = task.professionalId
+    ? stored("professionals", await transaction.get(scope.doc("professionals", task.professionalId)))
+    : null;
+  const ownerLinked =
+    !!professional?.userId &&
+    (await calendarOwnerAllowed(transaction, {
+      organizationId: payload.organizationId,
+      professionalId: task.professionalId,
+      userId: professional.userId,
+    }));
+  return { organization, appointment, connection, ownerLinked };
+}
+
+/**
+ * Executa a sincronização fora da transação e grava o resultado numa segunda,
+ * que confere se a tarefa ainda é desta execução. Se o atendimento mudou no
+ * meio, agenda mais uma rodada: a última escrita no Google nunca fica velha.
+ */
+async function runCalendarSync(step, scope, { enqueue, clock, google, ciphertext }) {
+  let result;
+  try {
+    const accessToken = await google.accessTokenFor(ciphertext);
+    await google.reconcileEvent({
+      accessToken,
+      calendarId: step.calendarId,
+      eventId: step.eventId,
+      event: step.event,
+    });
+    result = { outcome: "SYNCED" };
+  } catch (error) {
+    result = syncResultFrom(error);
+  }
+
+  const firestore = db();
+  const taskRef = scope.doc("automationTasks", step.task.id);
+  const outcome = await firestore.runTransaction(async (transaction) => {
+    const current = stored("automationTasks", await transaction.get(taskRef));
+    if (
+      !current ||
+      current.status !== "DISPATCHING" ||
+      current.attempt !== step.task.attempt ||
+      current.dispatchingSince !== step.task.dispatchingSince
+    ) {
+      return null;
+    }
+    const connectionRef = scope.doc("calendarConnections", current.professionalId);
+    const connection = stored("calendarConnections", await transaction.get(connectionRef));
+    const appointment = stored("appointments", await transaction.get(scope.doc("appointments", current.appointmentId)));
+    const siblings = (await transaction.get(scope.ofAppointment("automationTasks", current.appointmentId))).docs.map(
+      (document) => stored("automationTasks", document),
+    );
+
+    const now = clock();
+    const done = applyCalendarResult({ task: current, result, now });
+    transaction.set(taskRef, toStored("automationTasks", done.task));
+    writeEffects(transaction, scope, done.effects);
+
+    // Autorização caída: a conexão passa a pedir reconexão — só se ainda for a
+    // mesma que esta execução usou; uma desconexão no meio prevalece.
+    if (
+      result.failureCode === "CALENDAR_RECONNECT_REQUIRED" &&
+      connection?.status === "CONNECTED" &&
+      connection.generation === step.generation
+    ) {
+      transaction.set(
+        connectionRef,
+        toStored("calendarConnections", {
+          ...connection,
+          status: "ERROR",
+          lastError: "RECONNECT_REQUIRED",
+          updatedAt: now,
+          updatedBy: null,
+        }),
+      );
+    }
+
+    let followUp = null;
+    const key = calendarSyncKey(current.appointmentId, current.professionalId);
+    if (
+      result.outcome === "SYNCED" &&
+      calendarFingerprint(appointment, current.professionalId) !== step.fingerprint &&
+      !siblings.some((task) => task.idempotencyKey === key && task.id !== current.id && isWaitingStatus(task.status))
+    ) {
+      followUp = newCalendarSyncTask({
+        id: noticeTaskId(key, siblings),
+        organizationId: current.organizationId,
+        appointmentId: current.appointmentId,
+        professionalId: current.professionalId,
+        appointmentStartsAt: appointment?.startsAt ?? current.appointmentStartsAt,
+        at: now,
+      });
+      transaction.create(scope.doc("automationTasks", followUp.id), toStored("automationTasks", followUp));
+    }
+    return { done, followUp };
+  });
+
+  if (!outcome) return "LEASE_LOST";
+  if (outcome.done.requeueAt) {
+    await enqueue(dispatchPayloadFor(outcome.done.task), {
+      at: outcome.done.requeueAt,
+      name: queueTaskName(outcome.done.task, outcome.done.requeueAt),
+    });
+  }
+  if (outcome.followUp) await scheduleTask(outcome.followUp, { enqueue, clock });
+  return outcome.done.task.status;
+}
+
 // ------------------------------------------------------------ despachante
 
 /**
@@ -343,6 +558,7 @@ export async function runAutomationTask(data, deps = {}) {
     enqueue = enqueueDispatch,
     clock = () => new Date().toISOString(),
     providers = defaultProviders,
+    google = { accessTokenFor, reconcileEvent },
     // Nome da tarefa na Cloud Tasks que trouxe este ponteiro, quando houver.
     currentTaskName = null,
   } = deps;
@@ -359,6 +575,7 @@ export async function runAutomationTask(data, deps = {}) {
   const taskRef = scope.doc("automationTasks", payload.taskId);
   const now = clock();
 
+  let ciphertext = null;
   const step = await firestore.runTransaction(async (transaction) => {
     const task = stored("automationTasks", await transaction.get(taskRef));
     const context = { delivery: null, organization: null, appointment: null, client: null, professional: null, sender: null };
@@ -368,6 +585,29 @@ export async function runAutomationTask(data, deps = {}) {
       organization: stored("automationSwitches", await transaction.get(scope.doc("automationSwitches", "organization"))),
       global: stored("platformAutomationSwitch", await transaction.get(firestore.doc(paths.platformAutomationSwitch()))),
     };
+
+    if (task?.type === "SYNC_CALENDAR_EVENT") {
+      const calendar = isTerminalStatus(task.status)
+        ? { organization: null, appointment: null, connection: null, ownerLinked: false }
+        : await calendarContext(transaction, firestore, scope, payload, task, now);
+      const decided = decideCalendarDispatch({
+        payload,
+        task,
+        organization: calendar.organization,
+        profession: calendar.organization ? getProfession(calendar.organization.primaryProfession) : null,
+        appointment: calendar.appointment,
+        connection: calendar.connection,
+        ownerLinked: calendar.ownerLinked,
+        switches,
+        now,
+      });
+      if (decided.kind === "STOP" || decided.kind === "SYNC") {
+        transaction.set(taskRef, toStored("automationTasks", decided.task));
+        if (decided.kind === "STOP") writeEffects(transaction, scope, decided.effects);
+      }
+      if (decided.kind === "SYNC") ciphertext = calendar.connection?.refreshTokenCiphertext ?? null;
+      return decided;
+    }
 
     if (task && !isTerminalStatus(task.status)) {
       if (task.deliveryId) {
@@ -442,6 +682,9 @@ export async function runAutomationTask(data, deps = {}) {
     case "SEND":
       outcome = await send(step, scope, { enqueue, clock, providers });
       break;
+    case "SYNC":
+      outcome = await runCalendarSync(step, scope, { enqueue, clock, google, ciphertext });
+      break;
   }
 
   logger.info("automation.dispatch", {
@@ -460,6 +703,8 @@ export const dispatchAutomationTask = onTaskDispatched(
     timeoutSeconds: DISPATCHER_TIMEOUT_SECONDS,
     retryConfig: { ...DISPATCHER_QUEUE_RETRY },
     ...runAs("automacao"),
+    // A agenda Google troca a credencial cifrada por token de acesso aqui.
+    secrets: ["GOOGLE_OAUTH_CLIENT_SECRET"],
     // Quem pode colocar tarefa nesta fila e chamar este despachante. Com isto a
     // CLI concede as duas permissoes so a conta da automacao, na fila e na
     // function — em vez de um papel no projeto inteiro.

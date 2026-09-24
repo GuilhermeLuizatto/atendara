@@ -136,12 +136,23 @@ export {
 
 // Fila de automacao: o gatilho da agenda planeja os avisos e o despachante os
 // executa no horario, conferindo as travas de novo. O navegador so le a fila.
-export { planAppointmentNotices, dispatchAutomationTask } from "./automation.js";
+export { planAppointmentNotices, planCalendarEvents, dispatchAutomationTask } from "./automation.js";
 export { automationCallback } from "./automation-callback.js";
+export { expireAutomationTasksEveryFiveMinutes } from "./automation-expiry.js";
 export { registerMessagingSender } from "./messaging-senders.js";
 export { completeWhatsappEmbeddedSignup } from "./whatsapp-signup.js";
 export { inboundWebhook } from "./inbound.js";
-export { startCalendarConnection, googleOAuthCallback, disconnectCalendar, calendarBusyCallback } from "./calendar.js";
+export { previewAI } from "./ai-preview.js";
+export {
+  startCalendarConnection,
+  googleOAuthCallback,
+  disconnectCalendar,
+  calendarBusyCallback,
+  getCalendarConnection,
+  refreshCalendarBusy,
+  cleanupDeletedCalendarConnection,
+  refreshCalendarBusyEvery30Minutes,
+} from "./calendar.js";
 export {
   setOrganizationAutomationSwitch,
   setGlobalAutomationSwitch,

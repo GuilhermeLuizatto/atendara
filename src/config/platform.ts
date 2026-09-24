@@ -149,6 +149,9 @@ export const PLATFORM_AUDIT_ACTION_LABELS: Record<PlatformAuditAction, string> =
  * mais de um contador, e cada um aparece nesta tabela com nome proprio.
  */
 export const CALLABLE_RATE_LIMITS = {
+  aiPreview: { max: 20, windowSeconds: 60 },
+  geminiOrganization: { max: 200, windowSeconds: 86400 },
+  geminiGlobal: { max: 2000, windowSeconds: 86400 },
   createSubscriptionCheckout: { max: 5, windowSeconds: 600 },
   openBillingPortal: { max: 10, windowSeconds: 600 },
   cancelPlatformSubscription: { max: 3, windowSeconds: 600 },
@@ -171,6 +174,9 @@ export const CALLABLE_RATE_LIMITS = {
   // Conectar e desconectar agenda sao atos raros da propria pessoa. O teto
   // existe porque cada tentativa fala com o Google e com o KMS.
   calendarConnection: { max: 10, windowSeconds: 3600 },
+  calendarStatus: { max: 120, windowSeconds: 3600 },
+  // Um teto separado permite desconectar após esgotar tentativas de conexão.
+  calendarDisconnect: { max: 20, windowSeconds: 3600 },
   whatsappSignup: { max: 10, windowSeconds: 3600 },
   // A chave e para emergencia: um punhado de vezes por hora e muito mais do
   // que qualquer emergencia real precisa, e ja segura um laco.

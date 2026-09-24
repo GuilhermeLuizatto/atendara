@@ -3,14 +3,15 @@ import { AUTOMATION_TASK_META, DISPATCH_CLOCK_SKEW_SECONDS } from "./automation-
 import { applyAttempt } from "./notifications-delivery.js";
 import { recheckBeforeSend } from "./notifications-eligibility.js";
 import { alertEffect, auditEffect } from "./automation-effects.js";
+import { expireWaitingTask } from "./automation-expiry.js";
 import { outboundBlock, switchRetryAt } from "./automation-emergency.js";
-import { isLeaseStale, isTaskExpired, isTerminalStatus, queueEnqueueAt, transitionTask, } from "./automation-tasks.js";
+import { isLeaseStale, isTerminalStatus, queueEnqueueAt, transitionTask, } from "./automation-tasks.js";
 function cancelledDelivery(delivery, at) {
     return delivery
         ? { ...delivery, status: "CANCELLED", cancelledAt: at, nextAttemptAt: null, updatedAt: at, updatedBy: null }
         : null;
 }
-function cancel(task, delivery, reason, at) {
+export function cancel(task, delivery, reason, at) {
     const cancelled = transitionTask(task, "CANCELLED", { at, code: reason, patch: { stopReason: reason } });
     return {
         kind: "STOP",
@@ -19,7 +20,12 @@ function cancel(task, delivery, reason, at) {
         effects: [auditEffect(cancelled, at)],
     };
 }
-export function decideDispatch(input) {
+/**
+ * O que vale para todo tipo executado pela Cloud Tasks: tarefa e tentativa
+ * certas, execucao em andamento, vencimento, horario e chave de emergencia.
+ * `CONTINUE` devolve a tarefa pronta para as travas proprias de cada tipo.
+ */
+export function guardDispatch(input) {
     const { payload, task, now } = input;
     if (!task || task.id !== payload.taskId || task.organizationId !== payload.organizationId) {
         return { kind: "IGNORE", why: "NOT_FOUND" };
@@ -62,19 +68,9 @@ export function decideDispatch(input) {
     if (AUTOMATION_TASK_META[task.type].executor === "INTERNAL") {
         return cancel(task, input.delivery, "NO_EXECUTOR", now);
     }
-    if (isTaskExpired(task, now)) {
-        const expired = transitionTask(task, "EXPIRED", {
-            at: now,
-            code: "TASK_EXPIRED",
-            patch: { stopReason: "TASK_EXPIRED" },
-        });
-        return {
-            kind: "STOP",
-            task: expired,
-            delivery: cancelledDelivery(input.delivery, now),
-            effects: [auditEffect(expired, now), alertEffect(expired, now)],
-        };
-    }
+    const expired = expireWaitingTask(task, input.delivery, now);
+    if (expired)
+        return { kind: "STOP", ...expired };
     if (Date.parse(task.scheduledFor) - DISPATCH_CLOCK_SKEW_SECONDS * 1000 > Date.parse(now)) {
         return { kind: "REQUEUE", task, at: queueEnqueueAt(task, now) };
     }
@@ -87,6 +83,14 @@ export function decideDispatch(input) {
     });
     if (blocked)
         return { kind: "REQUEUE", task, at: switchRetryAt(now) };
+    return { kind: "CONTINUE", task };
+}
+export function decideDispatch(input) {
+    const guarded = guardDispatch(input);
+    if (guarded.kind !== "CONTINUE")
+        return guarded;
+    const { task } = guarded;
+    const { now } = input;
     if (!input.delivery)
         return cancel(task, null, "DELIVERY_NOT_FOUND", now);
     if (!input.organization || !input.profession) {

@@ -42,6 +42,9 @@ export const SNAPSHOT_PAGE_SIZES = {
   aiDecisions: 200,
   notifications: 100,
   notificationDeliveries: 200,
+  automationTasks: 100,
+  // Um documento por profissional conectado; o teto acompanha `professionals`.
+  calendarBusyBlocks: 50,
   auditLogs: 200,
 } as const;
 
@@ -166,6 +169,12 @@ export const snapshotQueries: Record<
       orderBy("occurredAt", "desc"),
       limit(count),
     ),
+  automationTasks: (db, organizationId, count) =>
+    query(tenantQuery(db, organizationId, "automationTasks"), orderBy("createdAt", "desc"), limit(count)),
+
+  // Um documento por profissional; sem ordem de negócio, só um teto.
+  calendarBusyBlocks: (db, organizationId, count) =>
+    query(tenantQuery(db, organizationId, "calendarBusyBlocks"), limit(count)),
 };
 
 /** Id gerado pelo Firestore, sem ida ao servidor. */

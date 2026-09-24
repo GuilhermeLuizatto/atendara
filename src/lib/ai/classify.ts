@@ -27,13 +27,18 @@ export interface ClassificationResult {
   confidence: number;
   intent: AdminIntent | "NONE";
   matchedTerms: string[];
+  /** Impede que uma resposta parcial esconda um segundo pedido. */
+  ambiguous?: boolean;
 }
 
 function normalize(text: string): string {
   return text
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
@@ -59,6 +64,10 @@ const RISK_TERMS = [
   "sem saida",
   "quero desistir",
   "me machucar",
+  "quero morrer",
+  "me matar",
+  "suicidio",
+  "tirar minha vida",
   "socorro",
 ];
 
@@ -150,6 +159,7 @@ const CLASSIFICATION_TERMS: Partial<Record<MessageClassificationId, string[]>> =
     ],
     HEALTH_RELATED: [
       "dor",
+      "dores",
       "lesao",
       "machuquei",
       "estalo",
@@ -210,8 +220,17 @@ const SEVERITY_ORDER: MessageClassificationId[] = [
   "UNKNOWN",
 ];
 
+const STEMS = new Set([
+  "estou desesperad", "sozinh", "terapeutic", "inchad", "alergi", "inflam",
+  "sangr", "encravad", "sintoma", "exame", "treino", "exercicio", "lesao",
+]);
+
 function countMatches(haystack: string, terms: string[]): string[] {
-  return terms.filter((term) => haystack.includes(term));
+  // Limites de palavra evitam que "confirmar" seja encontrado em "desconfirmar"
+  // ou que "dor" transforme "computador" em um relato de saúde.
+  return terms.filter((term) =>
+    new RegExp(`(?:^|\\s)${term}${STEMS.has(term) ? "[a-z]*" : "(?:s|es)?"}(?=\\s|$)`).test(haystack),
+  );
 }
 
 function confidenceFor(matches: number, base: number): number {
@@ -227,7 +246,7 @@ export function classifyMessage(
 
   // 1. Risco tem passagem propria, antes de qualquer pontuacao.
   const riskMatches = countMatches(normalized, RISK_TERMS);
-  if (riskMatches.length > 0 && enabled.has("POSSIBLE_RISK")) {
+  if (riskMatches.length > 0) {
     return {
       classification: "POSSIBLE_RISK",
       confidence: confidenceFor(riskMatches.length, 0.82),
@@ -264,8 +283,10 @@ export function classifyMessage(
   // 3. Intencao administrativa.
   let bestIntent: AdminIntent | "NONE" = "NONE";
   let bestIntentMatches: string[] = [];
+  const intents: AdminIntent[] = [];
   for (const [intent, terms] of Object.entries(ADMIN_INTENT_TERMS)) {
     const matches = countMatches(normalized, terms);
+    if (matches.length) intents.push(intent as AdminIntent);
     if (matches.length > bestIntentMatches.length) {
       bestIntent = intent as AdminIntent;
       bestIntentMatches = matches;
@@ -288,6 +309,16 @@ export function classifyMessage(
     scored.set("ADMINISTRATIVE", bestIntentMatches);
   }
 
+  // Horário acompanha naturalmente remarcar/confirmar/cancelar. Outros pedidos
+  // simultâneos ou uma negação exigem revisão, sem escolher só a primeira parte.
+  const distinctIntents = intents.filter((intent) =>
+    intent !== "SCHEDULING" || !intents.some((item) =>
+      ["RESCHEDULING", "CONFIRMATION", "CANCELLATION"].includes(item)),
+  );
+  const ambiguous = distinctIntents.length > 1 ||
+    /\bnao\b/.test(normalized) ||
+    /\b(ignore|ignorar|desconsidere|esqueca|instrucoes|prompt|finja)\b/.test(normalized);
+
   // 4. Desempate por severidade, nao por quantidade de termos.
   for (const candidate of SEVERITY_ORDER) {
     const matches = scored.get(candidate);
@@ -296,8 +327,9 @@ export function classifyMessage(
     return {
       classification: candidate,
       confidence: confidenceFor(matches.length, 0.72),
-      intent: candidate === "ADMINISTRATIVE" ? bestIntent : "NONE",
+      intent: candidate === "ADMINISTRATIVE" && !ambiguous ? bestIntent : "NONE",
       matchedTerms: matches,
+      ambiguous: candidate === "ADMINISTRATIVE" && ambiguous,
     };
   }
 
@@ -308,5 +340,6 @@ export function classifyMessage(
     confidence: 0.32,
     intent: "NONE",
     matchedTerms: [],
+    ambiguous,
   };
 }

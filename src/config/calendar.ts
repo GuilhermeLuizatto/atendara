@@ -10,21 +10,14 @@ import type { AppointmentDisclosureLevel } from "@/types";
  */
 
 /**
- * Escopos pedidos ao profissional. Os dois mais fechados que resolvem o
- * problema:
- *
- * - `calendar.app.created` cria uma agenda secundária "Atendara" e deixa mexer
- *   **só nos eventos dela** — o Atendara nunca alcança a agenda pessoal;
- * - `calendar.freebusy` lê **livre e ocupado**, sem título, convidado ou
- *   descrição de evento nenhum.
- *
- * Pedir `calendar` inteiro seria pedir a agenda da pessoa para marcar horário
- * da clínica.
+ * Livre/ocupado da agenda principal e, para escrever, só a agenda que o próprio
+ * Atendara cria (`app.created`): o Atendara nunca enxerga nem altera outro
+ * evento do profissional.
  */
-export const GOOGLE_CALENDAR_SCOPES = [
-  "https://www.googleapis.com/auth/calendar.app.created",
-  "https://www.googleapis.com/auth/calendar.freebusy",
-] as const;
+export const GOOGLE_CALENDAR_FREEBUSY_SCOPE = "https://www.googleapis.com/auth/calendar.freebusy";
+export const GOOGLE_CALENDAR_WRITE_SCOPE = "https://www.googleapis.com/auth/calendar.app.created";
+
+export const GOOGLE_CALENDAR_SCOPES = [GOOGLE_CALENDAR_FREEBUSY_SCOPE, GOOGLE_CALENDAR_WRITE_SCOPE] as const;
 
 export const GOOGLE_CALENDAR_NAME = "Atendara";
 
@@ -54,7 +47,7 @@ export const CALENDAR_PRIVATE_EVENT_TITLE = "Atendimento";
 export const CALENDAR_BUSY_WINDOW_DAYS = 30;
 
 /**
- * De quanto em quanto tempo o ocupado externo é relido.
+ * Intervalo reservado para a futura atualização automática (a atual é manual).
  *
  * O bloco lido fica velho entre uma leitura e outra — um compromisso marcado no
  * Google agora só aparece na próxima. Por isso a oferta de horários da 13.6
@@ -65,6 +58,13 @@ export const CALENDAR_REFRESH_MINUTES = 30;
 
 /** Depois disso, o ocupado lido é velho demais para segurar uma oferta. */
 export const CALENDAR_BUSY_STALE_MINUTES = 120;
+
+/**
+ * Folga para leitura "à frente" do relógio de quem confere: o painel avança o
+ * relógio a cada minuto e o navegador pode estar um pouco atrás do servidor.
+ * Sem ela, a leitura recém-feita aparece como desatualizada.
+ */
+export const CALENDAR_CLOCK_SKEW_MINUTES = 5;
 
 export const CALENDAR_CONNECTION_STATUSES = ["CONNECTED", "REVOKED", "ERROR"] as const;
 

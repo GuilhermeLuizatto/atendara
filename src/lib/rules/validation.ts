@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CONDITION_FIELDS } from "@/config/rule-conditions";
 
 import {
   RULE_ACTION_TYPES,
@@ -99,6 +100,26 @@ export function validateRuleInput(input: unknown): ValidationResult {
 
   const errors: string[] = [];
   const rule = parsed.data;
+
+  for (const condition of rule.conditions.conditions) {
+    const field = CONDITION_FIELDS[condition.field];
+    const list = ["IN", "NOT_IN"].includes(condition.operator);
+    const values = Array.isArray(condition.value) ? condition.value : [condition.value];
+    const validType = values.length > 0 && values.every((value) =>
+      typeof value === (field.kind === "text" ? "string" : field.kind));
+    const validOperator = field.kind === "boolean"
+      ? ["EQUALS", "NOT_EQUALS", "IS_TRUE", "IS_FALSE"].includes(condition.operator)
+      : !["IS_TRUE", "IS_FALSE"].includes(condition.operator) &&
+        (field.kind === "number" || !["GREATER_THAN", "LESS_THAN"].includes(condition.operator));
+    const validRange = values.every((value) => typeof value !== "number" ||
+      (Number.isFinite(value) && value >= (field.min ?? -Infinity) &&
+        value <= (field.max ?? Infinity) &&
+        (condition.field === "agent.confidence" || Number.isInteger(value))));
+    const validChoice = !field.options || values.every((value) => typeof value === "string" && Object.hasOwn(field.options!, value));
+    if (!validType || !validOperator || !validRange || !validChoice || list !== Array.isArray(condition.value)) {
+      errors.push(`Condição inválida: ${field.label}. Confira o operador e o valor.`);
+    }
+  }
 
   if (!USER_EDITABLE_RULE_LEVELS.includes(rule.level as RuleLevel)) {
     errors.push(

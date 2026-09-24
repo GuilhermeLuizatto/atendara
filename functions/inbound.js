@@ -43,6 +43,8 @@ import { ROLE_PERMISSIONS } from "./generated/permissions.js";
 import { messagePath, paths } from "./generated/paths.js";
 import { verifyBridgeSignature } from "./n8n-bridge.js";
 import { runAs } from "./service-accounts.js";
+import { classifyWithGemini, geminiEnabledFor } from "./gemini.js";
+import { materializeSeededRules } from "./generated/system-rules-config.js";
 
 /**
  * A mensagem que chega (Fase 3, 13.5).
@@ -61,7 +63,7 @@ import { runAs } from "./service-accounts.js";
  */
 
 const REGION = "southamerica-east1";
-const SECRETS = ["N8N_CALLBACK_SECRET", "META_APP_SECRET"];
+const SECRETS = ["N8N_CALLBACK_SECRET", "META_APP_SECRET", "GEMINI_API_KEY"];
 
 const db = () => getFirestore();
 
@@ -123,6 +125,62 @@ async function clientOfPhone(transaction, organizationId, phone) {
   return snapshot.size === 1 ? stored("clients", snapshot.docs[0]) : null;
 }
 
+/**
+ * Classificação semântica (fase 4), pedida antes da transação. É só
+ * pré-leitura: a transação relê pessoa, conversa e travas, e o resultado só é
+ * usado se a conversa e a profissão continuarem as mesmas.
+ */
+async function semanticBeforeTransaction(ctx) {
+  const { event, firestore, scope, organizationId, phone, messageId, now } =
+    ctx;
+  const found = await firestore
+    .collection(paths.collection(organizationId, "clients"))
+    .where("phone", "==", phone)
+    .limit(2)
+    .get();
+  const client = found.size === 1 ? stored("clients", found.docs[0]) : null;
+  const conversationId = client ? `wa-${client.id}` : `wa-anonimo-${phone}`;
+
+  const [orgSnapshot, previousSnapshot, existingSnapshot] = await Promise.all([
+    firestore.doc(paths.organization(organizationId)).get(),
+    scope.doc("conversations", conversationId).get(),
+    firestore.doc(messagePath(organizationId, conversationId, messageId)).get(),
+  ]);
+  const org = stored("organizations", orgSnapshot);
+  const previous = stored("conversations", previousSnapshot);
+  const kind = decideInbound({
+    event,
+    knownProviderMessageIds: existingSnapshot.exists
+      ? [event.providerMessageId]
+      : [],
+    lastInboundAt: previous?.lastInboundAt ?? previous?.lastMessageAt ?? null,
+  }).kind;
+  // Numero puro e escolha de horario oferecido, nao texto para classificar.
+  if (
+    kind !== "CLASSIFY" ||
+    !org ||
+    org.deletion ||
+    !isProfessionId(org.primaryProfession) ||
+    previous?.escalated ||
+    /^\s*\d+\s*$/.test(event.text)
+  )
+    return null;
+
+  const organization = withOrganizationDefaults(
+    org,
+    organizationId,
+    org.primaryProfession,
+    now,
+  );
+  const result = await classifyWithGemini({
+    text: event.text,
+    profession: getProfession(org.primaryProfession),
+    organizationId,
+    enabled: organization.settings.ai.enabled,
+  });
+  return { conversationId, profession: org.primaryProfession, result };
+}
+
 // A fila é local à tentativa: todos os ramos concluem as leituras antes de
 // enviar escritas ao SDK, e uma repetição da transação refaz tudo do zero.
 async function withDeferredWrites(transaction, operation) {
@@ -166,6 +224,21 @@ export async function applyInboundEvent(event, deps = {}) {
       firestore.doc(paths.document(organizationId, collection, id)),
   };
   const messageId = inboundMessageId(event.providerMessageId);
+
+  // Rede fora da transação: uma repetição do Firestore não pode cobrar outra inferência.
+  // O estado e as travas são lidos novamente dentro da transação antes da decisão.
+  const semantic =
+    event.kind === "TEXT" && geminiEnabledFor(organizationId)
+      ? await semanticBeforeTransaction({
+          event,
+          firestore,
+          scope,
+          organizationId,
+          phone,
+          messageId,
+          now,
+        })
+      : null;
 
   return firestore.runTransaction((realTransaction) =>
     withDeferredWrites(realTransaction, async (transaction) => {
@@ -457,19 +530,31 @@ export async function applyInboundEvent(event, deps = {}) {
             rawOrganization.primaryProfession,
             now,
           );
+          const seeds = materializeSeededRules(organizationId, profession, now);
+          const seedIds = new Set(seeds.map((rule) => rule.id));
+          // O resultado semântico foi pedido antes da transação; só vale se a
+          // conversa e a profissão ainda forem as mesmas nesta leitura.
+          const semanticResult =
+            semantic &&
+            semantic.conversationId === conversationId &&
+            semantic.profession === rawOrganization.primaryProfession
+              ? semantic.result
+              : null;
           const decided = decide({
             text: event.text,
             profession,
             organization,
-            rules,
+            rules: [...seeds, ...rules.filter((rule) => !seedIds.has(rule.id))],
             channel: "WHATSAPP",
             client: client
               ? {
                   modality: client.preferredModality ?? null,
                   status: client.status ?? null,
-                  hasOutstandingBalance: false,
+                  // O webhook nao le o financeiro: desconhecido, nao "sem saldo".
+                  hasOutstandingBalance: null,
                 }
               : null,
+            semanticClassification: semanticResult?.classification,
             now: new Date(now),
             professionalId: conversation?.professionalId ?? null,
             humanHandoff: conversation?.escalated ?? false,
@@ -520,7 +605,8 @@ export async function applyInboundEvent(event, deps = {}) {
                 decided.action === "ESCALATE_TO_PROFESSIONAL",
               engineVersion: decided.engineVersion ?? "13.5",
               decidedAt: now,
-              latencyMs: 0,
+              latencyMs: semanticResult?.metadata.latencyMs ?? 0,
+              ...(semanticResult ? { classifier: semanticResult.metadata } : {}),
               createdAt: now,
               createdBy: null,
               updatedAt: now,

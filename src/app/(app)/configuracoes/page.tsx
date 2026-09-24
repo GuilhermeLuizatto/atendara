@@ -10,15 +10,17 @@ import { isPlatformAdmin, MODULE_LABELS } from "@/config/access";
 import { ROLE_LABELS } from "@/config/permissions";
 import { AgendaSettingsForm } from "@/features/settings/agenda-settings-form";
 import { AuditTrail } from "@/features/settings/audit-trail";
+import { AutomationQueue } from "@/features/automation/automation-queue";
 import { NotificationSettings } from "@/features/settings/notification-settings";
 import { ProfessionChange } from "@/features/settings/profession-change";
+import { GoogleCalendar } from "@/features/settings/google-calendar";
 import { ServiceCatalog } from "@/features/settings/service-catalog";
 import { WhatsappEmbeddedSignup } from "@/features/settings/whatsapp-embedded-signup";
 import { formatDate } from "@/lib/utils/format";
 import { useAuth } from "@/providers/auth-provider";
 import { useWorkspace } from "@/providers/workspace-provider";
 
-type Section = "geral" | "servicos" | "avisos" | "whatsapp" | "auditoria";
+type Section = "geral" | "servicos" | "avisos" | "whatsapp" | "auditoria" | "fila" | "google";
 
 const ID_BASE = "configuracoes";
 
@@ -30,6 +32,8 @@ export default function SettingsPage() {
   const admin = isPlatformAdmin(access);
 
   const canReadAudit = session?.permissions.includes("auditLog:read") ?? false;
+  const ownProfessional = data?.professionals.find((professional) => professional.userId === user?.userId && professional.active);
+  const canConnectCalendar = !admin && !!ownProfessional && session?.permissions.includes("appointment:read");
   // A aba existe pela flag da profissao, nunca pelo nome dela (regra 1).
   const hasCatalog = profession.features.serviceCatalog && (session?.permissions.includes("service:read") ?? false);
   const options: { value: Section; label: string }[] = [
@@ -37,6 +41,8 @@ export default function SettingsPage() {
     ...(hasCatalog ? [{ value: "servicos" as const, label: "Serviços" }] : []),
     { value: "avisos", label: "Avisos de atendimento" },
     { value: "whatsapp", label: "WhatsApp" },
+    ...(canConnectCalendar ? [{ value: "google" as const, label: "Google Calendar" }] : []),
+    ...(session?.permissions.includes("automationQueue:read") ? [{ value: "fila" as const, label: "Fila de automações" }] : []),
     ...(canReadAudit ? [{ value: "auditoria" as const, label: "Trilha de auditoria" }] : []),
   ];
   // Perder a permissao com a aba aberta nao pode deixar um painel orfao.
@@ -124,8 +130,10 @@ export default function SettingsPage() {
         {active === "avisos" ? data ? <NotificationSettings /> : <SkeletonCard lines={6} /> : null}
 
         {active === "whatsapp" ? <WhatsappEmbeddedSignup /> : null}
+        {active === "google" && ownProfessional ? <GoogleCalendar key={ownProfessional.id} professionalId={ownProfessional.id} /> : null}
 
         {active === "auditoria" ? <AuditTrail /> : null}
+        {active === "fila" ? <AutomationQueue /> : null}
       </TabPanel>
     </div>
   );

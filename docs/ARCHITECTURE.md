@@ -279,6 +279,100 @@ a automacao, gera alerta `CRITICAL` e aguarda o humano.
 
 ## 7. Rules Engine
 
+### Fase 4: regras e interpretação com Gemini
+
+O motor `0.4.0` mantém a decisão determinística e aceita classificação semântica
+validada no backend. O classificador local normaliza espaços,
+acentos e pontuação, usa limites de palavra e radicais explícitos, e encaminha
+negações, tentativas de instruir o agente e pedidos administrativos distintos
+na mesma mensagem. Esses sinais não constituem uma detecção semântica completa.
+Risco prevalece mesmo se uma configuração de profissão omitir a categoria.
+
+`CONDITION_FIELDS` descreve os tipos, opções e limites do editor de condições.
+O validador recusa operadores incompatíveis, listas vazias e valores fora do
+domínio. Contexto desconhecido não satisfaz nem condições negativas; em
+particular, não conhecer o cliente não equivale a saber que ele não tem saldo
+pendente. O expediente considera também os dias de trabalho, no fuso da
+organização. O estado de um atendimento específico permanece desconhecido no
+fluxo de mensagens: o editor não oferece esse campo para condições novas.
+
+`updateAISettings` usa a permissão já existente `organization:update`
+(OWNER/ADMIN). Ambos os repositórios validam os dados e registram configuração
+e auditoria atomicamente; as Security Rules validam o bloco alterado. O limiar
+fica entre 80% e 100%, e o motor também recusa limiares inválidos. Habilitar o
+agente não concede consentimento nem habilita canal de envio.
+
+O teste em `/agente` executa `decide` em memória por padrão. A opção
+“Interpretar com Gemini” chama `previewAI`, com autenticação, App Check,
+assinatura vigente, módulo habilitado e permissão de resposta. Organização,
+profissão, permissões e regras vêm do servidor. O simulador aceita contexto
+fictício; a assistência recebe apenas ids e lê mensagem e conversa dentro do
+tenant da conta. Nenhuma prévia grava decisão ou mensagem. A assistência
+consulta as permissões e regras atuais e preenche um rascunho
+somente por ação explícita. A resposta revisada segue a porta já existente de
+resposta humana. Decisões operacionais continuam append-only.
+
+`summarizeDecisions` filtra organização, período e profissional, elimina ids
+duplicados e agrega classificação, ação, confiança, latência p95 e aplicações
+por versão de regra. Não retorna trechos de mensagens, nomes de clientes ou
+dados da cobrança da plataforma. A tela informa paginação parcial, falha de
+carga e ausência de dados; confiança não é acurácia e decisão automática não é
+comprovante de entrega. Prévia sem gravação não alimenta esses indicadores.
+
+**Gemini no servidor.** `functions/gemini.js` chama a API `generateContent` do
+`gemini-3.1-flash-lite`, sem SDK adicional, ferramentas, histórico de conversa
+ou acesso ao banco pelo modelo. O retorno contém somente categoria, intenção,
+confiança e ambiguidade, em JSON validado estritamente. A resposta ao cliente
+continua sendo composta com informação cadastrada e regra autorizadora; texto
+livre gerado pelo modelo não vira resposta. Um parecer externo nunca retira
+risco, sensibilidade ou ambiguidade encontrados localmente. Falha, cota
+esgotada, resposta truncada, bloqueada ou inválida encaminham ao humano.
+
+A entrada de mensagens consulta o modelo fora da transação do Firestore e
+reavalia o estado atual antes de registrar a decisão. Reentregas já gravadas
+não consultam novamente; duas entregas simultâneas ainda podem consumir duas
+inferências, mas a transação mantém uma única decisão. Nenhum envio externo
+foi acrescentado: classificação não comprova elegibilidade nem entrega.
+`aiDecisions.classifier` registra modelo, versão do prompt, estado, tokens e
+latência, sem texto livre; é protegido contra pseudonimização.
+
+**Custo e privacidade.** Texto limitado a 4.000 caracteres, saída a 512 tokens,
+tempo de espera a 12 segundos, sem repetição automática da chamada. Cotas
+transacionais: 200 tentativas por organização e 2.000 globais por janela de
+24 horas; prévia limitada a 20 chamadas por usuário por minuto. Usam a coleção
+existente `platformRateLimits`, com TTL, sem armazenar mensagens. O modelo
+recebe somente a mensagem e a taxonomia; e-mail, telefone, CPF e links são
+reduzidos por padrões. Isso não anonimiza texto livre: nomes e informações
+sensíveis não reconhecidas localmente ainda podem estar presentes.
+
+**Ativação.** Integração desligada por padrão. A operadora configura nas
+Functions `GEMINI_ENABLED=true`, `GEMINI_ORGANIZATION_IDS` com os ids liberados
+(separados por vírgula, sem curinga) e `GEMINI_PAID_TIER_CONFIRMED=true` somente
+depois de verificar que o projeto Google usa a modalidade paga. Essa variável
+é uma declaração operacional, não uma consulta de faturamento. Pela
+[política de preços do Google](https://ai.google.dev/gemini-api/docs/pricing),
+a modalidade gratuita pode usar conteúdo para melhorar produtos; a paga não.
+A liberação do tenant deve considerar essa transferência de texto ao Google.
+
+`GEMINI_API_KEY` fica no Secret Manager, vinculado a `previewAI` e
+`inboundWebhook`, com acesso da conta `fn-automacao`. Nunca usar
+`NEXT_PUBLIC_GEMINI_API_KEY` nem gravar a chave no repositório. No emulador,
+usar `functions/.secret.local` (ignorado pelo Git). Exemplo de configuração
+não secreta: `functions/.env.example`. Antes da publicação, gerar as Functions
+e executar `npm run verify`. Criar o segredo antes de publicar as duas
+Functions; o deploy automático do site não publica Functions. Para desligar,
+remover o tenant da lista ou definir `GEMINI_ENABLED=false` e republicar.
+
+**Avaliação antes de liberar mensagens reais.** `npm run evaluate:gemini`
+executa 20 exemplos fictícios em português com uma chave disponibilizada no
+ambiente e confirmação de modalidade paga. É uma avaliação paga explícita,
+separada dos testes automáticos sem rede. Exige ao menos 90% de concordância,
+zero falhas de API, zero falso administrativo nos casos que exigem humano e
+zero risco perdido. O conjunto pequeno é uma barreira inicial, não comprova
+acurácia em produção. Guardar o resultado agregado com modelo e versão do
+prompt antes de habilitar um tenant. Sem credencial real, os testes locais
+validam a integração e as travas, mas não a qualidade do modelo.
+
 Seis niveis de precedencia (`RULE_LEVEL_PRECEDENCE`, menor = maior prioridade):
 
 | Nivel          | Quem define | Editavel |
@@ -559,8 +653,24 @@ Firestore — backup, arquivo baixado, gateway, provedores — nao sao alcancada
 > Tasks e despachante), nao publicada. A ponte com o n8n e os canais reais nao
 > existem: o despachante executa com o provedor simulado.
 
-WhatsApp, Google Calendar e e-mail sao executados por um n8n em servidor
-proprio. O n8n **executa**; quem **decide** e o Atendara.
+WhatsApp, escrita de eventos Google Calendar e e-mail têm execução prevista em
+n8n próprio. O n8n **executa**; quem **decide** é o Atendara.
+
+**Exceção da 3C ao n8n:** o Google Calendar é executado pelo próprio backend
+enquanto a 3B e o n8n de produção estão em espera (decisão do titular, 24/09),
+sem entregar credenciais a outro serviço. A consulta manual de livre/ocupado
+(`refreshCalendarBusy`) lê só a agenda principal por 30 dias. A escrita de
+eventos passa pela fila: o gatilho `planCalendarEvents` cria uma tarefa
+`SYNC_CALENDAR_EVENT` por atendimento e profissional, e o despachante, na hora de
+executar, lê o atendimento atual e grava ou apaga o evento na agenda "Atendara"
+(`functions/calendar-google.js`). A decisão continua em
+`src/lib/automation/calendar-sync.ts`; trocar o executor pelo n8n é trocar só
+esse passo. O ocupado é relido a cada 30 minutos por
+`refreshCalendarBusyEvery30Minutes` (consulta de grupo em `calendarConnections`)
+e chega ao painel no snapshot do workspace (`calendarBusy`); a agenda avisa
+sobre conflito, sem bloquear. Integração com remarcação ainda não está ativada.
+O contrato HTTP legado `calendarBusyCallback` responde 410: não há tarefa
+correlacionada que legitime uma escrita externa de ocupado.
 
 ```text
 Atendara (painel)
@@ -572,7 +682,8 @@ Firestore + Cloud Functions                              <- decide tudo
 organizations/{orgId}/automationTasks   (+ Cloud Tasks no horario exato)
     |
     +-- confirmar, lembrar, cancelar, oferecer horario --> n8n --> WhatsApp, e-mail
-    +-- criar/editar/apagar evento, ler ocupado ---------> n8n --> Google Calendar
+    +-- acertar evento na agenda "Atendara" -----------> Google Calendar (backend)
+    +-- consulta manual de ocupado --------------------> Google Calendar (backend)
     +-- processar mensagem recebida   <-- n8n repassa o corpo bruto
     +-- gerar alerta ------------------- dentro do Atendara
     +-- registrar auditoria ------------ dentro do Atendara
@@ -666,11 +777,23 @@ e pelo retorno.
 
 - **Um numero de WhatsApp por organizacao.** Quem fala com o paciente e a
   propria organizacao (regra 12).
-- **Google Calendar: enviar e ler so ocupado.** O Atendara escreve numa agenda
-  secundaria criada por ele, com texto limitado pelo grau de exposicao (perfil
-  `HIGH`: sem nome e sem tipo de atendimento), e le da agenda principal so inicio
-  e fim dos blocos ocupados. Nenhum titulo ou convidado de terceiro entra no
-  banco, e nao existem duas fontes da verdade.
+- **Google Calendar: enviar e ler só ocupado.** A escrita é numa agenda
+  secundaria, "Atendara", criada pelo próprio Atendara, com texto limitado pelo
+  grau de exposicao da profissão (`TIME_ONLY`: só "Atendimento" e o horário), e
+  le da agenda principal so inicio e fim dos blocos ocupados. Nenhum titulo ou
+  convidado de terceiro entra no banco, e nao existem duas fontes da verdade.
+  O OAuth pede `calendar.freebusy` e `calendar.app.created` — este só alcança a
+  agenda que o Atendara criou. O id do evento é derivado do atendimento, então
+  repetir a tarefa não duplica evento. Desconectar apaga a agenda "Atendara";
+  conexão apagada por outro caminho (exclusão da organização) dispara
+  `cleanupDeletedCalendarConnection`, que apaga a agenda e revoga a credencial.
+  O estado assinado é consumido uma única vez no
+  Firestore, com vínculo e acesso revalidados na conclusão. Desconectar apaga
+  credencial, pedido pendente e ocupado antes de chamar a revogação Google.
+  Cada conexão tem uma geração e cada consulta tem um identificador: respostas
+  antigas não sobrescrevem leituras recentes nem restauram uma conexão apagada.
+  Falhas, inclusive erros por agenda em HTTP 200, preservam a leitura anterior
+  sem renovar sua validade. A tela marca esse resultado como indisponível.
 - **E-mail: Amazon SES em `sa-east-1`, com dominio proprio.** Subdominio de
   envio com SPF, DKIM e DMARC; remetente com o nome da organizacao; descadastro
   que retira o consentimento com registro. Devolucao chega pelo SNS e tem a
@@ -694,3 +817,28 @@ recebida e nao transforma aceite em entrega. Por isso: so as rotas de webhook
 expostas, editor fora da internet publica, administrador com segundo fator,
 execucao bem-sucedida nao guardada e revogacao dos tokens como corte de
 emergencia. A automacao acrescenta duas rotas HTTP publicas ao produto.
+
+### Painel operacional e vencimento independente da fila
+
+Em Configurações → Fila de automações, OWNER, ADMIN e PROFESSIONAL com módulo
+agenda consultam `automationTasks`. O snapshot vem por páginas de 100 registros,
+ordenados pela criação; filtros e indicadores descrevem somente a amostra
+carregada. Nenhum controle da tela escreve na fila ou repete um envio. Falhas
+na leitura aparecem como indisponibilidade, não como uma fila vazia.
+
+`expireAutomationTasksEveryFiveMinutes` roda a cada cinco minutos com a conta
+`automacao`. A consulta de grupo usa o índice `status + expiresAt` e só encontra
+PLANNED/SCHEDULED vencidas. Cada transação relê tarefa e organização, recusa
+organização ausente/em exclusão, encerra a tarefa e grava entrega cancelada,
+alerta DASHBOARD e auditoria juntos. Execuções concorrentes são idempotentes.
+A rotina processa até 1.000 tarefas por ciclo em lotes de 100; ao atingir o teto,
+registra aviso de acúmulo. Falhas por documento são reportadas e repetidas.
+
+DISPATCHING e DISPATCHED não viram EXPIRED: um envio em curso pode ter saído.
+O painel destaca execução interrompida e retorno após a validade sem inventar
+um resultado ou reenviar. O acompanhamento desses retornos continua dependendo
+do despachante/callback e da conferência operacional.
+
+Publicação: aguardar o índice pronto e publicar a nova function separadamente.
+O fluxo atual de Hosting não publica functions; atualizar apenas a interface
+não ativa o agendamento. Este recurso independe da publicação do app na Meta.

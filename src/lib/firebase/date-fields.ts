@@ -52,7 +52,7 @@ export const COLLECTION_DATE_FIELDS = {
   automationSwitches: [...STAMP_FIELDS, "changedAt"],
   platformAutomationSwitch: [...STAMP_FIELDS, "changedAt"],
   calendarConnections: [...STAMP_FIELDS, "connectedAt", "lastSyncAt"],
-  calendarBusyBlocks: [...STAMP_FIELDS, "readAt"],
+  calendarBusyBlocks: [...STAMP_FIELDS, "readAt", "timeMin", "timeMax"],
   automationTasks: [
     ...STAMP_FIELDS,
     "scheduledFor",

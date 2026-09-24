@@ -34,6 +34,7 @@ const PERMISSION_MODULE: Partial<Record<string, AppModule>> = {
   // cadastro. Sem isto, ninguem consegue registrar consentimento — e sem
   // consentimento nenhum aviso pode sair (regra 11).
   notificationConsent: "clientes",
+  automationQueue: "agenda",
 };
 
 /**

@@ -314,6 +314,22 @@ service cloud.firestore {
 
     // ------------------------------------------------------------ organizacao
 
+    function validAISettingsChange() {
+      let before = resource.data.get('settings', {}).get('ai', null);
+      let after = request.resource.data.get('settings', {}).get('ai', null);
+      return before == after || (after is map
+        && after.keys().hasOnly(['enabled', 'displayName', 'autoResponseConfidenceThreshold', 'allowAutonomousReplies', 'quietHoursStart', 'quietHoursEnd'])
+        && after.enabled is bool && after.allowAutonomousReplies is bool
+        && after.displayName is string && after.displayName.size() > 0 && after.displayName.size() <= 60
+        && after.autoResponseConfidenceThreshold is number
+        && after.autoResponseConfidenceThreshold >= 0.8 && after.autoResponseConfidenceThreshold <= 1
+        && ((after.quietHoursStart == null && after.quietHoursEnd == null)
+          || (after.quietHoursStart is string && after.quietHoursEnd is string
+            && after.quietHoursStart.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+            && after.quietHoursEnd.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+            && after.quietHoursStart != after.quietHoursEnd)));
+    }
+
     match /organizations/{orgId} {
       allow read: if isMember(orgId);
 
@@ -327,6 +343,7 @@ service cloud.firestore {
       // proprio horario (`notificationSettings:update`, `agendaSettings:update`)
       // e mais nada.
       allow update: if request.resource.data.ownerId == resource.data.ownerId
+        && validAISettingsChange()
         && (isAdmin(orgId)
           || (organizationHolder(orgId) && onlyHolderSettings()));
 

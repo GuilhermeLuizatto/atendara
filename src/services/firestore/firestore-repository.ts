@@ -19,6 +19,7 @@ import type { DepositChoice } from "@/config/deposit";
 import type { TenantCollection } from "@/lib/firebase/paths";
 import type {
   AgendaSettings,
+  AIAgentSettings,
   Appointment,
   AppointmentStatus,
   Conversation,
@@ -78,7 +79,7 @@ import {
   planReplyToConversation,
   planUpdateConversation,
 } from "./plans/messaging";
-import { planUpdateAgendaSettings } from "./plans/organization";
+import { planUpdateAgendaSettings, planUpdateAISettings } from "./plans/organization";
 import {
   planCreateRule,
   planDeleteRule,
@@ -133,6 +134,8 @@ const COLLECTION_PARTS: Array<[PagedPart, ConvertedCollection, WorkspaceCollecti
   ["aiDecisions", "aiDecisions", "decisions"],
   ["notifications", "notifications", "notifications"],
   ["notificationDeliveries", "notificationDeliveries", "notificationDeliveries"],
+  ["automationTasks", "automationTasks", "automationTasks"],
+  ["calendarBusyBlocks", "calendarBusyBlocks", "calendarBusy"],
   ["auditLogs", "auditLogs", "auditLogs"],
 ];
 
@@ -787,6 +790,10 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
 
   async updateAgendaSettings(settings: AgendaSettings): Promise<void> {
     await this.commit(planUpdateAgendaSettings(this.context(), settings).writes);
+  }
+
+  async updateAISettings(settings: AIAgentSettings): Promise<void> {
+    await this.commit(planUpdateAISettings(this.context(), settings).writes);
   }
 
   /**

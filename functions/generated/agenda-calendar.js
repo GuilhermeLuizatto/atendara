@@ -1,5 +1,5 @@
 // Gerado por scripts/build-functions.mjs.
-import { CALENDAR_BUSY_STALE_MINUTES, CALENDAR_EVENT_DISCLOSURE, CALENDAR_PRIVATE_EVENT_TITLE, } from "./calendar-config.js";
+import { CALENDAR_BUSY_STALE_MINUTES, CALENDAR_CLOCK_SKEW_MINUTES, CALENDAR_EVENT_DISCLOSURE, CALENDAR_PRIVATE_EVENT_TITLE, } from "./calendar-config.js";
 /**
  * O que o evento diz, pelo grau de exposição da profissão.
  *
@@ -83,5 +83,31 @@ export function parseBusyBlocks(data) {
 export function isBusySnapshotFresh(readAt, now) {
     if (!readAt)
         return false;
-    return Date.parse(now) - Date.parse(readAt) <= CALENDAR_BUSY_STALE_MINUTES * 60_000;
+    const age = Date.parse(now) - Date.parse(readAt);
+    return age >= -CALENDAR_CLOCK_SKEW_MINUTES * 60_000 && age <= CALENDAR_BUSY_STALE_MINUTES * 60_000;
+}
+export function busyConflicts(input) {
+    const snapshot = input.snapshots.find((item) => item.professionalId === input.professionalId);
+    if (!snapshot)
+        return { status: "ABSENT", conflicts: [] };
+    const start = Date.parse(input.startsAt);
+    const end = Date.parse(input.endsAt);
+    const conflicts = snapshot.blocks.filter((block) => Date.parse(block.startsAt) < end && Date.parse(block.endsAt) > start);
+    // Fora do período lido também não é prova de nada.
+    const covered = Date.parse(snapshot.timeMin) <= start && Date.parse(snapshot.timeMax) >= end;
+    const fresh = isBusySnapshotFresh(snapshot.readAt, input.now) && covered;
+    return { status: fresh ? "FRESH" : "STALE", conflicts };
+}
+/** Erro parcial do Google não é prova de agenda livre. */
+export function parsePrimaryBusy(data) {
+    if (!data || typeof data !== "object")
+        return null;
+    const calendars = data.calendars;
+    const primary = calendars?.primary;
+    if (!primary || (primary.errors !== undefined && (!Array.isArray(primary.errors) || primary.errors.length > 0)))
+        return null;
+    if (!Array.isArray(primary.busy))
+        return null;
+    const blocks = parseBusyBlocks({ calendars: { primary } });
+    return blocks.length === primary.busy.length ? blocks : null;
 }

@@ -9,6 +9,7 @@ import type {
   AIRule,
   Appointment,
   AuditLog,
+  AutomationTask,
   Client,
   Conversation,
   ID,
@@ -22,6 +23,8 @@ import type {
   Service,
   Transaction,
 } from "@/types";
+
+import type { CalendarBusySnapshot } from "@/types/calendar";
 
 import { markOverdue, recomputeClientAggregates } from "../aggregates";
 import type { WorkspacePagination, WorkspaceSnapshot } from "../types";
@@ -41,6 +44,8 @@ export interface SnapshotParts {
   aiDecisions: AIDecision[];
   notifications: Notification[];
   notificationDeliveries: NotificationDelivery[];
+  automationTasks: AutomationTask[];
+  calendarBusyBlocks: CalendarBusySnapshot[];
   auditLogs: AuditLog[];
 }
 
@@ -59,6 +64,8 @@ export function emptyParts(): SnapshotParts {
     aiDecisions: [],
     notifications: [],
     notificationDeliveries: [],
+    automationTasks: [],
+    calendarBusyBlocks: [],
     auditLogs: [],
   };
 }
@@ -135,6 +142,8 @@ export function assembleSnapshot(
     decisions: parts.aiDecisions,
     notifications: parts.notifications,
     notificationDeliveries: parts.notificationDeliveries,
+    automationTasks: parts.automationTasks,
+    calendarBusy: parts.calendarBusyBlocks,
     auditLogs: parts.auditLogs,
     membership: parts.membership,
     pagination,

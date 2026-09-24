@@ -1,13 +1,16 @@
 import type { DepositChoice } from "@/config/deposit";
 import type { DispatchSummary } from "@/lib/notifications";
+import type { CalendarBusySnapshot } from "@/types/calendar";
 import type {
   AgendaSettings,
+  AIAgentSettings,
   AIDecision,
   AIRule,
   Appointment,
   AppointmentStatus,
   AuditAction,
   AuditLog,
+  AutomationTask,
   Client,
   Conversation,
   ID,
@@ -38,6 +41,8 @@ export type WorkspaceCollection =
   | "decisions"
   | "notifications"
   | "notificationDeliveries"
+  | "automationTasks"
+  | "calendarBusy"
   | "auditLogs";
 
 export interface CollectionPage {
@@ -92,6 +97,13 @@ export interface WorkspaceSnapshot {
   notifications: Notification[];
   /** Fila de saida dos avisos ao cliente. Vazia enquanto nada for configurado. */
   notificationDeliveries: NotificationDelivery[];
+  /** Histórico da fila, somente leitura; pode estar paginado. */
+  automationTasks: AutomationTask[];
+  /**
+   * Ocupado do Google por profissional (3C). Ausente na demonstração e para
+   * quem não tem o módulo de agenda — as rules negam, e a parte chega vazia.
+   */
+  calendarBusy?: CalendarBusySnapshot[];
   auditLogs: AuditLog[];
   /**
    * Vinculo de quem usa o painel, lido de `members/{uid}` — o mesmo documento
@@ -334,6 +346,7 @@ export interface WorkspaceRepository {
   ): Promise<void>;
   /** Horario de atendimento e padroes da agenda. Exige `agendaSettings:update` (OWNER, ADMIN e o titular). */
   updateAgendaSettings(settings: AgendaSettings): Promise<void>;
+  updateAISettings(settings: AIAgentSettings): Promise<void>;
   /**
    * Executa as entregas vencidas com o provedor simulado e grava o resultado.
    *

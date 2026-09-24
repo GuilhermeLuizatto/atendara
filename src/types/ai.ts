@@ -51,6 +51,17 @@ export interface AIDecision extends TenantScopedEntity {
   /** Relogio escolhido no simulador; separado do instante real de registro. */
   evaluatedAt?: ISODateString;
   latencyMs: number;
+  /** Sem texto pessoal; permite distinguir modelo, falha e guarda local na trilha. */
+  classifier?: {
+    provider: "LOCAL" | "GEMINI";
+    status: "DISABLED" | "LOCAL_GUARD" | "SUCCEEDED" | "LIMITED" | "UNAVAILABLE";
+    model: string | null;
+    promptVersion: string | null;
+    inputTokens: number;
+    outputTokens: number;
+    thinkingTokens: number;
+    latencyMs: number;
+  };
   /**
    * Presente quando o backend retirou o conteudo pessoal a pedido do titular.
    * Classificacao, regras, acao e motivo continuam os originais.

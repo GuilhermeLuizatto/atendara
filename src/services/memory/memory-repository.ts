@@ -3,6 +3,7 @@ import { permissionsForRole } from "@/config/permissions";
 import { getProfession } from "@/config/professions";
 import { ruleInputSchema, validateRuleInput } from "@/lib/rules/validation";
 import { decide } from "@/lib/ai/decision-engine";
+import { validateAISettings } from "@/lib/ai/settings";
 import { nextServicePosition, validateService } from "@/lib/agenda/services";
 import { amountForPart, partOf } from "@/lib/agenda/charges";
 import {
@@ -31,6 +32,7 @@ import {
 } from "../notifications";
 import type {
   AgendaSettings,
+  AIAgentSettings,
   AIRule,
   Appointment,
   AppointmentNotificationEvent,
@@ -188,7 +190,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       now,
     );
 
-    return { ...snapshot, transactions, clients };
+    return { ...snapshot, automationTasks: snapshot.automationTasks ?? [], transactions, clients };
   }
 
   private audit(input: AuditInput, at: ISODateString): AuditLog {
@@ -1645,6 +1647,22 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
         ),
         ...this.snapshot.auditLogs,
       ],
+    });
+  }
+
+  async updateAISettings(settings: AIAgentSettings): Promise<void> {
+    this.assertPermission("organization:update");
+    const errors = validateAISettings(settings);
+    if (errors.length) throw new RepositoryError(errors.join(" "));
+    const now = this.now();
+    this.commit({
+      ...this.snapshot,
+      organization: { ...this.snapshot.organization, settings: { ...this.snapshot.organization.settings, ai: settings }, updatedAt: now, updatedBy: this.actor.userId },
+      auditLogs: [this.audit({ action: "UPDATE", actorType: "USER",
+        resource: { type: "organization", id: this.organizationId },
+        summary: "Autorizações da Dara atualizadas.",
+        metadata: { enabled: settings.enabled, autonomous: settings.allowAutonomousReplies, threshold: settings.autoResponseConfidenceThreshold },
+      }, now), ...this.snapshot.auditLogs],
     });
   }
 

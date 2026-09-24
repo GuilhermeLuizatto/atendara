@@ -1,5 +1,48 @@
-import { minutesIntoDay } from "@/lib/utils/datetime";
+import type { BusyBlock } from "@/lib/agenda/availability";
+import { atTime, minutesIntoDay, shiftDays, type DateKey } from "@/lib/utils/datetime";
 import type { Appointment } from "@/types";
+
+export interface PositionedBusy {
+  /** Trecho da faixa que cai neste dia, para o rótulo. */
+  startsAt: string;
+  endsAt: string;
+  top: number;
+  height: number;
+}
+
+/**
+ * Faixas de ocupado do Google recortadas ao dia e à janela de horas da grade.
+ * Uma faixa que atravessa a meia-noite aparece nos dois dias.
+ */
+export function layoutBusy(
+  blocks: readonly BusyBlock[],
+  dateKey: DateKey,
+  startHour: number,
+  endHour: number,
+  pixelsPerHour: number,
+): PositionedBusy[] {
+  const dayStart = Date.parse(atTime(dateKey, 0));
+  const dayEnd = Date.parse(atTime(shiftDays(dateKey, 1), 0));
+  const result: PositionedBusy[] = [];
+  for (const block of blocks) {
+    const start = Math.max(Date.parse(block.startsAt), dayStart);
+    const end = Math.min(Date.parse(block.endsAt), dayEnd);
+    if (end <= start) continue;
+    const startsAt = new Date(start).toISOString();
+    const endsAt = new Date(end).toISOString();
+    const fromMinute = Math.max(minutesIntoDay(startsAt), startHour * 60);
+    // O fim no começo do dia seguinte vale 24:00, não 00:00.
+    const untilMinute = Math.min(end === dayEnd ? 24 * 60 : minutesIntoDay(endsAt), endHour * 60);
+    if (untilMinute <= fromMinute) continue;
+    result.push({
+      startsAt,
+      endsAt,
+      top: (fromMinute - startHour * 60) * (pixelsPerHour / 60),
+      height: (untilMinute - fromMinute) * (pixelsPerHour / 60),
+    });
+  }
+  return result;
+}
 
 export interface PositionedAppointment {
   appointment: Appointment;

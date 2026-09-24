@@ -32,6 +32,7 @@ const demoBuild = env.NEXT_PUBLIC_DEMO_MODE === "true" || !firebaseConfigured;
 
 /** Valores exatos que nao podem aparecer. */
 const forbiddenValues = [];
+if (env.GEMINI_API_KEY) forbiddenValues.push({ label: "chave privada do Gemini", value: env.GEMINI_API_KEY });
 if (!demoBuild) {
   for (const name of ["NEXT_PUBLIC_DEMO_ADMIN_SALT", "NEXT_PUBLIC_DEMO_ADMIN_HASH"]) {
     if (env[name] && env[name].length >= 8) forbiddenValues.push({ label: name, value: env[name] });
@@ -40,6 +41,7 @@ if (!demoBuild) {
 
 /** Formatos que nunca pertencem ao navegador, em build nenhum. */
 const forbiddenPatterns = [
+  { label: "configuração privada do Gemini", pattern: /NEXT_PUBLIC_GEMINI_API_KEY|GEMINI_API_KEY/ },
   { label: "chave secreta do gateway", pattern: /\b[sr]k_(test|live)_[A-Za-z0-9]{10,}/ },
   { label: "segredo de webhook", pattern: /\bwhsec_[A-Za-z0-9]{10,}/ },
   { label: "chave privada", pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----/ },

@@ -18,7 +18,7 @@
  */
 
 const METADATA_TOKEN_URL =
-  "http://metadata.google.internal/computeMetadata/v1/instance/service-account/token";
+  "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
 let cached = { token: null, expiresAtMs: 0 };
 
@@ -28,7 +28,12 @@ export async function accessToken(deps = {}) {
   if (cached.token && now() < cached.expiresAtMs) return cached.token;
 
   const response = await fetchImpl(METADATA_TOKEN_URL, { headers: { "Metadata-Flavor": "Google" } });
-  if (!response.ok) throw new Error("Não foi possível obter credencial do servidor.");
+  if (!response.ok) {
+    throw Object.assign(new Error("Não foi possível obter credencial do servidor."), {
+      name: "MetadataTokenError",
+      status: response.status,
+    });
+  }
 
   const data = await response.json();
   if (typeof data?.access_token !== "string") throw new Error("Credencial do servidor em formato inesperado.");
@@ -60,7 +65,10 @@ async function callKms(operation, body, deps) {
 
   if (!response.ok) {
     // Sem detalhe da resposta no erro: ela pode repetir o material enviado.
-    throw new Error(`KMS recusou a operação (${response.status}).`);
+    throw Object.assign(new Error(`KMS recusou a operação (${response.status}).`), {
+      name: "KmsError",
+      status: response.status,
+    });
   }
   return response.json();
 }

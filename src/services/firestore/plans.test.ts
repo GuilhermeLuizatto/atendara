@@ -18,7 +18,7 @@ import {
 } from "./plans/clients";
 import { planCreateTransaction } from "./plans/finance";
 import { planReceiveMessage, planReplyToConversation } from "./plans/messaging";
-import { planUpdateAgendaSettings } from "./plans/organization";
+import { planUpdateAgendaSettings, planUpdateAISettings } from "./plans/organization";
 import { planUpdateNotificationSettings } from "./plans/outbound";
 import {
   planCreateRule,
@@ -36,6 +36,21 @@ import {
 
 const ANCHOR = new Date("2026-09-09T15:00:00.000Z");
 const NOW = ANCHOR.toISOString();
+
+describe("autorizações da Dara", () => {
+  it("grava configuração e trilha juntas sem tocar em outros campos", () => {
+    const ctx = makeContext();
+    const plan = planUpdateAISettings(ctx, { ...ctx.snapshot.organization.settings.ai, enabled: false });
+    expect(plan.writes).toHaveLength(2);
+    expect(plan.writes[0]).toMatchObject({ op: "update", collection: "organizations", data: { "settings.ai": { enabled: false } } });
+    expect(plan.writes[1]).toMatchObject({ op: "set", collection: "auditLogs" });
+  });
+  it("recusa permissão insuficiente e confiança inválida", () => {
+    const ctx = makeContext();
+    expect(() => planUpdateAISettings({ ...ctx, actor: { ...ctx.actor, role: "VIEWER", permissions: permissionsForRole("VIEWER") } }, ctx.snapshot.organization.settings.ai)).toThrow();
+    expect(() => planUpdateAISettings(ctx, { ...ctx.snapshot.organization.settings.ai, autoResponseConfidenceThreshold: 0.1 })).toThrow();
+  });
+});
 
 function makeContext(
   patch: (snapshot: WorkspaceSnapshot) => WorkspaceSnapshot = (s) => s,

@@ -29,6 +29,7 @@ const GROUP_OF_FILE = {
   "privacy.js": "privacidade",
   "billing.js": "cobranca",
   "automation.js": "automacao",
+  "automation-expiry.js": "automacao",
   // A volta da ponte do n8n muda estado de tarefa e grava a trilha do aviso:
   // mesmo alcance do despachante, e nada alem dele.
   "automation-callback.js": "automacao",
@@ -38,6 +39,7 @@ const GROUP_OF_FILE = {
   // A entrada grava mensagem, conversa e decisao do tenant: mesmo alcance da
   // fila que a alimenta.
   "inbound.js": "automacao",
+  "ai-preview.js": "automacao",
   // A agenda externa e da automacao: e ela que sincroniza e le ocupado.
   "calendar.js": "automacao",
   "automation-control.js": "automacao",

@@ -26,6 +26,8 @@ import { useWorkspace } from "@/providers/workspace-provider";
 import type { AppointmentInput } from "@/services";
 import type { Appointment, AppointmentStatus, ServiceModality } from "@/types";
 
+import { BusyConflictNotice } from "./busy-conflict-notice";
+
 interface Draft {
   clientId: string;
   professionalId: string;
@@ -393,6 +395,19 @@ export function AppointmentForm({
               />
             )}
           </Field>
+
+          <BusyConflictNotice
+            className="sm:col-span-2"
+            professionalId={draft.professionalId}
+            professionalName={
+              professionals.find((item) => item.id === draft.professionalId)
+                ?.displayName ?? "quem atende"
+            }
+            date={draft.date}
+            time={draft.time}
+            durationMinutes={draft.durationMinutes}
+            snapshots={data?.calendarBusy ?? []}
+          />
 
           <Field label="Valor (R$)" error={errors.priceInReais}>
             {(props) => (

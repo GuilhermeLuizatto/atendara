@@ -62,7 +62,7 @@ export const TENANT_COLLECTIONS = {
   // fila de saida, com estado de entrega e tentativas.
   notificationDeliveries: "notificationDeliveries",
   // Fila de automacao: cada execucao (aviso, alerta, registro na trilha), com
-  // estado, tentativa e validade. So o backend le e escreve.
+  // estado, tentativa e validade. O painel autorizado lê; só o backend escreve.
   automationTasks: "automationTasks",
   // Conexao com a agenda externa de cada profissional (13.7). Guarda o token
   // de atualizacao CIFRADO com KMS; as regras recusam leitura pelo cliente.

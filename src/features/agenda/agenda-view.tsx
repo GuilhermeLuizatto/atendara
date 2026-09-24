@@ -11,6 +11,7 @@ import { LoadMore } from "@/components/ui/load-more";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
+import { isBusySnapshotFresh } from "@/lib/agenda/calendar";
 import { cn } from "@/lib/utils/cn";
 import {
   dayLabel,
@@ -56,6 +57,23 @@ export function AgendaView() {
     Boolean(page?.hasMore || page?.loading) &&
     oldestLoaded !== null &&
     agenda.visibleDays[0] <= toDateKey(new Date(oldestLoaded));
+
+  // O ocupado do Google é de UMA pessoa: aparece quando a agenda mostra só
+  // ela — filtrada, ou a única da organização. Na visão de todos, faixas de
+  // várias pessoas numa mesma coluna confundiriam mais do que ajudariam.
+  const busyOwner =
+    agenda.professionalId !== "ALL"
+      ? agenda.professionalId
+      : agenda.professionals.length === 1
+        ? agenda.professionals[0].id
+        : null;
+  const busySnapshot = busyOwner
+    ? (data?.calendarBusy ?? []).find((item) => item.professionalId === busyOwner)
+    : undefined;
+  const busyBlocks =
+    busySnapshot && isBusySnapshotFresh(busySnapshot.readAt, now.toISOString())
+      ? busySnapshot.blocks
+      : [];
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
@@ -253,6 +271,7 @@ export function AgendaView() {
                       endHour={endHour}
                       now={now}
                       compact={agenda.mode === "week"}
+                      busy={busyBlocks}
                       onSelect={(appointment) => setSelectedId(appointment.id)}
                       onCreateAt={(dateKey, time) => openCreate(dateKey, time)}
                     />

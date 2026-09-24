@@ -4,6 +4,7 @@ import { classificationMeta } from "./classifications-config.js";
 import { buildEvaluationContext } from "./rules-context.js";
 import { resolvePrecedence } from "./rules-precedence.js";
 import { classifyMessage } from "./classify.js";
+import { mergeClassification } from "./ai-semantic.js";
 import { INTENT_TO_CATEGORY, composeResponse } from "./ai-responses.js";
 function attentionFor(classification) {
     if (classification === "POSSIBLE_RISK")
@@ -37,7 +38,10 @@ function withinWindow(hour, start, end) {
 export function decide(request) {
     const { text, profession, organization, rules, channel, client, now } = request;
     const steps = [];
-    const classification = classifyMessage(text, profession);
+    const local = classifyMessage(text, profession);
+    const classification = request.semanticClassification
+        ? mergeClassification(local, request.semanticClassification, profession)
+        : local;
     const meta = classificationMeta(classification.classification);
     const attention = attentionFor(classification.classification);
     steps.push({
@@ -47,16 +51,16 @@ export function decide(request) {
             ? ` · sinais: ${classification.matchedTerms.slice(0, 3).join(", ")}`
             : ""}`,
     });
-    const local = new Intl.DateTimeFormat("en-GB", {
+    const localTime = new Intl.DateTimeFormat("en-GB", {
         timeZone: organization.timezone,
         hour: "2-digit",
         minute: "2-digit",
         hourCycle: "h23",
         weekday: "short",
     }).formatToParts(now);
-    const hour = Number(local.find((part) => part.type === "hour")?.value);
-    const minute = Number(local.find((part) => part.type === "minute")?.value);
-    const dayOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(local.find((part) => part.type === "weekday")?.value ?? "");
+    const hour = Number(localTime.find((part) => part.type === "hour")?.value);
+    const minute = Number(localTime.find((part) => part.type === "minute")?.value);
+    const dayOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(localTime.find((part) => part.type === "weekday")?.value ?? "");
     const minutes = hour * 60 + minute;
     const context = buildEvaluationContext({
         classification: classification.classification,
@@ -65,11 +69,11 @@ export function decide(request) {
         confidence: classification.confidence,
         clientModality: client?.modality ?? null,
         clientStatus: client?.status ?? null,
-        clientHasOutstandingBalance: client?.hasOutstandingBalance ?? false,
+        clientHasOutstandingBalance: client?.hasOutstandingBalance ?? null,
         appointmentStatus: null,
         dayOfWeek,
         hour,
-        withinBusinessHours: withinWindow(minutes, organization.settings.agenda.workdayStart, organization.settings.agenda.workdayEnd),
+        withinBusinessHours: organization.settings.agenda.workingDays.includes(dayOfWeek) && withinWindow(minutes, organization.settings.agenda.workdayStart, organization.settings.agenda.workdayEnd),
     });
     const scopedRules = rules.filter((rule) => rule.organizationId === organization.id &&
         (rule.professionalId === null ||
@@ -103,10 +107,12 @@ export function decide(request) {
         return escalate(`Conteúdo classificado como ${meta.label.toLowerCase()}: decisão é do profissional.`, "Regra fundamental: somente assunto administrativo pode ser respondido automaticamente.");
     }
     if (classification.intent === "NONE") {
-        return escalate("Intenção não reconhecida com confiança suficiente.", "Regra fundamental: na dúvida, escalar.");
+        return escalate(classification.ambiguous
+            ? "Mensagem com pedidos diferentes, negação ou instruções ambíguas. Revisão humana necessária."
+            : "Intenção não reconhecida com confiança suficiente.", "Regra fundamental: na dúvida, escalar.");
     }
     const threshold = organization.settings.ai.autoResponseConfidenceThreshold;
-    if (classification.confidence < threshold) {
+    if (!Number.isFinite(threshold) || threshold < 0.8 || threshold > 1 || classification.confidence < threshold) {
         return escalate(`Confiança de ${Math.round(classification.confidence * 100)}% abaixo do limite configurado (${Math.round(threshold * 100)}%).`, "Limite de confiança da organização não atingido.");
     }
     // --- Configuracao do agente ---------------------------------------------

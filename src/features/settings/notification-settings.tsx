@@ -6,6 +6,7 @@ import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@/componen
 import { NOTICE_TASK_TYPES } from "@/config/automation";
 import {
   APPOINTMENT_EVENT_META,
+  channelsForEvent,
   CHANNEL_META,
   SKIP_REASON_LABELS,
 } from "@/config/notifications";
@@ -244,7 +245,7 @@ export function NotificationSettings() {
                   </p>
                 ) : null}
 
-                {profession.notifications.allowedChannels.map((channel) => {
+                {channelsForEvent(event, profession.notifications.allowedChannels).map((channel) => {
                   const rule = settings.rules.find(
                     (item) => item.id === `${event}:${channel}`,
                   );

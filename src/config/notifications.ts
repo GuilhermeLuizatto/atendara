@@ -105,6 +105,12 @@ export interface AppointmentEventMeta {
   anchor: "START" | "CHANGE";
   /** Como o evento aparece no texto de consentimento, em minusculas. */
   consentLabel: string;
+  /**
+   * Canais em que o evento pode sair, quando e mais estreito que o da profissao.
+   * Resposta na conversa sai pelo canal em que a pessoa escreveu — hoje, so o
+   * WhatsApp —, entao uma regra de e-mail para ela nunca seria usada.
+   */
+  channels?: readonly OutboundChannel[];
 }
 
 export const APPOINTMENT_EVENT_META: Record<
@@ -144,7 +150,45 @@ export const APPOINTMENT_EVENT_META: Record<
     anchor: "CHANGE",
     consentLabel: "cancelamento do horário",
   },
+  RESCHEDULE_OFFERED: {
+    label: "Horários para remarcar",
+    description:
+      "Responde a quem pediu para remarcar com os horários livres dentro da política de remarcação. Sai só dentro das 24 horas que a pessoa abriu e só enquanto os horários estão segurados.",
+    defaultEnabled: false,
+    allowedLeadMinutes: [0],
+    anchor: "CHANGE",
+    consentLabel: "horários livres quando você pedir para remarcar",
+    channels: ["WHATSAPP"],
+  },
+  RESCHEDULE_CONFIRMED: {
+    label: "Remarcação feita",
+    description: "Confirma à pessoa o novo horário que ela escolheu.",
+    defaultEnabled: false,
+    allowedLeadMinutes: [0],
+    anchor: "CHANGE",
+    consentLabel: "confirmação do horário remarcado",
+    channels: ["WHATSAPP"],
+  },
+  RESCHEDULE_HANDED_OFF: {
+    label: "Remarcação com a equipe",
+    description:
+      "Avisa que o pedido de remarcação foi para a equipe, sem dizer o motivo. O motivo aparece só no alerta do painel.",
+    defaultEnabled: false,
+    allowedLeadMinutes: [0],
+    anchor: "CHANGE",
+    consentLabel: "aviso de que o pedido de remarcação foi para a equipe",
+    channels: ["WHATSAPP"],
+  },
 };
+
+/** Canais em que um evento pode sair, dentro do que a profissao permite. */
+export function channelsForEvent(
+  event: AppointmentNotificationEvent,
+  professionChannels: readonly OutboundChannel[],
+): OutboundChannel[] {
+  const only = APPOINTMENT_EVENT_META[event].channels;
+  return professionChannels.filter((channel) => !only || only.includes(channel));
+}
 
 // ------------------------------------------------------- consentimento
 
@@ -156,7 +200,8 @@ export const APPOINTMENT_EVENT_META: Record<
  * RASCUNHO: redacao, base legal e necessidade do consentimento para cada
  * evento dependem de revisao por profissional qualificado.
  */
-export const NOTIFICATION_CONSENT_TEXT_VERSION = "2026-09-11-rascunho";
+// 24/09: entram as respostas da assistente a pedidos de remarcacao.
+export const NOTIFICATION_CONSENT_TEXT_VERSION = "2026-09-24-rascunho";
 
 export const NOTIFICATION_CONSENT_REVIEW_STATUS = "DRAFT_PENDING_LEGAL_REVIEW" as const;
 
@@ -318,6 +363,10 @@ export const SKIP_REASON_LABELS: Record<NotificationSkipReason, string> = {
   SCHEDULE_IN_THE_PAST: "O horário de envio já passou.",
   ALREADY_PLANNED: "Já existe um envio planejado igual a este.",
   TEMPLATE_REJECTED: "O modelo foi recusado pela política de conteúdo.",
+  CLIENT_NOT_IDENTIFIED: "O número não corresponde a um único cadastro nesta organização.",
+  CONVERSATION_WITH_HUMAN: "A conversa está com a equipe; a assistente não responde sozinha.",
+  REPLY_WINDOW_CLOSED: "Passaram as 24 horas desde a última mensagem da pessoa.",
+  REPLY_EXPIRED: "A resposta perdeu a validade: os horários oferecidos não estão mais segurados.",
 };
 
 export const DELIVERY_FAILURE_LABELS: Record<DeliveryFailureCode, string> = {

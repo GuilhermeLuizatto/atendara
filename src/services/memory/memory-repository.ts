@@ -35,7 +35,7 @@ import type {
   AIAgentSettings,
   AIRule,
   Appointment,
-  AppointmentNotificationEvent,
+  AgendaNoticeEvent,
   AppointmentPart,
   AppointmentStatus,
   AuditLog,
@@ -1754,7 +1754,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
   private withPlannedNotifications(
     next: WorkspaceSnapshot,
     appointment: Appointment,
-    event: AppointmentNotificationEvent,
+    event: AgendaNoticeEvent,
     now: ISODateString,
   ): NotificationDelivery[] {
     const plan = planForAppointmentEvent(next, appointment, event, now);

@@ -23,6 +23,7 @@ describe("politica da fila de automacao", () => {
   });
 
   it("todo evento com tarefa aponta para um tipo externo, e so confirmacao e lembrete tem tarefa", () => {
+    // As respostas da assistente ganham tarefa na etapa 2 da proposta de 24/09.
     for (const event of APPOINTMENT_NOTIFICATION_EVENTS) {
       const type = NOTICE_TASK_TYPES[event];
       if (type) expect(AUTOMATION_TASK_META[type].executor, event).toBe("EXTERNAL");
@@ -32,6 +33,9 @@ describe("politica da fila de automacao", () => {
       APPOINTMENT_REMINDER: "SEND_REMINDER",
       APPOINTMENT_CONFIRMED: "CONFIRM_APPOINTMENT",
       APPOINTMENT_CANCELLED: null,
+      RESCHEDULE_OFFERED: null,
+      RESCHEDULE_CONFIRMED: null,
+      RESCHEDULE_HANDED_OFF: null,
     });
   });
 

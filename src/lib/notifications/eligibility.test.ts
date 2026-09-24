@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getProfession } from "@/config/professions";
 import { APPOINTMENT_EVENT_META } from "@/config/notifications";
 import {
+  AGENDA_NOTICE_EVENTS,
   APPOINTMENT_NOTIFICATION_EVENTS,
   OUTBOUND_CHANNELS,
   type AppointmentNotificationEvent,
@@ -76,7 +77,7 @@ describe("nada sai sem configuracao explicita", () => {
     // de se cadastrar.
     const fresh = organization({ enabled: false, verifiedSenderChannels: [], rules: [] });
 
-    for (const event of APPOINTMENT_NOTIFICATION_EVENTS) {
+    for (const event of AGENDA_NOTICE_EVENTS) {
       const plan = planAppointmentNotifications(input({ organization: fresh, event }));
       expect(plan.planned).toEqual([]);
       expect(plan.skipped[0].reason).toBe("ORGANIZATION_DISABLED");

@@ -67,6 +67,11 @@ export const PROFESSION_DEFINITIONS = {
                 "APPOINTMENT_REMINDER",
                 "APPOINTMENT_CONFIRMED",
                 "APPOINTMENT_CANCELLED",
+                // Respostas da assistente a quem pediu para remarcar (24/09). Ligadas
+                // pela organizacao, regra a regra; a politica de remarcacao nasce desligada.
+                "RESCHEDULE_OFFERED",
+                "RESCHEDULE_CONFIRMED",
+                "RESCHEDULE_HANDED_OFF",
             ],
             // SMS fica de fora: chega sem remetente identificavel e sem como revogar
             // o consentimento pela propria mensagem.
@@ -140,6 +145,11 @@ export const PROFESSION_DEFINITIONS = {
                 "APPOINTMENT_REMINDER",
                 "APPOINTMENT_CONFIRMED",
                 "APPOINTMENT_CANCELLED",
+                // Respostas da assistente a quem pediu para remarcar (24/09). Ligadas
+                // pela organizacao, regra a regra; a politica de remarcacao nasce desligada.
+                "RESCHEDULE_OFFERED",
+                "RESCHEDULE_CONFIRMED",
+                "RESCHEDULE_HANDED_OFF",
             ],
             // SMS fica de fora: chega sem remetente identificavel e sem como revogar
             // o consentimento pela propria mensagem.
@@ -213,6 +223,11 @@ export const PROFESSION_DEFINITIONS = {
                 "APPOINTMENT_REMINDER",
                 "APPOINTMENT_CONFIRMED",
                 "APPOINTMENT_CANCELLED",
+                // Respostas da assistente a quem pediu para remarcar (24/09). Ligadas
+                // pela organizacao, regra a regra; a politica de remarcacao nasce desligada.
+                "RESCHEDULE_OFFERED",
+                "RESCHEDULE_CONFIRMED",
+                "RESCHEDULE_HANDED_OFF",
             ],
             // SMS fica de fora: chega sem remetente identificavel e sem como revogar
             // o consentimento pela propria mensagem.
@@ -284,6 +299,11 @@ export const PROFESSION_DEFINITIONS = {
                 "APPOINTMENT_REMINDER",
                 "APPOINTMENT_CONFIRMED",
                 "APPOINTMENT_CANCELLED",
+                // Respostas da assistente a quem pediu para remarcar (24/09). Ligadas
+                // pela organizacao, regra a regra; a politica de remarcacao nasce desligada.
+                "RESCHEDULE_OFFERED",
+                "RESCHEDULE_CONFIRMED",
+                "RESCHEDULE_HANDED_OFF",
             ],
             allowedChannels: ["EMAIL", "SMS", "WHATSAPP"],
             disclosure: "TIME_AND_PROFESSIONAL",
@@ -353,6 +373,11 @@ export const PROFESSION_DEFINITIONS = {
                 "APPOINTMENT_REMINDER",
                 "APPOINTMENT_CONFIRMED",
                 "APPOINTMENT_CANCELLED",
+                // Respostas da assistente a quem pediu para remarcar (24/09). Ligadas
+                // pela organizacao, regra a regra; a politica de remarcacao nasce desligada.
+                "RESCHEDULE_OFFERED",
+                "RESCHEDULE_CONFIRMED",
+                "RESCHEDULE_HANDED_OFF",
             ],
             allowedChannels: ["EMAIL", "SMS", "WHATSAPP"],
             disclosure: "TIME_AND_PROFESSIONAL",
@@ -422,6 +447,11 @@ export const PROFESSION_DEFINITIONS = {
                 "APPOINTMENT_REMINDER",
                 "APPOINTMENT_CONFIRMED",
                 "APPOINTMENT_CANCELLED",
+                // Respostas da assistente a quem pediu para remarcar (24/09). Ligadas
+                // pela organizacao, regra a regra; a politica de remarcacao nasce desligada.
+                "RESCHEDULE_OFFERED",
+                "RESCHEDULE_CONFIRMED",
+                "RESCHEDULE_HANDED_OFF",
             ],
             allowedChannels: ["EMAIL", "SMS", "WHATSAPP"],
             disclosure: "TIME_AND_PROFESSIONAL",
@@ -496,6 +526,11 @@ export const PROFESSION_DEFINITIONS = {
                 "APPOINTMENT_REMINDER",
                 "APPOINTMENT_CONFIRMED",
                 "APPOINTMENT_CANCELLED",
+                // Respostas da assistente a quem pediu para remarcar (24/09). Ligadas
+                // pela organizacao, regra a regra; a politica de remarcacao nasce desligada.
+                "RESCHEDULE_OFFERED",
+                "RESCHEDULE_CONFIRMED",
+                "RESCHEDULE_HANDED_OFF",
             ],
             // SMS fica de fora: chega sem remetente identificavel e sem como revogar
             // o consentimento pela propria mensagem.
@@ -567,6 +602,11 @@ export const PROFESSION_DEFINITIONS = {
                 "APPOINTMENT_REMINDER",
                 "APPOINTMENT_CONFIRMED",
                 "APPOINTMENT_CANCELLED",
+                // Respostas da assistente a quem pediu para remarcar (24/09). Ligadas
+                // pela organizacao, regra a regra; a politica de remarcacao nasce desligada.
+                "RESCHEDULE_OFFERED",
+                "RESCHEDULE_CONFIRMED",
+                "RESCHEDULE_HANDED_OFF",
             ],
             allowedChannels: ["EMAIL", "SMS", "WHATSAPP"],
             // Nada aqui revela condicao de saude, entao o texto pode nomear o
@@ -642,6 +682,11 @@ export const PROFESSION_DEFINITIONS = {
                 "APPOINTMENT_REMINDER",
                 "APPOINTMENT_CONFIRMED",
                 "APPOINTMENT_CANCELLED",
+                // Respostas da assistente a quem pediu para remarcar (24/09). Ligadas
+                // pela organizacao, regra a regra; a politica de remarcacao nasce desligada.
+                "RESCHEDULE_OFFERED",
+                "RESCHEDULE_CONFIRMED",
+                "RESCHEDULE_HANDED_OFF",
             ],
             allowedChannels: ["EMAIL", "SMS", "WHATSAPP"],
             // Sem o nome do servico: "sua depilacao" na tela bloqueada diz mais do

@@ -1,5 +1,6 @@
 import type { MessageClassificationId } from "./classification";
 import type {
+  AgendaNoticeEvent,
   AppointmentNotificationEvent,
   OutboundChannel,
 } from "./notifications";
@@ -147,7 +148,7 @@ export interface ProfessionNotificationConfig {
    * Modelo por evento. Usa apenas as variaveis de `TEMPLATE_VARIABLES`; o
    * renderizador recusa qualquer outra e recusa vocabulario clinico.
    */
-  templates: Record<AppointmentNotificationEvent, string>;
+  templates: Record<AgendaNoticeEvent, string>;
 }
 
 export interface ProfessionConfig {

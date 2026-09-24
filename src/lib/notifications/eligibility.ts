@@ -1,10 +1,15 @@
+import type { ReplyStage } from "@/config/assistant";
 import { NOTICE_TASK_TYPES } from "@/config/automation";
 import { CHANNEL_META } from "@/config/notifications";
 import { formatDate, formatTime } from "@/lib/utils/format";
+import { isConversationReplyEvent } from "@/types";
 import type {
+  AgendaNoticeEvent,
   Appointment,
   AppointmentNotificationEvent,
   Client,
+  Conversation,
+  ConversationReplyEvent,
   ID,
   ISODateString,
   MessagingSender,
@@ -26,6 +31,7 @@ import {
 import { contactFor, hasRawContact } from "./contacts";
 import { deliveryKey } from "./delivery";
 import { scheduledTimeFor } from "./schedule";
+import { renderReply, type ReplyContext } from "./replies";
 import { whatsappMessageFor, type WhatsappMessage } from "./whatsapp";
 import { hashBody, renderTemplate, type TemplateContext } from "./templates";
 
@@ -52,7 +58,8 @@ export interface EligibilityInput {
   appointment: Appointment;
   client: Client;
   professionalName: string | null;
-  event: AppointmentNotificationEvent;
+  /** So mudanca da agenda: resposta na conversa tem portao proprio. */
+  event: AgendaNoticeEvent;
   now: ISODateString;
   /** Ids de entregas ja existentes. E o que torna o replanejamento inofensivo. */
   existingDeliveryIds: readonly ID[];
@@ -187,7 +194,7 @@ function gateProblem(
 
 function renderFor(
   rule: NotificationRule,
-  event: AppointmentNotificationEvent,
+  event: AgendaNoticeEvent,
   input: TemplateInput,
 ) {
   const professionRules = input.profession.notifications;
@@ -226,6 +233,98 @@ export function consentProblemFor(
   if (record.withdrawn) return "CONSENT_REVOKED";
   if (!isCompleteConsentRecord(record)) return "CONSENT_INCOMPLETE";
   return null;
+}
+
+// ------------------------------------------------- resposta na conversa
+
+export interface ConversationReplyInput {
+  organization: Organization;
+  profession: ProfessionConfig;
+  /** `null` quando o numero nao corresponde a um unico cadastro. */
+  client: Client | null;
+  sender?: MessagingSender | null;
+  event: ConversationReplyEvent;
+  stage: ReplyStage;
+  /** Canal em que a pessoa escreveu. A resposta sai por ele, e so por ele. */
+  channel: OutboundChannel;
+  conversation: Pick<Conversation, "escalated" | "attention" | "inboundWindowEndsAt">;
+  now: ISODateString;
+  /**
+   * Ate quando a resposta faz sentido. Na oferta, o fim da reserva: horarios
+   * que ja nao estao segurados nao podem ser mostrados como livres.
+   */
+  validUntil?: ISODateString | null;
+  /** Horarios da oferta ou horario novo da confirmacao. */
+  details?: Pick<ReplyContext, "slots" | "startsAt">;
+}
+
+export type ConversationReplyEligibility =
+  | { eligible: true; destination: string; body: string }
+  | { eligible: false; reason: NotificationSkipReason };
+
+/**
+ * A resposta da assistente a um pedido que a propria pessoa fez.
+ *
+ * Primeiro as MESMAS travas de qualquer aviso (`gateProblem`: organizacao,
+ * regra, remetente, profissao, produto, consentimento e contato) — a resposta e
+ * aviso, e a regra 11 nao tem excecao para ela. Depois o que so a conversa
+ * sabe: se ha gente cuidando dela, se a janela aberta pela pessoa continua
+ * aberta e se a resposta ainda vale. Chamada ao planejar e de novo ao enviar.
+ */
+export function evaluateConversationReply(
+  input: ConversationReplyInput,
+): ConversationReplyEligibility {
+  const settings = input.organization.settings.notifications;
+  if (!settings.enabled) return { eligible: false, reason: "ORGANIZATION_DISABLED" };
+
+  const rule = settings.rules.find(
+    (item) => item.event === input.event && item.channel === input.channel,
+  );
+  if (!rule) return { eligible: false, reason: "NO_RULE_FOR_EVENT" };
+  if (!input.client) return { eligible: false, reason: "CLIENT_NOT_IDENTIFIED" };
+
+  const problem = gateProblem(rule, input.event, {
+    organization: input.organization,
+    profession: input.profession,
+    client: input.client,
+    sender: input.sender,
+  });
+  if (problem) return { eligible: false, reason: problem };
+
+  // Resposta nao tem planejamento adiantado: o destino e conhecido ja aqui, e a
+  // lista de testadores do remetente e conferida contra ele.
+  const contact = contactFor(input.client, input.channel);
+  if (!contact) return { eligible: false, reason: "INVALID_CONTACT" };
+  const restricted = senderProblemFor({
+    providerId: CHANNEL_META[input.channel].providerId,
+    sender: input.sender ?? null,
+    channel: input.channel,
+    destination: contact.destination,
+  });
+  if (restricted) return { eligible: false, reason: restricted };
+
+  // Quem falou em risco, ou foi assumido pela equipe, nao recebe mensagem de
+  // automacao — nem a de remarcacao que ele mesmo pediu depois.
+  const { conversation } = input;
+  if (conversation.escalated || conversation.attention === "CRITICAL") {
+    return { eligible: false, reason: "CONVERSATION_WITH_HUMAN" };
+  }
+  const windowEndsAt = conversation.inboundWindowEndsAt;
+  if (!windowEndsAt || Date.parse(input.now) > Date.parse(windowEndsAt)) {
+    return { eligible: false, reason: "REPLY_WINDOW_CLOSED" };
+  }
+  if (input.validUntil && Date.parse(input.now) > Date.parse(input.validUntil)) {
+    return { eligible: false, reason: "REPLY_EXPIRED" };
+  }
+
+  const rendered = renderReply(input.event, input.stage, {
+    clientName: input.client.preferredName ?? firstName(input.client.fullName),
+    organizationName: input.organization.name,
+    ...input.details,
+  });
+  if (!rendered.ok) return { eligible: false, reason: "TEMPLATE_REJECTED" };
+
+  return { eligible: true, destination: contact.destination, body: rendered.value };
 }
 
 export function templateContext(input: TemplateInput): TemplateContext {
@@ -307,6 +406,10 @@ export function composeForSend(input: SendCheckInput): SendCheck {
   }
   if (appointment.clientId !== delivery.clientId) return stop("APPOINTMENT_CLIENT_CHANGED");
   if (!client || client.id !== delivery.clientId) return stop("CLIENT_NOT_FOUND");
+  // Resposta na conversa nao se recompoe do atendimento: depende da conversa e
+  // da reserva, e passa por `evaluateConversationReply`. Chegar aqui e engano.
+  if (isConversationReplyEvent(delivery.event)) return stop("EVENT_WITHOUT_AUTOMATION");
+  const event = delivery.event;
 
   const context: TemplateInput = {
     organization,
@@ -315,7 +418,7 @@ export function composeForSend(input: SendCheckInput): SendCheck {
     client,
     professionalName: input.professionalName,
   };
-  const problem = gateProblem(rule, delivery.event, { ...context, sender: input.sender ?? null });
+  const problem = gateProblem(rule, event, { ...context, sender: input.sender ?? null });
   if (problem) return stop(problem);
 
   const contact = contactFor(client, rule.channel);
@@ -331,7 +434,7 @@ export function composeForSend(input: SendCheckInput): SendCheck {
   });
   if (restricted) return stop(restricted);
 
-  const rendered = renderFor(rule, delivery.event, context);
+  const rendered = renderFor(rule, event, context);
   if (!rendered.ok) return stop("TEMPLATE_REJECTED");
 
   return {

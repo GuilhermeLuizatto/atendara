@@ -50,6 +50,12 @@ export const NOTICE_TASK_TYPES: Record<AppointmentNotificationEvent, AutomationT
   APPOINTMENT_REMINDER: "SEND_REMINDER",
   APPOINTMENT_CONFIRMED: "CONFIRM_APPOINTMENT",
   APPOINTMENT_CANCELLED: null,
+  // Respostas da assistente na conversa. A tarefa que as leva ate a pessoa e a
+  // etapa 2 da proposta (docs/planos/DARA-RESPOSTA-REMARCACAO-2026-09-24.md);
+  // ate la, o portao recusa com EVENT_WITHOUT_AUTOMATION e nada sai.
+  RESCHEDULE_OFFERED: null,
+  RESCHEDULE_CONFIRMED: null,
+  RESCHEDULE_HANDED_OFF: null,
 };
 
 export interface AutomationTransitionRule {

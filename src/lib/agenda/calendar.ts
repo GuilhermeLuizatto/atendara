@@ -1,5 +1,6 @@
 import {
   CALENDAR_BUSY_STALE_MINUTES,
+  CALENDAR_CLOCK_SKEW_MINUTES,
   CALENDAR_EVENT_DISCLOSURE,
   CALENDAR_PRIVATE_EVENT_TITLE,
   type CalendarSyncAction,
@@ -121,7 +122,7 @@ export function parseBusyBlocks(data: unknown): BusyBlock[] {
 export function isBusySnapshotFresh(readAt: ISODateString | null, now: ISODateString): boolean {
   if (!readAt) return false;
   const age = Date.parse(now) - Date.parse(readAt);
-  return age >= 0 && age <= CALENDAR_BUSY_STALE_MINUTES * 60_000;
+  return age >= -CALENDAR_CLOCK_SKEW_MINUTES * 60_000 && age <= CALENDAR_BUSY_STALE_MINUTES * 60_000;
 }
 
 /** Erro parcial do Google não é prova de agenda livre. */

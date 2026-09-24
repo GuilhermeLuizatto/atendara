@@ -1,5 +1,6 @@
 import type { DepositChoice } from "@/config/deposit";
 import type { DispatchSummary } from "@/lib/notifications";
+import type { CalendarBusySnapshot } from "@/types/calendar";
 import type {
   AgendaSettings,
   AIAgentSettings,
@@ -41,6 +42,7 @@ export type WorkspaceCollection =
   | "notifications"
   | "notificationDeliveries"
   | "automationTasks"
+  | "calendarBusy"
   | "auditLogs";
 
 export interface CollectionPage {
@@ -97,6 +99,11 @@ export interface WorkspaceSnapshot {
   notificationDeliveries: NotificationDelivery[];
   /** Histórico da fila, somente leitura; pode estar paginado. */
   automationTasks: AutomationTask[];
+  /**
+   * Ocupado do Google por profissional (3C). Ausente na demonstração e para
+   * quem não tem o módulo de agenda — as rules negam, e a parte chega vazia.
+   */
+  calendarBusy?: CalendarBusySnapshot[];
   auditLogs: AuditLog[];
   /**
    * Vinculo de quem usa o painel, lido de `members/{uid}` — o mesmo documento

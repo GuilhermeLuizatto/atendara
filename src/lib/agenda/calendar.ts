@@ -6,6 +6,7 @@ import {
   type CalendarSyncAction,
 } from "@/config/calendar";
 import type { Appointment, AppointmentDisclosureLevel, ISODateString } from "@/types";
+import type { CalendarBusySnapshot } from "@/types/calendar";
 
 import type { BusyBlock } from "./availability";
 
@@ -123,6 +124,38 @@ export function isBusySnapshotFresh(readAt: ISODateString | null, now: ISODateSt
   if (!readAt) return false;
   const age = Date.parse(now) - Date.parse(readAt);
   return age >= -CALENDAR_CLOCK_SKEW_MINUTES * 60_000 && age <= CALENDAR_BUSY_STALE_MINUTES * 60_000;
+}
+
+/**
+ * O horário cruza um compromisso do Google de quem atende? (3C, frente 2)
+ *
+ * `FRESH` só com leitura dentro do prazo: aí a lista de faixas é a resposta.
+ * `STALE` e `ABSENT` dizem que não dá para afirmar nada — a tela avisa isso em
+ * vez de tratar o silêncio como agenda livre. A decisão de marcar é da equipe.
+ */
+export interface BusyConflictCheck {
+  status: "FRESH" | "STALE" | "ABSENT";
+  conflicts: BusyBlock[];
+}
+
+export function busyConflicts(input: {
+  startsAt: ISODateString;
+  endsAt: ISODateString;
+  professionalId: string;
+  snapshots: readonly Pick<CalendarBusySnapshot, "professionalId" | "readAt" | "blocks" | "timeMin" | "timeMax">[];
+  now: ISODateString;
+}): BusyConflictCheck {
+  const snapshot = input.snapshots.find((item) => item.professionalId === input.professionalId);
+  if (!snapshot) return { status: "ABSENT", conflicts: [] };
+  const start = Date.parse(input.startsAt);
+  const end = Date.parse(input.endsAt);
+  const conflicts = snapshot.blocks.filter(
+    (block) => Date.parse(block.startsAt) < end && Date.parse(block.endsAt) > start,
+  );
+  // Fora do período lido também não é prova de nada.
+  const covered = Date.parse(snapshot.timeMin) <= start && Date.parse(snapshot.timeMax) >= end;
+  const fresh = isBusySnapshotFresh(snapshot.readAt, input.now) && covered;
+  return { status: fresh ? "FRESH" : "STALE", conflicts };
 }
 
 /** Erro parcial do Google não é prova de agenda livre. */

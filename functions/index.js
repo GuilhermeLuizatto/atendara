@@ -150,6 +150,7 @@ export {
   getCalendarConnection,
   refreshCalendarBusy,
   cleanupDeletedCalendarConnection,
+  refreshCalendarBusyEvery30Minutes,
 } from "./calendar.js";
 export {
   setOrganizationAutomationSwitch,

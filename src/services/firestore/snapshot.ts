@@ -24,6 +24,8 @@ import type {
   Transaction,
 } from "@/types";
 
+import type { CalendarBusySnapshot } from "@/types/calendar";
+
 import { markOverdue, recomputeClientAggregates } from "../aggregates";
 import type { WorkspacePagination, WorkspaceSnapshot } from "../types";
 
@@ -43,6 +45,7 @@ export interface SnapshotParts {
   notifications: Notification[];
   notificationDeliveries: NotificationDelivery[];
   automationTasks: AutomationTask[];
+  calendarBusyBlocks: CalendarBusySnapshot[];
   auditLogs: AuditLog[];
 }
 
@@ -62,6 +65,7 @@ export function emptyParts(): SnapshotParts {
     notifications: [],
     notificationDeliveries: [],
     automationTasks: [],
+    calendarBusyBlocks: [],
     auditLogs: [],
   };
 }
@@ -139,6 +143,7 @@ export function assembleSnapshot(
     notifications: parts.notifications,
     notificationDeliveries: parts.notificationDeliveries,
     automationTasks: parts.automationTasks,
+    calendarBusy: parts.calendarBusyBlocks,
     auditLogs: parts.auditLogs,
     membership: parts.membership,
     pagination,

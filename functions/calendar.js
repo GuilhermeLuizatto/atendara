@@ -3,13 +3,15 @@ import * as logger from "firebase-functions/logger";
 import { onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { z } from "zod";
-import { getFirestore } from "firebase-admin/firestore";
+import { FieldPath, getFirestore } from "firebase-admin/firestore";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { requeueTask } from "./automation.js";
 import {
   accessTokenFor,
   calendarExists,
   createAtendaraCalendar,
   deleteAtendaraCalendar,
+  googleClient,
   requestGoogle,
   ReconnectRequiredError,
   TOKEN_URL,
@@ -20,10 +22,11 @@ import {
   planCalendarBackfill,
   queueEnqueueAt,
 } from "./generated/automation.js";
-import { paths } from "./generated/paths.js";
+import { paths, TENANT_COLLECTIONS } from "./generated/paths.js";
 import {
   GOOGLE_CALENDAR_SCOPES,
   CALENDAR_BUSY_WINDOW_DAYS,
+  CALENDAR_REFRESH_MINUTES,
 } from "./generated/calendar-config.js";
 import { parsePrimaryBusy } from "./generated/agenda-calendar.js";
 import { encryptSecret, decryptSecret } from "./kms.js";
@@ -32,6 +35,7 @@ import { consumeRateLimit } from "./rate-limit.js";
 import { runAs } from "./service-accounts.js";
 import {
   calendarData,
+  calendarOwnerAllowed,
   calendarRef,
   calendarTransaction,
   writeConnection,
@@ -519,15 +523,17 @@ export async function removeAtendaraCalendar(ciphertext, calendarId, deps = {}) 
   }
 }
 
-export const refreshCalendarBusy = onCall(CALL_OPTIONS, async (request) => {
-  const context = {
-    ...(await contextOf(request)),
-    ...parse(connectSchema, request.data),
-  };
-  await consumeRateLimit(context.userId, "calendarConnection");
-  const config = configuration();
+/**
+ * Uma leitura de ocupado da agenda principal, do pedido à gravação. Usada pela
+ * consulta manual e pela rotina de 30 em 30 minutos. Nunca lança erro do
+ * Google: devolve o resultado, e quem chama decide o que dizer.
+ *
+ * Uma falha não renova a validade da leitura anterior nem a substitui por
+ * agenda vazia. Autorização revogada põe a conexão em `ERROR`.
+ */
+export async function readBusyNow(context, { client, clock = () => new Date().toISOString() } = {}) {
   const requestId = randomUUID();
-  const timeMin = new Date().toISOString();
+  const timeMin = clock();
   const timeMax = new Date(
     Date.parse(timeMin) + CALENDAR_BUSY_WINDOW_DAYS * 86_400_000,
   ).toISOString();
@@ -537,21 +543,18 @@ export const refreshCalendarBusy = onCall(CALL_OPTIONS, async (request) => {
       !connection.refreshTokenCiphertext ||
       !connection.generation
     ) {
-      throw new HttpsError(
-        "failed-precondition",
-        "Conecte sua agenda Google novamente.",
-      );
+      return null;
     }
     writeConnection(tx, ref, context, connection, { pendingRead: requestId });
     return connection;
   });
+  if (!original) return { ok: false, failure: "NOT_CONNECTED" };
+
   let failure = "UNAVAILABLE";
   try {
     let accessToken;
     try {
-      accessToken = await accessTokenFor(original.refreshTokenCiphertext, {
-        client: { clientId: config.clientId, clientSecret: config.clientSecret },
-      });
+      accessToken = await accessTokenFor(original.refreshTokenCiphertext, { client });
     } catch (error) {
       if (error instanceof ReconnectRequiredError) failure = "RECONNECT_REQUIRED";
       throw error;
@@ -572,16 +575,15 @@ export const refreshCalendarBusy = onCall(CALL_OPTIONS, async (request) => {
     if (!result.ok) throw new Error("BUSY_UNAVAILABLE");
     const blocks = parsePrimaryBusy(await result.json());
     if (blocks === null) throw new Error("BUSY_INCOMPLETE");
-    await calendarTransaction(context, (tx, ref, connection) => {
+    const saved = await calendarTransaction(context, (tx, ref, connection) => {
+      // Desconectar, reconectar ou uma leitura mais nova no meio: esta resposta
+      // chegou tarde e não vale mais.
       if (
         connection?.status !== "CONNECTED" ||
         connection.generation !== original.generation ||
         connection.pendingRead !== requestId
       ) {
-        throw new HttpsError(
-          "aborted",
-          "A conexão mudou. Verifique a situação atual e tente novamente.",
-        );
+        return false;
       }
       tx.set(
         calendarRef(context, "calendarBusyBlocks"),
@@ -605,10 +607,10 @@ export const refreshCalendarBusy = onCall(CALL_OPTIONS, async (request) => {
         lastError: null,
         pendingRead: null,
       });
+      return true;
     });
-    return { blocks: blocks.length };
-  } catch (error) {
-    // Uma falha não renova a validade da leitura anterior nem a substitui por agenda vazia.
+    return saved ? { ok: true, blocks: blocks.length } : { ok: false, failure: "ABORTED" };
+  } catch {
     await calendarTransaction(context, (tx, ref, connection) => {
       if (
         connection?.generation === original.generation &&
@@ -621,15 +623,113 @@ export const refreshCalendarBusy = onCall(CALL_OPTIONS, async (request) => {
         });
       }
     });
-    if (error instanceof HttpsError) throw error;
+    return { ok: false, failure };
+  }
+}
+
+export const refreshCalendarBusy = onCall(CALL_OPTIONS, async (request) => {
+  const context = {
+    ...(await contextOf(request)),
+    ...parse(connectSchema, request.data),
+  };
+  await consumeRateLimit(context.userId, "calendarConnection");
+  const config = configuration();
+  const outcome = await readBusyNow(context, {
+    client: { clientId: config.clientId, clientSecret: config.clientSecret },
+  });
+  if (outcome.ok) return { blocks: outcome.blocks };
+  if (outcome.failure === "NOT_CONNECTED") {
+    throw new HttpsError("failed-precondition", "Conecte sua agenda Google novamente.");
+  }
+  if (outcome.failure === "ABORTED") {
     throw new HttpsError(
-      "unavailable",
-      failure === "RECONNECT_REQUIRED"
-        ? "A autorização Google expirou ou foi revogada. Conecte sua agenda novamente."
-        : "Não foi possível consultar o Google. A leitura anterior não foi atualizada.",
+      "aborted",
+      "A conexão mudou. Verifique a situação atual e tente novamente.",
     );
   }
+  throw new HttpsError(
+    "unavailable",
+    outcome.failure === "RECONNECT_REQUIRED"
+      ? "A autorização Google expirou ou foi revogada. Conecte sua agenda novamente."
+      : "Não foi possível consultar o Google. A leitura anterior não foi atualizada.",
+  );
 });
+
+/** Conexões lidas por vez: o Google e o Firestore aguentam; a rotina termina em minutos. */
+const REFRESH_CONCURRENCY = 5;
+const REFRESH_PAGE_SIZE = 200;
+
+/**
+ * Lê o ocupado de toda agenda conectada (3C, frente 2). Quem perdeu o vínculo
+ * ou está com a assinatura vencida é pulado — a mesma conferência da consulta
+ * manual. Nenhum registro leva nome, horário ou conteúdo: só contagens.
+ */
+export async function refreshAllCalendars(deps = {}) {
+  const { firestore = getFirestore(), client = googleClient(), clock } = deps;
+  const tally = { read: 0, skipped: 0, reconnect: 0, failed: 0 };
+  if (!client) return { ...tally, configured: false };
+
+  const base = firestore
+    .collectionGroup(TENANT_COLLECTIONS.calendarConnections)
+    .where("status", "==", "CONNECTED")
+    .orderBy(FieldPath.documentId())
+    .limit(REFRESH_PAGE_SIZE);
+  let cursor = null;
+  for (;;) {
+    const page = await (cursor ? base.startAfter(cursor) : base).get();
+    const documents = page.docs;
+    for (let index = 0; index < documents.length; index += REFRESH_CONCURRENCY) {
+      await Promise.all(
+        documents.slice(index, index + REFRESH_CONCURRENCY).map(async (document) => {
+          const organizationId = document.ref.parent.parent?.id;
+          const professionalId = document.id;
+          if (!organizationId) {
+            tally.skipped += 1;
+            return;
+          }
+          const professional = (
+            await firestore.doc(paths.document(organizationId, "professionals", professionalId)).get()
+          ).data();
+          const context = { organizationId, professionalId, userId: professional?.userId ?? null };
+          const allowed =
+            !!context.userId &&
+            (await firestore.runTransaction((transaction) => calendarOwnerAllowed(transaction, context)));
+          if (!allowed) {
+            tally.skipped += 1;
+            return;
+          }
+          try {
+            const outcome = await readBusyNow(context, { client, clock });
+            if (outcome.ok) tally.read += 1;
+            else if (outcome.failure === "RECONNECT_REQUIRED") tally.reconnect += 1;
+            else if (outcome.failure === "UNAVAILABLE") tally.failed += 1;
+            else tally.skipped += 1;
+          } catch {
+            tally.failed += 1;
+          }
+        }),
+      );
+    }
+    if (documents.length < REFRESH_PAGE_SIZE) break;
+    cursor = documents[documents.length - 1];
+  }
+  return { ...tally, configured: true };
+}
+
+export const refreshCalendarBusyEvery30Minutes = onSchedule(
+  {
+    schedule: `every ${CALENDAR_REFRESH_MINUTES} minutes`,
+    region: "southamerica-east1",
+    timeoutSeconds: 540,
+    maxInstances: 1,
+    secrets: ["GOOGLE_OAUTH_CLIENT_SECRET"],
+    ...runAs("automacao"),
+  },
+  async () => {
+    const result = await refreshAllCalendars();
+    logger.info("calendar.busy.refresh", result);
+  },
+);
 
 // O contrato antigo aceitava ocupado sem pedido correlacionado. Mantemos a rota
 // fechada até existir uma tarefa de automação que permita validar sua origem.

@@ -117,8 +117,9 @@ export function GoogleCalendar({ professionalId }: { professionalId: string }) {
           altera nenhum outro evento seu.
         </p>
         <p className="text-muted-foreground text-sm">
-          A consulta de ocupado é manual e ainda não bloqueia horários na agenda
-          do Atendara.
+          O ocupado da sua agenda principal é relido a cada 30 minutos e
+          aparece na agenda do Atendara; marcar por cima mostra um aviso, sem
+          bloquear. Aqui você também pode atualizar na hora.
         </p>
         {error ? (
           <p role="alert" className="text-danger text-sm">

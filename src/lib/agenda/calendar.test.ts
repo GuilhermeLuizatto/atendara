@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { CALENDAR_BUSY_STALE_MINUTES, CALENDAR_CLOCK_SKEW_MINUTES, GOOGLE_CALENDAR_SCOPES } from "@/config/calendar";
 import type { Appointment } from "@/types";
 
-import { calendarEventFor, decideCalendarSync, isBusySnapshotFresh, parseBusyBlocks, parsePrimaryBusy } from "./calendar";
+import { busyConflicts, calendarEventFor, decideCalendarSync, isBusySnapshotFresh, parseBusyBlocks, parsePrimaryBusy } from "./calendar";
 
 const ATENDIMENTO: Pick<Appointment, "startsAt" | "endsAt" | "clientName" | "status"> = {
   startsAt: "2026-09-25T13:00:00.000Z",
@@ -153,5 +153,34 @@ describe("consulta completa da agenda principal", () => {
       { start: "2026-09-25T12:00:00Z", end: "2026-09-25T13:00:00Z" },
       { start: "inválido", end: "inválido" },
     ] } } })).toBeNull();
+  });
+});
+
+describe("o horário cruza um compromisso do Google?", () => {
+  const agora = "2026-09-25T12:00:00.000Z";
+  const leitura = {
+    professionalId: "prof-1",
+    readAt: agora,
+    timeMin: agora,
+    timeMax: "2026-10-25T12:00:00.000Z",
+    blocks: [{ startsAt: "2026-09-26T14:00:00.000Z", endsAt: "2026-09-26T15:00:00.000Z" }],
+  };
+  const checar = (startsAt: string, endsAt: string, overrides = {}) =>
+    busyConflicts({ startsAt, endsAt, professionalId: "prof-1", snapshots: [{ ...leitura, ...overrides }], now: agora });
+
+  it("leitura recente: cruza quem encosta por dentro, não quem só toca a borda", () => {
+    expect(checar("2026-09-26T14:30:00.000Z", "2026-09-26T15:30:00.000Z")).toEqual({
+      status: "FRESH",
+      conflicts: leitura.blocks,
+    });
+    expect(checar("2026-09-26T15:00:00.000Z", "2026-09-26T16:00:00.000Z")).toEqual({ status: "FRESH", conflicts: [] });
+  });
+
+  it("sem leitura, leitura velha ou fora do período não afirmam agenda livre", () => {
+    expect(
+      busyConflicts({ startsAt: agora, endsAt: agora, professionalId: "outro", snapshots: [leitura], now: agora }).status,
+    ).toBe("ABSENT");
+    expect(checar("2026-09-26T16:00:00.000Z", "2026-09-26T17:00:00.000Z", { readAt: "2026-09-20T12:00:00.000Z" }).status).toBe("STALE");
+    expect(checar("2026-11-26T16:00:00.000Z", "2026-11-26T17:00:00.000Z").status).toBe("STALE");
   });
 });

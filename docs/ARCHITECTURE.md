@@ -665,8 +665,10 @@ eventos passa pela fila: o gatilho `planCalendarEvents` cria uma tarefa
 executar, lê o atendimento atual e grava ou apaga o evento na agenda "Atendara"
 (`functions/calendar-google.js`). A decisão continua em
 `src/lib/automation/calendar-sync.ts`; trocar o executor pelo n8n é trocar só
-esse passo. Atualização automática do ocupado e integração com remarcação ainda
-não estão ativadas.
+esse passo. O ocupado é relido a cada 30 minutos por
+`refreshCalendarBusyEvery30Minutes` (consulta de grupo em `calendarConnections`)
+e chega ao painel no snapshot do workspace (`calendarBusy`); a agenda avisa
+sobre conflito, sem bloquear. Integração com remarcação ainda não está ativada.
 O contrato HTTP legado `calendarBusyCallback` responde 410: não há tarefa
 correlacionada que legitime uma escrita externa de ocupado.
 

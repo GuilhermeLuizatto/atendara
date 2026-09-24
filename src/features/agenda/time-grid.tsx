@@ -9,9 +9,10 @@ import {
   type DateKey,
 } from "@/lib/utils/datetime";
 import { formatTime } from "@/lib/utils/format";
+import type { BusyBlock } from "@/lib/agenda/availability";
 import type { Appointment } from "@/types";
 
-import { layoutDay } from "./layout";
+import { layoutBusy, layoutDay } from "./layout";
 
 export const PIXELS_PER_HOUR = 64;
 
@@ -64,6 +65,7 @@ export function DayColumn({
   endHour,
   now,
   compact = false,
+  busy = [],
   onSelect,
   onCreateAt,
 }: {
@@ -73,10 +75,13 @@ export function DayColumn({
   endHour: number;
   now: Date;
   compact?: boolean;
+  /** Ocupado recente do Google de quem está sendo visto. */
+  busy?: readonly BusyBlock[];
   onSelect: (appointment: Appointment) => void;
   onCreateAt: (dateKey: DateKey, time: string) => void;
 }) {
   const positioned = layoutDay(appointments, startHour, PIXELS_PER_HOUR);
+  const busyBands = layoutBusy(busy, dateKey, startHour, endHour, PIXELS_PER_HOUR);
   const hours = endHour - startHour;
   const isToday = toDateKey(now) === dateKey;
   const nowOffset =
@@ -104,6 +109,26 @@ export function DayColumn({
           />
         );
       })}
+
+      {/* Compromisso pessoal no Google: só a faixa de tempo. Não recebe clique —
+          agendar por cima continua possível, com aviso no formulário. */}
+      {busyBands.map((band) => (
+        <div
+          key={band.startsAt}
+          style={{ top: band.top, height: band.height }}
+          className="border-border bg-surface-muted/80 text-muted-foreground pointer-events-none absolute inset-x-0 overflow-hidden border-y border-dashed px-2 py-0.5 text-[11px]"
+        >
+          {band.height >= 18 ? (
+            <span>
+              Ocupado no Google · {formatTime(band.startsAt)}–{formatTime(band.endsAt)}
+            </span>
+          ) : (
+            <span className="sr-only">
+              Ocupado no Google das {formatTime(band.startsAt)} às {formatTime(band.endsAt)}
+            </span>
+          )}
+        </div>
+      ))}
 
       {showNowLine ? (
         <div

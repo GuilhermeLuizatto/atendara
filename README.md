@@ -273,6 +273,11 @@ testes de ponta a ponta.
 | **5** | Produto: equipes, importação administrativa, suporte, cobrança real e planos | 🟨 |
 | **6** | Expansão: portfólio da Estética, marketplace e cobrador dos clientes | ⬜ |
 
+As validações externas ou manuais que dependem do titular ficam no
+[checklist vivo em PDF](docs/VALIDACOES-REAIS-PENDENTES.pdf), acompanhado da
+[fonte editável](docs/VALIDACOES-REAIS-PENDENTES.md). A lista inclui a Fase 3B
+e deve ser atualizada a cada conclusão ou mudança de roteiro.
+
 ### Próximas entregas
 
 A Fase 4 local está disponível em `/agente`: autorizações da Dara, editor de

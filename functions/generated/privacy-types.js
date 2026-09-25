@@ -46,6 +46,7 @@ export const ORGANIZATION_EXPORT_SECTIONS = [
     "transactions",
     "aiRules",
     "aiDecisions",
+    "aiDecisionReviews",
     "notifications",
     "notificationDeliveries",
     "services",

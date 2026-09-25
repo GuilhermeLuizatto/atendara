@@ -40,6 +40,8 @@ export const SNAPSHOT_PAGE_SIZES = {
   transactions: 500,
   aiRules: 200,
   aiDecisions: 200,
+  // Acompanha `aiDecisions`: o acerto so se calcula onde as duas paginas se cruzam.
+  aiDecisionReviews: 200,
   notifications: 100,
   notificationDeliveries: 200,
   automationTasks: 100,
@@ -146,6 +148,13 @@ export const snapshotQueries: Record<
     query(
       tenantQuery(db, organizationId, "aiDecisions"),
       orderBy("decidedAt", "desc"),
+      limit(count),
+    ),
+
+  aiDecisionReviews: (db, organizationId, count) =>
+    query(
+      tenantQuery(db, organizationId, "aiDecisionReviews"),
+      orderBy("updatedAt", "desc"),
       limit(count),
     ),
 

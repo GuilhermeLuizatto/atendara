@@ -1,10 +1,12 @@
 import type { DepositChoice } from "@/config/deposit";
+import type { DecisionReviewInput } from "@/lib/ai/decision-review";
 import type { DispatchSummary } from "@/lib/notifications";
 import type { CalendarBusySnapshot } from "@/types/calendar";
 import type {
   AgendaSettings,
   AIAgentSettings,
   AIDecision,
+  AIDecisionReview,
   AIRule,
   Appointment,
   AppointmentStatus,
@@ -39,6 +41,7 @@ export type WorkspaceCollection =
   | "transactions"
   | "rules"
   | "decisions"
+  | "decisionReviews"
   | "notifications"
   | "notificationDeliveries"
   | "automationTasks"
@@ -94,6 +97,11 @@ export interface WorkspaceSnapshot {
   transactions: Transaction[];
   rules: AIRule[];
   decisions: AIDecision[];
+  /**
+   * Revisao humana das decisoes (Fase 4). Opcional como `calendarBusy`: a
+   * demonstracao antiga e os fixtures nao a trazem, e ausente vale vazia.
+   */
+  decisionReviews?: AIDecisionReview[];
   notifications: Notification[];
   /** Fila de saida dos avisos ao cliente. Vazia enquanto nada for configurado. */
   notificationDeliveries: NotificationDelivery[];
@@ -347,6 +355,11 @@ export interface WorkspaceRepository {
   /** Horario de atendimento e padroes da agenda. Exige `agendaSettings:update` (OWNER, ADMIN e o titular). */
   updateAgendaSettings(settings: AgendaSettings): Promise<void>;
   updateAISettings(settings: AIAgentSettings): Promise<void>;
+  /**
+   * Marca se a classificacao de uma decisao estava certa. Exige
+   * `aiDecision:review` (OWNER e ADMIN); a decisao em si nao muda.
+   */
+  reviewDecision(decisionId: ID, input: DecisionReviewInput): Promise<void>;
   /**
    * Executa as entregas vencidas com o provedor simulado e grava o resultado.
    *

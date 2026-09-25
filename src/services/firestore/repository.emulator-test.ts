@@ -562,4 +562,39 @@ describe("repositorio do Firestore contra o emulador", () => {
       estudio.dispose();
     }
   });
+  it("revisão da decisão vai e volta sem tocar na decisão, e corrigir preserva a primeira", async () => {
+    const decisionId = "decisao-revisada";
+    const decidedAt = "2026-09-20T12:00:00.000Z";
+    const decision = {
+      id: decisionId, organizationId: ORG, conversationId: CONVERSATION, messageId: "m-rev",
+      clientId: CLIENT, professionalId: PROFESSIONAL, inputPreview: "", classification: "ADMINISTRATIVE",
+      confidence: 0.9, appliedRules: [], action: "AUTO_RESPONSE", responseText: null, reason: "",
+      attention: "NORMAL", escalated: false, engineVersion: "1", decidedAt, latencyMs: 5,
+      createdAt: decidedAt, updatedAt: decidedAt, createdBy: null, updatedBy: null,
+    };
+    await setDoc(doc(db, paths.document(ORG, "aiDecisions", decisionId)), toFirestoreData("aiDecisions", decision));
+
+    const owner = new FirestoreWorkspaceRepository(db, ORG, "PSYCHOLOGIST");
+    try {
+      owner.setActor({ userId: "user-owner", name: "Titular", role: "OWNER", permissions: permissionsForRole("OWNER") });
+      await nextSnapshot((snapshot) => snapshot.decisions.some((item) => item.id === decisionId), owner);
+
+      await owner.reviewDecision(decisionId, { verdict: "CORRECT", expectedClassification: null });
+      const first = (await nextSnapshot((s) => s.decisionReviews?.some((r) => r.decisionId === decisionId) ?? false, owner))
+        .decisionReviews!.find((r) => r.decisionId === decisionId)!;
+      const stored = await getDoc(doc(db, paths.document(ORG, "aiDecisionReviews", decisionId)));
+      expect(stored.get("createdAt")).toBeInstanceOf(Timestamp);
+
+      await owner.reviewDecision(decisionId, { verdict: "INCORRECT", expectedClassification: "CLINICAL" });
+      const corrected = (await nextSnapshot((s) => s.decisionReviews?.some((r) => r.verdict === "INCORRECT") ?? false, owner))
+        .decisionReviews!.find((r) => r.decisionId === decisionId)!;
+      expect(corrected).toMatchObject({ expectedClassification: "CLINICAL", createdAt: first.createdAt, createdBy: "user-owner" });
+
+      const untouched = await getDoc(doc(db, paths.document(ORG, "aiDecisions", decisionId)));
+      expect(untouched.get("classification")).toBe("ADMINISTRATIVE");
+      expect(untouched.get("updatedAt")).toEqual(Timestamp.fromDate(new Date(decidedAt)));
+    } finally {
+      owner.dispose();
+    }
+  });
 });

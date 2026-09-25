@@ -76,6 +76,9 @@ const ADMIN_PERMISSIONS: Permission[] = [
   "automationSwitch:manage",
   "transaction:delete",
   "organization:update",
+  // Os mesmos papeis que mudam as autorizacoes da Dara julgam se ela acertou
+  // (decisao do titular, 25/09). Espelha `isAdmin()` em `aiDecisionReviews`.
+  "aiDecision:review",
   "notificationSettings:update",
   "agendaSettings:update",
   "member:invite",

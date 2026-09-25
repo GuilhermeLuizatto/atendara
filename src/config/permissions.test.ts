@@ -85,6 +85,16 @@ describe("matriz de permissoes", () => {
     }
   });
 
+  it("reserva a revisao de decisoes da Dara a quem muda as autorizacoes dela", () => {
+    // Nas rules, `isAdmin()` em `aiDecisionReviews`. Ser titular nao basta.
+    for (const role of ROLES) {
+      expect(hasPermission(role, "aiDecision:review")).toBe(hasPermission(role, "organization:update"));
+      expect(permissionsForMembership(role, true).includes("aiDecision:review")).toBe(
+        role === "OWNER" || role === "ADMIN",
+      );
+    }
+  });
+
   it("da ao titular so a lista fechada, alem do proprio papel", () => {
     // Espelha `organizationHolder()` nas rules: avisos, horario, pedidos de
     // titular e a chave de emergencia da automacao (13.9).

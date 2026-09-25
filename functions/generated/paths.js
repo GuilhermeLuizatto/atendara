@@ -56,6 +56,9 @@ export const TENANT_COLLECTIONS = {
     transactions: "transactions",
     aiRules: "aiRules",
     aiDecisions: "aiDecisions",
+    // Revisao humana da classificacao, uma por decisao e com o id dela. Fica
+    // fora de `aiDecisions` porque aquela e append-only (regra 6).
+    aiDecisionReviews: "aiDecisionReviews",
     notifications: "notifications",
     // Avisos que a organizacao envia a quem ela atende. Separada de
     // `notifications` de proposito: aquela e o alerta dentro do painel, esta e a

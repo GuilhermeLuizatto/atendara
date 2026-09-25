@@ -17,6 +17,16 @@ const PATTERNS = [
   ["chave privada (PEM)", /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/],
   ["conta de servico do Google", /"type"\s*:\s*"service_account"/],
   ["chave de API do Google", /\bAIza[0-9A-Za-z_-]{35}\b/],
+  // Formato mais novo das chaves do Google (Gemini incluso), que nao comeca
+  // com `AIza` e passava pela varredura (25/09/2026).
+  ["chave de API do Google (AQ.)", /\bAQ\.[0-9A-Za-z_-]{40,}/],
+  // Rede para formato que nenhum padrao acima conhece: nome de segredo
+  // recebendo valor literal longo, como numa linha copiada de um `.env`.
+  // Valor que se anuncia como exemplo ("segredo-...", "troque-...") passa.
+  [
+    "segredo atribuido a variavel",
+    /\b[A-Z0-9_]*(?:API_KEY|SECRET|TOKEN)\s*[:=]\s*["']?(?!(?:segredo|troque|cole|exemplo|seu|sua)[-_])[0-9A-Za-z_./+-]{20,}/,
+  ],
   ["token de atualizacao OAuth", /\b1\/\/[0-9A-Za-z_-]{30,}/],
   ["chave secreta da Stripe", /\b(?:sk|rk)_(?:live|test)_[0-9A-Za-z]{16,}/],
   ["segredo de webhook da Stripe", /\bwhsec_[0-9A-Za-z]{16,}/],
@@ -37,6 +47,7 @@ const ALLOWED = [
   [/[.-]test\.(?:ts|tsx|js|mjs)$/, "fixture de teste"],
   [/^\.env\.example$/, "exemplo sem valor real"],
   [/^src\/lib\/testing\//, "dubles de teste"],
+  [/^scripts\/run-access-tests\.mjs$/, "segredos ficticios do emulador"],
 ];
 
 const allowed = (path) => ALLOWED.some(([pattern]) => pattern.test(path));
@@ -66,7 +77,10 @@ function scanWorkingTree(onlyStaged, findings) {
       continue; // arquivo removido no indice
     }
     if (size > 2 * 1024 * 1024) continue;
-    scanText(readFileSync(path, "utf8"), path, onlyStaged ? "indice" : "arvore", findings);
+    // No gancho vale o que entra no commit, nao o arquivo da pasta: com
+    // `git add -p`, os dois diferem.
+    const text = onlyStaged ? git(["show", `:${path}`]) : readFileSync(path, "utf8");
+    scanText(text, path, onlyStaged ? "indice" : "arvore", findings);
   }
 }
 

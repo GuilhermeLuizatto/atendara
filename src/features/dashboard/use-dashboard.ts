@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import { useNow } from "@/lib/utils/use-now";
 import { toDateKey } from "@/mocks";
+import { isOpenNotification } from "@/lib/notifications/targets";
 import { useWorkspace } from "@/providers/workspace-provider";
 import type {
   AIDecision,
@@ -129,7 +130,7 @@ export function useDashboard(): DashboardModel | null {
     );
 
     const openAlerts = data.notifications
-      .filter((notification) => notification.status !== "ACKNOWLEDGED")
+      .filter(isOpenNotification)
       .sort(
         (a, b) =>
           ATTENTION_RANK[a.priority] - ATTENTION_RANK[b.priority] ||

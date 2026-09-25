@@ -28,7 +28,13 @@ export type NotificationChannel =
 
 /** Recurso ao qual a notificacao aponta, para navegacao direta na interface. */
 export interface NotificationTarget {
-  type: "conversation" | "appointment" | "client" | "transaction" | "rule";
+  type:
+    | "conversation"
+    | "appointment"
+    | "client"
+    | "transaction"
+    | "rule"
+    | "calendar_connection";
   id: ID;
 }
 

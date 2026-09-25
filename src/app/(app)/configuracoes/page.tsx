@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
@@ -16,37 +17,79 @@ import { ProfessionChange } from "@/features/settings/profession-change";
 import { GoogleCalendar } from "@/features/settings/google-calendar";
 import { ServiceCatalog } from "@/features/settings/service-catalog";
 import { WhatsappEmbeddedSignup } from "@/features/settings/whatsapp-embedded-signup";
+import {
+  settingsSectionFromQuery,
+  type SettingsSection,
+} from "@/features/settings/sections";
 import { formatDate } from "@/lib/utils/format";
 import { useAuth } from "@/providers/auth-provider";
 import { useWorkspace } from "@/providers/workspace-provider";
 
-type Section = "geral" | "servicos" | "avisos" | "whatsapp" | "auditoria" | "fila" | "google";
-
 const ID_BASE = "configuracoes";
 
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={<SettingsFallback />}>
+      <SettingsContent />
+    </Suspense>
+  );
+}
+
+function SettingsFallback() {
+  return (
+    <div className="mx-auto max-w-3xl space-y-6" aria-busy="true">
+      <PageHeader
+        title="Configurações"
+        description="Carregando suas configurações…"
+      />
+      <SkeletonCard lines={6} />
+    </div>
+  );
+}
+
+function SettingsContent() {
   const { user } = useAuth();
   const { data, session, profession, organization } = useWorkspace();
-  const [section, setSection] = useState<Section>("geral");
+  const searchParams = useSearchParams();
+  const requestedSection = settingsSectionFromQuery(searchParams.get("secao"));
+  const [selectedSection, setSelectedSection] =
+    useState<SettingsSection | null>(null);
+  const section = selectedSection ?? requestedSection ?? "geral";
   const access = user?.access;
   const admin = isPlatformAdmin(access);
 
   const canReadAudit = session?.permissions.includes("auditLog:read") ?? false;
-  const ownProfessional = data?.professionals.find((professional) => professional.userId === user?.userId && professional.active);
-  const canConnectCalendar = !admin && !!ownProfessional && session?.permissions.includes("appointment:read");
+  const ownProfessional = data?.professionals.find(
+    (professional) =>
+      professional.userId === user?.userId && professional.active,
+  );
+  const canConnectCalendar =
+    !admin &&
+    !!ownProfessional &&
+    session?.permissions.includes("appointment:read");
   // A aba existe pela flag da profissao, nunca pelo nome dela (regra 1).
-  const hasCatalog = profession.features.serviceCatalog && (session?.permissions.includes("service:read") ?? false);
-  const options: { value: Section; label: string }[] = [
+  const hasCatalog =
+    profession.features.serviceCatalog &&
+    (session?.permissions.includes("service:read") ?? false);
+  const options: { value: SettingsSection; label: string }[] = [
     { value: "geral", label: "Geral" },
     ...(hasCatalog ? [{ value: "servicos" as const, label: "Serviços" }] : []),
     { value: "avisos", label: "Avisos de atendimento" },
     { value: "whatsapp", label: "WhatsApp" },
-    ...(canConnectCalendar ? [{ value: "google" as const, label: "Google Calendar" }] : []),
-    ...(session?.permissions.includes("automationQueue:read") ? [{ value: "fila" as const, label: "Fila de automações" }] : []),
-    ...(canReadAudit ? [{ value: "auditoria" as const, label: "Trilha de auditoria" }] : []),
+    ...(canConnectCalendar
+      ? [{ value: "google" as const, label: "Google Calendar" }]
+      : []),
+    ...(session?.permissions.includes("automationQueue:read")
+      ? [{ value: "fila" as const, label: "Fila de automações" }]
+      : []),
+    ...(canReadAudit
+      ? [{ value: "auditoria" as const, label: "Trilha de auditoria" }]
+      : []),
   ];
   // Perder a permissao com a aba aberta nao pode deixar um painel orfao.
-  const active = options.some((option) => option.value === section) ? section : "geral";
+  const active = options.some((option) => option.value === section)
+    ? section
+    : "geral";
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -60,7 +103,7 @@ export default function SettingsPage() {
         label="Seções das configurações"
         options={options}
         value={active}
-        onChange={setSection}
+        onChange={setSelectedSection}
       />
 
       <TabPanel idBase={ID_BASE} value={active} className="space-y-4">
@@ -72,10 +115,13 @@ export default function SettingsPage() {
               </CardHeader>
               <CardBody className="space-y-2 text-sm">
                 <p className="text-foreground">
-                  {user?.displayName} · <span className="text-muted-foreground">{user?.email}</span>
+                  {user?.displayName} ·{" "}
+                  <span className="text-muted-foreground">{user?.email}</span>
                 </p>
                 <p className="text-foreground">
-                  {admin ? "Administrador da plataforma — todas as profissões" : profession.label}
+                  {admin
+                    ? "Administrador da plataforma — todas as profissões"
+                    : profession.label}
                 </p>
                 <p className="text-muted-foreground">
                   {admin
@@ -84,12 +130,19 @@ export default function SettingsPage() {
                 </p>
                 <p className="text-muted-foreground">
                   Áreas liberadas:{" "}
-                  {admin ? "todas" : access?.modules.map((area) => MODULE_LABELS[area]).join(", ")}
+                  {admin
+                    ? "todas"
+                    : access?.modules
+                        .map((area) => MODULE_LABELS[area])
+                        .join(", ")}
                 </p>
                 {session && !admin ? (
                   <p className="text-muted-foreground">
                     Papel na organização: {ROLE_LABELS[session.role]}
-                    {session.isOrganizationHolder ? ", titular da organização" : ""}.
+                    {session.isOrganizationHolder
+                      ? ", titular da organização"
+                      : ""}
+                    .
                   </p>
                 ) : null}
               </CardBody>
@@ -125,12 +178,29 @@ export default function SettingsPage() {
           </>
         ) : null}
 
-        {active === "servicos" ? data ? <ServiceCatalog /> : <SkeletonCard lines={5} /> : null}
+        {active === "servicos" ? (
+          data ? (
+            <ServiceCatalog />
+          ) : (
+            <SkeletonCard lines={5} />
+          )
+        ) : null}
 
-        {active === "avisos" ? data ? <NotificationSettings /> : <SkeletonCard lines={6} /> : null}
+        {active === "avisos" ? (
+          data ? (
+            <NotificationSettings />
+          ) : (
+            <SkeletonCard lines={6} />
+          )
+        ) : null}
 
         {active === "whatsapp" ? <WhatsappEmbeddedSignup /> : null}
-        {active === "google" && ownProfessional ? <GoogleCalendar key={ownProfessional.id} professionalId={ownProfessional.id} /> : null}
+        {active === "google" && ownProfessional ? (
+          <GoogleCalendar
+            key={ownProfessional.id}
+            professionalId={ownProfessional.id}
+          />
+        ) : null}
 
         {active === "auditoria" ? <AuditTrail /> : null}
         {active === "fila" ? <AutomationQueue /> : null}

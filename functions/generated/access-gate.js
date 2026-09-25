@@ -26,7 +26,7 @@ export function resolveAccountGate(input) {
     const { subscription, grant, nowMs } = input;
     const paid = subscription
         ? {
-            subscriptionStatus: toAccountSubscriptionStatus(subscription.status),
+            subscriptionStatus: toAccountSubscriptionStatus(subscription.status, subscription.failedPaymentAttempts ?? 0),
             accessUntil: subscription.accessUntil,
         }
         : null;

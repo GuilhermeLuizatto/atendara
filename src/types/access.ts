@@ -1,7 +1,18 @@
 import type { InitialAccessGrant } from "./platform";
 import type { ProfessionId } from "./profession";
 
-export const APP_MODULES = ["dashboard", "agenda", "clientes", "mensagens", "financeiro", "agente", "configuracoes"] as const;
+export const APP_MODULES = [
+  "dashboard",
+  "agenda",
+  "clientes",
+  "mensagens",
+  "financeiro",
+  "agente",
+  "configuracoes",
+  "equipe",
+  "importacao",
+  "suporte",
+] as const;
 export type AppModule = (typeof APP_MODULES)[number];
 
 /**
@@ -9,7 +20,7 @@ export type AppModule = (typeof APP_MODULES)[number];
  * sao todas da operadora — por isso o campo e opcional em vez de exigir
  * migracao de dado.
  */
-export type AccountOrigin = "OPERATOR" | "SELF_SERVICE";
+export type AccountOrigin = "OPERATOR" | "SELF_SERVICE" | "INVITATION";
 
 /** Versao dos textos legais aceita no cadastro, e quando. */
 export interface LegalAcceptance {

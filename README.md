@@ -70,7 +70,10 @@ representam o estado do projeto, sem alegação de autoria individual exclusiva.
 | Mensagens        | `/mensagens`     | Caixa de entrada com classificacao e acao da IA         |
 | Financeiro       | `/financeiro`    | Receitas, pendencias e atrasos do negocio do assinante  |
 | Dara             | `/agente`        | Regras, decisoes auditaveis e simulador                 |
-| Configuracoes    | `/configuracoes` | Profissao, equipe, agenda, privacidade e avisos         |
+| Equipe           | `/equipe`        | Convites, vínculos, suspensão e remoção                 |
+| Importação       | `/importacao`    | CSV/XLSX, mapeamento, prévia e duplicidades por linha   |
+| Suporte          | `/suporte`       | Chamados autenticados e conversa oficial no painel      |
+| Configuracoes    | `/configuracoes` | Profissao, marca, agenda, privacidade e avisos          |
 | Minha assinatura | `/assinatura`    | Plano, situacao e cobrancas da mensalidade do Atendara  |
 | Administracao    | `/admin`         | Cadastros, acesso e a cobranca da plataforma            |
 
@@ -166,7 +169,10 @@ esta nas Security Rules.
 
 Depois habilite **Authentication → Sign-in method → E-mail/senha** e crie o
 Firestore. As Cloud Functions exigem o plano Blaze; as de cobranca exigem ainda
-`STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET` no Secret Manager.
+`STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET` no Secret Manager. Convites e
+notificações de suporte usam o Amazon SES já configurado, com
+`SES_ACCESS_KEY_ID` e `SES_SECRET_ACCESS_KEY` no Secret Manager e remetente em
+`SES_FROM_EMAIL`.
 
 ### Emuladores locais
 
@@ -199,9 +205,10 @@ Suites que exigem o emulador (Java e a CLI do Firebase):
 | Comando                   | O que prova                                                          |
 | ------------------------- | -------------------------------------------------------------------- |
 | `npm run test:rules`      | Security Rules: isolamento entre organizacoes, modulos, append-only  |
+| `npm run test:storage`    | Arquivos: logo, anexos, tipos, tamanhos e visibilidade               |
 | `npm run test:repository` | Fiacao do repositorio: `Timestamp` <-> ISO, lote atomico, transacao  |
 | `npm run test:access`     | Matriz de acesso e cobranca: Auth, callables, webhook e regras juntos |
-| `npm run test:emulator`   | As tres em sequencia                                                 |
+| `npm run test:emulator`   | As quatro suites de emulador em sequencia                            |
 
 ---
 
@@ -212,7 +219,7 @@ O build gera um site estatico em `out/`, servido pelo Firebase Hosting.
 ```bash
 firebase deploy --only functions
 npm run build
-firebase deploy --only firestore:rules,firestore:indexes
+firebase deploy --only firestore:rules,firestore:indexes,storage
 firebase deploy --only hosting
 ```
 
@@ -270,8 +277,13 @@ testes de ponta a ponta.
 | **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco | ⏸️ Em espera; validação externa pendente |
 | **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | 🟨 Código integrado à `main` e Functions publicadas; validações reais pendentes |
 | **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | ✅ Gemini por allowlist em 6 organizações; acerto revisado e entrega nos indicadores |
-| **5** | Produto: equipes, importação administrativa, suporte, cobrança real e planos | 🟨 |
+| **5** | Produto: equipes, importação administrativa, suporte, marca e preparação da cobrança | 🟨 Código concluído; validações reais e catálogo de planos pendentes |
 | **6** | Expansão: portfólio da Estética, marketplace e cobrador dos clientes | ⬜ |
+
+As validações externas ou manuais que dependem do titular ficam no
+[checklist vivo em PDF](docs/VALIDACOES-REAIS-PENDENTES.pdf), acompanhado da
+[fonte editável](docs/VALIDACOES-REAIS-PENDENTES.md). A lista inclui a Fase 3B
+e deve ser atualizada a cada conclusão ou mudança de roteiro.
 
 ### Próximas entregas
 
@@ -332,9 +344,15 @@ resultado.
    O reteste real do e-mail passou em 25/09/2026 com um endereço inédito: a
    mensagem chegou à caixa principal e o link confirmou o endereço. A 3B
    continua em espera pela validação externa da Meta.
-6. Depois do piloto, priorizar equipes, importação de dados administrativos e
-   suporte. O cobrador de clientes só começa após decisão contábil, jurídica e
-   de gateway sobre split, responsabilidade fiscal e consentimento.
+6. A Fase 5 está concluída no código em branch isolada: equipe por convite de
+   sete dias, solicitação interna por profissional, importação CSV/XLSX com
+   mapeamento e decisão por duplicidade, chamados autenticados no painel,
+   anexos protegidos e logo da organização. O Amazon SES envia somente os
+   convites e avisos; a conversa de suporte permanece no painel. O catálogo e
+   os preços dos planos continuam deliberadamente em espera, e a Stripe segue
+   travada para uso real até a decisão comercial, jurídica, fiscal e o teste
+   explicitamente autorizado. O roteiro que depende do titular está no
+   [checklist vivo](docs/VALIDACOES-REAIS-PENDENTES.pdf).
 
 Planos e billing da plataforma continuam em modo de testes. A IA externa
 (Gemini) está ativa em produção só para as organizações da allowlist

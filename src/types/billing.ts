@@ -62,6 +62,8 @@ export interface PlatformSubscription {
   subscriberEmail: string;
   planId: ID;
   status: PlatformSubscriptionStatus;
+  /** Quantidade de tentativas recusadas da fatura atual; zera ao pagar. */
+  failedPaymentAttempts?: number;
   amountInCents: number;
   currency: CurrencyCode;
   interval: BillingInterval;

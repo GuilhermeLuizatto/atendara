@@ -73,7 +73,11 @@ service cloud.firestore {
     }
 
     function moduleAccess(orgId, moduleName) {
-      return isMember(orgId) && moduleName in get(accountRef()).data.modules;
+      // Equipe, importacao e suporte ficam abertos aos participantes do piloto
+      // enquanto o catalogo definitivo da Fase 5 esta em espera. Sao modulos
+      // separados para que os planos futuros os concedam sem mudar rotas.
+      return isMember(orgId) && (moduleName in get(accountRef()).data.modules
+        || moduleName in ['equipe', 'importacao', 'suporte']);
     }
 
     function memberRef(orgId) {
@@ -379,6 +383,19 @@ service cloud.firestore {
         allow read: if isMember(orgId);
         // Vinculo e papel sao escritos pelo SDK administrativo.
         allow write: if false;
+      }
+
+      // Pedidos, convites e modelos de importacao passam por callables. Isso
+      // permite conferir papel, titularidade, uma unica organizacao por conta,
+      // token de convite e a gravacao da trilha no mesmo ato.
+      match /memberRequests/{requestId} {
+        allow read, write: if false;
+      }
+      match /memberInvitations/{invitationId} {
+        allow read, write: if false;
+      }
+      match /importMappings/{mappingId} {
+        allow read, write: if false;
       }
 
       // ------------------------------------------------------- profissionais
@@ -741,6 +758,15 @@ service cloud.firestore {
     // Contadores de abuso por usuario. Mecanismo interno do backend.
     match /platformRateLimits/{key} {
       allow read, write: if false;
+    }
+
+    // Chamados sao intermediados pelo backend: membros nunca enxergam os de
+    // outro tenant e a operadora nunca ganha acesso aos dados operacionais.
+    match /platformSupportTickets/{ticketId} {
+      allow read, write: if false;
+      match /messages/{messageId} {
+        allow read, write: if false;
+      }
     }
 
     // ----------------------------------------------------------------- padrao

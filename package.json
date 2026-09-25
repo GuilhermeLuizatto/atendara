@@ -23,9 +23,10 @@
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "scan:secrets:historico": "node scripts/scan-secrets.mjs --historico",
     "test:rules": "node .local/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js emulators:exec --config firebase.emulator-tests.json --project demo-atendara --only firestore \"node scripts/test-firestore-rules.mjs\"",
+    "test:storage": "node .local/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js emulators:exec --config firebase.storage-tests.json --project demo-atendara --only firestore,storage \"node scripts/test-storage-rules.mjs\"",
     "test:repository": "node .local/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js emulators:exec --config firebase.repository-tests.json --project demo-atendara --only firestore \"vitest run --config vitest.emulator.mts\"",
     "test:whatsapp:sandbox": "node scripts/run-whatsapp-sandbox.mjs",
-    "test:emulator": "npm run test:rules && npm run test:repository && npm run test:access",
+    "test:emulator": "npm run test:rules && npm run test:storage && npm run test:repository && npm run test:access",
     "test:emulator:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-emulator-tests.ps1",
     "test:access": "node scripts/run-access-tests.mjs"
   },
@@ -37,6 +38,7 @@
     "next": "16.3.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "read-excel-file": "^6.0.1",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.5.4"
   },

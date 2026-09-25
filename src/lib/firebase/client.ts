@@ -7,6 +7,11 @@ import {
   getFirestore,
   type Firestore,
 } from "firebase/firestore";
+import {
+  connectStorageEmulator,
+  getStorage,
+  type FirebaseStorage,
+} from "firebase/storage";
 
 import { appCheckSiteKey, getFirebaseConfig, useEmulators } from "./config";
 
@@ -25,8 +30,10 @@ let cachedApp: FirebaseApp | null = null;
 let cachedAuth: Auth | null = null;
 let cachedDb: Firestore | null = null;
 let cachedFunctions: Functions | null = null;
+let cachedStorage: FirebaseStorage | null = null;
 let authEmulatorConnected = false;
 let dbEmulatorConnected = false;
+let storageEmulatorConnected = false;
 let appCheckActivated = false;
 
 export function getFirebaseApp(): FirebaseApp {
@@ -86,6 +93,16 @@ export function getFirebaseFunctions(): Functions {
     connectFunctionsEmulator(cachedFunctions, "127.0.0.1", 5001);
   }
   return cachedFunctions;
+}
+
+export function getFirebaseStorage(): FirebaseStorage {
+  if (cachedStorage) return cachedStorage;
+  cachedStorage = getStorage(getFirebaseApp());
+  if (useEmulators && typeof window !== "undefined" && !storageEmulatorConnected) {
+    storageEmulatorConnected = true;
+    connectStorageEmulator(cachedStorage, "127.0.0.1", 9199);
+  }
+  return cachedStorage;
 }
 
 function connectEmulatorsOnce(): void {

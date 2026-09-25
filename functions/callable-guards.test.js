@@ -74,6 +74,8 @@ const WITHOUT_RATE_LIMIT = {
  */
 const WITHOUT_LOGIN = {
   registerSelfService: "E o cadastro aberto: quem chama ainda nao tem conta. App Check, limite por rede e resposta unica seguram o abuso.",
+  inspectTeamInvitation: "O destinatario ainda nao tem conta; App Check e limite por rede protegem a consulta do token.",
+  acceptTeamInvitation: "O primeiro acesso cria a conta; App Check, token de uso unico e limite por rede protegem a chamada.",
 };
 
 let callables = [];

@@ -32,6 +32,9 @@ const READ_ONLY_PERMISSIONS: Permission[] = [
   "rule:read",
   "aiDecision:read",
   "notification:read",
+  "support:create",
+  "support:read",
+  "support:reply",
 ];
 
 const ASSISTANT_PERMISSIONS: Permission[] = [
@@ -60,6 +63,8 @@ const PROFESSIONAL_PERMISSIONS: Permission[] = [
   "rule:create",
   "rule:update",
   "rule:delete",
+  "member:request",
+  "import:manage",
 ];
 
 const ADMIN_PERMISSIONS: Permission[] = [
@@ -79,6 +84,7 @@ const ADMIN_PERMISSIONS: Permission[] = [
   "member:invite",
   "member:update",
   "member:remove",
+  "organizationBranding:update",
   "auditLog:read",
   // Espelha `PRIVACY_RESPONSIBLE_ROLES` (`src/config/privacy.ts`) e
   // `privacyResponsible()` nas rules. O titular da organizacao tambem atende,
@@ -108,7 +114,7 @@ export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   ADMIN: "Gerencia equipe, configurações e todos os dados operacionais.",
   PROFESSIONAL: "Atende, gerencia a própria agenda e as regras do agente.",
   ASSISTANT: "Apoia a operação: agenda, cadastros e mensagens.",
-  VIEWER: "Apenas leitura. Não altera nenhum dado.",
+  VIEWER: "Consulta os dados permitidos e participa dos próprios chamados de suporte.",
 };
 
 /**
@@ -129,6 +135,10 @@ export const ORGANIZATION_HOLDER_PERMISSIONS: readonly Permission[] = [
   "automationSwitch:manage",
   "privacy:export",
   "privacy:erase",
+  "organizationBranding:update",
+  "member:invite",
+  "member:update",
+  "member:remove",
 ];
 
 export function permissionsForRole(role: Role): Permission[] {

@@ -165,6 +165,14 @@ export const CALLABLE_RATE_LIMITS = {
     // que qualquer emergencia real precisa, e ja segura um laco.
     automationSwitch: { max: 20, windowSeconds: 3600 },
     automationRetry: { max: 30, windowSeconds: 3600 },
+    teamRead: { max: 120, windowSeconds: 3600 },
+    teamWrite: { max: 30, windowSeconds: 3600 },
+    teamInvitationByNetwork: { max: 20, windowSeconds: 3600 },
+    administrativeImportRead: { max: 120, windowSeconds: 3600 },
+    administrativeImportWrite: { max: 30, windowSeconds: 3600 },
+    supportRead: { max: 180, windowSeconds: 3600 },
+    supportWrite: { max: 60, windowSeconds: 3600 },
+    organizationBranding: { max: 20, windowSeconds: 3600 },
 };
 /**
  * Retencao PROVISORIA, em dias, gravada como `expiresAt` para uma futura

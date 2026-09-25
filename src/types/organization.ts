@@ -90,6 +90,13 @@ export interface OrganizationSettings {
   notifications: OrganizationNotificationSettings;
 }
 
+export interface OrganizationBranding {
+  logoUrl: string | null;
+  logoStoragePath: string | null;
+  logoContentType: "image/png" | "image/jpeg" | "image/webp" | null;
+  updatedAt: string | null;
+}
+
 export interface Organization extends BaseEntity {
   name: string;
   slug: string;
@@ -105,5 +112,7 @@ export interface Organization extends BaseEntity {
   currency: CurrencyCode;
   plan: PlanTier;
   ownerId: ID;
+  /** Identidade visual usada no painel e nos e-mails da organizacao. */
+  branding?: OrganizationBranding;
   settings: OrganizationSettings;
 }

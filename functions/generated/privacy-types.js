@@ -35,6 +35,9 @@ export const PRIVACY_REQUEST_CHANNELS = [
  */
 export const ORGANIZATION_EXPORT_SECTIONS = [
     "members",
+    "memberRequests",
+    "memberInvitations",
+    "importMappings",
     "professionals",
     "clients",
     "appointments",

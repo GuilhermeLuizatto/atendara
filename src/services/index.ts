@@ -7,6 +7,7 @@ import { MemoryWorkspaceRepository } from "./memory/memory-repository";
 import type { WorkspaceRepository } from "./types";
 
 export * from "./types";
+export * from "./phase-five";
 export { MemoryWorkspaceRepository, FirestoreWorkspaceRepository };
 
 export interface WorkspaceRepositoryOptions {

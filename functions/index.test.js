@@ -9,6 +9,7 @@ vi.mock("firebase-admin/app", () => ({ initializeApp: vi.fn() }));
 vi.mock("firebase-admin/auth", () => ({ getAuth: () => ({ createUser: mock.createUser, updateUser: mock.updateUser, deleteUser: mock.deleteUser, revokeRefreshTokens: mock.revokeRefreshTokens }) }));
 vi.mock("firebase-admin/firestore", () => ({ getFirestore: () => ({
   doc: path => ({ path, get: async () => ({ data: () => mock.documents.get(path) }) }),
+  collection: path => ({ path, where: (field, _operator, value) => ({ path, query: { field, value } }) }),
   batch: () => ({
     create: (ref, data) => mock.writes.push({ origin: "batch", op: "create", path: ref.path, data }),
     update: (ref, data) => mock.writes.push({ origin: "batch", op: "update", path: ref.path, data }),
@@ -18,7 +19,12 @@ vi.mock("firebase-admin/firestore", () => ({ getFirestore: () => ({
   runTransaction: async callback => {
     const origin = `tx-${++mock.transactions}`;
     const record = op => (ref, data) => mock.writes.push({ origin, op, path: ref.path, data });
-    return callback({ get: ref => ref.get(), set: record("set"), update: record("update"), create: record("create") });
+    return callback({
+      get: ref => ref.query
+        ? Promise.resolve({ docs: [...mock.documents.entries()].filter(([path, data]) => path.startsWith(`${ref.path}/`) && !path.slice(ref.path.length + 1).includes("/") && data[ref.query.field] === ref.query.value).map(([path, data]) => ({ ref: { path }, data: () => data })) })
+        : ref.get(),
+      set: record("set"), update: record("update"), create: record("create"),
+    });
   },
 }) }));
 // `onRequest` entra porque index.js reexporta o webhook de cobranca; sem ele o
@@ -225,7 +231,9 @@ describe("Pontos de escrita da validade e atestado do aplicativo", () => {
     // `self-service.js` entrou na lista com a A.2: o teste de 14 dias e
     // concessao registrada de tipo `TRIAL`, com prazo fixo, uma por
     // organizacao e trilha na mesma transacao — a terceira frase da regra 10.
-    expect(writers.sort()).toEqual(["billing.js", "platform.js", "self-service.js"]);
+    // `team.js` apenas copia o portao ja decidido para a conta que nasce do
+    // convite; nao concede validade nova nem altera conta existente.
+    expect(writers.sort()).toEqual(["billing.js", "platform.js", "self-service.js", "team.js"]);
   });
 
   it("so um arquivo sabe pseudonimizar", () => {

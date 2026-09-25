@@ -19,6 +19,7 @@ export * from "./organization";
 export * from "./pagination";
 export * from "./platform";
 export * from "./privacy";
+export * from "./product";
 export * from "./profession";
 export * from "./professional";
 export * from "./rules";

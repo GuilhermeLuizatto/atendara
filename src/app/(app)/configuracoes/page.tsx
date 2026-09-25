@@ -13,6 +13,7 @@ import { AgendaSettingsForm } from "@/features/settings/agenda-settings-form";
 import { AuditTrail } from "@/features/settings/audit-trail";
 import { AutomationQueue } from "@/features/automation/automation-queue";
 import { NotificationSettings } from "@/features/settings/notification-settings";
+import { OrganizationBranding } from "@/features/settings/organization-branding";
 import { ProfessionChange } from "@/features/settings/profession-change";
 import { GoogleCalendar } from "@/features/settings/google-calendar";
 import { ServiceCatalog } from "@/features/settings/service-catalog";
@@ -160,6 +161,13 @@ function SettingsContent() {
                     isHolder={session?.isOrganizationHolder ?? false}
                   />
                 </CardBody>
+              </Card>
+            ) : null}
+
+            {data && organization ? (
+              <Card>
+                <CardHeader><CardTitle>Logo da organização</CardTitle></CardHeader>
+                <CardBody><OrganizationBranding /></CardBody>
               </Card>
             ) : null}
 

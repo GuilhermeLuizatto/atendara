@@ -381,16 +381,16 @@ function invoicePeriodEnd(invoice) {
  * A concessao e lida NA MESMA transacao: sem isso, uma concessao gravada entre
  * a leitura e a escrita seria sobrescrita por um portao calculado sem ela.
  */
-async function readAccountGate(transaction, subscriberUserId, organizationId) {
-  if (!subscriberUserId) return null;
+async function readAccountGates(transaction, subscriberUserId, organizationId) {
+  if (!subscriberUserId) return [];
 
-  const accountRef = db().doc(paths.account(subscriberUserId));
-  const account = (await transaction.get(accountRef)).data();
-  if (!account) return null;
-  if (account.platformRole !== "PROFESSIONAL") return null;
-  if (account.organizationId !== organizationId) return null;
+  const snapshot = await transaction.get(
+    db().collection(paths.accounts()).where("organizationId", "==", organizationId),
+  );
   const grant = (await transaction.get(db().doc(paths.platformAccessGrant(organizationId)))).data() ?? null;
-  return { accountRef, grant, account };
+  return snapshot.docs
+    .filter((document) => document.data().platformRole === "PROFESSIONAL")
+    .map((document) => ({ accountRef: document.ref, grant, account: document.data() }));
 }
 
 /**
@@ -400,40 +400,44 @@ async function readAccountGate(transaction, subscriberUserId, organizationId) {
  * maior validade entre os dois, entao um evento nunca fecha uma concessao
  * vigente, e uma concessao nunca encurta ciclo pago.
  */
-function applyAccountGate(transaction, target, subscription, planId) {
-  if (!target) return;
-
-  const gate = resolveAccountGate({
-    subscription: { status: subscription.status, accessUntil: subscription.accessUntil ?? null },
-    grant: target.grant,
-    nowMs: Date.now(),
-  });
-  const changes = {
-    subscriptionStatus: gate.subscriptionStatus,
-    accessUntil: gate.accessUntil,
-    accessUntilMs: gate.accessUntil ? Date.parse(gate.accessUntil) : 0,
-  };
+function applyAccountGate(transaction, targets, subscription, planId) {
+  for (const target of targets) {
+    const gate = resolveAccountGate({
+      subscription: {
+        status: subscription.status,
+        accessUntil: subscription.accessUntil ?? null,
+        failedPaymentAttempts: subscription.failedPaymentAttempts ?? 0,
+      },
+      grant: target.grant,
+      nowMs: Date.now(),
+    });
+    const changes = {
+      subscriptionStatus: gate.subscriptionStatus,
+      accessUntil: gate.accessUntil,
+      accessUntilMs: gate.accessUntil ? Date.parse(gate.accessUntil) : 0,
+    };
 
   // Os modulos do plano so entram enquanto a assinatura da direito a eles.
-  const plan = planId ? findPlan(planId) : null;
-  if (plan && (subscription.status === "ACTIVE" || subscription.status === "TRIALING")) {
-    changes.modules = plan.modules;
-  }
+    const plan = planId ? findPlan(planId) : null;
+    if (plan && (subscription.status === "ACTIVE" || subscription.status === "TRIALING")) {
+      changes.modules = plan.modules;
+    }
 
   // A.6: quem veio do cadastro aberto e pagou volta ao normal. O portao acima ja
   // reabre o painel; isto tira a conta do ciclo do teste, para que a rotina
   // diaria nao a marque como bloqueada nem a apague aos 30 dias. So com
   // pagamento confirmado (`ACTIVE`) e com o acesso de fato aberto.
-  const paidAndOpen =
-    subscription.status === "ACTIVE" &&
-    gate.subscriptionStatus === "ACTIVE" &&
-    changes.accessUntilMs > Date.now();
-  if (target.account?.origin === "SELF_SERVICE" && paidAndOpen) {
-    changes.blockedSince = null;
-    if (!target.account.subscribedAt) changes.subscribedAt = new Date().toISOString();
-  }
+    const paidAndOpen =
+      subscription.status === "ACTIVE" &&
+      gate.subscriptionStatus === "ACTIVE" &&
+      changes.accessUntilMs > Date.now();
+    if (target.account?.origin === "SELF_SERVICE" && paidAndOpen) {
+      changes.blockedSince = null;
+      if (!target.account.subscribedAt) changes.subscribedAt = new Date().toISOString();
+    }
 
-  transaction.update(target.accountRef, changes);
+    transaction.update(target.accountRef, changes);
+  }
 }
 
 const SKIP = (reason, organizationId = null) => ({ outcome: "IGNORED", reason, organizationId });
@@ -496,6 +500,7 @@ async function handleCheckoutCompleted(transaction, event) {
       // Sem evento de pagamento confirmado, a assinatura nasce incompleta —
       // e `computeAccessUntil` devolve `null` para esse estado.
       status: existing.data()?.status ?? "INCOMPLETE",
+      failedPaymentAttempts: existing.data()?.failedPaymentAttempts ?? 0,
       accessUntil: existing.data()?.accessUntil ?? null,
       cancelAtPeriodEnd: existing.data()?.cancelAtPeriodEnd ?? false,
       canceledAt: existing.data()?.canceledAt ?? null,
@@ -558,7 +563,7 @@ async function handleSubscriptionEvent(transaction, event) {
     }
   }
 
-  const accountRef = await readAccountGate(transaction, subscriberUserId, organizationId);
+  const accountRefs = await readAccountGates(transaction, subscriberUserId, organizationId);
 
   const deleted = event.type === "customer.subscription.deleted";
   const gatewayStatus = toPlatformStatus(deleted ? "canceled" : object.status);
@@ -591,6 +596,10 @@ async function handleSubscriptionEvent(transaction, event) {
     subscriberEmail: existing?.subscriberEmail ?? null,
     planId,
     status,
+    failedPaymentAttempts:
+      status === "ACTIVE" || status === "TRIALING"
+        ? 0
+        : (existing?.failedPaymentAttempts ?? 0),
     amountInCents: object.items?.data?.[0]?.price?.unit_amount ?? plan?.priceInCents ?? existing?.amountInCents ?? 0,
     currency: (object.currency ?? plan?.currency ?? existing?.currency ?? "BRL").toUpperCase(),
     interval:
@@ -615,7 +624,7 @@ async function handleSubscriptionEvent(transaction, event) {
     lastEventId: event.id,
   };
 
-  applyAccountGate(transaction, accountRef, next, planId);
+  applyAccountGate(transaction, accountRefs, next, planId);
   transaction.set(subscriptionRef, next, { merge: true });
   return { outcome: "APPLIED", reason: null, organizationId };
 }
@@ -663,7 +672,7 @@ async function handleInvoiceEvent(transaction, event) {
   const planId = invoice.lines?.data?.[0]?.metadata?.planId ?? subscription?.planId ?? null;
 
   // Toda leitura antes de qualquer escrita: e exigencia da transacao.
-  const accountRef = await readAccountGate(
+  const accountRefs = await readAccountGates(
     transaction,
     subscription?.subscriberUserId ?? null,
     organizationId,
@@ -693,6 +702,24 @@ async function handleInvoiceEvent(transaction, event) {
     { merge: true },
   );
 
+  if (status === "PAST_DUE" && subscription) {
+    const failedPaymentAttempts = Math.max(
+      subscription.failedPaymentAttempts ?? 0,
+      Number.isInteger(invoice.attempt_count) ? invoice.attempt_count : 1,
+    );
+    const next = {
+      ...subscription,
+      status: "PAST_DUE",
+      failedPaymentAttempts,
+      accessUntil: computeAccessUntil({ status: "PAST_DUE", currentPeriodEnd: subscription.currentPeriodEnd }),
+      updatedAt: now(),
+      lastEventAt: latestInstant(subscription.lastEventAt, gatewayCreatedAt),
+      lastEventId: event.id,
+    };
+    applyAccountGate(transaction, accountRefs, next, next.planId ?? planId);
+    transaction.set(subscriptionRef, next, { merge: true });
+  }
+
   // Pagamento confirmado estende o ciclo. E o unico caminho pelo qual o acesso
   // cresce: nem a tela, nem o retorno do checkout, nem o cadastro manual.
   //
@@ -714,15 +741,20 @@ async function handleInvoiceEvent(transaction, event) {
       const next = {
         ...subscription,
         status: nextStatus,
+        failedPaymentAttempts: 0,
         currentPeriodEnd: periodEnd,
         accessUntil: computeAccessUntil({ status: nextStatus, currentPeriodEnd: periodEnd }),
         updatedAt: now(),
         lastEventAt: gatewayCreatedAt,
         lastEventId: event.id,
       };
-      applyAccountGate(transaction, accountRef, next, next.planId ?? planId);
+      applyAccountGate(transaction, accountRefs, next, next.planId ?? planId);
       transaction.set(subscriptionRef, next, { merge: true });
     }
+  } else if (status === "PAID" && subscription && (subscription.failedPaymentAttempts ?? 0) > 0) {
+    const next = { ...subscription, failedPaymentAttempts: 0, updatedAt: now() };
+    applyAccountGate(transaction, accountRefs, next, next.planId ?? planId);
+    transaction.set(subscriptionRef, next, { merge: true });
   }
 
   return { outcome: "APPLIED", reason: null, organizationId };
@@ -791,7 +823,7 @@ async function handleRefundEvent(transaction, event, context = {}) {
 
   const refunded = charge.amount_refunded ?? 0;
   const full = isFullRefund(stored.amountPaidInCents ?? 0, refunded);
-  const accountRef = await readAccountGate(
+  const accountRefs = await readAccountGates(
     transaction,
     subscription?.subscriberUserId ?? null,
     organizationId,
@@ -819,6 +851,9 @@ async function handleRefundEvent(transaction, event, context = {}) {
       // Cancelada continua cancelada: o reembolso fecha o acesso, nao reabre a
       // possibilidade de a assinatura se recuperar.
       status: subscription.status === "CANCELED" ? "CANCELED" : "PAST_DUE",
+      // Reembolso integral nao e uma tentativa de cobranca recusada: o ciclo
+      // deixou de estar pago e precisa fechar imediatamente.
+      failedPaymentAttempts: 3,
       accessUntil: gatewayCreatedAt,
       // Marca o ciclo reembolsado, para os eventos seguintes da assinatura nao o
       // reabrirem (`handleSubscriptionEvent`).
@@ -830,7 +865,7 @@ async function handleRefundEvent(transaction, event, context = {}) {
       lastEventAt: latestInstant(subscription.lastEventAt, gatewayCreatedAt),
       lastEventId: event.id,
     };
-    applyAccountGate(transaction, accountRef, next, next.planId);
+    applyAccountGate(transaction, accountRefs, next, next.planId);
     transaction.set(subscriptionRef, next, { merge: true });
   }
 

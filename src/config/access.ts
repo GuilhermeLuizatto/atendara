@@ -16,7 +16,11 @@ export const ACCESS_RECHECK_INTERVAL_MS = 15_000;
 export const MODULE_LABELS: Record<AppModule, string> = {
   dashboard: "Dashboard", agenda: "Agenda", clientes: "Clientes", mensagens: "Mensagens",
   financeiro: "Financeiro", agente: "Dara", configuracoes: "Configurações",
+  equipe: "Equipe", importacao: "Importação", suporte: "Suporte",
 };
+
+/** Temporario enquanto o catalogo da Fase 5 permanece em definicao. */
+export const PILOT_OPEN_MODULES: readonly AppModule[] = ["equipe", "importacao", "suporte"];
 /**
  * Area do painel de cada recurso.
  *
@@ -35,6 +39,10 @@ const PERMISSION_MODULE: Partial<Record<string, AppModule>> = {
   // consentimento nenhum aviso pode sair (regra 11).
   notificationConsent: "clientes",
   automationQueue: "agenda",
+  member: "equipe",
+  organizationBranding: "configuracoes",
+  import: "importacao",
+  support: "suporte",
 };
 
 /**
@@ -78,7 +86,11 @@ export function canAccessProfession(account: AccountAccess | null | undefined, p
 }
 
 export function canAccessModule(account: AccountAccess | null | undefined, module: AppModule): boolean {
-  return hasActiveAccess(account) && (isPlatformAdmin(account) || !!account?.modules.includes(module));
+  return hasActiveAccess(account) && (
+    isPlatformAdmin(account) ||
+    !!account?.modules.includes(module) ||
+    PILOT_OPEN_MODULES.includes(module)
+  );
 }
 
 /**
@@ -97,7 +109,7 @@ export function accountPermissions(
   if (isPlatformAdmin(account)) return permissionsForRole("OWNER");
   return permissionsForMembership(membership.role, membership.isOrganizationHolder).filter((permission) => {
     const area = PERMISSION_MODULE[permission.split(":")[0]];
-    return area ? !!account?.modules.includes(area) : false;
+    return area ? (!!account?.modules.includes(area) || PILOT_OPEN_MODULES.includes(area)) : false;
   });
 }
 

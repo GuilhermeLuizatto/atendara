@@ -1,0 +1,69 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function account() {
+      return firestore.get(/databases/(default)/documents/accounts/$(request.auth.uid)).data;
+    }
+
+    function member(orgId) {
+      return firestore.get(/databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data;
+    }
+
+    function activeMember(orgId) {
+      return signedIn()
+        && account().organizationId == orgId
+        && account().status == "ACTIVE"
+        && member(orgId).status == "ACTIVE";
+    }
+
+    function platformSupport() {
+      return signedIn()
+        && account().platformRole == "PLATFORM_ADMIN"
+        && account().status == "ACTIVE"
+        && request.auth.token.firebase.keys().hasAny(["sign_in_second_factor"])
+        && request.auth.token.firebase.sign_in_second_factor == "totp";
+    }
+
+    function safeImage() {
+      return request.resource.contentType in ["image/png", "image/jpeg", "image/webp"];
+    }
+
+    function tenantTicketAccess(orgId, ticketId) {
+      let ticket = firestore.get(/databases/(default)/documents/platformSupportTickets/$(ticketId)).data;
+      return activeMember(orgId)
+        && ticket.organizationId == orgId
+        && (ticket.openedBy == request.auth.uid
+          || firestore.get(/databases/(default)/documents/organizations/$(orgId)).data.ownerId == request.auth.uid
+          || member(orgId).role in ["OWNER", "ADMIN"]);
+    }
+
+    match /branding/{orgId}/logo/{fileName} {
+      allow read: if activeMember(orgId);
+      allow create, update: if activeMember(orgId)
+        && (firestore.get(/databases/(default)/documents/organizations/$(orgId)).data.ownerId == request.auth.uid
+          || member(orgId).role in ["OWNER", "ADMIN"])
+        && safeImage()
+        && request.resource.size <= 2 * 1024 * 1024;
+      allow delete: if activeMember(orgId)
+        && (firestore.get(/databases/(default)/documents/organizations/$(orgId)).data.ownerId == request.auth.uid
+          || member(orgId).role in ["OWNER", "ADMIN"]);
+    }
+
+    match /support/{orgId}/{ticketId}/{messageId}/{fileName} {
+      allow read: if tenantTicketAccess(orgId, ticketId) || platformSupport();
+      allow create: if (activeMember(orgId) || platformSupport())
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType in ["image/png", "image/jpeg", "image/webp", "application/pdf"];
+      allow update, delete: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

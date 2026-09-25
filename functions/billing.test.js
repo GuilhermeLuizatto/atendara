@@ -39,7 +39,17 @@ vi.mock("firebase-admin/firestore", () => {
     data: () => store.get(path),
   });
   const transaction = {
-    get: async (ref) => snapshot(ref.path),
+    get: async (ref) => {
+      if (ref.query) {
+        const prefix = `${ref.path}/`;
+        return {
+          docs: [...store.entries()]
+            .filter(([path, data]) => path.startsWith(prefix) && !path.slice(prefix.length).includes("/") && data[ref.query.field] === ref.query.value)
+            .map(([path, data]) => ({ id: path.slice(prefix.length), ref: { path }, data: () => data })),
+        };
+      }
+      return snapshot(ref.path);
+    },
     set: (ref, data, options) => {
       store.set(ref.path, options?.merge ? { ...(store.get(ref.path) ?? {}), ...data } : data);
     },
@@ -52,6 +62,7 @@ vi.mock("firebase-admin/firestore", () => {
   return {
     getFirestore: () => ({
       doc: (path) => ({ path, get: async () => snapshot(path) }),
+      collection: (path) => ({ path, where: (field, _operator, value) => ({ path, query: { field, value } }) }),
       runTransaction: async (callback) => callback(transaction),
     }),
   };
@@ -233,7 +244,7 @@ describe("Ciclo de vida da assinatura", () => {
     expect(invoice("in_ciclo_2")).toMatchObject({ status: "PAID", amountPaidInCents: 19_900 });
   });
 
-  it("falha de pagamento registra a fatura e fecha o painel na hora", async () => {
+  it("mantem o painel nas duas primeiras falhas e fecha na terceira tentativa", async () => {
     await applyGatewayEvent(checkoutEvent("evt_1"));
     await applyGatewayEvent(
       subscriptionEvent("evt_2", "customer.subscription.created", "active", PERIODO_1_FIM, "2026-09-09T12:00:05.000Z"),
@@ -241,17 +252,18 @@ describe("Ciclo de vida da assinatura", () => {
     const antes = account().accessUntil;
 
     await applyGatewayEvent(
-      invoiceEvent("evt_3", "invoice.payment_failed", "in_falhou", PERIODO_2_FIM, "2026-10-09T12:00:10.000Z"),
+      invoiceEvent("evt_3", "invoice.payment_failed", "in_falhou", PERIODO_2_FIM, "2026-10-09T12:00:10.000Z", { attempt_count: 1 }),
     );
 
     expect(invoice("in_falhou")).toMatchObject({ status: "PAST_DUE", amountPaidInCents: 0 });
     // Falhar a cobranca nao estende nem encurta: quem move a data e o ciclo.
     expect(account().accessUntil).toBe(antes);
 
-    await applyGatewayEvent(
-      subscriptionEvent("evt_4", "customer.subscription.updated", "past_due", PERIODO_1_FIM, "2026-10-09T12:00:20.000Z"),
-    );
-    // PENDING fecha o painel: as regras exigem ACTIVE, qualquer que seja a data.
+    expect(account()).toMatchObject({ subscriptionStatus: "ACTIVE", accessUntil: antes });
+    await applyGatewayEvent(invoiceEvent("evt_4", "invoice.payment_failed", "in_falhou_2", PERIODO_2_FIM, "2026-10-09T12:00:20.000Z", { attempt_count: 2 }));
+    expect(account().subscriptionStatus).toBe("ACTIVE");
+    await applyGatewayEvent(invoiceEvent("evt_5", "invoice.payment_failed", "in_falhou_3", PERIODO_2_FIM, "2026-10-09T12:00:30.000Z", { attempt_count: 3 }));
+    expect(subscription()).toMatchObject({ status: "PAST_DUE", failedPaymentAttempts: 3 });
     expect(account()).toMatchObject({ subscriptionStatus: "PENDING", accessUntil: antes });
   });
 
@@ -442,7 +454,7 @@ describe("Revisao de seguranca — ordem entre fatura, assinatura e reembolso", 
       currentPeriodEnd: PERIODO_1_FIM,
       lastEventAt: "2026-10-10T12:00:00.000Z",
     });
-    expect(account()).toMatchObject({ subscriptionStatus: "PENDING" });
+    expect(account()).toMatchObject({ subscriptionStatus: "ACTIVE" });
   });
 
   it("reembolso atrasado fecha o acesso sem voltar o carimbo nem desfazer o cancelamento", async () => {

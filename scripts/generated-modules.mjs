@@ -43,6 +43,7 @@ export const SOURCES = [
   ["src/types/notifications.ts", "types-notifications"],
   ["src/types/organization.ts", "types-organization"],
   ["src/types/pagination.ts", "types-pagination"],
+  ["src/types/product.ts", "types-product"],
   ["src/types/professional.ts", "types-professional"],
   ["src/types/rules.ts", "types-rules"],
   ["src/types/service.ts", "types-service"],

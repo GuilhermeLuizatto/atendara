@@ -166,6 +166,7 @@ function invoiceEvent(
   invoiceId: string,
   periodEnd: string,
   createdIso: string,
+  attemptCount = 1,
 ) {
   return {
     id,
@@ -179,6 +180,7 @@ function invoiceEvent(
         currency: "brl",
         amount_due: 19_900,
         amount_paid: type === "invoice.paid" ? 19_900 : 0,
+        attempt_count: attemptCount,
         created: unix(createdIso),
         hosted_invoice_url: `https://exemplo.invalido/${invoiceId}`,
         lines: {
@@ -423,24 +425,33 @@ describe("Etapa 3 — o webhook e a unica autoridade", () => {
     ).toMatchObject({ outcome: "OUT_OF_ORDER" });
   });
 
-  it("falha de pagamento marca a fatura e fecha o painel na hora", async () => {
+  it("mantem o painel por duas falhas e fecha na terceira tentativa", async () => {
     const antes = await accountOf(ownerUid);
 
-    await deliver(invoiceEvent("evt_falha", "invoice.payment_failed", "in_falhou", PERIOD_2_END, "2026-11-09T12:00:00.000Z"));
+    await deliver(invoiceEvent("evt_falha_1", "invoice.payment_failed", "in_falhou_1", PERIOD_2_END, "2026-11-09T12:00:00.000Z", 1));
     await deliver(
       subscriptionEvent("evt_atraso", "customer.subscription.updated", "past_due", PERIOD_2_END, "2026-11-09T12:00:10.000Z"),
     );
 
     expect(
-      (await adminDb().doc(paths.platformInvoice("in_falhou")).get()).data(),
+      (await adminDb().doc(paths.platformInvoice("in_falhou_1")).get()).data(),
     ).toMatchObject({ status: "PAST_DUE" });
-    // Cartao recusado fecha o painel na hora, por decisao do titular: a conta
-    // vai a PENDING e as regras exigem ACTIVE, qualquer que seja a data.
+    expect(await accountOf(ownerUid)).toMatchObject({
+      subscriptionStatus: "ACTIVE",
+      accessUntil: antes.accessUntil,
+    });
+    await signInWithEmailAndPassword(auth, OWNER.email, OWNER.password);
+    await expect(getDoc(doc(db, paths.document(ownerOrg, "clients", "qualquer")))).resolves.toBeDefined();
+
+    await deliver(invoiceEvent("evt_falha_2", "invoice.payment_failed", "in_falhou_2", PERIOD_2_END, "2026-11-09T12:00:20.000Z", 2));
+    expect(await accountOf(ownerUid)).toMatchObject({ subscriptionStatus: "ACTIVE" });
+    await expect(getDoc(doc(db, paths.document(ownerOrg, "clients", "qualquer")))).resolves.toBeDefined();
+
+    await deliver(invoiceEvent("evt_falha_3", "invoice.payment_failed", "in_falhou_3", PERIOD_2_END, "2026-11-09T12:00:30.000Z", 3));
     expect(await accountOf(ownerUid)).toMatchObject({
       subscriptionStatus: "PENDING",
       accessUntil: antes.accessUntil,
     });
-    await signInWithEmailAndPassword(auth, OWNER.email, OWNER.password);
     await expectDenied(getDoc(doc(db, paths.document(ownerOrg, "clients", "qualquer"))));
   });
 });

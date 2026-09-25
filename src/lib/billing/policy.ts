@@ -30,6 +30,9 @@ export const GATEWAY_SUBSCRIPTION_STATUSES = [
 export type GatewaySubscriptionStatus =
   (typeof GATEWAY_SUBSCRIPTION_STATUSES)[number];
 
+/** O painel fecha na terceira tentativa de cobrança recusada. */
+export const PAYMENT_FAILURE_ATTEMPTS_BEFORE_BLOCK = 3;
+
 const STATUS_MAP: Record<GatewaySubscriptionStatus, PlatformSubscriptionStatus> =
   {
     trialing: "TRIALING",
@@ -57,12 +60,16 @@ export function toPlatformStatus(raw: string): PlatformSubscriptionStatus {
  */
 export function toAccountSubscriptionStatus(
   status: PlatformSubscriptionStatus,
+  failedPaymentAttempts = 0,
 ): "ACTIVE" | "PENDING" | "CANCELLED" {
   switch (status) {
     case "ACTIVE":
     case "TRIALING":
       return "ACTIVE";
     case "PAST_DUE":
+      return failedPaymentAttempts < PAYMENT_FAILURE_ATTEMPTS_BEFORE_BLOCK
+        ? "ACTIVE"
+        : "PENDING";
     case "INCOMPLETE":
       return "PENDING";
     case "CANCELED":
@@ -79,9 +86,9 @@ function addDays(iso: ISODateString, days: number): ISODateString {
  * Ate quando a conta PODE ter acesso — o teto, nao a garantia.
  *
  * A tolerancia (`GRACE_PERIOD_DAYS`) entra enquanto a assinatura ainda pode se
- * recuperar sozinha, inclusive em `PAST_DUE`. Quem abre o painel, porem, e a
- * situacao da conta: `PAST_DUE` vira `PENDING` e as regras exigem `ACTIVE`, entao
- * com cartao recusado o painel fecha na hora, por decisao do titular.
+ * recuperar sozinha, inclusive em `PAST_DUE`. Quem abre o painel e a situacao
+ * calculada em conjunto com `failedPaymentAttempts`: as duas primeiras falhas
+ * mantem o uso e a terceira fecha o painel.
  * Cancelamento e inadimplencia terminal nao ganham tolerancia: o teto e o fim
  * do ciclo pago.
  *

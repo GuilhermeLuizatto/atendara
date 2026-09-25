@@ -14,14 +14,16 @@ import { PlatformAuditPanel } from "./platform-audit-panel";
 import { PlatformBillingPanel } from "./platform-billing";
 import { ProfessionRequestsPanel } from "./profession-requests-panel";
 import { SecondFactorGate } from "./second-factor-gate";
+import { SupportPanel } from "./support-panel";
 
-type AdminTab = "cadastros" | "concessoes" | "profissoes" | "cobranca" | "trilha" | "administradores";
+type AdminTab = "cadastros" | "concessoes" | "profissoes" | "cobranca" | "suporte" | "trilha" | "administradores";
 
 const TABS: { value: AdminTab; label: string }[] = [
   { value: "cadastros", label: "Cadastros" },
   { value: "concessoes", label: "Concessões de acesso" },
   { value: "profissoes", label: "Troca de profissão" },
   { value: "cobranca", label: "Cobrança da plataforma" },
+  { value: "suporte", label: "Suporte" },
   { value: "trilha", label: "Trilha da operadora" },
 ];
 
@@ -54,6 +56,7 @@ export function AdminView() {
         {tab === "concessoes" ? <AccessGrantsPanel /> : null}
         {tab === "profissoes" ? <ProfessionRequestsPanel /> : null}
         {tab === "cobranca" ? <PlatformBillingPanel /> : null}
+        {tab === "suporte" ? <SupportPanel /> : null}
         {tab === "trilha" ? <PlatformAuditPanel /> : null}
         {tab === "administradores" ? <PlatformAdminsPanel /> : null}
       </SecondFactorGate>

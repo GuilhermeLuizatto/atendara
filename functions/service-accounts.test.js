@@ -43,6 +43,10 @@ const GROUP_OF_FILE = {
   // A agenda externa e da automacao: e ela que sincroniza e le ocupado.
   "calendar.js": "automacao",
   "automation-control.js": "automacao",
+  "team.js": "contas",
+  "administrative-import.js": "contas",
+  "support.js": "contas",
+  "branding.js": "contas",
 };
 
 function sourceFileOf(name) {

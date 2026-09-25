@@ -12,6 +12,7 @@ import { Field, FormActions, Input, Select } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard } from "@/components/ui/skeleton";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import {
   PAYMENT_METHOD_LABELS,
   TRANSACTION_STATUS_LABELS,
@@ -21,6 +22,10 @@ import { useWorkspaceActions } from "@/providers/use-workspace-actions";
 import { useWorkspace } from "@/providers/workspace-provider";
 import type { Transaction, TransactionStatus } from "@/types";
 import type { TransactionInput } from "@/services";
+
+import { ReceiptAction } from "./receipt-action";
+import { ReceiptsList } from "./receipts-list";
+import { RecurringView } from "./recurring-view";
 
 const STATUS_TONES: Record<TransactionStatus, "success" | "warning" | "danger" | "neutral"> = {
   PENDING: "warning",
@@ -71,6 +76,7 @@ export function FinanceView() {
   const [deleting, setDeleting] = useState<Transaction | null>(null);
   const [filter, setFilter] = useState<"ALL" | TransactionStatus>("ALL");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "INCOME" | "EXPENSE">("ALL");
+  const [tab, setTab] = useState<"entries" | "recurring" | "receipts">("entries");
 
   if (!data) {
     return <div className="space-y-5"><SkeletonCard lines={2} /><SkeletonCard lines={6} /></div>;
@@ -99,8 +105,22 @@ export function FinanceView() {
       <PageHeader
         title="Financeiro"
         description={`Receitas, despesas e pendências de ${terminology.client.pluralLower}.`}
-        actions={canCreate ? <Button onClick={() => setEditing("new")}><Plus className="size-4" aria-hidden /> Novo lançamento</Button> : undefined}
+        actions={canCreate && tab === "entries" ? <Button onClick={() => setEditing("new")}><Plus className="size-4" aria-hidden /> Novo lançamento</Button> : undefined}
       />
+
+      <Tabs
+        idBase="financeiro"
+        label="Seções do financeiro"
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: "entries", label: "Lançamentos" },
+          { value: "recurring", label: "Mensalidades", count: (data.recurringCharges ?? []).filter((item) => item.status === "ACTIVE").length },
+          ...(session?.permissions.includes("receipt:read") ? [{ value: "receipts" as const, label: "Recibos", count: (data.receipts ?? []).length }] : []),
+        ]}
+      />
+      <TabPanel idBase="financeiro" value={tab} className="space-y-5">
+      {tab === "receipts" ? <ReceiptsList /> : tab === "recurring" ? <RecurringView /> : <>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard label="Recebido" value={formatCurrency(summary.paid)} tone="success" />
@@ -145,6 +165,7 @@ export function FinanceView() {
                   <p className={transaction.type === "EXPENSE" ? "text-danger text-sm font-semibold" : "text-sm font-semibold"}>
                     {transaction.type === "EXPENSE" ? "−" : "+"}{formatCurrency(transaction.amountInCents)}
                   </p>
+                  <ReceiptAction transaction={transaction} />
                   {(canUpdate || canDelete) && (
                     <div className="flex gap-1">
                       {canUpdate && <Button variant="ghost" size="icon" aria-label={`Editar ${transaction.description}`} onClick={() => setEditing(transaction)}><Pencil className="size-4" aria-hidden /></Button>}
@@ -157,6 +178,9 @@ export function FinanceView() {
           </div>
         )}
       </Card>
+
+      </>}
+      </TabPanel>
 
       {editing && <TransactionForm transaction={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
       <ConfirmDialog open={Boolean(deleting)} onClose={() => setDeleting(null)} onConfirm={() => { if (deleting) void actions.deleteTransaction(deleting.id); }} title="Excluir lançamento" message={`Excluir “${deleting?.description}”? Esta ação não altera o histórico da agenda.`} confirmLabel="Excluir lançamento" />

@@ -1,4 +1,5 @@
 import type { Client, ID } from "@/types";
+import { openRecurringChargeError } from "@/lib/finance/recurring";
 
 import { assertConsentWrite, assertPermission } from "../../guards";
 import { RepositoryError, type ClientInput } from "../../types";
@@ -147,6 +148,8 @@ export function planDeleteClient(ctx: PlanContext, id: ID): Plan {
       "Há pendências financeiras em aberto para este cadastro.",
     );
   }
+  const recurring = openRecurringChargeError(ctx.snapshot.recurringCharges ?? [], id);
+  if (recurring) throw new RepositoryError(recurring);
 
   return {
     result: undefined,

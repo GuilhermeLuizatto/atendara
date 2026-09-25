@@ -30,6 +30,12 @@ organizations/{orgId}
 ├── conversations/{conversationId}       caixa de entrada
 │   └── messages/{messageId}             subcolecao, imutavel
 ├── transactions/{transactionId}         financeiro
+├── recurringCharges/{chargeId}          mensalidades dos clientes; lancam um transaction por mes
+├── paymentLinks/{transactionId}         link publico de pagamento do mes (so backend grava)
+├── paymentProofs/{proofId}              comprovante enviado pelo link; arquivo no Storage
+├── receipts/{receiptId}                 recibo emitido; numerado, nao muda (so backend grava)
+├── receiptSettings/organization         quem emite os recibos da organizacao
+├── receiptCounters/organization         ultimo numero de recibo (so backend)
 ├── aiRules/{ruleId}                     apenas os niveis editaveis
 ├── aiDecisions/{decisionId}             append-only
 ├── aiDecisionReviews/{decisionId}       revisao humana da classificacao (OWNER e ADMIN)
@@ -118,6 +124,9 @@ backend grava na fila e o que a tela le.
 | `conversations` | + `lastMessageAt`                                          |
 | `messages`      | + `sentAt`, `readAt`                                       |
 | `transactions`  | + `dueDate`, `paidAt`                                      |
+| `recurringCharges` | + `endedAt`                                             |
+| `paymentProofs` | + `submittedAt`, `reviewedAt`                              |
+| `receipts`      | + `paidAt`, `issuedAt`, `cancelledAt`                      |
 | `aiRules`       | + `lastAppliedAt`                                          |
 | `aiDecisions`   | + `decidedAt`, `evaluatedAt`                               |
 | `aiDecisionReviews` | so `createdAt`, `updatedAt`                          |
@@ -198,6 +207,10 @@ Definidas em [`src/services/firestore/queries.ts`](../src/services/firestore/que
 | `conversations` | `lastMessageAt` desc   | 200  |
 | `messages`      | `sentAt` desc          | 500  |
 | `transactions`  | `dueDate` desc         | 500  |
+| `recurringCharges` | `createdAt` desc    | 300  |
+| `paymentLinks`  | `createdAt` desc       | 300  |
+| `paymentProofs` | `submittedAt` desc     | 300  |
+| `receipts`      | `number` desc          | 300  |
 | `aiRules`       | `priority` desc        | 200  |
 | `aiDecisions`   | `decidedAt` desc       | 200  |
 | `aiDecisionReviews` | `updatedAt` desc   | 200  |
@@ -473,8 +486,12 @@ O destino de cada colecao esta em `PERSONAL_DATA_MAP`
   (`resource.id`, `target.id`, `aiDecisionId`), porque o resumo da trilha e o
   titulo do alerta sao montados com o nome. `aiDecisionReviews` fica como
   esta: guarda so o veredito, a classificacao esperada e ids da equipe.
+  `paymentProofs` do cliente sai inteiro, com o arquivo no Storage.
+  `receipts` fica inteiro (documento do profissional; prazo de guarda a
+  confirmar com o juridico) e entra na exportacao.
 - **Exclusao da organizacao.** Colecoes operacionais, membros e perfis sao
-  apagados, inclusive subcolecoes. `aiDecisions`, `auditLogs` e
+  apagados, inclusive subcolecoes, e os arquivos da organizacao no Storage
+  (`branding/`, `support/` e `paymentProofs/`). `aiDecisions`, `auditLogs` e
   `privacyRequests` sao pseudonimizados e ganham `expiresAt` provisorio.
   `organizations/{orgId}` vira lapide: `{ id, deletion, expiresAt }`, sem nome,
   dono, profissao nem configuracao — as regras deixam de reconhecer qualquer

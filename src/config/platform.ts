@@ -190,6 +190,12 @@ export const CALLABLE_RATE_LIMITS = {
   supportRead: { max: 180, windowSeconds: 3600 },
   supportWrite: { max: 60, windowSeconds: 3600 },
   organizationBranding: { max: 20, windowSeconds: 3600 },
+  // Cobrador (C2). A pagina publica e aberta sem login: o limite e por rede.
+  // Consultar e barato; enviar arquivo, nao.
+  paymentLinkByNetwork: { max: 120, windowSeconds: 3600 },
+  paymentProofByNetwork: { max: 10, windowSeconds: 3600 },
+  paymentLinkWrite: { max: 120, windowSeconds: 3600 },
+  receiptWrite: { max: 120, windowSeconds: 3600 },
 } as const;
 
 export type RateLimitKey = keyof typeof CALLABLE_RATE_LIMITS;

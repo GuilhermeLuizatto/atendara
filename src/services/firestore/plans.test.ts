@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { permissionsForMembership, permissionsForRole } from "@/config/permissions";
 import { buildMockDataset } from "@/mocks";
-import type { Appointment, Client, ServiceModality, Transaction } from "@/types";
+import type { Appointment, Client, PaymentProof, RecurringCharge, ServiceModality, Transaction } from "@/types";
 
 import type { WorkspaceSnapshot } from "../types";
 import type { PlanContext, WriteOperation } from "./plan";
@@ -18,6 +18,13 @@ import {
 } from "./plans/clients";
 import { planCreateTransaction } from "./plans/finance";
 import { planReviewDecision } from "./plans/decision-reviews";
+import {
+  planCreateRecurringCharge,
+  planSetRecurringChargeStatus,
+  planUpdateRecurringCharge,
+} from "./plans/recurring";
+import { planApprovePaymentProof, planRejectPaymentProof } from "./plans/payment-proofs";
+import { planUpdateReceiptSettings } from "./plans/receipt-settings";
 import { planReceiveMessage, planReplyToConversation } from "./plans/messaging";
 import { planUpdateAgendaSettings, planUpdateAISettings } from "./plans/organization";
 import { planUpdateNotificationSettings } from "./plans/outbound";
@@ -90,6 +97,143 @@ describe("revisão das decisões da Dara", () => {
     const decision = ctx.snapshot.decisions[0];
     expect(() => planReviewDecision(ctx, "nao-existe", { verdict: "CORRECT", expectedClassification: null })).toThrow("Decisão não encontrada.");
     expect(() => planReviewDecision(ctx, decision.id, { verdict: "INCORRECT", expectedClassification: decision.classification })).toThrow();
+  });
+});
+
+describe("mensalidades (cobrador, C1)", () => {
+  const input = (ctx: PlanContext) => ({
+    clientId: ctx.snapshot.clients[0].id,
+    professionalId: null,
+    description: "Acompanhamento mensal",
+    amountInCents: 45000,
+    method: "PIX" as const,
+    dueDay: 10,
+    startPeriod: "2026-09",
+  });
+
+  it("cria a mensalidade, lança o mês corrente e avança o marcador no mesmo lote", () => {
+    const ctx = makeContext();
+    const plan = planCreateRecurringCharge(ctx, input(ctx));
+    expect(collections(plan.writes)).toEqual(["recurringCharges", "transactions", "auditLogs"]);
+    expect(plan.writes[0]).toMatchObject({ data: { status: "ACTIVE", lastLaunchedPeriod: "2026-09", clientName: ctx.snapshot.clients[0].fullName } });
+    expect(plan.writes[1]).toMatchObject({ data: { id: `${plan.result}-202609`, period: "2026-09", status: "PENDING", amountInCents: 45000 } });
+  });
+
+  it("mensalidade que começa no mês seguinte não lança nada agora", () => {
+    const ctx = makeContext();
+    const plan = planCreateRecurringCharge(ctx, { ...input(ctx), startPeriod: "2026-10" });
+    expect(collections(plan.writes)).toEqual(["recurringCharges", "auditLogs"]);
+    expect(plan.writes[0]).toMatchObject({ data: { lastLaunchedPeriod: null } });
+  });
+
+  it("recusa quem não cria lançamento e dado inválido", () => {
+    const ctx = makeContext();
+    expect(() => planCreateRecurringCharge({ ...ctx, actor: { ...ctx.actor, role: "VIEWER", permissions: permissionsForRole("VIEWER") } }, input(ctx))).toThrow();
+    expect(() => planCreateRecurringCharge(ctx, { ...input(ctx), dueDay: 31 })).toThrow("dia 28");
+    expect(() => planCreateRecurringCharge(ctx, { ...input(ctx), clientId: "nao-existe" })).toThrow();
+  });
+
+  const withCharge = (patch: Partial<RecurringCharge> = {}) =>
+    makeContext((s) => ({
+      ...s,
+      recurringCharges: [
+        {
+          id: "m1", organizationId: s.organization.id, clientId: s.clients[0].id, clientName: s.clients[0].fullName,
+          professionalId: null, description: "Mensal", amountInCents: 45000, method: "PIX", dueDay: 10,
+          startPeriod: "2026-08", lastLaunchedPeriod: "2026-08", status: "PAUSED", endedAt: null,
+          createdAt: NOW, updatedAt: NOW, createdBy: "owner", updatedBy: "owner", ...patch,
+        },
+      ],
+    }));
+
+  it("retomar lança o mês que faltou; pausar não lança", () => {
+    const resumed = planSetRecurringChargeStatus(withCharge(), "m1", "ACTIVE");
+    expect(collections(resumed.writes)).toEqual(["recurringCharges", "transactions", "auditLogs"]);
+    expect(resumed.writes[0]).toMatchObject({ op: "update", data: { status: "ACTIVE", lastLaunchedPeriod: "2026-09" } });
+    const paused = planSetRecurringChargeStatus(withCharge({ status: "ACTIVE" }), "m1", "PAUSED");
+    expect(collections(paused.writes)).toEqual(["recurringCharges", "auditLogs"]);
+  });
+
+  it("retomar no mês já lançado não lança de novo — mês apagado não renasce", () => {
+    const plan = planSetRecurringChargeStatus(withCharge({ lastLaunchedPeriod: "2026-09" }), "m1", "ACTIVE");
+    expect(collections(plan.writes)).toEqual(["recurringCharges", "auditLogs"]);
+  });
+
+  it("encerrada não muda, e editar guarda o valor anterior na trilha", () => {
+    expect(() => planSetRecurringChargeStatus(withCharge({ status: "ENDED" }), "m1", "ACTIVE")).toThrow("encerrada");
+    expect(() => planUpdateRecurringCharge(withCharge({ status: "ENDED" }), "m1", { amountInCents: 1 })).toThrow("encerrada");
+    const plan = planUpdateRecurringCharge(withCharge(), "m1", { amountInCents: 50000 });
+    expect(plan.writes[1]).toMatchObject({ data: { metadata: { amountInCents: 50000, previousAmountInCents: 45000 } } });
+  });
+
+  it("cadastro com mensalidade aberta não é excluído", () => {
+    const ctx = withCharge();
+    const clientId = ctx.snapshot.clients[0].id;
+    const semPendencia = { ...ctx, snapshot: { ...ctx.snapshot, transactions: [], appointments: [] } };
+    expect(() => planDeleteClient(semPendencia, clientId)).toThrow("mensalidade");
+  });
+});
+
+describe("conferência do comprovante (cobrador, C2)", () => {
+  const withProof = (txStatus: Transaction["status"] = "PENDING", proofStatus: PaymentProof["status"] = "SUBMITTED") =>
+    makeContext((s) => {
+      const tx = { ...s.transactions.find((item) => item.type === "INCOME")!, id: "m1-202609", status: txStatus, paidAt: null, recurringChargeId: "m1", period: "2026-09" };
+      return {
+        ...s,
+        transactions: [tx, ...s.transactions],
+        paymentProofs: [
+          {
+            id: "p1", organizationId: s.organization.id, transactionId: "m1-202609", recurringChargeId: "m1", clientId: tx.clientId,
+            status: proofStatus, storagePath: "paymentProofs/org/m1-202609/p1", contentType: "image/png", sizeBytes: 10, sha256: "x",
+            submittedAt: NOW, reviewedAt: null, reviewedBy: null, rejectionReason: null, createdAt: NOW, updatedAt: NOW, createdBy: null, updatedBy: null,
+          },
+        ],
+      };
+    });
+
+  it("aprovar marca o mês como pago no mesmo lote", () => {
+    const plan = planApprovePaymentProof(withProof(), "p1");
+    expect(collections(plan.writes)).toEqual(["paymentProofs", "transactions", "auditLogs"]);
+    expect(plan.writes[0]).toMatchObject({ data: { status: "APPROVED", reviewedBy: "owner" } });
+    expect(plan.writes[1]).toMatchObject({ data: { status: "PAID", paidAt: NOW } });
+  });
+
+  it("mês já pago à mão: aprova sem mexer no lançamento", () => {
+    const plan = planApprovePaymentProof(withProof("PAID"), "p1");
+    expect(collections(plan.writes)).toEqual(["paymentProofs", "auditLogs"]);
+  });
+
+  it("recusar exige motivo, não mexe no mês e não põe o motivo na trilha", () => {
+    expect(() => planRejectPaymentProof(withProof(), "p1", "  ")).toThrow("motivo");
+    const plan = planRejectPaymentProof(withProof(), "p1", " Valor diferente ");
+    expect(collections(plan.writes)).toEqual(["paymentProofs", "auditLogs"]);
+    expect(plan.writes[0]).toMatchObject({ data: { status: "REJECTED", rejectionReason: "Valor diferente" } });
+    expect(JSON.stringify(plan.writes[1])).not.toContain("Valor diferente");
+  });
+
+  it("não confere de novo, e só quem altera lançamento confere", () => {
+    expect(() => planApprovePaymentProof(withProof("PENDING", "APPROVED"), "p1")).toThrow("já foi");
+    const ctx = withProof();
+    expect(() => planApprovePaymentProof({ ...ctx, actor: { ...ctx.actor, role: "ASSISTANT", permissions: permissionsForRole("ASSISTANT") } }, "p1")).toThrow();
+  });
+});
+
+describe("emissor dos recibos (C3)", () => {
+  const input = { issuerName: "Ana Emissora", issuerDocument: "529.982.247-25", issuerAddress: "Rua Um, 10", issuerCity: "Santos" };
+
+  it("grava o emissor com só os dígitos e a trilha com o documento mascarado", () => {
+    const plan = planUpdateReceiptSettings(makeContext(), input);
+    expect(collections(plan.writes)).toEqual(["receiptSettings", "auditLogs"]);
+    expect(plan.writes[0]).toMatchObject({ path: expect.stringContaining("/receiptSettings/organization"), data: { issuerDocument: "52998224725" } });
+    expect(JSON.stringify(plan.writes[1])).not.toContain("52998224725");
+  });
+
+  it("o titular autônomo configura; a secretária e o CPF inválido não", () => {
+    const holder = makeContext((s) => s, { role: "PROFESSIONAL", permissions: permissionsForMembership("PROFESSIONAL", true) });
+    expect(() => planUpdateReceiptSettings(holder, input)).not.toThrow();
+    const assistant = makeContext((s) => s, { role: "ASSISTANT", permissions: permissionsForRole("ASSISTANT") });
+    expect(() => planUpdateReceiptSettings(assistant, input)).toThrow();
+    expect(() => planUpdateReceiptSettings(makeContext(), { ...input, issuerDocument: "12345678900" })).toThrow("CPF ou CNPJ");
   });
 });
 

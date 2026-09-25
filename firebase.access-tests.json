@@ -1,11 +1,13 @@
 {
   "functions": { "source": "functions", "ignore": ["node_modules", ".git", "*.log", "bootstrap-admin.js", "**/*.test.js"] },
   "firestore": { "rules": "firestore.rules" },
+  "storage": { "rules": "storage.rules" },
   "emulators": {
     "auth": { "port": 9098 },
     "firestore": { "port": 8087 },
     "functions": { "port": 5002 },
     "tasks": { "port": 9498 },
+    "storage": { "port": 9197 },
     "ui": { "enabled": false },
     "singleProjectMode": true
   }

@@ -226,4 +226,5 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   PAYMENT_OVERDUE: "Pagamento atrasado",
   AUTOMATION_FAILURE: "Falha de automação",
   RULE_CHANGED: "Regra alterada",
+  PAYMENT_PROOF_RECEIVED: "Comprovante recebido",
 };

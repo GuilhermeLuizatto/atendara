@@ -95,6 +95,9 @@ try {
       for (const collection of ["professionals", "clients", "appointments", "transactions", "aiDecisions", "automationTasks", "auditLogs"]) await setDoc(doc(db, paths.document(org, collection, "example")), { organizationId: org });
       await setDoc(doc(db, paths.document(org, "aiRules", "immutable")), { organizationId: org, immutable: true, level: "SYSTEM", enabled: true });
       await setDoc(doc(db, paths.document(org, "aiDecisions", "revisada")), { organizationId: org, classification: "ADMINISTRATIVE" });
+      await setDoc(doc(db, paths.document(org, "receipts", "r1")), { organizationId: org, number: 1, status: "ISSUED", amountInCents: 45000 });
+      await setDoc(doc(db, paths.document(org, "paymentLinks", "m1-202609")), { organizationId: org, transactionId: "m1-202609", token: "t", tokenHash: "h" });
+      await setDoc(doc(db, paths.document(org, "paymentProofs", "p1")), { organizationId: org, transactionId: "m1-202609", status: "SUBMITTED", storagePath: `paymentProofs/${org}/m1-202609/p1`, reviewedAt: null, reviewedBy: null, rejectionReason: null });
       await setDoc(doc(db, paths.document(org, "conversations", "conv")), { organizationId: org, clientId: "example", status: "OPEN" });
       await setDoc(doc(db, messagePath(org, "conv", "m1")), { organizationId: org, conversationId: "conv", body: "Bom dia", sentAt: new Date() });
       await setDoc(doc(db, paths.document(org, "notifications", "alert")), { organizationId: org, status: "UNREAD", title: "Alerta" });
@@ -191,6 +194,72 @@ try {
   await deniedBecause("reescrever quem revisou primeiro", setDoc(reviewOf("adminRole"), review("adminRole", { verdict: "INCORRECT", expectedClassification: "CLINICAL" })));
   await allowed(setDoc(reviewOf("adminRole"), review("ownerRole", { verdict: "INCORRECT", expectedClassification: "CLINICAL", updatedBy: "adminRole" })));
   await denied(deleteDoc(reviewOf("ownerRole")));
+
+  // Mensalidades (cobrador, C1): financeiro, valor inteiro, dia 1 a 28,
+  // nasce ativa, encerrada nao muda e nada se apaga.
+  const chargeOf = (uid, org = "org-a", id = "nova") => doc(db(uid), paths.document(org, "recurringCharges", id));
+  const charge = (uid, patch = {}) => ({
+    id: "nova", organizationId: "org-a", clientId: "consentido", clientName: "Alex Ficticio", professionalId: null,
+    description: "Mensalidade", amountInCents: 45000, method: "PIX", dueDay: 10, startPeriod: "2026-09", lastLaunchedPeriod: "2026-09", status: "ACTIVE",
+    endedAt: null, createdAt: new Date("2026-09-25T10:00:00.000Z"), updatedAt: new Date(), createdBy: uid, updatedBy: uid, ...patch,
+  });
+  await deniedBecause("visualizador criando mensalidade", setDoc(chargeOf("viewerRole"), charge("viewerRole")));
+  await deniedBecause("sem modulo financeiro", setDoc(chargeOf("restricted"), charge("restricted")));
+  await deniedBecause("valor quebrado", setDoc(chargeOf("a"), charge("a", { amountInCents: 450.5 })));
+  await deniedBecause("dia 29", setDoc(chargeOf("a"), charge("a", { dueDay: 29 })));
+  await deniedBecause("mes invalido", setDoc(chargeOf("a"), charge("a", { startPeriod: "2026-13" })));
+  await deniedBecause("marcador fora do formato", setDoc(chargeOf("a"), charge("a", { lastLaunchedPeriod: "setembro" })));
+  await deniedBecause("nascendo pausada", setDoc(chargeOf("a"), charge("a", { status: "PAUSED" })));
+  await deniedBecause("campo a mais", setDoc(chargeOf("a"), charge("a", { pixKey: "chave" })));
+  await deniedBecause("outro tenant", setDoc(chargeOf("a", "org-b"), charge("a", { organizationId: "org-b" })));
+  await allowed(setDoc(chargeOf("assistantRole"), charge("assistantRole")));
+  await allowed(getDoc(chargeOf("viewerRole")));
+  await denied(getDoc(chargeOf("restricted")));
+  await deniedBecause("secretaria pausando", updateDoc(chargeOf("assistantRole"), { status: "PAUSED" }));
+  await deniedBecause("trocar o cliente", updateDoc(chargeOf("a"), { clientId: "antigo" }));
+  await allowed(updateDoc(chargeOf("a"), { status: "PAUSED", amountInCents: 50000 }));
+  await allowed(updateDoc(chargeOf("a"), { status: "ENDED", endedAt: new Date() }));
+  await deniedBecause("mexer em encerrada", updateDoc(chargeOf("ownerRole"), { status: "ACTIVE", endedAt: null }));
+  await denied(deleteDoc(chargeOf("ownerRole")));
+
+  // Link e comprovante (cobrador, C2): so o backend cria; a conferencia muda
+  // so a situacao, de aguardando para aprovado ou recusado.
+  const linkOf = (uid) => doc(db(uid), paths.document("org-a", "paymentLinks", "m1-202609"));
+  const proofOf = (uid, id = "p1") => doc(db(uid), paths.document("org-a", "paymentProofs", id));
+  const proofReview = (uid, patch = {}) => ({ status: "APPROVED", reviewedAt: new Date(), reviewedBy: uid, updatedAt: new Date(), updatedBy: uid, ...patch });
+  await allowed(getDoc(linkOf("a")));
+  await denied(getDoc(linkOf("restricted")));
+  await deniedBecause("titular gravando link", setDoc(linkOf("ownerRole"), { organizationId: "org-a", transactionId: "m1-202609", token: "t", tokenHash: "h" }));
+  await deniedBecause("criar comprovante pelo navegador", setDoc(proofOf("ownerRole", "forjado"), { organizationId: "org-a", status: "SUBMITTED" }));
+  await allowed(getDoc(proofOf("viewerRole")));
+  await deniedBecause("secretaria aprovando", updateDoc(proofOf("assistantRole"), proofReview("assistantRole")));
+  await deniedBecause("aprovando em nome de outro", updateDoc(proofOf("a"), proofReview("a", { reviewedBy: "ownerRole" })));
+  await deniedBecause("trocando o arquivo", updateDoc(proofOf("a"), proofReview("a", { storagePath: "outro" })));
+  await deniedBecause("recusa sem motivo", updateDoc(proofOf("a"), proofReview("a", { status: "REJECTED", rejectionReason: "" })));
+  await deniedBecause("voltando a aguardando", updateDoc(proofOf("a"), proofReview("a", { status: "SUBMITTED" })));
+  await allowed(updateDoc(proofOf("a"), proofReview("a", { status: "REJECTED", rejectionReason: "Valor diferente" })));
+  await deniedBecause("reconferir o que ja foi conferido", updateDoc(proofOf("ownerRole"), proofReview("ownerRole")));
+  await denied(deleteDoc(proofOf("ownerRole")));
+
+  // Recibos (C3): recibo e contador so pelo backend; emissor por OWNER, ADMIN
+  // e o titular, no formato certo.
+  const receiptOf = (uid) => doc(db(uid), paths.document("org-a", "receipts", "r1"));
+  const counterOf = (uid) => doc(db(uid), paths.document("org-a", "receiptCounters", "organization"));
+  const issuerOf = (uid, org = "org-a", id = "organization") => doc(db(uid), paths.document(org, "receiptSettings", id));
+  const issuer = (patch = {}) => ({ id: "organization", organizationId: "org-a", issuerName: "Ana Emissora", issuerDocument: "52998224725", issuerAddress: "Rua Um, 10", issuerCity: "Santos", ...patch });
+  await allowed(getDoc(receiptOf("viewerRole")));
+  await denied(getDoc(receiptOf("restricted")));
+  await deniedBecause("titular reescrevendo recibo", updateDoc(receiptOf("ownerRole"), { amountInCents: 1 }));
+  await deniedBecause("emitindo pelo navegador", setDoc(doc(db("ownerRole"), paths.document("org-a", "receipts", "forjado")), { organizationId: "org-a", number: 1 }));
+  await denied(getDoc(counterOf("ownerRole")));
+  await deniedBecause("mexendo no contador", setDoc(counterOf("ownerRole"), { organizationId: "org-a", next: 1 }));
+  await deniedBecause("secretaria configurando emissor", setDoc(issuerOf("assistantRole"), issuer()));
+  await deniedBecause("documento com letras", setDoc(issuerOf("a"), issuer({ issuerDocument: "529.982.247-25" })));
+  await deniedBecause("outro id de emissor", setDoc(issuerOf("a", "org-a", "segundo"), issuer({ id: "segundo" })));
+  await deniedBecause("emissor de outro tenant", setDoc(issuerOf("a", "org-b"), issuer({ organizationId: "org-b" })));
+  await allowed(setDoc(issuerOf("a"), issuer()));
+  await allowed(setDoc(issuerOf("adminRole"), issuer({ issuerDocument: "11222333000181" })));
+  await denied(deleteDoc(issuerOf("ownerRole")));
   await denied(setDoc(doc(db("a"), paths.document("org-a", "clients", "foreign")), { organizationId: "org-b" }));
   await denied(getDoc(doc(withTotp("admin"), paths.initialPassword("a"))));
   await denied(getDoc(doc(tag(environment.unauthenticatedContext().firestore(), "anonimo"), paths.account("a"))));
@@ -416,7 +485,7 @@ try {
   await denied(getDoc(doc(operator, paths.document("org-a", "members", "a"))));
   await denied(updateDoc(doc(operator, paths.document("org-a", "members", "a")), { role: "OWNER" }));
   await denied(deleteDoc(doc(operator, paths.document("org-a", "members", "restricted"))));
-  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "whatsappConnections", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "automationSwitches", "services", "aiDecisionReviews", "auditLogs"]) {
+  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "whatsappConnections", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "automationSwitches", "services", "aiDecisionReviews", "recurringCharges", "paymentLinks", "paymentProofs", "receipts", "receiptSettings", "receiptCounters", "auditLogs"]) {
     await denied(getDoc(doc(operator, own(name))));
     await denied(setDoc(doc(operator, paths.document("org-a", name, "da-operadora")), { organizationId: "org-a" }));
   }
@@ -667,6 +736,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 403);
+  assert.equal(checks, 459);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

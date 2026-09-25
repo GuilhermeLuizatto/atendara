@@ -13,7 +13,7 @@ const environment = await initializeTestEnvironment({
   storage: { host: "127.0.0.1", port: 9198, rules: readFileSync("storage.rules", "utf8") },
 });
 
-const account = (organizationId, platformRole = "PROFESSIONAL") => ({ organizationId, platformRole, status: "ACTIVE", subscriptionStatus: "ACTIVE", accessUntilMs: Date.now() + 86_400_000 });
+const account = (organizationId, platformRole = "PROFESSIONAL", modules = []) => ({ organizationId, platformRole, status: "ACTIVE", subscriptionStatus: "ACTIVE", accessUntilMs: Date.now() + 86_400_000, modules });
 const bytes = new Uint8Array([1, 2, 3]);
 const metadata = contentType => ({ contentType });
 
@@ -34,6 +34,12 @@ try {
     await setDoc(doc(db, "organizations/org-a/members/viewer"), { role: "VIEWER", status: "ACTIVE" });
     await setDoc(doc(db, "organizations/org-b/members/other"), { role: "PROFESSIONAL", status: "ACTIVE" });
     await setDoc(doc(db, "platformSupportTickets/ticket"), { organizationId: "org-a", openedBy: "member" });
+    // Comprovante (cobrador, C2): quem le e quem tem o modulo financeiro.
+    await setDoc(doc(db, "accounts/finance"), account("org-a", "PROFESSIONAL", ["financeiro"]));
+    await setDoc(doc(db, "accounts/nofinance"), account("org-a", "PROFESSIONAL", ["agenda"]));
+    await setDoc(doc(db, "organizations/org-a/members/finance"), { role: "ASSISTANT", status: "ACTIVE" });
+    await setDoc(doc(db, "organizations/org-a/members/nofinance"), { role: "ASSISTANT", status: "ACTIVE" });
+    await uploadBytes(ref(context.storage(), "paymentProofs/org-a/m1-202609/p1"), bytes, metadata("image/png"));
   });
 
   const storage = (uid, claims = {}) => environment.authenticatedContext(uid, claims).storage();
@@ -56,7 +62,15 @@ try {
   await assertFails(getBytes(ref(storage("support"), supportPath)));
   await assertSucceeds(getBytes(ref(storage("support", { firebase: { sign_in_second_factor: "totp" } }), supportPath)));
 
-  console.log("14 verificações das regras de arquivos passaram no emulador.");
+  const proofPath = "paymentProofs/org-a/m1-202609/p1";
+  await assertSucceeds(getBytes(ref(storage("finance"), proofPath)));
+  await assertFails(getBytes(ref(storage("nofinance"), proofPath)));
+  await assertFails(getBytes(ref(storage("other"), proofPath)));
+  await assertFails(getBytes(ref(environment.unauthenticatedContext().storage(), proofPath)));
+  await assertFails(uploadBytes(ref(storage("finance"), "paymentProofs/org-a/m1-202609/forjado"), bytes, metadata("image/png")));
+  await assertFails(deleteObject(ref(storage("finance"), proofPath)));
+
+  console.log("20 verificações das regras de arquivos passaram no emulador.");
 } finally {
   await environment.cleanup();
 }

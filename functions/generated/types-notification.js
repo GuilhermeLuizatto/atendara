@@ -9,4 +9,6 @@ export const NOTIFICATION_TYPES = [
     "PAYMENT_OVERDUE",
     "AUTOMATION_FAILURE",
     "RULE_CHANGED",
+    // Cobrador (C2): o cliente mandou comprovante pelo link.
+    "PAYMENT_PROOF_RECEIVED",
 ];

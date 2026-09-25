@@ -38,6 +38,12 @@ export const SNAPSHOT_PAGE_SIZES = {
   conversations: 200,
   messages: 500,
   transactions: 500,
+  recurringCharges: 300,
+  paymentLinks: 300,
+  paymentProofs: 300,
+  receipts: 300,
+  // Um documento so, de id `organization`.
+  receiptSettings: 1,
   aiRules: 200,
   aiDecisions: 200,
   // Acompanha `aiDecisions`: o acerto so se calcula onde as duas paginas se cruzam.
@@ -136,6 +142,25 @@ export const snapshotQueries: Record<
       orderBy("dueDate", "desc"),
       limit(count),
     ),
+
+  recurringCharges: (db, organizationId, count) =>
+    query(
+      tenantQuery(db, organizationId, "recurringCharges"),
+      orderBy("createdAt", "desc"),
+      limit(count),
+    ),
+
+  paymentLinks: (db, organizationId, count) =>
+    query(tenantQuery(db, organizationId, "paymentLinks"), orderBy("createdAt", "desc"), limit(count)),
+
+  paymentProofs: (db, organizationId, count) =>
+    query(tenantQuery(db, organizationId, "paymentProofs"), orderBy("submittedAt", "desc"), limit(count)),
+
+  receipts: (db, organizationId, count) =>
+    query(tenantQuery(db, organizationId, "receipts"), orderBy("number", "desc"), limit(count)),
+
+  receiptSettings: (db, organizationId, count) =>
+    query(tenantQuery(db, organizationId, "receiptSettings"), limit(count)),
 
   aiRules: (db, organizationId, count) =>
     query(

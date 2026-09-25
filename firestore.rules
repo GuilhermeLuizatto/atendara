@@ -195,6 +195,35 @@ service cloud.firestore {
         .hasOnly(fields);
     }
 
+    // Espelho de `validateIssuer` (`src/lib/finance/receipts.ts`), menos os
+    // digitos verificadores do CPF e do CNPJ, que o CEL nao calcula.
+    function receiptSettingsOk(data) {
+      return data.keys().hasOnly(['id', 'organizationId', 'issuerName', 'issuerDocument',
+          'issuerAddress', 'issuerCity', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy'])
+        && data.issuerName is string && data.issuerName.size() > 0 && data.issuerName.size() <= 120
+        && data.issuerDocument is string && data.issuerDocument.matches('^([0-9]{11}|[0-9]{14})$')
+        && data.issuerAddress is string && data.issuerAddress.size() > 0 && data.issuerAddress.size() <= 200
+        && data.issuerCity is string && data.issuerCity.size() > 0 && data.issuerCity.size() <= 80;
+    }
+
+    // Espelho de `validateRecurringCharge` (`src/lib/finance/recurring.ts`).
+    // Dinheiro em centavos inteiros (regra 7); dia 1 a 28 cabe em todo mes.
+    function recurringChargeOk(data) {
+      return data.keys().hasOnly(['id', 'organizationId', 'clientId', 'clientName',
+          'professionalId', 'description', 'amountInCents', 'method', 'dueDay',
+          'startPeriod', 'lastLaunchedPeriod', 'status', 'endedAt', 'createdAt', 'updatedAt',
+          'createdBy', 'updatedBy'])
+        && data.clientId is string && data.clientId.size() > 0
+        && data.description is string && data.description.size() > 0 && data.description.size() <= 120
+        && data.amountInCents is int && data.amountInCents > 0 && data.amountInCents <= 100000000
+        && data.dueDay is int && data.dueDay >= 1 && data.dueDay <= 28
+        && data.startPeriod is string && data.startPeriod.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
+        && (data.get('lastLaunchedPeriod', null) == null
+          || (data.lastLaunchedPeriod is string
+            && data.lastLaunchedPeriod.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')))
+        && data.status in ['ACTIVE', 'PAUSED', 'ENDED'];
+    }
+
     // Espelho de `validateDecisionReview` (`src/lib/ai/decision-review.ts`),
     // menos a lista da profissao, que as rules nao conhecem. O `exists` e
     // explicito porque `let` so e avaliado quando usado: no veredito
@@ -459,6 +488,76 @@ service cloud.firestore {
         allow update: if moduleAccess(orgId, 'financeiro') && canManage(orgId) && belongsToOrg(orgId);
         // transaction:delete acompanha ADMIN/OWNER na matriz TypeScript.
         allow delete: if moduleAccess(orgId, 'financeiro') && isAdmin(orgId);
+      }
+
+      // Mensalidade do cliente (cobrador, C1). Criar espelha transaction:create
+      // e mudar espelha transaction:update. Nao se apaga, e encerrada nao muda:
+      // o historico dos meses lancados depende dela. Quem cobra e o
+      // profissional; nenhum dinheiro passa pelo Atendara.
+      match /recurringCharges/{chargeId} {
+        allow read: if moduleAccess(orgId, 'financeiro');
+        allow create: if moduleAccess(orgId, 'financeiro') && canWriteOperational(orgId)
+          && belongsToOrg(orgId)
+          && recurringChargeOk(request.resource.data)
+          && request.resource.data.status == 'ACTIVE';
+        allow update: if moduleAccess(orgId, 'financeiro') && canManage(orgId)
+          && belongsToOrg(orgId)
+          && resource.data.status != 'ENDED'
+          && recurringChargeOk(request.resource.data)
+          && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['clientId', 'startPeriod', 'createdAt', 'createdBy']);
+        allow delete: if false;
+      }
+
+      // Link de pagamento (cobrador, C2). So o backend grava; quem ve o
+      // financeiro le, para copiar o link de novo. O link abre so o que essa
+      // mesma pessoa ja ve.
+      match /paymentLinks/{transactionId} {
+        allow read: if moduleAccess(orgId, 'financeiro');
+        allow write: if false;
+      }
+
+      // Comprovante (C2). Nasce pelo backend, que conferiu o link e o arquivo.
+      // A conferencia muda so a situacao — de aguardando para aprovado ou
+      // recusado —, com quem conferiu e, na recusa, o motivo que a pessoa ve.
+      match /paymentProofs/{proofId} {
+        allow read: if moduleAccess(orgId, 'financeiro');
+        allow update: if moduleAccess(orgId, 'financeiro') && canManage(orgId)
+          && resource.data.status == 'SUBMITTED'
+          && request.resource.data.status in ['APPROVED', 'REJECTED']
+          && request.resource.data.reviewedBy == uid()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'reviewedAt', 'reviewedBy', 'rejectionReason', 'updatedAt', 'updatedBy'])
+          && (request.resource.data.status == 'APPROVED'
+            || (request.resource.data.rejectionReason is string
+              && request.resource.data.rejectionReason.size() > 0
+              && request.resource.data.rejectionReason.size() <= 200));
+        allow create, delete: if false;
+      }
+
+      // Recibos (ADR 0004, 14.9 — C3). Emitir e cancelar so pelas callables,
+      // que conferem receipt:create / receipt:cancel e reservam o numero numa
+      // transacao. Recibo emitido nao muda pelo cliente, nem para OWNER.
+      match /receipts/{receiptId} {
+        allow read: if moduleAccess(orgId, 'financeiro');
+        allow write: if false;
+      }
+
+      // A numeracao e so do backend: um contador escrito pelo navegador
+      // repetiria ou pularia numeros.
+      match /receiptCounters/{counterId} {
+        allow read, write: if false;
+      }
+
+      // Quem emite. Espelha receiptSettings:update — OWNER, ADMIN e o titular,
+      // porque o autonomo nasce PROFESSIONAL e e o emissor do proprio recibo.
+      match /receiptSettings/{settingsId} {
+        allow read: if moduleAccess(orgId, 'financeiro') || isAdmin(orgId) || organizationHolder(orgId);
+        allow create, update: if settingsId == 'organization'
+          && (isAdmin(orgId) || organizationHolder(orgId))
+          && belongsToOrg(orgId)
+          && receiptSettingsOk(request.resource.data);
+        allow delete: if false;
       }
 
       // ------------------------------------------------- regras do agente IA

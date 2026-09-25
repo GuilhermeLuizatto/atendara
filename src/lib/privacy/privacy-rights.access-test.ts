@@ -38,7 +38,7 @@ import type {
  * Rodar com: npm run test:access
  */
 
-import { AdminTimestamp, adminAuth, adminDb, deleteAdminApps, initializeAdminSdk } from "../testing/admin-sdk";
+import { AdminTimestamp, adminAuth, adminBucket, adminDb, deleteAdminApps, initializeAdminSdk } from "../testing/admin-sdk";
 
 const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9098";
 const [FIRESTORE_HOST, FIRESTORE_PORT] = (process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8087").split(":");
@@ -383,6 +383,28 @@ describe("Etapa 5C — direitos do titular dos dados", () => {
     expect(byAdmin.subject.id).toBe(Y.client);
   });
 
+  it("recusa eliminar com mensalidade viva; encerrada, ela entra na eliminação", async () => {
+    const orgA = titularA.organizationId;
+    const chargePath = paths.document(orgA, "recurringCharges", "mensalidade-x");
+    const at = timestamp("2026-09-01T10:00:00.000Z");
+    await fs().doc(chargePath).set({
+      id: "mensalidade-x", organizationId: orgA, clientId: X.client, clientName: SUBJECT.name,
+      professionalId: null, description: `Mensalidade de ${SUBJECT.name}`, amountInCents: 45000,
+      method: "PIX", dueDay: 10, startPeriod: "2026-09", lastLaunchedPeriod: "2026-09", status: "ACTIVE",
+      endedAt: null, createdAt: at, updatedAt: at, createdBy: null, updatedBy: null,
+    });
+
+    await expect(titularA.call("eraseClientData", { clientId: X.client, receivedVia: "LETTER" })).rejects.toMatchObject({
+      code: "failed-precondition",
+      message: expect.stringContaining("mensalidade"),
+    });
+    expect(await data(paths.document(orgA, "clients", X.client))).toBeDefined();
+
+    // Encerrada, deixa de travar; o teste seguinte elimina e a varredura final
+    // confere que o nome sumiu dela tambem.
+    await fs().doc(chargePath).update({ status: "ENDED", endedAt: at });
+  });
+
   it("elimina o cliente e pseudonimiza a trilha, sem apagar decisao nem auditoria", async () => {
     const orgA = titularA.organizationId;
     const at = (collectionName: keyof typeof TENANT_COLLECTIONS, id: string) => paths.document(orgA, collectionName, id);
@@ -538,7 +560,16 @@ describe("Etapa 5C — direitos do titular dos dados", () => {
     const orgB = titularB.organizationId;
     await fs().doc(paths.platformSubscription(orgA)).update({ status: "CANCELED" });
 
+    // Arquivos da organizacao: ate o cobrador (C2), nada apagava o Storage.
+    const files = [`branding/${orgA}/logo/logo.png`, `support/${orgA}/t/m/anexo.pdf`, `paymentProofs/${orgA}/m1/p1`];
+    for (const path of files) await adminBucket().file(path).save(Buffer.from([0x89, 0x50, 0x4e, 0x47]), { resumable: false });
+    const neighborFile = `branding/${titularB.organizationId}/logo/logo.png`;
+    await adminBucket().file(neighborFile).save(Buffer.from([0x89, 0x50, 0x4e, 0x47]), { resumable: false });
+
     const result = await titularA.call<PrivacyOperationResult>("deleteOrganization", { confirmOrganizationId: orgA });
+
+    for (const path of files) expect((await adminBucket().file(path).exists())[0]).toBe(false);
+    expect((await adminBucket().file(neighborFile).exists())[0]).toBe(true);
 
     for (const name of ["members", "professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "notifications", "notificationDeliveries"] as const) {
       expect(await sizeOf(paths.collection(orgA, name)), name).toBe(0);

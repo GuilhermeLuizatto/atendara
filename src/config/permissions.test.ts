@@ -95,6 +95,16 @@ describe("matriz de permissoes", () => {
     }
   });
 
+  it("recibo: quem assina emite e cancela; quem ve o financeiro le", () => {
+    // Nas rules, a callable confere; `receipts` so aceita leitura pelo cliente.
+    for (const role of ROLES) expect(hasPermission(role, "receipt:read")).toBe(true);
+    for (const permission of ["receipt:create", "receipt:cancel"] as const) {
+      expect(ROLES.filter((role) => hasPermission(role, permission))).toEqual(["OWNER", "ADMIN", "PROFESSIONAL"]);
+    }
+    expect(permissionsForMembership("PROFESSIONAL", true)).toContain("receiptSettings:update");
+    expect(hasPermission("PROFESSIONAL", "receiptSettings:update")).toBe(false);
+  });
+
   it("da ao titular so a lista fechada, alem do proprio papel", () => {
     // Espelha `organizationHolder()` nas rules: avisos, horario, pedidos de
     // titular e a chave de emergencia da automacao (13.9).
@@ -109,6 +119,7 @@ describe("matriz de permissoes", () => {
         "organizationBranding:update",
         "privacy:export",
         "privacy:erase",
+        "receiptSettings:update",
       ]),
     );
     const professional = new Set(permissionsForRole("PROFESSIONAL"));

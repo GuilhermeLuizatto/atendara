@@ -47,7 +47,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           Pular para o conteúdo
         </a>
 
-        <Sidebar />
+        {/* Na impressao so o conteudo sai: e o que torna o recibo imprimivel
+            pela propria pagina, sem gerar PDF no servidor. */}
+        <div className="contents print:hidden">
+          <Sidebar />
+        </div>
 
         {menuOpen ? (
           <div className="fixed inset-0 z-50 lg:hidden">
@@ -83,14 +87,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         ) : null}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <Header onOpenMenu={() => setMenuOpen(true)} />
+          <div className="contents print:hidden">
+            <Header onOpenMenu={() => setMenuOpen(true)} />
+          </div>
           <main
             id="conteudo"
             tabIndex={-1}
             className="flex-1 px-4 py-6 outline-none sm:px-6 lg:px-8"
           >
             <div className="mx-auto w-full max-w-7xl">
-              <TrialNotice />
+              <div className="print:hidden">
+                <TrialNotice />
+              </div>
               <WorkspaceGate>{children}</WorkspaceGate>
             </div>
           </main>

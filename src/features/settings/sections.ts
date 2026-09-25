@@ -2,6 +2,7 @@ export const SETTINGS_SECTIONS = [
   "geral",
   "servicos",
   "avisos",
+  "recibos",
   "whatsapp",
   "auditoria",
   "fila",

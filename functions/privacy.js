@@ -1,11 +1,14 @@
 import { getAuth } from "firebase-admin/auth";
 import { FieldPath, getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { messagePath, messagesPath, paths, TENANT_COLLECTIONS } from "./generated/paths.js";
 import { ORGANIZATION_EXPORT_SECTIONS, PRIVACY_REQUEST_CHANNELS } from "./generated/privacy-types.js";
+import { openRecurringChargeError } from "./generated/finance-recurring.js";
+import { organizationStoragePrefixes } from "./generated/finance-payment-proof.js";
 import {
   ORGANIZATION_EXPORT_PAGE_SIZE,
   ORGANIZATION_EXPORT_WINDOW_MINUTES,
@@ -198,10 +201,13 @@ async function linkedToClient(organizationId, clientId) {
   const tenant = (name) => db().collection(paths.collection(organizationId, name));
   const byClient = (name) => tenant(name).where("clientId", "==", clientId).get().then((snapshot) => snapshot.docs);
 
-  const [appointments, conversations, transactions, notificationDeliveries, automationTasks, aiDecisions, privacyRequests] = await Promise.all([
+  const [appointments, conversations, transactions, recurringCharges, paymentProofs, receipts, notificationDeliveries, automationTasks, aiDecisions, privacyRequests] = await Promise.all([
     byClient("appointments"),
     byClient("conversations"),
     byClient("transactions"),
+    byClient("recurringCharges"),
+    byClient("paymentProofs"),
+    byClient("receipts"),
     byClient("notificationDeliveries"),
     byClient("automationTasks"),
     byClient("aiDecisions"),
@@ -211,7 +217,7 @@ async function linkedToClient(organizationId, clientId) {
     await Promise.all(conversations.map((conversation) => db().collection(messagesPath(organizationId, conversation.id)).get()))
   ).flatMap((snapshot) => snapshot.docs);
 
-  const relatedIds = [clientId, ...[appointments, conversations, messages, transactions, notificationDeliveries, aiDecisions].flat().map((document) => document.id)];
+  const relatedIds = [clientId, ...[appointments, conversations, messages, transactions, recurringCharges, notificationDeliveries, aiDecisions].flat().map((document) => document.id)];
   const [auditLogs, byTarget, byDecision] = await Promise.all([
     inChunks(tenant("auditLogs"), "resource.id", relatedIds),
     inChunks(tenant("notifications"), "target.id", relatedIds),
@@ -219,7 +225,7 @@ async function linkedToClient(organizationId, clientId) {
   ]);
   const notifications = [...new Map([...byTarget, ...byDecision].map((document) => [document.ref.path, document])).values()];
 
-  return { appointments, conversations, messages, transactions, notificationDeliveries, automationTasks, aiDecisions, auditLogs, notifications, privacyRequests };
+  return { appointments, conversations, messages, transactions, recurringCharges, paymentProofs, receipts, notificationDeliveries, automationTasks, aiDecisions, auditLogs, notifications, privacyRequests };
 }
 
 // ---------------------------------------------------------------- cliente
@@ -259,6 +265,11 @@ export const exportClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => 
     appointments: linked.appointments.map(withId),
     conversations: linked.conversations.map((conversation) => ({ ...withId(conversation), messages: messagesOf(conversation.id) })),
     transactions: linked.transactions.map(withId),
+    recurringCharges: linked.recurringCharges.map(withId),
+    // So o registro: o arquivo fica no Storage e e entregue a parte, se pedido.
+    paymentProofs: linked.paymentProofs.map(withId),
+    // A copia do documento emitido em nome da pessoa.
+    receipts: linked.receipts.map(withId),
     notificationDeliveries: linked.notificationDeliveries.map(withId),
     automationTasks: linked.automationTasks.map(withId),
     aiDecisions: linked.aiDecisions.map(withId),
@@ -277,7 +288,7 @@ export const exportClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => 
 
   const { counts, add } = counter();
   add("clients", "exported");
-  for (const name of ["appointments", "conversations", "messages", "transactions", "notificationDeliveries", "automationTasks", "aiDecisions", "auditLogs"]) {
+  for (const name of ["appointments", "conversations", "messages", "transactions", "recurringCharges", "paymentProofs", "receipts", "notificationDeliveries", "automationTasks", "aiDecisions", "auditLogs"]) {
     add(name, "exported", linked[name].length);
   }
 
@@ -312,6 +323,10 @@ export const eraseClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
   if (linked.transactions.some((transaction) => ["PENDING", "OVERDUE"].includes(transaction.data().status))) {
     throw new HttpsError("failed-precondition", "Há pendências financeiras em aberto para este cadastro. Receba, cancele ou estorne antes de eliminar.");
   }
+  // Mensalidade viva lancaria o mes seguinte para um titular que nao existe
+  // mais. Mesma trava da tela (`openRecurringChargeError`).
+  const recurring = openRecurringChargeError(linked.recurringCharges.map((document) => document.data()), input.clientId);
+  if (recurring) throw new HttpsError("failed-precondition", recurring);
 
   const at = new Date();
   const requestId = randomUUID();
@@ -325,7 +340,13 @@ export const eraseClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
   const { counts, add } = counter();
   const writer = db().bulkWriter();
   const results = [];
-  for (const collection of ["messages", "conversations", "appointments", "transactions", "notificationDeliveries", "automationTasks", "notifications", "aiDecisions", "auditLogs", "privacyRequests"]) {
+  // O arquivo do comprovante sai antes do registro: sem o registro, nada
+  // apontaria mais para ele.
+  for (const proof of linked.paymentProofs) {
+    const storagePath = proof.data().storagePath;
+    if (storagePath) await getStorage().bucket().file(storagePath).delete({ ignoreNotFound: true });
+  }
+  for (const collection of ["messages", "conversations", "appointments", "transactions", "recurringCharges", "paymentProofs", "notificationDeliveries", "automationTasks", "notifications", "aiDecisions", "auditLogs", "privacyRequests"]) {
     const treatment = PERSONAL_DATA_MAP[collection].onClientErasure;
     for (const document of linked[collection]) {
       if (treatment.action === "DELETE") {
@@ -544,6 +565,14 @@ export async function eraseOrganization({ organizationId, organization, organiza
     } else if (treatment.action === "PSEUDONYMIZE") {
       add(name, "pseudonymized", await pseudonymizeCollection(collection, treatment, context, { expiresAt: trailExpiresAt }));
     }
+  }
+
+  // Arquivos: logo, anexos de suporte e comprovantes. Ate a C2 do cobrador
+  // nada apagava o Storage, e a organizacao excluida deixava arquivos para tras.
+  for (const prefix of organizationStoragePrefixes(organizationId)) {
+    const [files] = await getStorage().bucket().getFiles({ prefix });
+    await Promise.all(files.map((file) => file.delete({ ignoreNotFound: true })));
+    if (files.length) add("storage", "deleted", files.length);
   }
 
   // Plataforma: so o que o mapa manda tirar. Faturas, eventos e trilha ficam,

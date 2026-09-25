@@ -13,6 +13,7 @@ import { AgendaSettingsForm } from "@/features/settings/agenda-settings-form";
 import { AuditTrail } from "@/features/settings/audit-trail";
 import { AutomationQueue } from "@/features/automation/automation-queue";
 import { NotificationSettings } from "@/features/settings/notification-settings";
+import { ReceiptSettingsForm } from "@/features/settings/receipt-settings";
 import { OrganizationBranding } from "@/features/settings/organization-branding";
 import { ProfessionChange } from "@/features/settings/profession-change";
 import { GoogleCalendar } from "@/features/settings/google-calendar";
@@ -76,6 +77,9 @@ function SettingsContent() {
     { value: "geral", label: "Geral" },
     ...(hasCatalog ? [{ value: "servicos" as const, label: "Serviços" }] : []),
     { value: "avisos", label: "Avisos de atendimento" },
+    ...(session?.permissions.includes("receipt:read")
+      ? [{ value: "recibos" as const, label: "Recibos" }]
+      : []),
     { value: "whatsapp", label: "WhatsApp" },
     ...(canConnectCalendar
       ? [{ value: "google" as const, label: "Google Calendar" }]
@@ -199,6 +203,14 @@ function SettingsContent() {
             <NotificationSettings />
           ) : (
             <SkeletonCard lines={6} />
+          )
+        ) : null}
+
+        {active === "recibos" ? (
+          data ? (
+            <ReceiptSettingsForm key={data.receiptSettings?.updatedAt ?? "novo"} />
+          ) : (
+            <SkeletonCard lines={4} />
           )
         ) : null}
 

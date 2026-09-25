@@ -313,6 +313,60 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     },
     onOrganizationDeletion: DELETE,
   },
+  // Mensalidade (cobrador, C1). Mesmo destino dos lancamentos que ela gera:
+  // o financeiro fica, sem o que identifica a pessoa. Eliminar exige a
+  // mensalidade encerrada antes, para nao nascer mes novo sem titular.
+  recurringCharges: {
+    personalFields: ["clientId", "clientName", "description"],
+    retention: WHILE_ORGANIZATION,
+    onClientErasure: {
+      action: "PSEUDONYMIZE",
+      fields: { clientId: "CLIENT_ID", clientName: "NULL", description: "REDACTED_TEXT" },
+    },
+    onOrganizationDeletion: DELETE,
+  },
+  // Link de pagamento (C2): so ids e o token. Nada da pessoa atendida.
+  paymentLinks: {
+    personalFields: [],
+    retention: WHILE_ORGANIZATION,
+    onClientErasure: NOT_APPLICABLE,
+    onOrganizationDeletion: DELETE,
+  },
+  // Comprovante (C2). O arquivo e dado financeiro da pessoa, e nao e o que
+  // prova a cobranca — o lancamento pago continua. Por isso sai inteiro no
+  // pedido do titular, e o backend apaga o arquivo junto.
+  paymentProofs: {
+    personalFields: ["clientId", "storagePath"],
+    retention: WHILE_ORGANIZATION,
+    onClientErasure: { action: "DELETE" },
+    onOrganizationDeletion: DELETE,
+  },
+  // Recibo (C3). Documento do profissional — livro-caixa e comprovacao de
+  // renda —, emitido em nome de quem pagou. Fica inteiro no pedido do titular
+  // (decisao de 25/09), ate o juridico responder o prazo de guarda (pergunta
+  // 16 do ADR 0004). Entra na exportacao.
+  receipts: {
+    personalFields: ["clientId", "payerName", "payerDocument", "beneficiaryName", "beneficiaryDocument", "description"],
+    retention: WHILE_ORGANIZATION,
+    onClientErasure: {
+      action: "KEEP",
+      why: "Recibo emitido é documento do profissional (livro-caixa, comprovação de renda). Prazo de guarda a confirmar com o jurídico (ADR 0004, pergunta 16); segue a linha da D21: reter o necessário.",
+    },
+    onOrganizationDeletion: DELETE,
+  },
+  // Emissor da organizacao: nome e CPF de quem emite, que e da equipe.
+  receiptSettings: {
+    personalFields: ["issuerName", "issuerDocument", "issuerAddress"],
+    retention: WHILE_ORGANIZATION,
+    onClientErasure: NOT_APPLICABLE,
+    onOrganizationDeletion: DELETE,
+  },
+  receiptCounters: {
+    personalFields: [],
+    retention: WHILE_ORGANIZATION,
+    onClientErasure: NOT_APPLICABLE,
+    onOrganizationDeletion: DELETE,
+  },
   aiRules: {
     personalFields: ["naturalLanguageInput", "createdBy", "updatedBy"],
     retention: WHILE_ORGANIZATION,

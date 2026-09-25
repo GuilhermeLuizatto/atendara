@@ -41,6 +41,8 @@ import { withOrganizationDefaults } from "./generated/organization-config.js";
 import { getProfession, isProfessionId } from "./generated/professions.js";
 import { ROLE_PERMISSIONS } from "./generated/permissions.js";
 import { messagePath, paths } from "./generated/paths.js";
+import { planConversationReply } from "./generated/automation-conversation-replies.js";
+import { scheduleTask } from "./automation-queue.js";
 import { verifyBridgeSignature } from "./n8n-bridge.js";
 import { runAs } from "./service-accounts.js";
 import { classifyWithGemini, geminiEnabledFor } from "./gemini.js";
@@ -206,7 +208,7 @@ function preview(text) {
  * existe sem a mensagem que a pediu.
  */
 export async function applyInboundEvent(event, deps = {}) {
-  const { clock = () => new Date().toISOString() } = deps;
+  const { clock = () => new Date().toISOString(), enqueue } = deps;
   const now = clock();
 
   const sender = await organizationOfSender(event.providerSenderId);
@@ -240,7 +242,7 @@ export async function applyInboundEvent(event, deps = {}) {
         })
       : null;
 
-  return firestore.runTransaction((realTransaction) =>
+  const result = await firestore.runTransaction((realTransaction) =>
     withDeferredWrites(realTransaction, async (transaction) => {
       // A leitura participa da transação para não sobrescrever consentimento ou
       // cadastro alterado pela equipe enquanto a mensagem está sendo processada.
@@ -282,6 +284,23 @@ export async function applyInboundEvent(event, deps = {}) {
         Date.parse(now) <= Date.parse(pendingRaw.holdEndsAt)
           ? pendingRaw
           : null;
+
+      // Resposta da assistente, planejada nesta transacao. Tudo o que ela
+      // confere ja foi lido acima: organizacao, cadastro, conversa e remetente.
+      const replyTo = (reply) =>
+        planReply({
+          transaction,
+          scope,
+          organizationId,
+          organizationSnapshot,
+          client,
+          sender,
+          conversation,
+          sentAt: event.sentAt,
+          messageId,
+          now,
+          ...reply,
+        });
 
       const decision = decideInbound({
         event,
@@ -462,6 +481,7 @@ export async function applyInboundEvent(event, deps = {}) {
           client,
           messageId,
           now,
+          replyTo,
         });
         return {
           outcome: resultado.outcome,
@@ -469,6 +489,7 @@ export async function applyInboundEvent(event, deps = {}) {
           conversationId,
           clientId: client?.id ?? null,
           reason: resultado.reason ?? null,
+          ...replyOutcome(resultado.reply),
         };
       }
 
@@ -498,6 +519,7 @@ export async function applyInboundEvent(event, deps = {}) {
             ),
             messageId,
             now,
+            replyTo,
           });
           return {
             outcome: resultado.outcome,
@@ -505,6 +527,7 @@ export async function applyInboundEvent(event, deps = {}) {
             conversationId,
             clientId: client?.id ?? null,
             reason: resultado.reason ?? null,
+            ...replyOutcome(resultado.reply),
           };
         }
       }
@@ -713,6 +736,64 @@ export async function applyInboundEvent(event, deps = {}) {
       };
     }),
   );
+
+  // Fila depois da transacao: rede dentro dela seria refeita a cada repeticao.
+  // Falha aqui nao desfaz o que foi gravado — a tarefa fica planejada, vence
+  // no prazo e vira alerta para a equipe.
+  const { replyTask, ...outcome } = result;
+  if (replyTask) {
+    try {
+      await scheduleTask(replyTask, { clock, ...(enqueue ? { enqueue } : {}) });
+    } catch (error) {
+      logger.error("automation.inbound.reply_not_queued", {
+        taskId: replyTask.id,
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
+    }
+  }
+  return outcome;
+}
+
+/** Grava a resposta da assistente, se ela puder sair, na transacao de quem pediu. */
+function planReply(ctx) {
+  const { transaction, scope, organizationId, organizationSnapshot, client, sender, conversation, sentAt } = ctx;
+  const raw = stored("organizations", organizationSnapshot);
+  if (!raw || raw.deletion || !isProfessionId(raw.primaryProfession)) {
+    return { kind: "SKIPPED", reason: "ORGANIZATION_DISABLED" };
+  }
+  const plan = planConversationReply({
+    organization: withOrganizationDefaults(raw, organizationId, raw.primaryProfession, ctx.now),
+    profession: getProfession(raw.primaryProfession),
+    client,
+    sender,
+    event: ctx.event,
+    stage: ctx.stage,
+    channel: "WHATSAPP",
+    conversation: {
+      escalated: conversation?.escalated ?? false,
+      attention: conversation?.attention ?? "NORMAL",
+      // A janela que ESTA mensagem abriu.
+      inboundWindowEndsAt: inboundWindowEndsAt(sentAt),
+    },
+    now: ctx.now,
+    validUntil: ctx.validUntil ?? null,
+    details: ctx.details,
+    inboundMessageId: ctx.messageId,
+    appointment: ctx.appointment,
+  });
+  if (plan.kind === "PLANNED") {
+    transaction.create(scope.doc("automationTasks", plan.task.id), toStored("automationTasks", plan.task));
+    transaction.set(scope.doc("notificationDeliveries", plan.delivery.id), toStored("notificationDeliveries", plan.delivery));
+  }
+  return plan;
+}
+
+/** O que o resultado conta da resposta: planejada, ou por que nao. */
+function replyOutcome(plan) {
+  if (!plan) return {};
+  return plan.kind === "PLANNED"
+    ? { reply: "PLANNED", replyTask: plan.task }
+    : { reply: plan.reason };
 }
 
 export const inboundWebhook = onRequest(
@@ -777,9 +858,14 @@ export const inboundWebhook = onRequest(
 
     try {
       const outcomes = [];
-      for (const event of events)
-        outcomes.push((await applyInboundEvent(event)).outcome);
-      logger.info("automation.inbound", { received: events.length, outcomes });
+      // Por que a resposta da assistente saiu ou nao: motivo nomeado, sem texto.
+      const replies = [];
+      for (const event of events) {
+        const result = await applyInboundEvent(event);
+        outcomes.push(result.outcome);
+        if (result.reply) replies.push(result.reply);
+      }
+      logger.info("automation.inbound", { received: events.length, outcomes, replies });
       // 200 sempre que o corpo foi aceito: a Meta reentrega o que nao recebe
       // 200, e reentrega e inofensiva pela trava de duplicidade.
       response.status(200).json({ received: events.length });
@@ -815,6 +901,7 @@ async function handleRescheduleRequest(ctx) {
     client,
     messageId,
     now,
+    replyTo,
   } = ctx;
 
   const organization = stored("organizations", organizationSnapshot);
@@ -885,7 +972,9 @@ async function handleRescheduleRequest(ctx) {
       messageId,
       now,
     });
-    return { outcome: "RESCHEDULE_ESCALATED", reason: decided.reason };
+    // A pessoa ouve que o pedido foi para a equipe; o motivo fica no alerta.
+    const reply = replyTo({ event: "RESCHEDULE_HANDED_OFF", stage: "REQUEST", appointment });
+    return { outcome: "RESCHEDULE_ESCALATED", reason: decided.reason, reply };
   }
 
   transaction.set(
@@ -906,7 +995,16 @@ async function handleRescheduleRequest(ctx) {
       updatedBy: null,
     }),
   );
-  return { outcome: "RESCHEDULE_OFFERED" };
+  // A oferta vale enquanto a reserva vale: depois dela, os horarios ja nao
+  // estao segurados e nao podem ser mostrados como livres.
+  const reply = replyTo({
+    event: "RESCHEDULE_OFFERED",
+    stage: "REQUEST",
+    appointment: decided.appointment,
+    validUntil: decided.holdEndsAt,
+    details: { slots: decided.slots },
+  });
+  return { outcome: "RESCHEDULE_OFFERED", reply };
 }
 
 /** A escolha da pessoa, conferida contra a agenda do mesmo instante. */
@@ -922,6 +1020,7 @@ async function confirmChosenSlot(ctx) {
     appointment,
     messageId,
     now,
+    replyTo,
   } = ctx;
 
   const encaminhar = (reason, status, outcome) => {
@@ -945,7 +1044,8 @@ async function confirmChosenSlot(ctx) {
       messageId,
       now,
     });
-    return { outcome, reason };
+    const reply = replyTo({ event: "RESCHEDULE_HANDED_OFF", stage: "CHOICE", appointment });
+    return { outcome, reason, reply };
   };
 
   if (!appointment)
@@ -1022,7 +1122,13 @@ async function confirmChosenSlot(ctx) {
       updatedBy: null,
     }),
   );
-  return { outcome: "RESCHEDULE_CONFIRMED" };
+  const reply = replyTo({
+    event: "RESCHEDULE_CONFIRMED",
+    stage: "CHOICE",
+    appointment: confirmacao.appointment,
+    details: { startsAt: confirmacao.appointment.startsAt },
+  });
+  return { outcome: "RESCHEDULE_CONFIRMED", reply };
 }
 
 /**

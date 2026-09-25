@@ -123,6 +123,13 @@ export const AUTOMATION_QUEUE_STOP_LABELS = {
  * com alerta: o Google pode estar mostrando um horario que ja nao vale.
  */
 export const CALENDAR_SYNC_VALIDITY_MINUTES = 1_440;
+/**
+ * Validade de uma resposta na conversa que nao seja oferta (a oferta vence com a
+ * reserva). Curta de proposito: "seu atendimento ficou para quarta" chegando
+ * uma hora depois da escolha confunde mais do que ajuda. Nunca passa da janela
+ * de 24 horas que a pessoa abriu.
+ */
+export const CONVERSATION_REPLY_VALIDITY_MINUTES = 30;
 export const AUTOMATION_STATUS_LABELS = {
     PLANNED: "Planejada",
     SCHEDULED: "Agendada",

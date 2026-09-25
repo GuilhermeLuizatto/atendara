@@ -1,10 +1,10 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { getFunctions } from "firebase-admin/functions";
 import * as logger from "firebase-functions/logger";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onTaskDispatched } from "firebase-functions/v2/tasks";
 import { z } from "zod";
 
+import { DISPATCHER_NAME, enqueueDispatch, requeueTask, scheduleTask } from "./automation-queue.js";
 import { accessTokenFor, reconcileEvent, syncResultFrom } from "./calendar-google.js";
 import { calendarOwnerAllowed } from "./calendar-store.js";
 import { fromStored, toStored } from "./firestore-dates.js";
@@ -23,9 +23,7 @@ import {
   noticeTaskId,
   planAppointmentChange,
   planCalendarSync,
-  queueEnqueueAt,
   queueTaskName,
-  transitionTask,
 } from "./generated/automation.js";
 import {
   AUTOMATION_ACCEPTED_CONTRACT_VERSIONS,
@@ -66,7 +64,7 @@ import { getProfession, isProfessionId } from "./generated/professions.js";
  */
 
 const REGION = "southamerica-east1";
-export const DISPATCHER_NAME = "dispatchAutomationTask";
+export { DISPATCHER_NAME };
 
 // `getFirestore()` preguicoso: os modulos sao avaliados antes de
 // `initializeApp()` do index.js.
@@ -121,44 +119,8 @@ function writeEffects(transaction, scope, effects) {
 
 // ------------------------------------------------------------------- fila
 
-async function enqueueDispatch(payload, { at, name }) {
-  const queue = getFunctions().taskQueue(`locations/${REGION}/functions/${DISPATCHER_NAME}`);
-  try {
-    await queue.enqueue(payload, {
-      id: name,
-      scheduleTime: new Date(at),
-      dispatchDeadlineSeconds: DISPATCHER_TIMEOUT_SECONDS + 30,
-    });
-  } catch (error) {
-    // Nome repetido: esta tentativa ja esta na fila. E o caso da reentrega.
-    if (error?.code === "functions/task-already-exists") return;
-    throw error;
-  }
-}
-
-/**
- * Repor uma tentativa na Cloud Tasks a partir de fora do despachante — hoje so
- * o retorno da ponte do n8n (13.3), que decide a nova tentativa noutra function.
- */
-export async function requeueTask(task, at) {
-  await enqueueDispatch(dispatchPayloadFor(task), { at, name: queueTaskName(task, at) });
-}
-
-async function scheduleTask(task, { enqueue, clock }) {
-  const now = clock();
-  const at = queueEnqueueAt(task, now);
-  await enqueue(dispatchPayloadFor(task), { at, name: queueTaskName(task, at) });
-
-  const firestore = db();
-  const ref = tenant(firestore, task.organizationId).doc("automationTasks", task.id);
-  await firestore.runTransaction(async (transaction) => {
-    const current = stored("automationTasks", await transaction.get(ref));
-    // So a tentativa que acabou de ir para a fila muda de estado. Se o
-    // despachante ja a pegou, o estado dele prevalece.
-    if (!current || current.status !== "PLANNED" || current.attempt !== task.attempt) return;
-    transaction.set(ref, toStored("automationTasks", transitionTask(current, "SCHEDULED", { at: now })));
-  });
-}
+// A fila vive em automation-queue.js; quem ja importava daqui continua igual.
+export { requeueTask };
 
 // ------------------------------------------------------------ planejamento
 

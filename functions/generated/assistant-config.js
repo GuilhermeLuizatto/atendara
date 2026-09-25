@@ -33,6 +33,12 @@ export const REPLY_VARIABLES = [
     "slotOptions",
     "holdMinutes",
 ];
+/*
+ * O encaminhamento muda de texto conforme o ponto do pedido (`ReplyStage`):
+ * antes da oferta a assistente ainda não se apresentou; depois de uma escolha
+ * que não vingou, a pessoa já sabe com quem fala e precisa saber que o horário
+ * caiu.
+ */
 /** Apresentação, só na primeira mensagem da assistente num pedido. */
 const INTRODUCTION = "Olá, {{clientName}}! Aqui é a {{assistantName}}, assistente virtual de {{organizationName}}.";
 /**

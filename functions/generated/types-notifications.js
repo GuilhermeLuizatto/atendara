@@ -30,6 +30,11 @@ export const APPOINTMENT_NOTIFICATION_EVENTS = [
     ...AGENDA_NOTICE_EVENTS,
     ...CONVERSATION_REPLY_EVENTS,
 ];
+/**
+ * Em que ponto do pedido a resposta sai: ao receber o pedido (`REQUEST`) ou
+ * depois da escolha de um horario oferecido (`CHOICE`).
+ */
+export const REPLY_STAGES = ["REQUEST", "CHOICE"];
 export function isConversationReplyEvent(event) {
     return CONVERSATION_REPLY_EVENTS.includes(event);
 }

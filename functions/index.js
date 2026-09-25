@@ -118,6 +118,17 @@ export { registerSelfService, activateTrial } from "./self-service.js";
 export { closeExpiredTrialsDaily, eraseAbandonedTrialsDaily } from "./trial.js";
 export { eraseUnconfirmedSignupsDaily } from "./signup-cleanup.js";
 
+// Mensalidades dos clientes (cobrador, C1): lanca o mes corrente de cada
+// mensalidade ativa. Nenhum aviso sai daqui.
+export { launchRecurringChargesDaily } from "./recurring.js";
+
+// Link de pagamento e comprovante (cobrador, C2). A consulta e o envio sao
+// publicos, sem login: quem prova o direito e o token do link.
+export { createPaymentLink, inspectPaymentLink, submitPaymentProof } from "./payment-links.js";
+
+// Recibos (ADR 0004, 14.9 — C3): numeracao reservada no backend.
+export { cancelReceipt, issueReceipt } from "./receipts.js";
+
 // Troca de profissao: o titular pede, a operadora decide. Enquanto nao houver
 // aprovacao, a profissao nao muda.
 export { requestProfessionChange, decideProfessionChange } from "./profession-change.js";

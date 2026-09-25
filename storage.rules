@@ -62,6 +62,13 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
+    // Comprovante do cobrador (C2). Entra so pelo backend, que confere o link,
+    // o tipo real e o tamanho; le quem ve o financeiro da organizacao.
+    match /paymentProofs/{orgId}/{transactionId}/{proofId} {
+      allow read: if activeMember(orgId) && "financeiro" in account().modules;
+      allow write: if false;
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

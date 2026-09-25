@@ -16,10 +16,13 @@ const require = createRequire(import.meta.url);
 const appModule = require("../../../functions/node_modules/firebase-admin/lib/app/index.js");
 const authModule = require("../../../functions/node_modules/firebase-admin/lib/auth/index.js");
 const firestoreModule = require("../../../functions/node_modules/firebase-admin/lib/firestore/index.js");
+const storageModule = require("../../../functions/node_modules/firebase-admin/lib/storage/index.js");
 
 /** Inicializa uma vez por processo; chamar de novo nao derruba o que existe. */
 export function initializeAdminSdk(projectId: string): void {
-  if (appModule.getApps().length === 0) appModule.initializeApp({ projectId });
+  // O bucket padrao e o que as functions emuladas recebem do Firebase: a
+  // exclusao de organizacao chamada daqui apaga os arquivos do mesmo lugar.
+  if (appModule.getApps().length === 0) appModule.initializeApp({ projectId, storageBucket: `${projectId}.appspot.com` });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- o SDK entra por `require`, sem tipos.
@@ -27,6 +30,13 @@ export const adminAuth = (): any => authModule.getAuth();
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- idem.
 export const adminDb = (): any => firestoreModule.getFirestore();
+
+/**
+ * Bucket padrao do projeto de demonstracao — o mesmo que `getStorage().bucket()`
+ * resolve dentro das functions emuladas.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- idem.
+export const adminBucket = (): any => storageModule.getStorage().bucket();
 
 /** `Timestamp` do SDK administrativo, para semear campos de data no emulador. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- idem.

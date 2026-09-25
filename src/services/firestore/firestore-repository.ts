@@ -28,9 +28,12 @@ import type {
   Membership,
   OrganizationNotificationSettings,
   ProfessionId,
+  RecurringChargeStatus,
 } from "@/types";
 
 import type { DecisionReviewInput } from "@/lib/ai/decision-review";
+import type { RecurringChargeInput } from "@/lib/finance/recurring";
+import type { ReceiptIssuerInput } from "@/lib/finance/receipts";
 import type { DispatchSummary } from "@/lib/notifications";
 import { planUpdateNotificationSettings } from "./plans/outbound";
 import {
@@ -42,6 +45,7 @@ import {
   type MessageInput,
   type NotificationInput,
   type RepositoryActor,
+  type RecurringChargeUpdate,
   type RuleInput,
   type ServiceInput,
   type TransactionInput,
@@ -67,6 +71,13 @@ import {
   planDeleteTransaction,
   planUpdateTransaction,
 } from "./plans/finance";
+import {
+  planCreateRecurringCharge,
+  planSetRecurringChargeStatus,
+  planUpdateRecurringCharge,
+} from "./plans/recurring";
+import { planApprovePaymentProof, planRejectPaymentProof } from "./plans/payment-proofs";
+import { planUpdateReceiptSettings } from "./plans/receipt-settings";
 import {
   planAcknowledgeNotification,
   planAppendAuditLog,
@@ -132,6 +143,11 @@ const COLLECTION_PARTS: Array<[PagedPart, ConvertedCollection, WorkspaceCollecti
   ["conversations", "conversations", "conversations"],
   ["messages", "messages", "messages"],
   ["transactions", "transactions", "transactions"],
+  ["recurringCharges", "recurringCharges", "recurringCharges"],
+  ["paymentLinks", "paymentLinks", "paymentLinks"],
+  ["paymentProofs", "paymentProofs", "paymentProofs"],
+  ["receipts", "receipts", "receipts"],
+  ["receiptSettings", "receiptSettings", "receiptSettings"],
   ["aiRules", "aiRules", "rules"],
   ["aiDecisions", "aiDecisions", "decisions"],
   ["aiDecisionReviews", "aiDecisionReviews", "decisionReviews"],
@@ -688,6 +704,32 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
 
   async deleteTransaction(id: ID): Promise<void> {
     await this.commit(planDeleteTransaction(this.context(), id).writes);
+  }
+
+  async createRecurringCharge(input: RecurringChargeInput): Promise<ID> {
+    const plan = planCreateRecurringCharge(this.context(), input);
+    await this.commit(plan.writes);
+    return plan.result;
+  }
+
+  async updateRecurringCharge(id: ID, patch: RecurringChargeUpdate): Promise<void> {
+    await this.commit(planUpdateRecurringCharge(this.context(), id, patch).writes);
+  }
+
+  async setRecurringChargeStatus(id: ID, status: RecurringChargeStatus): Promise<void> {
+    await this.commit(planSetRecurringChargeStatus(this.context(), id, status).writes);
+  }
+
+  async approvePaymentProof(id: ID): Promise<void> {
+    await this.commit(planApprovePaymentProof(this.context(), id).writes);
+  }
+
+  async rejectPaymentProof(id: ID, reason: string): Promise<void> {
+    await this.commit(planRejectPaymentProof(this.context(), id, reason).writes);
+  }
+
+  async updateReceiptSettings(input: ReceiptIssuerInput): Promise<void> {
+    await this.commit(planUpdateReceiptSettings(this.context(), input).writes);
   }
 
   // --------------------------------------------------------------- regras

@@ -1,5 +1,7 @@
 import type { DepositChoice } from "@/config/deposit";
 import type { DecisionReviewInput } from "@/lib/ai/decision-review";
+import type { RecurringChargeInput } from "@/lib/finance/recurring";
+import type { ReceiptIssuerInput } from "@/lib/finance/receipts";
 import type { DispatchSummary } from "@/lib/notifications";
 import type { CalendarBusySnapshot } from "@/types/calendar";
 import type {
@@ -24,6 +26,12 @@ import type {
   Organization,
   OrganizationNotificationSettings,
   Professional,
+  PaymentLink,
+  PaymentProof,
+  Receipt,
+  ReceiptSettings,
+  RecurringCharge,
+  RecurringChargeStatus,
   Service,
   ServiceInput,
   StoredNotificationConsent,
@@ -39,6 +47,11 @@ export type WorkspaceCollection =
   | "conversations"
   | "messages"
   | "transactions"
+  | "recurringCharges"
+  | "paymentLinks"
+  | "paymentProofs"
+  | "receipts"
+  | "receiptSettings"
   | "rules"
   | "decisions"
   | "decisionReviews"
@@ -95,6 +108,14 @@ export interface WorkspaceSnapshot {
   conversations: Conversation[];
   messages: Message[];
   transactions: Transaction[];
+  /** Mensalidades dos clientes (cobrador, C1). Ausente vale vazia. */
+  recurringCharges?: RecurringCharge[];
+  /** Links de pagamento e comprovantes (cobrador, C2). Ausentes valem vazios. */
+  paymentLinks?: PaymentLink[];
+  paymentProofs?: PaymentProof[];
+  /** Recibos emitidos e o emissor da organizacao (C3). */
+  receipts?: Receipt[];
+  receiptSettings?: ReceiptSettings | null;
   rules: AIRule[];
   decisions: AIDecision[];
   /**
@@ -179,6 +200,9 @@ export interface AppointmentInput {
   visitAddress?: string | null;
   travelFeeInCents?: number | null;
 }
+
+/** O que muda numa mensalidade: vale dos proximos meses em diante. */
+export type RecurringChargeUpdate = Partial<Pick<RecurringChargeInput, "description" | "amountInCents" | "method" | "dueDay">>;
 
 export interface TransactionInput {
   type: Transaction["type"];
@@ -317,6 +341,23 @@ export interface WorkspaceRepository {
   createTransaction(input: TransactionInput): Promise<ID>;
   updateTransaction(id: ID, input: Partial<TransactionInput>): Promise<void>;
   deleteTransaction(id: ID): Promise<void>;
+
+  /**
+   * Mensalidade do cliente (cobrador, C1). Criar exige `transaction:create` e
+   * ja lanca o mes corrente; mudar e pausar, retomar ou encerrar exigem
+   * `transaction:update`. Mes ja lancado nunca muda por aqui.
+   */
+  createRecurringCharge(input: RecurringChargeInput): Promise<ID>;
+  updateRecurringCharge(id: ID, patch: RecurringChargeUpdate): Promise<void>;
+  setRecurringChargeStatus(id: ID, status: RecurringChargeStatus): Promise<void>;
+  /**
+   * Conferencia do comprovante (C2). Aprovar marca o mes como pago no mesmo
+   * lote; recusar exige motivo, que a pessoa ve no link. `transaction:update`.
+   */
+  approvePaymentProof(id: ID): Promise<void>;
+  rejectPaymentProof(id: ID, reason: string): Promise<void>;
+  /** Quem emite os recibos. Exige `receiptSettings:update` (OWNER, ADMIN e o titular). */
+  updateReceiptSettings(input: ReceiptIssuerInput): Promise<void>;
 
   createRule(input: RuleInput): Promise<ID>;
   updateRule(id: ID, input: Partial<RuleInput>): Promise<void>;

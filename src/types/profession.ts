@@ -188,6 +188,13 @@ export interface ProfessionConfig {
   sensitiveDataProfile: SensitiveDataProfile;
   /** Conselho de classe, ou `null` para quem nao tem. */
   council: ProfessionCouncil | null;
+  /**
+   * Recibo fiscal oficial da profissao, quando existe. Desde 01/01/2025 o
+   * recibo de saude de pessoa fisica valido para o IR sai so pelo Receita
+   * Saude: nessas profissoes o recibo do Atendara e comprovante de pagamento,
+   * e a tela avisa antes de emitir (ADR 0004, 4.7).
+   */
+  officialTaxReceipt: "RECEITA_SAUDE" | null;
   /** Aviso exibido na interface. Texto informativo, nao parecer juridico. */
   complianceNotice: string;
   suggestedRules: SuggestedRuleSeed[];

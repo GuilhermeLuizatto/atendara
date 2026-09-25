@@ -34,6 +34,9 @@ const PERMISSION_MODULE = {
     // cadastro. Sem isto, ninguem consegue registrar consentimento — e sem
     // consentimento nenhum aviso pode sair (regra 11).
     notificationConsent: "clientes",
+    // Recibos saem do financeiro; quem emite se configura nas Configuracoes.
+    receipt: "financeiro",
+    receiptSettings: "configuracoes",
     automationQueue: "agenda",
     member: "equipe",
     organizationBranding: "configuracoes",

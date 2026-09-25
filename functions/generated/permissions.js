@@ -23,6 +23,7 @@ const READ_ONLY_PERMISSIONS = [
     "rule:read",
     "aiDecision:read",
     "notification:read",
+    "receipt:read",
     "support:create",
     "support:read",
     "support:reply",
@@ -54,6 +55,10 @@ const PROFESSIONAL_PERMISSIONS = [
     "rule:delete",
     "member:request",
     "import:manage",
+    // Quem assina o recibo: OWNER, ADMIN e o profissional (decisao de 25/09).
+    // A secretaria le, mas nao emite nem cancela.
+    "receipt:create",
+    "receipt:cancel",
 ];
 const ADMIN_PERMISSIONS = [
     ...PROFESSIONAL_PERMISSIONS,
@@ -73,6 +78,7 @@ const ADMIN_PERMISSIONS = [
     "member:update",
     "member:remove",
     "organizationBranding:update",
+    "receiptSettings:update",
     "auditLog:read",
     // Espelha `PRIVACY_RESPONSIBLE_ROLES` (`src/config/privacy.ts`) e
     // `privacyResponsible()` nas rules. O titular da organizacao tambem atende,
@@ -123,6 +129,8 @@ export const ORGANIZATION_HOLDER_PERMISSIONS = [
     "member:invite",
     "member:update",
     "member:remove",
+    // O autonomo e o emissor do proprio recibo.
+    "receiptSettings:update",
 ];
 export function permissionsForRole(role) {
     return ROLE_PERMISSIONS[role];

@@ -52,6 +52,12 @@ export const ORGANIZATION_EXPORT_SECTIONS = [
   "conversations",
   "messages",
   "transactions",
+  "recurringCharges",
+  "paymentLinks",
+  "paymentProofs",
+  "receipts",
+  "receiptSettings",
+  "receiptCounters",
   "aiRules",
   "aiDecisions",
   "aiDecisionReviews",
@@ -130,6 +136,12 @@ export interface ClientDataExport {
   appointments: Record<string, unknown>[];
   conversations: Array<Record<string, unknown> & { messages: Record<string, unknown>[] }>;
   transactions: Record<string, unknown>[];
+  /** Mensalidades da pessoa: valor, vencimento e situacao. */
+  recurringCharges: Record<string, unknown>[];
+  /** Comprovantes enviados: situacao e datas. O arquivo nao vai na exportacao. */
+  paymentProofs: Record<string, unknown>[];
+  /** Recibos emitidos em nome da pessoa: e dela a copia do documento. */
+  receipts: Record<string, unknown>[];
   notificationDeliveries: Record<string, unknown>[];
   /** Execucoes da fila de automacao ligadas a esta pessoa: ids e estado, sem texto. */
   automationTasks: Record<string, unknown>[];

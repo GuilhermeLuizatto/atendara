@@ -54,6 +54,18 @@ export const TENANT_COLLECTIONS = {
     conversations: "conversations",
     messages: "messages",
     transactions: "transactions",
+    // Mensalidade de cada cliente (cobrador, C1): faz nascer um lancamento por
+    // mes em `transactions`. Nenhum dinheiro passa pelo Atendara.
+    recurringCharges: "recurringCharges",
+    // Link publico de cada lancamento de mensalidade (C2) e os comprovantes que
+    // chegam por ele. So o backend cria; o arquivo mora no Storage.
+    paymentLinks: "paymentLinks",
+    paymentProofs: "paymentProofs",
+    // Recibos (C3): o emitido, o emissor da organizacao (um documento so, de id
+    // `organization`) e o contador da numeracao, que so o backend toca.
+    receipts: "receipts",
+    receiptSettings: "receiptSettings",
+    receiptCounters: "receiptCounters",
     aiRules: "aiRules",
     aiDecisions: "aiDecisions",
     // Revisao humana da classificacao, uma por decisao e com o id dela. Fica

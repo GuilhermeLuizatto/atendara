@@ -21,6 +21,11 @@ import type {
   NotificationDelivery,
   Professional,
   ProfessionId,
+  PaymentLink,
+  PaymentProof,
+  Receipt,
+  ReceiptSettings,
+  RecurringCharge,
   Service,
   Transaction,
 } from "@/types";
@@ -41,6 +46,11 @@ export interface SnapshotParts {
   conversations: Conversation[];
   messages: Message[];
   transactions: Transaction[];
+  recurringCharges: RecurringCharge[];
+  paymentLinks: PaymentLink[];
+  paymentProofs: PaymentProof[];
+  receipts: Receipt[];
+  receiptSettings: ReceiptSettings[];
   aiRules: AIRule[];
   aiDecisions: AIDecision[];
   aiDecisionReviews: AIDecisionReview[];
@@ -62,6 +72,11 @@ export function emptyParts(): SnapshotParts {
     conversations: [],
     messages: [],
     transactions: [],
+    recurringCharges: [],
+    paymentLinks: [],
+    paymentProofs: [],
+    receipts: [],
+    receiptSettings: [],
     aiRules: [],
     aiDecisions: [],
     aiDecisionReviews: [],
@@ -133,6 +148,11 @@ export function assembleSnapshot(
       a.sentAt.localeCompare(b.sentAt),
     ),
     transactions,
+    recurringCharges: parts.recurringCharges,
+    paymentLinks: parts.paymentLinks,
+    paymentProofs: parts.paymentProofs,
+    receipts: parts.receipts,
+    receiptSettings: parts.receiptSettings[0] ?? null,
     rules: [
       ...seededRules,
       // Uma regra editavel nunca sobrepoe uma fundamental: os ids das semeadas

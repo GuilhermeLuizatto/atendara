@@ -43,6 +43,14 @@ const GROUP_OF_FILE = {
   // A agenda externa e da automacao: e ela que sincroniza e le ocupado.
   "calendar.js": "automacao",
   "automation-control.js": "automacao",
+  // Lancar o mes da mensalidade grava lancamento e trilha do tenant: o mesmo
+  // alcance das outras rotinas que escrevem dado operacional.
+  "recurring.js": "automacao",
+  // O comprovante e dado do tenant e entra no Storage pelo backend: a conta
+  // precisa do papel de criar objeto no bucket (roteiro na publicacao).
+  "payment-links.js": "automacao",
+  // Recibo e dado financeiro do tenant, como o lancamento que o origina.
+  "receipts.js": "automacao",
   "team.js": "contas",
   "administrative-import.js": "contas",
   "support.js": "contas",

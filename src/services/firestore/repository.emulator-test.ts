@@ -15,6 +15,7 @@ import { permissionsForRole } from "@/config/permissions";
 import { messagePath, paths } from "@/lib/firebase/paths";
 import { toFirestoreData } from "@/lib/firebase/converters";
 import { plannedReminder } from "@/lib/automation/fixtures";
+import { periodOf, recurringTransactionId } from "@/lib/finance/recurring";
 import type { WorkspaceSnapshot } from "@/services/types";
 
 import { FirestoreWorkspaceRepository } from "./firestore-repository";
@@ -596,5 +597,44 @@ describe("repositorio do Firestore contra o emulador", () => {
     } finally {
       owner.dispose();
     }
+  });
+  it("mensalidade grava o mês com Timestamp e retomar não duplica o mês", async () => {
+    const clientId = await repository.createClient({
+      fullName: "Cliente Mensalidade",
+      preferredName: null,
+      email: null,
+      phone: null,
+      status: "ACTIVE",
+      preferredModality: "ONLINE",
+      assignedProfessionalId: PROFESSIONAL,
+      acquisitionChannel: "OTHER",
+      tags: [],
+      administrativeNotes: null,
+    });
+    await nextSnapshot((current) => current.clients.some((client) => client.id === clientId));
+    const period = periodOf(new Date());
+
+    const id = await repository.createRecurringCharge({
+      clientId,
+      professionalId: PROFESSIONAL,
+      description: "Mensalidade de integração",
+      amountInCents: 45000,
+      method: "PIX",
+      dueDay: 28,
+      startPeriod: period,
+    });
+    const launchedId = recurringTransactionId(id, period);
+    const snapshot = await nextSnapshot((current) => current.transactions.some((item) => item.id === launchedId));
+    expect(snapshot.recurringCharges?.find((item) => item.id === id)).toMatchObject({ lastLaunchedPeriod: period, status: "ACTIVE" });
+
+    const raw = await getDoc(doc(db, paths.document(ORG, "transactions", launchedId)));
+    expect(raw.get("dueDate")).toBeInstanceOf(Timestamp);
+    expect(raw.get("amountInCents")).toBe(45000);
+
+    await repository.setRecurringChargeStatus(id, "PAUSED");
+    await nextSnapshot((current) => current.recurringCharges?.find((item) => item.id === id)?.status === "PAUSED");
+    await repository.setRecurringChargeStatus(id, "ACTIVE");
+    const after = await nextSnapshot((current) => current.recurringCharges?.find((item) => item.id === id)?.status === "ACTIVE");
+    expect(after.transactions.filter((item) => item.recurringChargeId === id)).toHaveLength(1);
   });
 });

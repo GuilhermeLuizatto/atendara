@@ -78,4 +78,12 @@ export const PERMISSIONS = [
     // guarda sobre uma pessoa atendida. Executados so pelo backend.
     "privacy:export",
     "privacy:erase",
+    // Recibos (ADR 0004, 14.9). Emitir e cancelar sao atos de quem assina o
+    // documento; ler acompanha quem ve o financeiro.
+    "receipt:read",
+    "receipt:create",
+    "receipt:cancel",
+    // Quem emite (nome, CPF ou CNPJ, endereco). Separada de `organization:update`
+    // porque o titular autonomo precisa preencher o proprio emissor.
+    "receiptSettings:update",
 ];

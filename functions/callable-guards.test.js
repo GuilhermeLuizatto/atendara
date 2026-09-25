@@ -76,6 +76,8 @@ const WITHOUT_LOGIN = {
   registerSelfService: "E o cadastro aberto: quem chama ainda nao tem conta. App Check, limite por rede e resposta unica seguram o abuso.",
   inspectTeamInvitation: "O destinatario ainda nao tem conta; App Check e limite por rede protegem a consulta do token.",
   acceptTeamInvitation: "O primeiro acesso cria a conta; App Check, token de uso unico e limite por rede protegem a chamada.",
+  inspectPaymentLink: "Quem paga a mensalidade nao tem conta; App Check, token de 32 bytes buscado pelo hash e limite por rede. Mostra so a cobranca, sem nome.",
+  submitPaymentProof: "Idem: o token prova o direito; tipo real pelos bytes, 5 MB, um comprovante por vez e limite por rede mais baixo.",
 };
 
 let callables = [];

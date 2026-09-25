@@ -26,6 +26,8 @@ const EMULATOR_ENVIRONMENT = {
     "profissional-anual": "price_emulador_anual",
   }),
   APP_BASE_URL: "http://127.0.0.1:3000",
+  // O SDK administrativo da suite inspeciona o mesmo Storage que as functions.
+  FIREBASE_STORAGE_EMULATOR_HOST: "127.0.0.1:9197",
 };
 
 const firebase = fileURLToPath(
@@ -47,7 +49,9 @@ const child = spawn(
     "--only",
     // `tasks`: a fila de automacao pede a Cloud Tasks emulada. O emulador
     // executa na hora, sem esperar `scheduleTime`.
-    "auth,firestore,functions,tasks",
+    // `storage`: o comprovante do cobrador entra pelo backend, e a exclusao
+    // da organizacao apaga os arquivos dela.
+    "auth,firestore,functions,tasks,storage",
     "vitest run --config vitest.access.mts",
   ],
   {

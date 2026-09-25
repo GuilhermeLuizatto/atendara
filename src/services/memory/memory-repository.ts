@@ -4,6 +4,17 @@ import { classificationsFor, getProfession } from "@/config/professions";
 import { ruleInputSchema, validateRuleInput } from "@/lib/rules/validation";
 import { decide } from "@/lib/ai/decision-engine";
 import { validateAISettings } from "@/lib/ai/settings";
+import { formatCurrency } from "@/lib/utils/format";
+import {
+  RECURRING_STATUS_AUDIT,
+  currentMonthLaunch,
+  openRecurringChargeError,
+  statusTransitionError,
+  validateRecurringCharge,
+  type RecurringChargeInput,
+} from "@/lib/finance/recurring";
+import { reviewProofError, type ProofDecision } from "@/lib/finance/payment-proof";
+import { maskDocument, validateIssuer, type ReceiptIssuerInput } from "@/lib/finance/receipts";
 import {
   buildDecisionReview,
   decisionReviewAuditSummary,
@@ -53,7 +64,11 @@ import type {
   Notification,
   NotificationDelivery,
   OrganizationNotificationSettings,
+  PaymentProof,
   ProfessionId,
+  ReceiptSettings,
+  RecurringCharge,
+  RecurringChargeStatus,
   Service,
   Transaction,
 } from "@/types";
@@ -66,6 +81,7 @@ import {
   type DecisionInput,
   type MessageInput,
   type NotificationInput,
+  type RecurringChargeUpdate,
   type RepositoryActor,
   type RuleInput,
   type ServiceInput,
@@ -371,6 +387,8 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
         "Há pendências financeiras em aberto para este cadastro.",
       );
     }
+    const recurring = openRecurringChargeError(this.snapshot.recurringCharges ?? [], id);
+    if (recurring) throw new RepositoryError(recurring);
 
     this.commit({
       ...this.snapshot,
@@ -1189,6 +1207,235 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
             actorType: "USER",
             resource: { type: "transaction", id },
             summary: `Lançamento "${existing.description}" excluído.`,
+          },
+          now,
+        ),
+        ...this.snapshot.auditLogs,
+      ],
+    });
+  }
+
+  // ---------------------------------------------------------- mensalidades
+
+  private requireCharge(id: ID): RecurringCharge {
+    const charge = (this.snapshot.recurringCharges ?? []).find((item) => item.id === id);
+    if (!charge) throw new RepositoryError("Mensalidade não encontrada.");
+    return charge;
+  }
+
+  /** O mes e o marcador saem juntos, como no Firestore. */
+  private launch(charge: RecurringCharge, now: ISODateString): { charge: RecurringCharge; transactions: Transaction[] } {
+    const launched = currentMonthLaunch(charge, { now, userId: this.actor.userId });
+    if (!launched) return { charge, transactions: this.snapshot.transactions };
+    return {
+      charge: { ...charge, lastLaunchedPeriod: launched.period ?? null },
+      transactions: [launched, ...this.snapshot.transactions],
+    };
+  }
+
+  async createRecurringCharge(raw: RecurringChargeInput): Promise<ID> {
+    this.assertPermission("transaction:create");
+    const validation = validateRecurringCharge(raw);
+    if (!validation.ok) throw new RepositoryError(validation.error);
+    const input = validation.value;
+    const client = this.snapshot.clients.find((item) => item.id === input.clientId);
+    if (!client) throw new RepositoryError("Cadastro não encontrado.");
+    const now = this.now();
+    const id = this.nextId("recurring");
+    const launched = this.launch(
+      {
+        id,
+        organizationId: this.organizationId,
+        ...this.stamp(now),
+        ...input,
+        clientName: client.fullName,
+        lastLaunchedPeriod: null,
+        status: "ACTIVE",
+        endedAt: null,
+      },
+      now,
+    );
+    const charge = launched.charge;
+    this.commit({
+      ...this.snapshot,
+      recurringCharges: [charge, ...(this.snapshot.recurringCharges ?? [])],
+      transactions: launched.transactions,
+      auditLogs: [
+        this.audit(
+          {
+            action: "CREATE",
+            actorType: "USER",
+            resource: { type: "recurringCharge", id },
+            summary: `Mensalidade "${charge.description}" criada: ${formatCurrency(charge.amountInCents)} todo dia ${charge.dueDay}.`,
+            metadata: { amountInCents: charge.amountInCents, dueDay: charge.dueDay, startPeriod: charge.startPeriod },
+          },
+          now,
+        ),
+        ...this.snapshot.auditLogs,
+      ],
+    });
+    return id;
+  }
+
+  async updateRecurringCharge(id: ID, patch: RecurringChargeUpdate): Promise<void> {
+    this.assertPermission("transaction:update");
+    const existing = this.requireCharge(id);
+    if (existing.status === "ENDED") throw new RepositoryError("Mensalidade encerrada não muda.");
+    const validation = validateRecurringCharge({ ...existing, ...patch, clientId: existing.clientId });
+    if (!validation.ok) throw new RepositoryError(validation.error);
+    const { description, amountInCents, method, dueDay } = validation.value;
+    const now = this.now();
+    this.commit({
+      ...this.snapshot,
+      recurringCharges: (this.snapshot.recurringCharges ?? []).map((item) =>
+        item.id === id
+          ? { ...item, description, amountInCents, method, dueDay, updatedAt: now, updatedBy: this.actor.userId }
+          : item,
+      ),
+      auditLogs: [
+        this.audit(
+          {
+            action: "UPDATE",
+            actorType: "USER",
+            resource: { type: "recurringCharge", id },
+            summary: `Mensalidade "${description}" alterada; vale a partir do próximo mês lançado.`,
+            metadata: { amountInCents, previousAmountInCents: existing.amountInCents, dueDay, previousDueDay: existing.dueDay },
+          },
+          now,
+        ),
+        ...this.snapshot.auditLogs,
+      ],
+    });
+  }
+
+  async setRecurringChargeStatus(id: ID, status: RecurringChargeStatus): Promise<void> {
+    this.assertPermission("transaction:update");
+    const existing = this.requireCharge(id);
+    const error = statusTransitionError(existing.status, status);
+    if (error) throw new RepositoryError(error);
+    const now = this.now();
+    const changed: RecurringCharge = {
+      ...existing,
+      status,
+      endedAt: status === "ENDED" ? now : null,
+      updatedAt: now,
+      updatedBy: this.actor.userId,
+    };
+    const resumed = status === "ACTIVE"
+      ? this.launch(changed, now)
+      : { charge: changed, transactions: this.snapshot.transactions };
+    this.commit({
+      ...this.snapshot,
+      recurringCharges: (this.snapshot.recurringCharges ?? []).map((item) => (item.id === id ? resumed.charge : item)),
+      transactions: resumed.transactions,
+      auditLogs: [
+        this.audit(
+          {
+            action: "UPDATE",
+            actorType: "USER",
+            resource: { type: "recurringCharge", id },
+            summary: RECURRING_STATUS_AUDIT[status],
+            metadata: { status, previousStatus: existing.status },
+          },
+          now,
+        ),
+        ...this.snapshot.auditLogs,
+      ],
+    });
+  }
+
+  // ------------------------------------------------ comprovantes (C2)
+
+  private reviewProof(id: ID, decision: ProofDecision): { proof: PaymentProof; now: ISODateString } {
+    this.assertPermission("transaction:update");
+    const proof = (this.snapshot.paymentProofs ?? []).find((item) => item.id === id);
+    if (!proof) throw new RepositoryError("Comprovante não encontrado.");
+    const error = reviewProofError(proof, decision);
+    if (error) throw new RepositoryError(error);
+    return { proof, now: this.now() };
+  }
+
+  async approvePaymentProof(id: ID): Promise<void> {
+    const { proof, now } = this.reviewProof(id, { verdict: "APPROVED" });
+    const transaction = this.snapshot.transactions.find((item) => item.id === proof.transactionId);
+    if (!transaction) throw new RepositoryError("Lançamento não encontrado.");
+    const opens = transaction.status === "PENDING" || transaction.status === "OVERDUE";
+    const touch = { updatedAt: now, updatedBy: this.actor.userId };
+    this.commit({
+      ...this.snapshot,
+      paymentProofs: (this.snapshot.paymentProofs ?? []).map((item) =>
+        item.id === id ? { ...item, status: "APPROVED", reviewedAt: now, reviewedBy: this.actor.userId, rejectionReason: null, ...touch } : item,
+      ),
+      transactions: opens
+        ? this.snapshot.transactions.map((item) => (item.id === transaction.id ? { ...item, status: "PAID", paidAt: now, ...touch } : item))
+        : this.snapshot.transactions,
+      auditLogs: [
+        this.audit(
+          {
+            action: "UPDATE",
+            actorType: "USER",
+            resource: { type: "paymentProof", id },
+            summary: opens ? "Comprovante aprovado; mês marcado como pago." : "Comprovante aprovado.",
+            metadata: { transactionId: transaction.id, verdict: "APPROVED" },
+          },
+          now,
+        ),
+        ...this.snapshot.auditLogs,
+      ],
+    });
+  }
+
+  async rejectPaymentProof(id: ID, reason: string): Promise<void> {
+    const { proof, now } = this.reviewProof(id, { verdict: "REJECTED", reason });
+    this.commit({
+      ...this.snapshot,
+      paymentProofs: (this.snapshot.paymentProofs ?? []).map((item) =>
+        item.id === id
+          ? { ...item, status: "REJECTED", reviewedAt: now, reviewedBy: this.actor.userId, rejectionReason: reason.trim(), updatedAt: now, updatedBy: this.actor.userId }
+          : item,
+      ),
+      auditLogs: [
+        this.audit(
+          {
+            action: "UPDATE",
+            actorType: "USER",
+            resource: { type: "paymentProof", id },
+            summary: "Comprovante recusado; o link aceita outro envio.",
+            metadata: { transactionId: proof.transactionId, verdict: "REJECTED" },
+          },
+          now,
+        ),
+        ...this.snapshot.auditLogs,
+      ],
+    });
+  }
+
+  // ----------------------------------------------------------- recibos (C3)
+
+  async updateReceiptSettings(raw: ReceiptIssuerInput): Promise<void> {
+    this.assertPermission("receiptSettings:update");
+    const validation = validateIssuer(raw);
+    if (!validation.ok) throw new RepositoryError(validation.error);
+    const now = this.now();
+    const existing = this.snapshot.receiptSettings ?? null;
+    const settings: ReceiptSettings = {
+      id: "organization",
+      organizationId: this.organizationId,
+      ...this.stamp(now),
+      ...(existing ? { createdAt: existing.createdAt, createdBy: existing.createdBy } : {}),
+      ...validation.value,
+    };
+    this.commit({
+      ...this.snapshot,
+      receiptSettings: settings,
+      auditLogs: [
+        this.audit(
+          {
+            action: existing ? "UPDATE" : "CREATE",
+            actorType: "USER",
+            resource: { type: "receiptSettings", id: "organization" },
+            summary: "Emissor dos recibos atualizado. Recibos já emitidos continuam como foram impressos.",
+            metadata: { issuerDocument: maskDocument(settings.issuerDocument) },
           },
           now,
         ),

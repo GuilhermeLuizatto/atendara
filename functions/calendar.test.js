@@ -24,19 +24,29 @@ vi.mock("firebase-admin/firestore", () => {
     exists: store.has(path),
     data: () => store.get(path),
   });
-  const asDate = (value) => (value && typeof value.toDate === "function" ? value.toDate() : new Date(value));
+  const asDate = (value) =>
+    value && typeof value.toDate === "function"
+      ? value.toDate()
+      : new Date(value);
   // Consulta mínima: filhos diretos da coleção, igualdade e ">=" em data.
   const query = (path, filters = [], max = Infinity) => ({
-    where: (field, op, value) => query(path, [...filters, { field, op, value }], max),
+    where: (field, op, value) =>
+      query(path, [...filters, { field, op, value }], max),
     orderBy: () => query(path, filters, max),
     limit: (count) => query(path, filters, count),
     get: async () => ({
       docs: [...store.keys()]
-        .filter((key) => key.startsWith(`${path}/`) && !key.slice(path.length + 1).includes("/"))
+        .filter(
+          (key) =>
+            key.startsWith(`${path}/`) &&
+            !key.slice(path.length + 1).includes("/"),
+        )
         .filter((key) =>
           filters.every(({ field, op, value }) => {
             const actual = store.get(key)[field];
-            return op === "==" ? actual === value : asDate(actual) >= asDate(value);
+            return op === "=="
+              ? actual === value
+              : asDate(actual) >= asDate(value);
           }),
         )
         .slice(0, max)
@@ -45,14 +55,19 @@ vi.mock("firebase-admin/firestore", () => {
   });
   // Grupo de coleções: qualquer `organizations/{org}/{nome}/{id}`.
   const group = (name, filters = [], after = null) => ({
-    where: (field, op, value) => group(name, [...filters, { field, op, value }], after),
+    where: (field, op, value) =>
+      group(name, [...filters, { field, op, value }], after),
     orderBy: () => group(name, filters, after),
     limit: () => group(name, filters, after),
     startAfter: (document) => group(name, filters, document.ref.path),
     get: async () => ({
       docs: [...store.keys()]
-        .filter((key) => key.split("/").length === 4 && key.split("/")[2] === name)
-        .filter((key) => filters.every(({ field, value }) => store.get(key)[field] === value))
+        .filter(
+          (key) => key.split("/").length === 4 && key.split("/")[2] === name,
+        )
+        .filter((key) =>
+          filters.every(({ field, value }) => store.get(key)[field] === value),
+        )
         .sort()
         .filter((key) => !after || key > after)
         .map((key) => ({
@@ -116,6 +131,11 @@ const PROFILE = "profile-not-the-uid";
 const SECRET = "state-secret-for-tests";
 const connectionPath = paths.document(ORG, "calendarConnections", PROFILE);
 const busyPath = paths.document(ORG, "calendarBusyBlocks", PROFILE);
+const reconnectAlertPath = paths.document(
+  ORG,
+  "notifications",
+  `calendar-reconnect-${PROFILE}-generation-1`,
+);
 const call = () => ({ auth: { uid: USER }, data: { professionalId: PROFILE } });
 const validTokens = {
   refresh_token: "private-refresh",
@@ -356,7 +376,10 @@ describe("retorno Google", () => {
     expect(network.calls).toHaveLength(2);
   });
   it("cria a agenda Atendara no fuso da organização e envia os atendimentos futuros", async () => {
-    store.set(paths.organization(ORG), { ownerId: USER, timezone: "America/Manaus" });
+    store.set(paths.organization(ORG), {
+      ownerId: USER,
+      timezone: "America/Manaus",
+    });
     const future = (id, overrides = {}) =>
       store.set(paths.document(ORG, "appointments", id), {
         professionalId: PROFILE,
@@ -379,8 +402,13 @@ describe("retorno Google", () => {
     expect((await callback(state)).code).toBe(200);
 
     const created = network.calls[1];
-    expect(created.url).toBe("https://www.googleapis.com/calendar/v3/calendars");
-    expect(JSON.parse(created.init.body)).toEqual({ summary: "Atendara", timeZone: "America/Manaus" });
+    expect(created.url).toBe(
+      "https://www.googleapis.com/calendar/v3/calendars",
+    );
+    expect(JSON.parse(created.init.body)).toEqual({
+      summary: "Atendara",
+      timeZone: "America/Manaus",
+    });
     expect(store.get(connectionPath)).toMatchObject({
       calendarId: "agenda-atendara",
       scopes: GOOGLE_CALENDAR_SCOPES,
@@ -401,14 +429,20 @@ describe("retorno Google", () => {
     const state = await begin();
     network.responses.push({
       ok: true,
-      body: { ...validTokens, scope: "https://www.googleapis.com/auth/calendar.freebusy" },
+      body: {
+        ...validTokens,
+        scope: "https://www.googleapis.com/auth/calendar.freebusy",
+      },
     });
     expect((await callback(state)).code).toBe(400);
     expect(store.get(connectionPath).status).toBe("REVOKED");
   });
   it("reconectar depois de autorização caída reaproveita a agenda que ainda existe", async () => {
     seedConnected();
-    Object.assign(store.get(connectionPath), { status: "ERROR", calendarId: "agenda-anterior" });
+    Object.assign(store.get(connectionPath), {
+      status: "ERROR",
+      calendarId: "agenda-anterior",
+    });
     const state = await begin();
     network.responses.push(
       { ok: true, body: validTokens },
@@ -424,10 +458,18 @@ describe("retorno Google", () => {
   });
   it("sem conseguir criar a agenda, conecta só para ler e a tela pede reconexão para escrever", async () => {
     const state = await begin();
-    network.responses.push({ ok: true, body: validTokens }, { ok: false, status: 500, body: {} });
+    network.responses.push(
+      { ok: true, body: validTokens },
+      { ok: false, status: 500, body: {} },
+    );
     expect((await callback(state)).code).toBe(200);
-    expect(store.get(connectionPath)).toMatchObject({ status: "CONNECTED", calendarId: null });
-    expect((await calendar.getCalendarConnection(call())).writeEnabled).toBe(false);
+    expect(store.get(connectionPath)).toMatchObject({
+      status: "CONNECTED",
+      calendarId: null,
+    });
+    expect((await calendar.getCalendarConnection(call())).writeEnabled).toBe(
+      false,
+    );
     expect(queued).toHaveLength(0);
   });
   it("falha do KMS registra etapa e status, sem token nem código", async () => {
@@ -515,7 +557,11 @@ describe("consulta manual e desconexão", () => {
   it("conexão anterior ao contrato atual exige nova autorização e não expõe ocupado legado", async () => {
     delete store.get(connectionPath).generation;
     store.set(busyPath, { blocks: [], readAt: new Date().toISOString() });
-    expect(await calendar.getCalendarConnection(call())).toMatchObject({ status: "ERROR", lastError: "RECONNECT_REQUIRED", snapshot: null });
+    expect(await calendar.getCalendarConnection(call())).toMatchObject({
+      status: "ERROR",
+      lastError: "RECONNECT_REQUIRED",
+      snapshot: null,
+    });
   });
   it("consulta só primary por 30 dias, grava faixas e não devolve tokens", async () => {
     queueBusy();
@@ -646,10 +692,16 @@ describe("consulta manual e desconexão", () => {
     });
     expect(network.calls.map((item) => [item.init.method, item.url])).toEqual([
       ["POST", "https://oauth2.googleapis.com/token"],
-      ["DELETE", "https://www.googleapis.com/calendar/v3/calendars/agenda-atendara"],
+      [
+        "DELETE",
+        "https://www.googleapis.com/calendar/v3/calendars/agenda-atendara",
+      ],
       ["POST", "https://oauth2.googleapis.com/revoke"],
     ]);
-    expect(store.get(connectionPath)).toMatchObject({ calendarId: null, refreshTokenCiphertext: null });
+    expect(store.get(connectionPath)).toMatchObject({
+      calendarId: null,
+      refreshTokenCiphertext: null,
+    });
   });
   it("conexão anterior à escrita continua lendo ocupado, mas não escreve", async () => {
     seedConnected();
@@ -658,7 +710,10 @@ describe("consulta manual e desconexão", () => {
       calendarId: null,
     });
     const publicData = await calendar.getCalendarConnection(call());
-    expect(publicData).toMatchObject({ status: "CONNECTED", writeEnabled: false });
+    expect(publicData).toMatchObject({
+      status: "CONNECTED",
+      writeEnabled: false,
+    });
   });
   it("reconectar apaga a leitura da conta anterior", async () => {
     queueBusy();
@@ -685,41 +740,116 @@ describe("consulta manual e desconexão", () => {
       accessUntil: "2000-01-01T00:00:00Z",
     });
     store.set(paths.organization(OTHER), { ownerId: otherUser });
-    store.set(paths.document(OTHER, "members", otherUser), { status: "ACTIVE", role: "PROFESSIONAL" });
-    store.set(paths.document(OTHER, "professionals", "perfil-vencido"), { userId: otherUser, active: true });
+    store.set(paths.document(OTHER, "members", otherUser), {
+      status: "ACTIVE",
+      role: "PROFESSIONAL",
+    });
+    store.set(paths.document(OTHER, "professionals", "perfil-vencido"), {
+      userId: otherUser,
+      active: true,
+    });
     store.set(paths.document(OTHER, "calendarConnections", "perfil-vencido"), {
       ...store.get(connectionPath),
       organizationId: OTHER,
       professionalId: "perfil-vencido",
     });
     // Desconectada: nem entra na consulta.
-    store.set(paths.document(OTHER, "calendarConnections", "revogada"), { status: "REVOKED" });
+    store.set(paths.document(OTHER, "calendarConnections", "revogada"), {
+      status: "REVOKED",
+    });
 
     queueBusy();
     const result = await calendar.refreshAllCalendars({
       client: { clientId: "id", clientSecret: "segredo" },
     });
-    expect(result).toEqual({ read: 1, skipped: 1, reconnect: 0, failed: 0, configured: true });
+    expect(result).toEqual({
+      read: 1,
+      skipped: 1,
+      reconnect: 0,
+      failed: 0,
+      configured: true,
+    });
     expect(store.get(busyPath).blocks).toHaveLength(1);
-    expect(JSON.stringify(store.get(busyPath))).not.toMatch(/Private event|private@example/);
-    expect(store.has(paths.document(OTHER, "calendarBusyBlocks", "perfil-vencido"))).toBe(false);
+    expect(JSON.stringify(store.get(busyPath))).not.toMatch(
+      /Private event|private@example/,
+    );
+    expect(
+      store.has(paths.document(OTHER, "calendarBusyBlocks", "perfil-vencido")),
+    ).toBe(false);
   });
   it("rotina: autorização revogada põe a conexão em reconexão sem apagar a leitura anterior", async () => {
     seedConnected();
     queueBusy();
     await calendar.refreshCalendarBusy(call());
     const before = store.get(busyPath);
-    network.responses.push({ ok: false, status: 400, body: { error: "invalid_grant" } });
+    network.responses.push({
+      ok: false,
+      status: 400,
+      body: { error: "invalid_grant" },
+    });
     const result = await calendar.refreshAllCalendars({
       client: { clientId: "id", clientSecret: "segredo" },
     });
     expect(result).toMatchObject({ read: 0, reconnect: 1 });
-    expect(store.get(connectionPath)).toMatchObject({ status: "ERROR", lastError: "RECONNECT_REQUIRED" });
+    expect(store.get(connectionPath)).toMatchObject({
+      status: "ERROR",
+      lastError: "RECONNECT_REQUIRED",
+    });
     expect(store.get(busyPath)).toBe(before);
+    expect(store.get(reconnectAlertPath)).toMatchObject({
+      type: "AUTOMATION_FAILURE",
+      priority: "HIGH",
+      status: "UNREAD",
+      professionalId: PROFILE,
+      target: { type: "calendar_connection", id: PROFILE },
+    });
+    expect(store.get(reconnectAlertPath).body).not.toMatch(
+      /private-refresh|Private event|private@example/,
+    );
+  });
+  it("não duplica o alerta da mesma queda e o encerra quando reconecta", async () => {
+    seedConnected();
+    network.responses.push({
+      ok: false,
+      status: 400,
+      body: { error: "invalid_grant" },
+    });
+    expect(
+      await calendar.readBusyNow(
+        { organizationId: ORG, professionalId: PROFILE, userId: USER },
+        {
+          client: { clientId: "id", clientSecret: "segredo" },
+          clock: () => "2026-09-25T12:00:00.000Z",
+        },
+      ),
+    ).toMatchObject({ failure: "RECONNECT_REQUIRED" });
+    const before = store.get(reconnectAlertPath);
+
+    expect(
+      await calendar.readBusyNow(
+        { organizationId: ORG, professionalId: PROFILE, userId: USER },
+        { client: { clientId: "id", clientSecret: "segredo" } },
+      ),
+    ).toEqual({ ok: false, failure: "NOT_CONNECTED" });
+    expect(store.get(reconnectAlertPath)).toBe(before);
+
+    const state = await begin();
+    network.responses.push(
+      { ok: true, body: validTokens },
+      { ok: true, body: { id: "agenda-atendara" } },
+    );
+    expect((await callback(state)).code).toBe(200);
+    expect(store.get(reconnectAlertPath)).toMatchObject({
+      status: "RESOLVED",
+      acknowledgedBy: USER,
+      updatedBy: USER,
+    });
   });
   it("rotina sem configuração não chama o Google", async () => {
     seedConnected();
-    expect(await calendar.refreshAllCalendars({ client: null })).toMatchObject({ configured: false });
+    expect(await calendar.refreshAllCalendars({ client: null })).toMatchObject({
+      configured: false,
+    });
     expect(network.calls).toHaveLength(0);
   });
   it("rota legada não aceita ocupado sem pedido correlacionado", async () => {

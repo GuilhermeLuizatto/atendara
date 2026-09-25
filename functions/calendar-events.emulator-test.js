@@ -31,7 +31,9 @@ const doc = (collection, id) => db.doc(paths.document(ORG, collection, id));
 
 async function read(collection, id) {
   const snapshot = await doc(collection, id).get();
-  return snapshot.exists ? fromStored(collection, snapshot.id, snapshot.data()) : null;
+  return snapshot.exists
+    ? fromStored(collection, snapshot.id, snapshot.data())
+    : null;
 }
 
 async function calendarTasks(appointmentId) {
@@ -40,7 +42,9 @@ async function calendarTasks(appointmentId) {
     .where("appointmentId", "==", appointmentId)
     .get();
   return snapshot.docs
-    .map((document) => fromStored("automationTasks", document.id, document.data()))
+    .map((document) =>
+      fromStored("automationTasks", document.id, document.data()),
+    )
     .filter((task) => task.type === "SYNC_CALENDAR_EVENT");
 }
 
@@ -79,7 +83,10 @@ function harness() {
   return {
     queued,
     google,
-    planning: { enqueue: async (payload, options) => queued.push({ payload, ...options }), clock: () => CHANGED },
+    planning: {
+      enqueue: async (payload, options) => queued.push({ payload, ...options }),
+      clock: () => CHANGED,
+    },
     dispatch: (reconcile = async () => "UPDATED") => ({
       enqueue: async (payload, options) => queued.push({ payload, ...options }),
       clock: () => CHANGED,
@@ -95,15 +102,27 @@ function harness() {
 }
 
 async function write(before, after, run) {
-  if (after) await doc("appointments", after.id).set(toStored("appointments", after));
+  if (after)
+    await doc("appointments", after.id).set(toStored("appointments", after));
   else await doc("appointments", before.id).delete();
   return planCalendarChange(
-    { organizationId: ORG, appointmentId: (after ?? before).id, before, after, changedAt: CHANGED },
+    {
+      organizationId: ORG,
+      appointmentId: (after ?? before).id,
+      before,
+      after,
+      changedAt: CHANGED,
+    },
     run.planning,
   );
 }
 
-const pointer = (task) => ({ version: 1, organizationId: ORG, taskId: task.id, attempt: task.attempt });
+const pointer = (task) => ({
+  version: 1,
+  organizationId: ORG,
+  taskId: task.id,
+  attempt: task.attempt,
+});
 
 async function connect(extra = {}) {
   await doc("calendarConnections", PROFILE).set(
@@ -145,7 +164,12 @@ beforeAll(async () => {
     mustChangePassword: false,
   });
   await doc("members", USER).set({ status: "ACTIVE", role: "PROFESSIONAL" });
-  await doc("professionals", PROFILE).set({ id: PROFILE, userId: USER, active: true, displayName: "Sam Fictício" });
+  await doc("professionals", PROFILE).set({
+    id: PROFILE,
+    userId: USER,
+    active: true,
+    displayName: "Sam Fictício",
+  });
 });
 
 beforeEach(async () => {
@@ -165,7 +189,11 @@ describe("3C — agenda Google pela fila", () => {
     expect(run.queued).toHaveLength(1);
 
     const [task] = await calendarTasks("novo");
-    expect(task).toMatchObject({ status: "SCHEDULED", clientId: null, channel: null });
+    expect(task).toMatchObject({
+      status: "SCHEDULED",
+      clientId: null,
+      channel: null,
+    });
     const result = await runAutomationTask(pointer(task), run.dispatch());
     expect(result.outcome).toBe("SUCCEEDED");
     expect(run.google).toEqual([
@@ -174,7 +202,12 @@ describe("3C — agenda Google pela fila", () => {
         calendarId: "agenda-atendara",
         eventId: expect.stringMatching(/^[0-9a-v]+$/),
         // Psicologia: grau mais fechado.
-        event: { summary: "Atendimento", startsAt: START, endsAt: END, description: null },
+        event: {
+          summary: "Atendimento",
+          startsAt: START,
+          endsAt: END,
+          description: null,
+        },
       },
     ]);
     expect(JSON.stringify(await calendarTasks("novo"))).not.toContain("Pessoa");
@@ -188,17 +221,30 @@ describe("3C — agenda Google pela fila", () => {
     await runAutomationTask(pointer(first), run.dispatch());
 
     await write(before, { ...before, status: "CANCELLED" }, run);
-    const second = (await calendarTasks("cancelar")).find((task) => task.id !== first.id);
-    expect((await runAutomationTask(pointer(second), run.dispatch())).outcome).toBe("SUCCEEDED");
-    expect((await runAutomationTask(pointer(second), run.dispatch())).outcome).toBe("TERMINAL");
-    expect(run.google.map((call) => call.event === null)).toEqual([false, true]);
+    const second = (await calendarTasks("cancelar")).find(
+      (task) => task.id !== first.id,
+    );
+    expect(
+      (await runAutomationTask(pointer(second), run.dispatch())).outcome,
+    ).toBe("SUCCEEDED");
+    expect(
+      (await runAutomationTask(pointer(second), run.dispatch())).outcome,
+    ).toBe("TERMINAL");
+    expect(run.google.map((call) => call.event === null)).toEqual([
+      false,
+      true,
+    ]);
   });
 
   it("editar só a observação não gera tarefa", async () => {
     const run = harness();
     const before = appointment("observacao");
     await write(null, before, run);
-    const result = await write(before, { ...before, administrativeNotes: "interna" }, run);
+    const result = await write(
+      before,
+      { ...before, administrativeNotes: "interna" },
+      run,
+    );
     expect(result.queued).toEqual([]);
   });
 
@@ -207,12 +253,18 @@ describe("3C — agenda Google pela fila", () => {
     const before = appointment("no-meio");
     await write(null, before, run);
     const [task] = await calendarTasks("no-meio");
-    const moved = { ...before, startsAt: "2099-03-03T13:00:00.000Z", endsAt: "2099-03-03T14:00:00.000Z" };
+    const moved = {
+      ...before,
+      startsAt: "2099-03-03T13:00:00.000Z",
+      endsAt: "2099-03-03T14:00:00.000Z",
+    };
     await runAutomationTask(
       pointer(task),
       run.dispatch(async () => {
         // Remarcado enquanto o Google respondia; o gatilho ainda não rodou.
-        await doc("appointments", "no-meio").set(toStored("appointments", moved));
+        await doc("appointments", "no-meio").set(
+          toStored("appointments", moved),
+        );
         return "UPDATED";
       }),
     );
@@ -247,21 +299,43 @@ describe("3C — agenda Google pela fila", () => {
       .where("title", "==", "Agenda Google não atualizada")
       .get();
     expect(alerts.size).toBeGreaterThan(0);
+    const connectionAlerts = await db
+      .collection(paths.collection(ORG, "notifications"))
+      .where("title", "==", "Google Calendar desconectado")
+      .get();
+    expect(connectionAlerts.size).toBe(1);
+    expect(connectionAlerts.docs[0].data()).toMatchObject({
+      status: "UNREAD",
+      professionalId: PROFILE,
+      target: { type: "calendar_connection", id: PROFILE },
+    });
   });
 
   it("desconectar com tarefa na fila: o despachante cancela sem chamar o Google", async () => {
     const run = harness();
     await write(null, appointment("desconectado"), run);
     const [task] = await calendarTasks("desconectado");
-    await connect({ status: "REVOKED", refreshTokenCiphertext: null, calendarId: null });
-    expect((await runAutomationTask(pointer(task), run.dispatch())).outcome).toBe("CANCELLED");
+    await connect({
+      status: "REVOKED",
+      refreshTokenCiphertext: null,
+      calendarId: null,
+    });
+    expect(
+      (await runAutomationTask(pointer(task), run.dispatch())).outcome,
+    ).toBe("CANCELLED");
     expect(run.google).toEqual([]);
-    expect(await read("automationTasks", task.id)).toMatchObject({ stopReason: "CALENDAR_NOT_CONNECTED" });
+    expect(await read("automationTasks", task.id)).toMatchObject({
+      stopReason: "CALENDAR_NOT_CONNECTED",
+    });
   });
 
   it("sem conexão apta, a escrita no atendimento não planeja nada", async () => {
     const run = harness();
-    await connect({ scopes: ["https://www.googleapis.com/auth/calendar.freebusy"] });
-    expect((await write(null, appointment("so-leitura"), run)).queued).toEqual([]);
+    await connect({
+      scopes: ["https://www.googleapis.com/auth/calendar.freebusy"],
+    });
+    expect((await write(null, appointment("so-leitura"), run)).queued).toEqual(
+      [],
+    );
   });
 });

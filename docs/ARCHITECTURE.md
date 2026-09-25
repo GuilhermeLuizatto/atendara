@@ -668,7 +668,10 @@ executar, lê o atendimento atual e grava ou apaga o evento na agenda "Atendara"
 esse passo. O ocupado é relido a cada 30 minutos por
 `refreshCalendarBusyEvery30Minutes` (consulta de grupo em `calendarConnections`)
 e chega ao painel no snapshot do workspace (`calendarBusy`); a agenda avisa
-sobre conflito, sem bloquear. Integração com remarcação ainda não está ativada.
+sobre conflito, sem bloquear. A ocupação do Google ainda não é uma reserva
+transacional da remarcação. Uma autorização expirada ou revogada abre um único
+alerta por geração da conexão no painel da organização; reconectar ou
+desconectar resolve esse alerta automaticamente.
 O contrato HTTP legado `calendarBusyCallback` responde 410: não há tarefa
 correlacionada que legitime uma escrita externa de ocupado.
 
@@ -794,7 +797,7 @@ e pelo retorno.
   antigas não sobrescrevem leituras recentes nem restauram uma conexão apagada.
   Falhas, inclusive erros por agenda em HTTP 200, preservam a leitura anterior
   sem renovar sua validade. A tela marca esse resultado como indisponível.
-- **E-mail: Amazon SES em `sa-east-1`, com dominio proprio.** Subdominio de
+- **E-mail: Amazon SES em `us-east-2`, com dominio proprio.** Subdominio de
   envio com SPF, DKIM e DMARC; remetente com o nome da organizacao; descadastro
   que retira o consentimento com registro. Devolucao chega pelo SNS e tem a
   assinatura conferida no Atendara, como a da Meta. Sem dominio verificado, o

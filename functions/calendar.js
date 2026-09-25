@@ -29,6 +29,11 @@ import {
   CALENDAR_REFRESH_MINUTES,
 } from "./generated/calendar-config.js";
 import { parsePrimaryBusy } from "./generated/agenda-calendar.js";
+import {
+  calendarReconnectAlert,
+  calendarReconnectAlertId,
+  resolveCalendarReconnectAlert,
+} from "./generated/agenda-calendar-connection-alert.js";
 import { encryptSecret, decryptSecret } from "./kms.js";
 import { ACCOUNT_CALL_OPTIONS, accountOf, parse } from "./platform-auth.js";
 import { consumeRateLimit } from "./rate-limit.js";
@@ -66,6 +71,39 @@ const stateSchema = z
 /** Atendimentos enviados ao Google na conexão; o resto chega pelas próximas mudanças. */
 const BACKFILL_LIMIT = 300;
 const DEFAULT_TIME_ZONE = "America/Sao_Paulo";
+
+function reconnectAlertRef(context, generation) {
+  return getFirestore().doc(
+    paths.document(
+      context.organizationId,
+      "notifications",
+      calendarReconnectAlertId(context.professionalId, generation),
+    ),
+  );
+}
+
+async function reconnectAlertFrom(transaction, context, connection) {
+  if (!connection?.generation) return null;
+  const ref = reconnectAlertRef(context, connection.generation);
+  const snapshot = await transaction.get(ref);
+  return {
+    ref,
+    alert: snapshot.exists
+      ? fromStored("notifications", snapshot.id, snapshot.data())
+      : null,
+  };
+}
+
+function resolveReconnectAlert(transaction, current, context, at) {
+  if (!current?.alert) return;
+  transaction.set(
+    current.ref,
+    toStored(
+      "notifications",
+      resolveCalendarReconnectAlert(current.alert, context.userId, at),
+    ),
+  );
+}
 
 export function signState(secret, payload) {
   const body = Buffer.from(JSON.stringify(payload), "utf8").toString(
@@ -179,13 +217,21 @@ function matchesPending(connection, payload) {
 async function provisionCalendar({ context, accessToken, previousCalendarId }) {
   if (typeof accessToken !== "string" || !accessToken) return null;
   try {
-    if (previousCalendarId && (await calendarExists({ accessToken, calendarId: previousCalendarId }))) {
+    if (
+      previousCalendarId &&
+      (await calendarExists({ accessToken, calendarId: previousCalendarId }))
+    ) {
       return previousCalendarId;
     }
-    const organization = (await getFirestore().doc(paths.organization(context.organizationId)).get()).data();
+    const organization = (
+      await getFirestore().doc(paths.organization(context.organizationId)).get()
+    ).data();
     return await createAtendaraCalendar({
       accessToken,
-      timeZone: typeof organization?.timezone === "string" ? organization.timezone : DEFAULT_TIME_ZONE,
+      timeZone:
+        typeof organization?.timezone === "string"
+          ? organization.timezone
+          : DEFAULT_TIME_ZONE,
     });
   } catch (error) {
     logger.warn("calendar.provision.failed", {
@@ -215,20 +261,28 @@ async function backfillCalendar(context) {
     const tasks = planCalendarBackfill({
       organizationId: context.organizationId,
       professionalId: context.professionalId,
-      appointments: snapshot.docs.map((document) => fromStored("appointments", document.id, document.data())),
+      appointments: snapshot.docs.map((document) =>
+        fromStored("appointments", document.id, document.data()),
+      ),
       waiting: [],
       at: now,
     });
     const batch = firestore.batch();
     for (const task of tasks) {
       batch.create(
-        firestore.doc(paths.document(context.organizationId, "automationTasks", task.id)),
+        firestore.doc(
+          paths.document(context.organizationId, "automationTasks", task.id),
+        ),
         toStored("automationTasks", task),
       );
     }
     await batch.commit();
-    for (const task of tasks) await requeueTask(task, queueEnqueueAt(task, now));
-    logger.info("calendar.backfill", { organizationId: context.organizationId, queued: tasks.length });
+    for (const task of tasks)
+      await requeueTask(task, queueEnqueueAt(task, now));
+    logger.info("calendar.backfill", {
+      organizationId: context.organizationId,
+      queued: tasks.length,
+    });
   } catch (error) {
     logger.warn("calendar.backfill.failed", {
       errorName: typeof error?.name === "string" ? error.name : null,
@@ -261,22 +315,25 @@ export const googleOAuthCallback = onRequest(
     let stage = "claim";
     try {
       // Uma autorização só pode ser consumida uma vez, mesmo com retornos simultâneos.
-      const previousCalendarId = await calendarTransaction(context, (tx, ref, connection) => {
-        if (
-          !matchesPending(connection, context) ||
-          connection.pendingOAuth.claimed
-        ) {
-          throw new HttpsError(
-            "failed-precondition",
-            "Pedido já utilizado ou cancelado.",
-          );
-        }
-        writeConnection(tx, ref, context, connection, {
-          pendingOAuth: { ...connection.pendingOAuth, claimed: true },
-        });
-        // Só sobrevive a queda de autorização (ERROR); desconectar apaga a agenda.
-        return connection.calendarId ?? null;
-      });
+      const previousCalendarId = await calendarTransaction(
+        context,
+        (tx, ref, connection) => {
+          if (
+            !matchesPending(connection, context) ||
+            connection.pendingOAuth.claimed
+          ) {
+            throw new HttpsError(
+              "failed-precondition",
+              "Pedido já utilizado ou cancelado.",
+            );
+          }
+          writeConnection(tx, ref, context, connection, {
+            pendingOAuth: { ...connection.pendingOAuth, claimed: true },
+          });
+          // Só sobrevive a queda de autorização (ERROR); desconectar apaga a agenda.
+          return connection.calendarId ?? null;
+        },
+      );
       if (typeof request.query.code !== "string" || !request.query.code) {
         return response
           .status(400)
@@ -331,7 +388,7 @@ export const googleOAuthCallback = onRequest(
       stage = "encrypt";
       const ciphertext = await encryptSecret(tokens.refresh_token);
       stage = "save";
-      await calendarTransaction(context, (tx, ref, connection) => {
+      await calendarTransaction(context, async (tx, ref, connection) => {
         if (
           !matchesPending(connection, context) ||
           !connection.pendingOAuth.claimed
@@ -341,6 +398,8 @@ export const googleOAuthCallback = onRequest(
             "Conexão cancelada durante a autorização.",
           );
         }
+        const previousAlert = await reconnectAlertFrom(tx, context, connection);
+        const connectedAt = new Date().toISOString();
         writeConnection(tx, ref, context, connection, {
           status: "CONNECTED",
           generation: randomUUID(),
@@ -351,9 +410,10 @@ export const googleOAuthCallback = onRequest(
           pendingRead: null,
           lastSyncAt: null,
           lastError: null,
-          connectedAt: new Date().toISOString(),
+          connectedAt,
         });
         tx.delete(calendarRef(context, "calendarBusyBlocks"));
+        resolveReconnectAlert(tx, previousAlert, context, connectedAt);
       });
       stage = "backfill";
       if (calendarId) await backfillCalendar(context);
@@ -400,10 +460,18 @@ export const getCalendarConnection = onCall(CALL_OPTIONS, async (request) => {
     // Lista explícita: nenhum campo novo da conexão privada vaza para o navegador.
     return {
       configured,
-      status: legacy ? "ERROR" : connection?.status ?? "REVOKED",
+      status: legacy ? "ERROR" : (connection?.status ?? "REVOKED"),
       // Conexões anteriores à escrita só leem ocupado até a próxima autorização.
-      writeEnabled: !legacy && canWriteCalendar(connection ? { ...connection, scopes: connection.scopes ?? [] } : null),
-      lastError: legacy ? "RECONNECT_REQUIRED" : connection?.lastError ?? null,
+      writeEnabled:
+        !legacy &&
+        canWriteCalendar(
+          connection
+            ? { ...connection, scopes: connection.scopes ?? [] }
+            : null,
+        ),
+      lastError: legacy
+        ? "RECONNECT_REQUIRED"
+        : (connection?.lastError ?? null),
       connectedAt: connection?.connectedAt ?? null,
       snapshot:
         connection?.status === "CONNECTED" &&
@@ -428,7 +496,9 @@ export const disconnectCalendar = onCall(CALL_OPTIONS, async (request) => {
   await consumeRateLimit(context.userId, "calendarDisconnect");
   const previous = await calendarTransaction(
     context,
-    (tx, ref, connection) => {
+    async (tx, ref, connection) => {
+      const previousAlert = await reconnectAlertFrom(tx, context, connection);
+      const disconnectedAt = new Date().toISOString();
       // Apaga antes da rede: uma resposta atrasada nunca restaura uma conexão revogada.
       writeConnection(tx, ref, context, connection, {
         status: "REVOKED",
@@ -443,6 +513,7 @@ export const disconnectCalendar = onCall(CALL_OPTIONS, async (request) => {
         scopes: [],
       });
       tx.delete(calendarRef(context, "calendarBusyBlocks"));
+      resolveReconnectAlert(tx, previousAlert, context, disconnectedAt);
       return {
         ciphertext: connection?.refreshTokenCiphertext ?? null,
         calendarId: connection?.calendarId ?? null,
@@ -484,7 +555,11 @@ export async function revokeAtGoogle(ciphertext) {
  */
 export const cleanupDeletedCalendarConnection = onDocumentDeleted(
   {
-    document: paths.document("{organizationId}", "calendarConnections", "{professionalId}"),
+    document: paths.document(
+      "{organizationId}",
+      "calendarConnections",
+      "{professionalId}",
+    ),
     region: "southamerica-east1",
     maxInstances: 2,
     secrets: ["GOOGLE_OAUTH_CLIENT_SECRET"],
@@ -492,9 +567,14 @@ export const cleanupDeletedCalendarConnection = onDocumentDeleted(
   },
   async (event) => {
     const data = event.data?.data();
-    const ciphertext = typeof data?.refreshTokenCiphertext === "string" ? data.refreshTokenCiphertext : null;
+    const ciphertext =
+      typeof data?.refreshTokenCiphertext === "string"
+        ? data.refreshTokenCiphertext
+        : null;
     if (!ciphertext) return;
-    const calendarDeleted = data.calendarId ? await removeAtendaraCalendar(ciphertext, data.calendarId) : true;
+    const calendarDeleted = data.calendarId
+      ? await removeAtendaraCalendar(ciphertext, data.calendarId)
+      : true;
     const revokedAtGoogle = await revokeAtGoogle(ciphertext);
     logger.info("calendar.cleanup", {
       organizationId: event.params.organizationId,
@@ -508,7 +588,11 @@ export const cleanupDeletedCalendarConnection = onDocumentDeleted(
  * Apaga a agenda "Atendara" com a credencial que está saindo. Sem credencial
  * ou sem resposta do Google, a tela orienta apagar pela Conta Google.
  */
-export async function removeAtendaraCalendar(ciphertext, calendarId, deps = {}) {
+export async function removeAtendaraCalendar(
+  ciphertext,
+  calendarId,
+  deps = {},
+) {
   if (!ciphertext || !calendarId) return false;
   try {
     const accessToken = await accessTokenFor(ciphertext, deps);
@@ -531,7 +615,10 @@ export async function removeAtendaraCalendar(ciphertext, calendarId, deps = {}) 
  * Uma falha não renova a validade da leitura anterior nem a substitui por
  * agenda vazia. Autorização revogada põe a conexão em `ERROR`.
  */
-export async function readBusyNow(context, { client, clock = () => new Date().toISOString() } = {}) {
+export async function readBusyNow(
+  context,
+  { client, clock = () => new Date().toISOString() } = {},
+) {
   const requestId = randomUUID();
   const timeMin = clock();
   const timeMax = new Date(
@@ -554,9 +641,12 @@ export async function readBusyNow(context, { client, clock = () => new Date().to
   try {
     let accessToken;
     try {
-      accessToken = await accessTokenFor(original.refreshTokenCiphertext, { client });
+      accessToken = await accessTokenFor(original.refreshTokenCiphertext, {
+        client,
+      });
     } catch (error) {
-      if (error instanceof ReconnectRequiredError) failure = "RECONNECT_REQUIRED";
+      if (error instanceof ReconnectRequiredError)
+        failure = "RECONNECT_REQUIRED";
       throw error;
     }
     const result = await requestGoogle(
@@ -609,7 +699,9 @@ export async function readBusyNow(context, { client, clock = () => new Date().to
       });
       return true;
     });
-    return saved ? { ok: true, blocks: blocks.length } : { ok: false, failure: "ABORTED" };
+    return saved
+      ? { ok: true, blocks: blocks.length }
+      : { ok: false, failure: "ABORTED" };
   } catch {
     await calendarTransaction(context, (tx, ref, connection) => {
       if (
@@ -621,6 +713,21 @@ export async function readBusyNow(context, { client, clock = () => new Date().to
           pendingRead: null,
           ...(failure === "RECONNECT_REQUIRED" ? { status: "ERROR" } : {}),
         });
+        if (
+          failure === "RECONNECT_REQUIRED" &&
+          connection.status === "CONNECTED"
+        ) {
+          const alert = calendarReconnectAlert({
+            organizationId: context.organizationId,
+            professionalId: context.professionalId,
+            generation: original.generation,
+            at: timeMin,
+          });
+          tx.set(
+            reconnectAlertRef(context, original.generation),
+            toStored("notifications", alert),
+          );
+        }
       }
     });
     return { ok: false, failure };
@@ -639,7 +746,10 @@ export const refreshCalendarBusy = onCall(CALL_OPTIONS, async (request) => {
   });
   if (outcome.ok) return { blocks: outcome.blocks };
   if (outcome.failure === "NOT_CONNECTED") {
-    throw new HttpsError("failed-precondition", "Conecte sua agenda Google novamente.");
+    throw new HttpsError(
+      "failed-precondition",
+      "Conecte sua agenda Google novamente.",
+    );
   }
   if (outcome.failure === "ABORTED") {
     throw new HttpsError(
@@ -678,36 +788,57 @@ export async function refreshAllCalendars(deps = {}) {
   for (;;) {
     const page = await (cursor ? base.startAfter(cursor) : base).get();
     const documents = page.docs;
-    for (let index = 0; index < documents.length; index += REFRESH_CONCURRENCY) {
+    for (
+      let index = 0;
+      index < documents.length;
+      index += REFRESH_CONCURRENCY
+    ) {
       await Promise.all(
-        documents.slice(index, index + REFRESH_CONCURRENCY).map(async (document) => {
-          const organizationId = document.ref.parent.parent?.id;
-          const professionalId = document.id;
-          if (!organizationId) {
-            tally.skipped += 1;
-            return;
-          }
-          const professional = (
-            await firestore.doc(paths.document(organizationId, "professionals", professionalId)).get()
-          ).data();
-          const context = { organizationId, professionalId, userId: professional?.userId ?? null };
-          const allowed =
-            !!context.userId &&
-            (await firestore.runTransaction((transaction) => calendarOwnerAllowed(transaction, context)));
-          if (!allowed) {
-            tally.skipped += 1;
-            return;
-          }
-          try {
-            const outcome = await readBusyNow(context, { client, clock });
-            if (outcome.ok) tally.read += 1;
-            else if (outcome.failure === "RECONNECT_REQUIRED") tally.reconnect += 1;
-            else if (outcome.failure === "UNAVAILABLE") tally.failed += 1;
-            else tally.skipped += 1;
-          } catch {
-            tally.failed += 1;
-          }
-        }),
+        documents
+          .slice(index, index + REFRESH_CONCURRENCY)
+          .map(async (document) => {
+            const organizationId = document.ref.parent.parent?.id;
+            const professionalId = document.id;
+            if (!organizationId) {
+              tally.skipped += 1;
+              return;
+            }
+            const professional = (
+              await firestore
+                .doc(
+                  paths.document(
+                    organizationId,
+                    "professionals",
+                    professionalId,
+                  ),
+                )
+                .get()
+            ).data();
+            const context = {
+              organizationId,
+              professionalId,
+              userId: professional?.userId ?? null,
+            };
+            const allowed =
+              !!context.userId &&
+              (await firestore.runTransaction((transaction) =>
+                calendarOwnerAllowed(transaction, context),
+              ));
+            if (!allowed) {
+              tally.skipped += 1;
+              return;
+            }
+            try {
+              const outcome = await readBusyNow(context, { client, clock });
+              if (outcome.ok) tally.read += 1;
+              else if (outcome.failure === "RECONNECT_REQUIRED")
+                tally.reconnect += 1;
+              else if (outcome.failure === "UNAVAILABLE") tally.failed += 1;
+              else tally.skipped += 1;
+            } catch {
+              tally.failed += 1;
+            }
+          }),
       );
     }
     if (documents.length < REFRESH_PAGE_SIZE) break;

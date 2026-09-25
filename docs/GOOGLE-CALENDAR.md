@@ -22,8 +22,17 @@ avisa quando o horário cruza um compromisso — **avisa e deixa marcar**, por
 decisão do titular. Leitura velha ou fora do período lido não é tratada como
 horário livre: o formulário diz que não dá para conferir.
 
-Não há bloqueio rígido nem remarcação integrada. Ativada em produção e testada com conta real em
-24/09/2026 — resultado na seção "Teste real de 24/09/2026".
+**Alerta de conexão (frente 3 da 3C, 25/09):** a primeira operação que detecta
+uma autorização expirada ou revogada muda a conexão para erro e abre um alerta
+de alta prioridade no painel da organização. A rotina automática e a escrita de
+eventos compartilham a mesma chave por profissional e geração da conexão, por
+isso uma queda produz um único alerta. O alerta leva à aba Google Calendar e é
+resolvido automaticamente quando a pessoa reconecta ou desconecta.
+
+Não há bloqueio rígido. A ocupação do Google ainda é um aviso, não uma reserva
+transacional usada pela remarcação autônoma. As frentes 1 e 2 foram ativadas em
+produção; o teste real de 24/09/2026 está registrado abaixo. A frente 3 está
+concluída no código e aguarda publicação e teste real.
 
 ## Configuração do ambiente de teste
 
@@ -86,7 +95,8 @@ Não há bloqueio rígido nem remarcação integrada. Ativada em produção e te
 
 O resultado automatizado com respostas fictícias não substitui este teste real.
 Segredos, conta OAuth e autorização do titular são requisitos de ativação, não
-evidência de que o teste já passou. A fase 3C permanece em andamento.
+evidência de que o teste já passou. O código da fase 3C está concluído; essas
+validações externas permanecem abertas.
 
 ## Teste real de 24/09/2026
 
@@ -117,8 +127,21 @@ Defeitos achados e corrigidos no caminho:
   cada minuto e recusava leitura segundos à frente dele. Folga de
   `CALENDAR_CLOCK_SKEW_MINUTES` (5 min).
 
-Em aberto: a mensagem de reconexão chega à tela com o sufixo `[503]`, que não está
-no texto enviado pelo servidor; a origem no navegador ainda não foi confirmada.
+Correção de 25/09/2026: o Firebase Functions SDK acrescenta o status HTTP ao
+fim da mensagem de uma callable indisponível. A camada do painel agora remove
+somente esse sufixo final (`[503]`), preservando o texto escrito pelo servidor.
+
+## Evidência automatizada de 25/09/2026
+
+- suíte principal: 103 arquivos e 1.237 testes;
+- regras do Firestore: 374 verificações no emulador;
+- repositórios e integrações com Firestore: 8 arquivos e 46 testes;
+- controle de acesso e Functions: 11 arquivos e 142 testes;
+- build estático de produção: 19 páginas geradas e CSP aplicado.
+
+Os testes cobrem conexão alheia, outro tenant, operadora, revogação durante
+OAuth ou consulta, alerta único por queda, resolução na reconexão e o alerta
+criado tanto pela leitura automática quanto pela escrita de eventos.
 
 ## Limites e continuidade
 
@@ -133,8 +156,8 @@ no texto enviado pelo servidor; a origem no navegador ainda não foi confirmada.
   não entram nesta leitura e não devem ser consideradas livres por omissão.
 - `calendarBusyCallback` responde 410 até existir um contrato correlacionado
   com uma tarefa de automação. Não ligar fluxos antigos de n8n a essa rota.
-- Para escrita de eventos, solicitar novo consentimento com `calendar.app.created`
-  e implementar a agenda secundária Atendara, respeitando o grau de exposição.
+- Antes do piloto aberto, concluir a verificação do escopo sensível
+  `calendar.app.created` no Google e repetir o roteiro real das três frentes.
 
 Referências: [OAuth Web Server](https://developers.google.com/identity/protocols/oauth2/web-server)
 e [consulta freeBusy](https://developers.google.com/workspace/calendar/api/v3/reference/freebusy/query).

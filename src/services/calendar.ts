@@ -3,6 +3,12 @@ import { getFirebaseFunctions } from "@/lib/firebase/client";
 import { isDemoMode } from "@/lib/firebase/config";
 import type { CalendarConnectionView } from "@/types/calendar";
 
+/** O SDK acrescenta o HTTP ao texto já escrito pela callable (`… [503]`). */
+export function readableCalendarError(error: unknown): string {
+  if (!(error instanceof Error)) return "";
+  return error.message.replace(/ \[\d{3}\]$/, "");
+}
+
 async function call<T>(name: string, professionalId: string): Promise<T> {
   if (isDemoMode)
     throw new Error(
@@ -23,7 +29,10 @@ async function call<T>(name: string, professionalId: string): Promise<T> {
       code === "functions/unavailable" ||
       code === "functions/resource-exhausted"
     ) {
-      throw new Error((error as Error).message);
+      throw new Error(
+        readableCalendarError(error) ||
+          "Não foi possível concluir a operação com o Google Calendar.",
+      );
     }
     if (
       code === "functions/permission-denied" ||
@@ -47,8 +56,9 @@ export const calendarService = {
   refresh: (professionalId: string) =>
     call<{ blocks: number }>("refreshCalendarBusy", professionalId),
   disconnect: (professionalId: string) =>
-    call<{ status: "REVOKED"; revokedAtGoogle: boolean; calendarDeleted: boolean }>(
-      "disconnectCalendar",
-      professionalId,
-    ),
+    call<{
+      status: "REVOKED";
+      revokedAtGoogle: boolean;
+      calendarDeleted: boolean;
+    }>("disconnectCalendar", professionalId),
 };

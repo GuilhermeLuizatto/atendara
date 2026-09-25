@@ -268,7 +268,7 @@ testes de ponta a ponta.
 | **2** | Persistência: Firestore, RBAC, auditoria, notificações e isolamento entre tenants | ✅ |
 | **3A** | Automação interna: fila, HMAC, callback, controle de emergência e n8n local | ✅ |
 | **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco | ⏸️ Em espera; validação externa pendente |
-| **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | 🟨 Código concluído; validações reais do titular e verificação do Google pendentes |
+| **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | 🟨 Código integrado à `main` e Functions publicadas; validações reais pendentes |
 | **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | 🟨 Gemini ativo para organizações de teste; expansão e analytics pendentes |
 | **5** | Produto: equipes, importação administrativa, suporte, cobrança real e planos | 🟨 |
 | **6** | Expansão: portfólio da Estética, marketplace e cobrador dos clientes | ⬜ |
@@ -313,9 +313,11 @@ tenants reais, fica para a continuação da Fase 4.
    escrita na agenda "Atendara", leitura manual e automática do ocupado e um
    alerta único de reconexão no painel; o sufixo técnico `[503]` não chega mais
    à mensagem da interface. A remarcação autônoma está provada no sandbox, e o
-   e-mail sai pelo domínio próprio. Permanecem os testes reais que exigem o
-   titular, a publicação desta frente e a verificação do escopo sensível pelo
-   Google antes do piloto aberto; seguir [o roteiro](docs/GOOGLE-CALENDAR.md).
+   e-mail sai pelo domínio próprio. As Functions da frente 3 foram publicadas em
+   produção em 25/09/2026, e a interface foi integrada à `main` pelo
+   [PR #66](https://github.com/GuilhermeLuizatto/atendara/pull/66).
+   Permanecem os testes reais que exigem o titular e a verificação do escopo
+   sensível pelo Google antes do piloto aberto; seguir [o roteiro](docs/GOOGLE-CALENDAR.md).
    O reteste real do e-mail passou em 25/09/2026 com um endereço inédito: a
    mensagem chegou à caixa principal e o link confirmou o endereço. A 3B
    continua em espera pela validação externa da Meta.

@@ -316,10 +316,9 @@ tenants reais, fica para a continuação da Fase 4.
    e-mail sai pelo domínio próprio. Permanecem os testes reais que exigem o
    titular, a publicação desta frente e a verificação do escopo sensível pelo
    Google antes do piloto aberto; seguir [o roteiro](docs/GOOGLE-CALENDAR.md).
-   O reteste real do e-mail foi iniciado em 25/09/2026 com um endereço inédito:
-   o cadastro foi criado e a tela confirmou a solicitação de envio; a chegada
-   na caixa de entrada e a abertura do link dependem do titular. A 3B continua
-   em espera pela validação externa da Meta.
+   O reteste real do e-mail passou em 25/09/2026 com um endereço inédito: a
+   mensagem chegou à caixa principal e o link confirmou o endereço. A 3B
+   continua em espera pela validação externa da Meta.
 6. Depois do piloto, priorizar equipes, importação de dados administrativos e
    suporte. O cobrador de clientes só começa após decisão contábil, jurídica e
    de gateway sobre split, responsabilidade fiscal e consentimento.

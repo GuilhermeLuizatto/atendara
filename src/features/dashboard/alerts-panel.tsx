@@ -1,6 +1,7 @@
 "use client";
 
 import { BellOff, Check, ShieldAlert, TriangleAlert } from "lucide-react";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, quietActionStyles } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { ATTENTION_TONE } from "@/components/ui/tones";
 import { ATTENTION_LABELS, NOTIFICATION_TYPE_LABELS } from "@/config/labels";
 import { cn } from "@/lib/utils/cn";
 import { formatRelativeToNow } from "@/lib/utils/format";
+import { notificationTargetHref } from "@/lib/notifications/targets";
 import { useWorkspaceActions } from "@/providers/use-workspace-actions";
 import type { Notification } from "@/types";
 
@@ -42,7 +44,9 @@ export function AlertsPanel({
               <button
                 type="button"
                 onClick={() => void markAllNotificationsRead()}
-                className={quietActionStyles("text-muted-foreground hover:text-foreground")}
+                className={quietActionStyles(
+                  "text-muted-foreground hover:text-foreground",
+                )}
               >
                 Marcar como lidos
               </button>
@@ -71,6 +75,7 @@ export function AlertsPanel({
           {alerts.map((alert) => {
             const critical = alert.priority === "CRITICAL";
             const Icon = critical ? ShieldAlert : TriangleAlert;
+            const targetHref = notificationTargetHref(alert.target);
 
             return (
               <li
@@ -119,6 +124,16 @@ export function AlertsPanel({
                       {formatRelativeToNow(alert.createdAt, now)}
                     </time>
                   </div>
+                  {targetHref ? (
+                    <Link
+                      href={targetHref}
+                      className={quietActionStyles(
+                        "text-primary hover:underline",
+                      )}
+                    >
+                      Abrir Google Calendar
+                    </Link>
+                  ) : null}
                 </div>
 
                 <Button

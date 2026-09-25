@@ -4,9 +4,19 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onTaskDispatched } from "firebase-functions/v2/tasks";
 import { z } from "zod";
 
-import { DISPATCHER_NAME, enqueueDispatch, requeueTask, scheduleTask } from "./automation-queue.js";
-import { accessTokenFor, reconcileEvent, syncResultFrom } from "./calendar-google.js";
+import {
+  DISPATCHER_NAME,
+  enqueueDispatch,
+  requeueTask,
+  scheduleTask,
+} from "./automation-queue.js";
+import {
+  accessTokenFor,
+  reconcileEvent,
+  syncResultFrom,
+} from "./calendar-google.js";
 import { calendarOwnerAllowed } from "./calendar-store.js";
+import { calendarReconnectAlert } from "./generated/agenda-calendar-connection-alert.js";
 import { fromStored, toStored } from "./firestore-dates.js";
 import {
   applyCalendarResult,
@@ -75,7 +85,12 @@ const db = () => getFirestore();
 const payloadSchema = z
   .object({
     // Ponteiro agendado antes da publicacao chega com a versao antiga.
-    version: z.number().int().refine((version) => AUTOMATION_ACCEPTED_CONTRACT_VERSIONS.includes(version)),
+    version: z
+      .number()
+      .int()
+      .refine((version) =>
+        AUTOMATION_ACCEPTED_CONTRACT_VERSIONS.includes(version),
+      ),
     organizationId: z.string().min(1).max(128),
     taskId: z.string().min(1).max(700),
     attempt: z.number().int().min(1).max(10),
@@ -85,7 +100,9 @@ const payloadSchema = z
 // ---------------------------------------------------------------- leitura
 
 function stored(collection, snapshot) {
-  return snapshot?.exists ? fromStored(collection, snapshot.id, snapshot.data()) : null;
+  return snapshot?.exists
+    ? fromStored(collection, snapshot.id, snapshot.data())
+    : null;
 }
 
 /**
@@ -95,26 +112,39 @@ function stored(collection, snapshot) {
  */
 function organizationFrom(snapshot, now) {
   const raw = stored("organizations", snapshot);
-  if (!raw || raw.deletion || !isProfessionId(raw.primaryProfession)) return null;
+  if (!raw || raw.deletion || !isProfessionId(raw.primaryProfession))
+    return null;
   return withOrganizationDefaults(raw, snapshot.id, raw.primaryProfession, now);
 }
 
 function tenant(firestore, organizationId) {
   return {
-    doc: (collection, id) => firestore.doc(paths.document(organizationId, collection, id)),
+    doc: (collection, id) =>
+      firestore.doc(paths.document(organizationId, collection, id)),
     ofAppointment: (collection, appointmentId) =>
-      firestore.collection(paths.collection(organizationId, collection)).where("appointmentId", "==", appointmentId),
+      firestore
+        .collection(paths.collection(organizationId, collection))
+        .where("appointmentId", "==", appointmentId),
   };
 }
 
 /** Tarefas internas e o que elas gravam, na transacao de quem as originou. */
 function writeEffects(transaction, scope, effects) {
   for (const effect of effects) {
-    transaction.create(scope.doc("automationTasks", effect.task.id), toStored("automationTasks", effect.task));
+    transaction.create(
+      scope.doc("automationTasks", effect.task.id),
+      toStored("automationTasks", effect.task),
+    );
     if (effect.kind === "WRITE_AUDIT") {
-      transaction.create(scope.doc("auditLogs", effect.audit.id), toStored("auditLogs", effect.audit));
+      transaction.create(
+        scope.doc("auditLogs", effect.audit.id),
+        toStored("auditLogs", effect.audit),
+      );
     } else {
-      transaction.create(scope.doc("notifications", effect.alert.id), toStored("notifications", effect.alert));
+      transaction.create(
+        scope.doc("notifications", effect.alert.id),
+        toStored("notifications", effect.alert),
+      );
     }
   }
 }
@@ -134,47 +164,82 @@ export { requeueTask };
  * anterior que falhou nesse passo.
  */
 export async function planAppointmentAutomation(change, deps = {}) {
-  const { enqueue = enqueueDispatch, clock = () => new Date().toISOString() } = deps;
+  const { enqueue = enqueueDispatch, clock = () => new Date().toISOString() } =
+    deps;
   const { organizationId, appointmentId, before, after, changedAt } = change;
   const firestore = db();
   const scope = tenant(firestore, organizationId);
 
   const waiting = await firestore.runTransaction(async (transaction) => {
-    const organizationSnapshot = await transaction.get(firestore.doc(paths.organization(organizationId)));
-    const current = stored("appointments", await transaction.get(scope.doc("appointments", appointmentId)));
-    const tasks = (await transaction.get(scope.ofAppointment("automationTasks", appointmentId))).docs.map((document) =>
-      stored("automationTasks", document),
+    const organizationSnapshot = await transaction.get(
+      firestore.doc(paths.organization(organizationId)),
     );
-    const deliveries = (await transaction.get(scope.ofAppointment("notificationDeliveries", appointmentId))).docs.map(
-      (document) => stored("notificationDeliveries", document),
+    const current = stored(
+      "appointments",
+      await transaction.get(scope.doc("appointments", appointmentId)),
     );
-    const client = current ? stored("clients", await transaction.get(scope.doc("clients", current.clientId))) : null;
+    const tasks = (
+      await transaction.get(
+        scope.ofAppointment("automationTasks", appointmentId),
+      )
+    ).docs.map((document) => stored("automationTasks", document));
+    const deliveries = (
+      await transaction.get(
+        scope.ofAppointment("notificationDeliveries", appointmentId),
+      )
+    ).docs.map((document) => stored("notificationDeliveries", document));
+    const client = current
+      ? stored(
+          "clients",
+          await transaction.get(scope.doc("clients", current.clientId)),
+        )
+      : null;
     const professional = current
-      ? stored("professionals", await transaction.get(scope.doc("professionals", current.professionalId)))
+      ? stored(
+          "professionals",
+          await transaction.get(
+            scope.doc("professionals", current.professionalId),
+          ),
+        )
       : null;
 
     const organization = organizationFrom(organizationSnapshot, changedAt);
     const plan = planAppointmentChange({
       organization,
-      profession: organization ? getProfession(organization.primaryProfession) : null,
+      profession: organization
+        ? getProfession(organization.primaryProfession)
+        : null,
       before,
       after,
       current,
       client,
-      professionalName: professional?.displayName ?? current?.professionalName ?? null,
+      professionalName:
+        professional?.displayName ?? current?.professionalName ?? null,
       tasks,
       deliveries,
       changedAt,
     });
 
     for (const { task, delivery } of plan.created) {
-      transaction.create(scope.doc("automationTasks", task.id), toStored("automationTasks", task));
-      transaction.set(scope.doc("notificationDeliveries", delivery.id), toStored("notificationDeliveries", delivery));
+      transaction.create(
+        scope.doc("automationTasks", task.id),
+        toStored("automationTasks", task),
+      );
+      transaction.set(
+        scope.doc("notificationDeliveries", delivery.id),
+        toStored("notificationDeliveries", delivery),
+      );
     }
     for (const { task, delivery } of plan.stopped) {
-      transaction.set(scope.doc("automationTasks", task.id), toStored("automationTasks", task));
+      transaction.set(
+        scope.doc("automationTasks", task.id),
+        toStored("automationTasks", task),
+      );
       if (delivery) {
-        transaction.set(scope.doc("notificationDeliveries", delivery.id), toStored("notificationDeliveries", delivery));
+        transaction.set(
+          scope.doc("notificationDeliveries", delivery.id),
+          toStored("notificationDeliveries", delivery),
+        );
       }
     }
     writeEffects(transaction, scope, plan.effects);
@@ -182,7 +247,12 @@ export async function planAppointmentAutomation(change, deps = {}) {
     const stopped = new Set(plan.stopped.map(({ task }) => task.id));
     return [
       ...plan.created.map(({ task }) => task),
-      ...tasks.filter((task) => task.status === "PLANNED" && task.deliveryId !== null && !stopped.has(task.id)),
+      ...tasks.filter(
+        (task) =>
+          task.status === "PLANNED" &&
+          task.deliveryId !== null &&
+          !stopped.has(task.id),
+      ),
     ];
   });
 
@@ -192,7 +262,11 @@ export async function planAppointmentAutomation(change, deps = {}) {
 
 export const planAppointmentNotices = onDocumentWritten(
   {
-    document: paths.document("{organizationId}", "appointments", "{appointmentId}"),
+    document: paths.document(
+      "{organizationId}",
+      "appointments",
+      "{appointmentId}",
+    ),
     region: REGION,
     maxInstances: 5,
     // Mesma conta do despachante: e ela que enfileira, e a tarefa carrega a
@@ -203,7 +277,10 @@ export const planAppointmentNotices = onDocumentWritten(
     retry: true,
   },
   async (event) => {
-    if (Date.now() - Date.parse(event.time) > PLANNING_EVENT_MAX_AGE_MINUTES * 60_000) {
+    if (
+      Date.now() - Date.parse(event.time) >
+      PLANNING_EVENT_MAX_AGE_MINUTES * 60_000
+    ) {
       logger.warn("automation.plan.stale_event", { eventId: event.id });
       return;
     }
@@ -220,7 +297,11 @@ export const planAppointmentNotices = onDocumentWritten(
       after: stored("appointments", event.data?.after),
       changedAt,
     });
-    logger.info("automation.plan", { organizationId, appointmentId, queued: result.queued.length });
+    logger.info("automation.plan", {
+      organizationId,
+      appointmentId,
+      queued: result.queued.length,
+    });
   },
 );
 
@@ -238,7 +319,8 @@ function writeConnectionFrom(snapshot) {
  * de quem atendia e de quem atende; grava só tarefas.
  */
 export async function planCalendarChange(change, deps = {}) {
-  const { enqueue = enqueueDispatch, clock = () => new Date().toISOString() } = deps;
+  const { enqueue = enqueueDispatch, clock = () => new Date().toISOString() } =
+    deps;
   const { organizationId, appointmentId, before, after, changedAt } = change;
   const firestore = db();
   const scope = tenant(firestore, organizationId);
@@ -249,11 +331,16 @@ export async function planCalendarChange(change, deps = {}) {
       changedAt,
     );
     if (!organization) return [];
-    const tasks = (await transaction.get(scope.ofAppointment("automationTasks", appointmentId))).docs.map(
-      (document) => stored("automationTasks", document),
-    );
+    const tasks = (
+      await transaction.get(
+        scope.ofAppointment("automationTasks", appointmentId),
+      )
+    ).docs.map((document) => stored("automationTasks", document));
     const connections = {};
-    for (const professionalId of new Set([before?.professionalId, after?.professionalId])) {
+    for (const professionalId of new Set([
+      before?.professionalId,
+      after?.professionalId,
+    ])) {
       if (!professionalId) continue;
       connections[professionalId] = writeConnectionFrom(
         await transaction.get(scope.doc("calendarConnections", professionalId)),
@@ -269,7 +356,10 @@ export async function planCalendarChange(change, deps = {}) {
       at: changedAt,
     });
     for (const task of created) {
-      transaction.create(scope.doc("automationTasks", task.id), toStored("automationTasks", task));
+      transaction.create(
+        scope.doc("automationTasks", task.id),
+        toStored("automationTasks", task),
+      );
     }
     return created;
   });
@@ -280,7 +370,11 @@ export async function planCalendarChange(change, deps = {}) {
 
 export const planCalendarEvents = onDocumentWritten(
   {
-    document: paths.document("{organizationId}", "appointments", "{appointmentId}"),
+    document: paths.document(
+      "{organizationId}",
+      "appointments",
+      "{appointmentId}",
+    ),
     region: REGION,
     maxInstances: 5,
     ...runAs("automacao"),
@@ -288,7 +382,10 @@ export const planCalendarEvents = onDocumentWritten(
     retry: true,
   },
   async (event) => {
-    if (Date.now() - Date.parse(event.time) > PLANNING_EVENT_MAX_AGE_MINUTES * 60_000) {
+    if (
+      Date.now() - Date.parse(event.time) >
+      PLANNING_EVENT_MAX_AGE_MINUTES * 60_000
+    ) {
       logger.warn("calendar.plan.stale_event", { eventId: event.id });
       return;
     }
@@ -303,7 +400,11 @@ export const planCalendarEvents = onDocumentWritten(
       after: stored("appointments", event.data?.after),
       changedAt,
     });
-    logger.info("calendar.plan", { organizationId, appointmentId, queued: result.queued.length });
+    logger.info("calendar.plan", {
+      organizationId,
+      appointmentId,
+      queued: result.queued.length,
+    });
   },
 );
 
@@ -311,19 +412,38 @@ export const planCalendarEvents = onDocumentWritten(
  * Lê, na transação que adquire a tarefa de agenda, o que ela precisa conferir.
  * O token cifrado sai daqui só para a memória desta execução.
  */
-async function calendarContext(transaction, firestore, scope, payload, task, now) {
+async function calendarContext(
+  transaction,
+  firestore,
+  scope,
+  payload,
+  task,
+  now,
+) {
   const organization = organizationFrom(
-    await transaction.get(firestore.doc(paths.organization(payload.organizationId))),
+    await transaction.get(
+      firestore.doc(paths.organization(payload.organizationId)),
+    ),
     now,
   );
   const appointment = task.appointmentId
-    ? stored("appointments", await transaction.get(scope.doc("appointments", task.appointmentId)))
+    ? stored(
+        "appointments",
+        await transaction.get(scope.doc("appointments", task.appointmentId)),
+      )
     : null;
   const connection = task.professionalId
-    ? writeConnectionFrom(await transaction.get(scope.doc("calendarConnections", task.professionalId)))
+    ? writeConnectionFrom(
+        await transaction.get(
+          scope.doc("calendarConnections", task.professionalId),
+        ),
+      )
     : null;
   const professional = task.professionalId
-    ? stored("professionals", await transaction.get(scope.doc("professionals", task.professionalId)))
+    ? stored(
+        "professionals",
+        await transaction.get(scope.doc("professionals", task.professionalId)),
+      )
     : null;
   const ownerLinked =
     !!professional?.userId &&
@@ -340,7 +460,11 @@ async function calendarContext(transaction, firestore, scope, payload, task, now
  * que confere se a tarefa ainda é desta execução. Se o atendimento mudou no
  * meio, agenda mais uma rodada: a última escrita no Google nunca fica velha.
  */
-async function runCalendarSync(step, scope, { enqueue, clock, google, ciphertext }) {
+async function runCalendarSync(
+  step,
+  scope,
+  { enqueue, clock, google, ciphertext },
+) {
   let result;
   try {
     const accessToken = await google.accessTokenFor(ciphertext);
@@ -367,12 +491,23 @@ async function runCalendarSync(step, scope, { enqueue, clock, google, ciphertext
     ) {
       return null;
     }
-    const connectionRef = scope.doc("calendarConnections", current.professionalId);
-    const connection = stored("calendarConnections", await transaction.get(connectionRef));
-    const appointment = stored("appointments", await transaction.get(scope.doc("appointments", current.appointmentId)));
-    const siblings = (await transaction.get(scope.ofAppointment("automationTasks", current.appointmentId))).docs.map(
-      (document) => stored("automationTasks", document),
+    const connectionRef = scope.doc(
+      "calendarConnections",
+      current.professionalId,
     );
+    const connection = stored(
+      "calendarConnections",
+      await transaction.get(connectionRef),
+    );
+    const appointment = stored(
+      "appointments",
+      await transaction.get(scope.doc("appointments", current.appointmentId)),
+    );
+    const siblings = (
+      await transaction.get(
+        scope.ofAppointment("automationTasks", current.appointmentId),
+      )
+    ).docs.map((document) => stored("automationTasks", document));
 
     const now = clock();
     const done = applyCalendarResult({ task: current, result, now });
@@ -396,24 +531,44 @@ async function runCalendarSync(step, scope, { enqueue, clock, google, ciphertext
           updatedBy: null,
         }),
       );
+      const alert = calendarReconnectAlert({
+        organizationId: current.organizationId,
+        professionalId: current.professionalId,
+        generation: connection.generation,
+        at: now,
+      });
+      transaction.set(
+        scope.doc("notifications", alert.id),
+        toStored("notifications", alert),
+      );
     }
 
     let followUp = null;
     const key = calendarSyncKey(current.appointmentId, current.professionalId);
     if (
       result.outcome === "SYNCED" &&
-      calendarFingerprint(appointment, current.professionalId) !== step.fingerprint &&
-      !siblings.some((task) => task.idempotencyKey === key && task.id !== current.id && isWaitingStatus(task.status))
+      calendarFingerprint(appointment, current.professionalId) !==
+        step.fingerprint &&
+      !siblings.some(
+        (task) =>
+          task.idempotencyKey === key &&
+          task.id !== current.id &&
+          isWaitingStatus(task.status),
+      )
     ) {
       followUp = newCalendarSyncTask({
         id: noticeTaskId(key, siblings),
         organizationId: current.organizationId,
         appointmentId: current.appointmentId,
         professionalId: current.professionalId,
-        appointmentStartsAt: appointment?.startsAt ?? current.appointmentStartsAt,
+        appointmentStartsAt:
+          appointment?.startsAt ?? current.appointmentStartsAt,
         at: now,
       });
-      transaction.create(scope.doc("automationTasks", followUp.id), toStored("automationTasks", followUp));
+      transaction.create(
+        scope.doc("automationTasks", followUp.id),
+        toStored("automationTasks", followUp),
+      );
     }
     return { done, followUp };
   });
@@ -425,7 +580,8 @@ async function runCalendarSync(step, scope, { enqueue, clock, google, ciphertext
       name: queueTaskName(outcome.done.task, outcome.done.requeueAt),
     });
   }
-  if (outcome.followUp) await scheduleTask(outcome.followUp, { enqueue, clock });
+  if (outcome.followUp)
+    await scheduleTask(outcome.followUp, { enqueue, clock });
   return outcome.done.task.status;
 }
 
@@ -456,7 +612,11 @@ async function handoff(step, scope, { clock }) {
     // O retorno do executor pode chegar antes deste registro — o fluxo do
     // WhatsApp chama o retorno e so depois responde — e ja ter aplicado o
     // resultado. Nao e perda da execucao: o estado dele vale.
-    if (current && current.attempt >= step.task.attempt && current.status !== "DISPATCHING") {
+    if (
+      current &&
+      current.attempt >= step.task.attempt &&
+      current.status !== "DISPATCHING"
+    ) {
       return current.status;
     }
     if (
@@ -467,7 +627,10 @@ async function handoff(step, scope, { clock }) {
     ) {
       return "LEASE_LOST";
     }
-    transaction.set(taskRef, toStored("automationTasks", handoffDispatch(current, clock())));
+    transaction.set(
+      taskRef,
+      toStored("automationTasks", handoffDispatch(current, clock())),
+    );
     return "DISPATCHED";
   });
 }
@@ -479,11 +642,16 @@ async function send(step, scope, { enqueue, clock, providers }) {
     result = await provider.send(step.request);
   } catch {
     // Excecao do provedor e falha temporaria: a politica de tentativas decide.
-    result = { outcome: "TEMPORARY_FAILURE", providerMessageId: null, failureCode: "PROVIDER_UNAVAILABLE" };
+    result = {
+      outcome: "TEMPORARY_FAILURE",
+      providerMessageId: null,
+      failureCode: "PROVIDER_UNAVAILABLE",
+    };
   }
 
   // Provedor de entrega em duas etapas: aceitar nao e enviar.
-  if (provider.handoff && result.outcome === "ACCEPTED") return handoff(step, scope, { clock });
+  if (provider.handoff && result.outcome === "ACCEPTED")
+    return handoff(step, scope, { clock });
 
   const firestore = db();
   const taskRef = scope.doc("automationTasks", step.task.id);
@@ -499,12 +667,25 @@ async function send(step, scope, { enqueue, clock, providers }) {
     ) {
       return null;
     }
-    const delivery = stored("notificationDeliveries", await transaction.get(scope.doc("notificationDeliveries", step.delivery.id)));
+    const delivery = stored(
+      "notificationDeliveries",
+      await transaction.get(
+        scope.doc("notificationDeliveries", step.delivery.id),
+      ),
+    );
     if (!delivery) return null;
 
-    const done = completeDispatch({ task: current, delivery, result, now: clock() });
+    const done = completeDispatch({
+      task: current,
+      delivery,
+      result,
+      now: clock(),
+    });
     transaction.set(taskRef, toStored("automationTasks", done.task));
-    transaction.set(scope.doc("notificationDeliveries", done.delivery.id), toStored("notificationDeliveries", done.delivery));
+    transaction.set(
+      scope.doc("notificationDeliveries", done.delivery.id),
+      toStored("notificationDeliveries", done.delivery),
+    );
     writeEffects(transaction, scope, done.effects);
     return done;
   });
@@ -562,19 +743,39 @@ export async function runAutomationTask(data, deps = {}) {
     // As duas chaves, lidas na MESMA transacao que adquire a tarefa: desligar
     // no meio do caminho para o envio que ja estava a caminho.
     const switches = {
-      organization: stored("automationSwitches", await transaction.get(scope.doc("automationSwitches", "organization"))),
-      global: stored("platformAutomationSwitch", await transaction.get(firestore.doc(paths.platformAutomationSwitch()))),
+      organization: stored(
+        "automationSwitches",
+        await transaction.get(scope.doc("automationSwitches", "organization")),
+      ),
+      global: stored(
+        "platformAutomationSwitch",
+        await transaction.get(firestore.doc(paths.platformAutomationSwitch())),
+      ),
     };
 
     if (task?.type === "SYNC_CALENDAR_EVENT") {
       const calendar = isTerminalStatus(task.status)
-        ? { organization: null, appointment: null, connection: null, ownerLinked: false }
-        : await calendarContext(transaction, firestore, scope, payload, task, now);
+        ? {
+            organization: null,
+            appointment: null,
+            connection: null,
+            ownerLinked: false,
+          }
+        : await calendarContext(
+            transaction,
+            firestore,
+            scope,
+            payload,
+            task,
+            now,
+          );
       const decided = decideCalendarDispatch({
         payload,
         task,
         organization: calendar.organization,
-        profession: calendar.organization ? getProfession(calendar.organization.primaryProfession) : null,
+        profession: calendar.organization
+          ? getProfession(calendar.organization.primaryProfession)
+          : null,
         appointment: calendar.appointment,
         connection: calendar.connection,
         ownerLinked: calendar.ownerLinked,
@@ -583,39 +784,72 @@ export async function runAutomationTask(data, deps = {}) {
       });
       if (decided.kind === "STOP" || decided.kind === "SYNC") {
         transaction.set(taskRef, toStored("automationTasks", decided.task));
-        if (decided.kind === "STOP") writeEffects(transaction, scope, decided.effects);
+        if (decided.kind === "STOP")
+          writeEffects(transaction, scope, decided.effects);
       }
-      if (decided.kind === "SYNC") ciphertext = calendar.connection?.refreshTokenCiphertext ?? null;
+      if (decided.kind === "SYNC")
+        ciphertext = calendar.connection?.refreshTokenCiphertext ?? null;
       return decided;
     }
 
     if (task && !isTerminalStatus(task.status)) {
       if (task.deliveryId) {
-        context.delivery = stored("notificationDeliveries", await transaction.get(scope.doc("notificationDeliveries", task.deliveryId)));
+        context.delivery = stored(
+          "notificationDeliveries",
+          await transaction.get(
+            scope.doc("notificationDeliveries", task.deliveryId),
+          ),
+        );
       }
-      context.organization = organizationFrom(await transaction.get(firestore.doc(paths.organization(payload.organizationId))), now);
+      context.organization = organizationFrom(
+        await transaction.get(
+          firestore.doc(paths.organization(payload.organizationId)),
+        ),
+        now,
+      );
       if (task.appointmentId) {
-        context.appointment = stored("appointments", await transaction.get(scope.doc("appointments", task.appointmentId)));
+        context.appointment = stored(
+          "appointments",
+          await transaction.get(scope.doc("appointments", task.appointmentId)),
+        );
       }
       if (task.channel) {
         // Quem pode falar pelo numero da organizacao naquele canal. Lido na
         // MESMA transacao: um remetente revogado entre planejar e enviar para
         // o envio que ja estava planejado.
-        context.sender = stored("messagingSenders", await transaction.get(scope.doc("messagingSenders", task.channel)));
+        context.sender = stored(
+          "messagingSenders",
+          await transaction.get(scope.doc("messagingSenders", task.channel)),
+        );
       }
       if (context.appointment) {
-        context.client = stored("clients", await transaction.get(scope.doc("clients", context.appointment.clientId)));
+        context.client = stored(
+          "clients",
+          await transaction.get(
+            scope.doc("clients", context.appointment.clientId),
+          ),
+        );
         context.professional = stored(
           "professionals",
-          await transaction.get(scope.doc("professionals", context.appointment.professionalId)),
+          await transaction.get(
+            scope.doc("professionals", context.appointment.professionalId),
+          ),
         );
       }
       if (task.type === "SEND_CONVERSATION_REPLY" && task.clientId) {
         // A conversa e o pedido se deduzem do cadastro, pela regra do webhook:
         // a tarefa nao guarda o id da conversa, que carrega o do cadastro.
         const conversationId = whatsappConversationId(task.clientId, "");
-        context.conversation = stored("conversations", await transaction.get(scope.doc("conversations", conversationId)));
-        context.offer = stored("rescheduleRequests", await transaction.get(scope.doc("rescheduleRequests", conversationId)));
+        context.conversation = stored(
+          "conversations",
+          await transaction.get(scope.doc("conversations", conversationId)),
+        );
+        context.offer = stored(
+          "rescheduleRequests",
+          await transaction.get(
+            scope.doc("rescheduleRequests", conversationId),
+          ),
+        );
       }
     }
 
@@ -624,25 +858,38 @@ export async function runAutomationTask(data, deps = {}) {
       task,
       delivery: context.delivery,
       organization: context.organization,
-      profession: context.organization ? getProfession(context.organization.primaryProfession) : null,
+      profession: context.organization
+        ? getProfession(context.organization.primaryProfession)
+        : null,
       appointment: context.appointment,
       client: context.client,
-      professionalName: context.professional?.displayName ?? context.appointment?.professionalName ?? null,
+      professionalName:
+        context.professional?.displayName ??
+        context.appointment?.professionalName ??
+        null,
       sender: context.sender,
       switches,
       now,
     };
     const decided =
       task?.type === "SEND_CONVERSATION_REPLY"
-        ? decideReplyDispatch({ ...common, conversation: context.conversation, offer: context.offer })
+        ? decideReplyDispatch({
+            ...common,
+            conversation: context.conversation,
+            offer: context.offer,
+          })
         : decideDispatch(common);
 
     if (decided.kind === "STOP" || decided.kind === "SEND") {
       transaction.set(taskRef, toStored("automationTasks", decided.task));
       if (decided.delivery) {
-        transaction.set(scope.doc("notificationDeliveries", decided.delivery.id), toStored("notificationDeliveries", decided.delivery));
+        transaction.set(
+          scope.doc("notificationDeliveries", decided.delivery.id),
+          toStored("notificationDeliveries", decided.delivery),
+        );
       }
-      if (decided.kind === "STOP") writeEffects(transaction, scope, decided.effects);
+      if (decided.kind === "STOP")
+        writeEffects(transaction, scope, decided.effects);
     }
     return decided;
   });
@@ -662,7 +909,8 @@ export async function runAutomationTask(data, deps = {}) {
       // novo: nao ha o que repor. A Cloud Tasks recusaria o nome repetido e a
       // tarefa se perderia; o emulador aceitaria e entraria em ciclo. Erro faz a
       // fila tentar de novo mais tarde, com espera.
-      if (name === currentTaskName) throw new Error("automation.dispatch.early");
+      if (name === currentTaskName)
+        throw new Error("automation.dispatch.early");
       await enqueue(dispatchPayloadFor(step.task), { at: step.at, name });
       outcome = "REQUEUED";
       break;
@@ -674,7 +922,12 @@ export async function runAutomationTask(data, deps = {}) {
       outcome = await send(step, scope, { enqueue, clock, providers });
       break;
     case "SYNC":
-      outcome = await runCalendarSync(step, scope, { enqueue, clock, google, ciphertext });
+      outcome = await runCalendarSync(step, scope, {
+        enqueue,
+        clock,
+        google,
+        ciphertext,
+      });
       break;
   }
 
@@ -703,6 +956,8 @@ export const dispatchAutomationTask = onTaskDispatched(
     rateLimits: { maxConcurrentDispatches: 20 },
   },
   async (request) => {
-    await runAutomationTask(request.data, { currentTaskName: request.id ?? null });
+    await runAutomationTask(request.data, {
+      currentTaskName: request.id ?? null,
+    });
   },
 );

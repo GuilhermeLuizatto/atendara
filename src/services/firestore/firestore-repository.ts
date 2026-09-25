@@ -30,6 +30,7 @@ import type {
   ProfessionId,
 } from "@/types";
 
+import type { DecisionReviewInput } from "@/lib/ai/decision-review";
 import type { DispatchSummary } from "@/lib/notifications";
 import { planUpdateNotificationSettings } from "./plans/outbound";
 import {
@@ -79,6 +80,7 @@ import {
   planReplyToConversation,
   planUpdateConversation,
 } from "./plans/messaging";
+import { planReviewDecision } from "./plans/decision-reviews";
 import { planUpdateAgendaSettings, planUpdateAISettings } from "./plans/organization";
 import {
   planCreateRule,
@@ -132,6 +134,7 @@ const COLLECTION_PARTS: Array<[PagedPart, ConvertedCollection, WorkspaceCollecti
   ["transactions", "transactions", "transactions"],
   ["aiRules", "aiRules", "rules"],
   ["aiDecisions", "aiDecisions", "decisions"],
+  ["aiDecisionReviews", "aiDecisionReviews", "decisionReviews"],
   ["notifications", "notifications", "notifications"],
   ["notificationDeliveries", "notificationDeliveries", "notificationDeliveries"],
   ["automationTasks", "automationTasks", "automationTasks"],
@@ -794,6 +797,10 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
 
   async updateAISettings(settings: AIAgentSettings): Promise<void> {
     await this.commit(planUpdateAISettings(this.context(), settings).writes);
+  }
+
+  async reviewDecision(decisionId: ID, input: DecisionReviewInput): Promise<void> {
+    await this.commit(planReviewDecision(this.context(), decisionId, input).writes);
   }
 
   /**

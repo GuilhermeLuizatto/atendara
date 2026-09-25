@@ -29,6 +29,7 @@ organizations/{orgId}
 ├── transactions/{transactionId}         financeiro
 ├── aiRules/{ruleId}                     apenas os niveis editaveis
 ├── aiDecisions/{decisionId}             append-only
+├── aiDecisionReviews/{decisionId}       revisao humana da classificacao (OWNER e ADMIN)
 ├── notifications/{notificationId}       alertas DENTRO do painel
 ├── notificationDeliveries/{deliveryId}  fila de saida dos avisos ao cliente (so backend escreve)
 ├── automationTasks/{taskId}             fila de automacao (painel autorizado le; so backend escreve)
@@ -113,6 +114,7 @@ backend grava na fila e o que a tela le.
 | `transactions`  | + `dueDate`, `paidAt`                                      |
 | `aiRules`       | + `lastAppliedAt`                                          |
 | `aiDecisions`   | + `decidedAt`, `evaluatedAt`                               |
+| `aiDecisionReviews` | so `createdAt`, `updatedAt`                          |
 | `notifications` | + `acknowledgedAt`                                         |
 | `notificationDeliveries` | + `scheduledFor`, `lastAttemptAt`, `nextAttemptAt`, `sentAt`, `cancelledAt` |
 | `automationTasks` | + `scheduledFor`, `expiresAt`, `appointmentStartsAt`, `dispatchingSince`, `completedAt` |
@@ -190,6 +192,7 @@ Definidas em [`src/services/firestore/queries.ts`](../src/services/firestore/que
 | `transactions`  | `dueDate` desc         | 500  |
 | `aiRules`       | `priority` desc        | 200  |
 | `aiDecisions`   | `decidedAt` desc       | 200  |
+| `aiDecisionReviews` | `updatedAt` desc   | 200  |
 | `notifications` | `createdAt` desc       | 100  |
 | `notificationDeliveries` | `scheduledFor` desc | 200 |
 | `auditLogs`     | `occurredAt` desc      | 200  |
@@ -459,7 +462,8 @@ O destino de cada colecao esta em `PERSONAL_DATA_MAP`
   `clientId`, fica o mesmo pseudonimo `titular-removido-{aleatorio}` em todos os
   documentos. A busca parte do `clientId` e segue os ids derivados
   (`resource.id`, `target.id`, `aiDecisionId`), porque o resumo da trilha e o
-  titulo do alerta sao montados com o nome.
+  titulo do alerta sao montados com o nome. `aiDecisionReviews` fica como
+  esta: guarda so o veredito, a classificacao esperada e ids da equipe.
 - **Exclusao da organizacao.** Colecoes operacionais, membros e perfis sao
   apagados, inclusive subcolecoes. `aiDecisions`, `auditLogs` e
   `privacyRequests` sao pseudonimizados e ganham `expiresAt` provisorio.

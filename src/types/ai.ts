@@ -69,6 +69,32 @@ export interface AIDecision extends TenantScopedEntity {
   privacyRedaction?: PrivacyRedactionMark | null;
 }
 
+export type ClassifierStatus = NonNullable<AIDecision["classifier"]>["status"];
+
+/** `NOT_RECORDED`: decisao anterior ao registro do classificador. */
+export type ClassifierUsageStatus = ClassifierStatus | "NOT_RECORDED";
+
+export const DECISION_REVIEW_VERDICTS = ["CORRECT", "INCORRECT"] as const;
+
+export type DecisionReviewVerdict = (typeof DECISION_REVIEW_VERDICTS)[number];
+
+/**
+ * Revisao humana da classificacao de uma decisao. E a unica referencia de
+ * acerto que o painel tem: sem ela, "acerto" seria a confianca do proprio
+ * classificador.
+ *
+ * Mora fora de `aiDecisions` porque aquela colecao e append-only (regra 6) —
+ * revisar nao reescreve o registro. O id e o da decisao: uma revisao por
+ * decisao, e corrigir a revisao substitui a anterior, com trilha em
+ * `auditLogs`. Nao guarda texto: so ids e enums.
+ */
+export interface AIDecisionReview extends TenantScopedEntity {
+  decisionId: ID;
+  verdict: DecisionReviewVerdict;
+  /** Classificacao que deveria ter saido. `null` quando o veredito e `CORRECT`. */
+  expectedClassification: MessageClassificationId | null;
+}
+
 /** Entrada do motor de decisao. Nao contem nada especifico de profissao. */
 export interface DecisionContext {
   organizationId: ID;

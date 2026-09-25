@@ -311,6 +311,17 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     onClientErasure: { action: "PSEUDONYMIZE", fields: DECISION_CONTENT },
     onOrganizationDeletion: { action: "PSEUDONYMIZE", fields: DECISION_CONTENT },
   },
+  // Revisao da classificacao (Fase 4). So ids e enums: o que a pessoa escreveu
+  // fica na decisao, que e quem responde ao pedido do titular.
+  aiDecisionReviews: {
+    personalFields: ["createdBy", "updatedBy"],
+    retention: { kind: "CONFIGURED_NOT_ENFORCED", setting: "auditRetentionDays" },
+    onClientErasure: {
+      action: "KEEP",
+      why: "Guarda só o veredito e a classificação esperada, sem texto da pessoa atendida. Os ids são de quem revisou, da equipe.",
+    },
+    onOrganizationDeletion: DELETE,
+  },
   notifications: {
     personalFields: ["title", "body"],
     retention: WHILE_ORGANIZATION,

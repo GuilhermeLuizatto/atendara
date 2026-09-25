@@ -5,11 +5,17 @@ import { Card } from "@/components/ui/card";
 import { Field, Select } from "@/components/ui/form";
 import { LoadMore } from "@/components/ui/load-more";
 import { classificationMeta } from "@/config/classifications";
-import { summarizeDecisions } from "@/lib/ai/analytics";
+import {
+  summarizeClassifier,
+  summarizeDecisions,
+  summarizeReplyDeliveries,
+  summarizeReviews,
+} from "@/lib/ai/analytics";
 import { useNow } from "@/lib/utils/use-now";
 import { useWorkspace } from "@/providers/workspace-provider";
 import { useWorkspaceActions } from "@/providers/use-workspace-actions";
 import type { MessageClassificationId } from "@/types";
+import { ClassifierUsage, ReplyDeliveries, ReviewAccuracy } from "./indicator-sections";
 
 export function AnalyticsPanel() {
   const { data, repository, loadState } = useWorkspace();
@@ -27,12 +33,22 @@ export function AnalyticsPanel() {
         </p>
       </Card>
     );
-  const stats = summarizeDecisions(data.decisions, {
+  const filter = {
     organizationId: data.organization.id,
     from: new Date(now.getTime() - days * 86400000),
     until: now,
     professionalId,
-  });
+  };
+  const stats = summarizeDecisions(data.decisions, filter);
+  const failed = (collection: "decisionReviews" | "notificationDeliveries") =>
+    loadState.status === "ready" && loadState.failed.includes(collection);
+  const deliveries = (
+    <ReplyDeliveries
+      stats={summarizeReplyDeliveries(data.notificationDeliveries, filter)}
+      failed={failed("notificationDeliveries")}
+      partial={data.pagination?.notificationDeliveries?.hasMore ?? false}
+    />
+  );
   const percent = (value: number | null) =>
     value === null ? "—" : `${Math.round(value * 100)}%`;
   return (
@@ -42,8 +58,8 @@ export function AnalyticsPanel() {
         <p className="text-muted-foreground text-sm">
           {repository?.mode === "memory" ? "Dados de demonstração. " : ""}
           Resultados calculados sobre as decisões carregadas, por data de
-          registro. Resposta automática é uma decisão do motor; não comprova
-          entrega ao cliente.
+          registro. Resposta automática é uma decisão do motor; a entrega ao
+          cliente aparece em separado, no fim desta aba.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Período">
@@ -89,9 +105,12 @@ export function AnalyticsPanel() {
         />
       </Card>
       {!stats.total ? (
-        <Card className="p-5">
-          <p>Nenhuma decisão neste período e filtro.</p>
-        </Card>
+        <>
+          <Card className="p-5">
+            <p>Nenhuma decisão neste período e filtro.</p>
+          </Card>
+          {deliveries}
+        </>
       ) : (
         <>
           <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -155,6 +174,14 @@ export function AnalyticsPanel() {
               ))}
             </Card>
           </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ReviewAccuracy
+              stats={summarizeReviews(data.decisions, data.decisionReviews ?? [], filter)}
+              failed={failed("decisionReviews")}
+            />
+            <ClassifierUsage stats={summarizeClassifier(data.decisions, filter)} />
+          </div>
+          {deliveries}
         </>
       )}
     </div>

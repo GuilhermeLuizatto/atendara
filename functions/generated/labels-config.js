@@ -161,6 +161,19 @@ export const AI_ACTION_LABELS = {
     NO_ACTION: "Sem ação",
     BLOCKED: "Bloqueado",
 };
+/** Quem classificou cada decisao, na linguagem de `functions/gemini.js`. */
+export const CLASSIFIER_STATUS_LABELS = {
+    SUCCEEDED: "Classificadas pelo Gemini",
+    LOCAL_GUARD: "Resolvidas pelas regras locais, sem chamar o Gemini",
+    DISABLED: "Gemini desligado para esta organização",
+    LIMITED: "Limite de uso do Gemini atingido",
+    UNAVAILABLE: "Gemini sem resposta válida",
+    NOT_RECORDED: "Sem registro do classificador",
+};
+export const DECISION_REVIEW_LABELS = {
+    CORRECT: "Classificação correta",
+    INCORRECT: "Classificação errada",
+};
 export const NOTIFICATION_TYPE_LABELS = {
     POSSIBLE_RISK_DETECTED: "Possível risco",
     NEW_MESSAGE: "Nova mensagem",

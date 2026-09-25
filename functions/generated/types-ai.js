@@ -1,2 +1,2 @@
 // Gerado por scripts/build-functions.mjs.
-export {};
+export const DECISION_REVIEW_VERDICTS = ["CORRECT", "INCORRECT"];

@@ -21,6 +21,7 @@ import type { AIRule } from "@/types";
 import { RuleForm } from "./rule-form";
 import { Simulator } from "./simulator";
 import { DecisionDetails } from "./decision-details";
+import { DecisionReview } from "./decision-review";
 import { AgentSettings } from "./agent-settings";
 import { AnalyticsPanel } from "./analytics-panel";
 
@@ -208,6 +209,9 @@ function AgentWorkspace() {
                 </summary>
                 <div className="mt-4">
                   <DecisionDetails decision={decision} />
+                  <div className="mt-4">
+                    <DecisionReview decision={decision} />
+                  </div>
                   <p className="text-muted-foreground mt-2 text-xs">
                     Organização: {decision.organizationId} · Decisão:{" "}
                     {decision.id}

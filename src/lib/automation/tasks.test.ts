@@ -178,7 +178,7 @@ describe("fila", () => {
 
   it("o ponteiro so leva organizacao, tarefa e tentativa", () => {
     const task = reminder();
-    expect(dispatchPayloadFor(task)).toEqual({ version: 1, organizationId: task.organizationId, taskId: task.id, attempt: 1 });
+    expect(dispatchPayloadFor(task)).toEqual({ version: 2, organizationId: task.organizationId, taskId: task.id, attempt: 1 });
   });
 
   it("execucao em andamento vale ate o prazo e depois e dada como interrompida", () => {

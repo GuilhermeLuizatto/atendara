@@ -1,4 +1,4 @@
-import { AUTOMATION_CONTRACT_VERSION } from "@/config/automation";
+import { AUTOMATION_ACCEPTED_CONTRACT_VERSIONS, AUTOMATION_CONTRACT_VERSION } from "@/config/automation";
 import type { SendRequest } from "@/lib/notifications/providers/types";
 import type {
   AutomationTask,
@@ -69,9 +69,26 @@ export interface BridgeTaskPayload {
     parameters: string[];
     buttons: readonly string[];
   };
+  /**
+   * Versao 2: o que o n8n monta para a Meta. `TEMPLATE` usa `template`;
+   * `TEXT` manda `body` como texto, e so vale dentro da janela de 24 horas —
+   * quem confere a janela e o Atendara, antes de despachar. Ausente nos canais
+   * que so conhecem texto.
+   */
+  messageType?: BridgeMessageType;
 }
 
+export const BRIDGE_MESSAGE_TYPES = ["TEMPLATE", "TEXT"] as const;
+
+export type BridgeMessageType = (typeof BRIDGE_MESSAGE_TYPES)[number];
+
 export function bridgeTaskPayload(request: SendRequest): BridgeTaskPayload {
+  // Modelo e texto livre ao mesmo tempo e erro de quem montou o pedido: qual dos
+  // dois a Meta receberia dependeria de um detalhe do fluxo do n8n.
+  if (request.freeText && request.template) {
+    throw new Error("Envio com modelo e texto livre ao mesmo tempo.");
+  }
+  const messageType: BridgeMessageType | null = request.template ? "TEMPLATE" : request.freeText ? "TEXT" : null;
   return {
     version: BRIDGE_CONTRACT_VERSION,
     taskId: request.taskId,
@@ -94,6 +111,7 @@ export function bridgeTaskPayload(request: SendRequest): BridgeTaskPayload {
           },
         }
       : {}),
+    ...(messageType ? { messageType } : {}),
   };
 }
 
@@ -152,7 +170,10 @@ export function parseCallbackPayload(data: unknown): BridgeCallbackPayload | nul
   const organizationId = text(raw.organizationId, 128);
   const outcome = OUTCOMES.find((value) => value === raw.outcome) ?? null;
   const attempt = typeof raw.attempt === "number" && Number.isInteger(raw.attempt) && raw.attempt >= 1 && raw.attempt <= 10 ? raw.attempt : null;
-  if (raw.version !== BRIDGE_CONTRACT_VERSION || !taskId || !organizationId || !outcome || attempt === null) return null;
+  // Retorno de tarefa despachada antes da publicacao chega com a versao antiga.
+  const version =
+    typeof raw.version === "number" && AUTOMATION_ACCEPTED_CONTRACT_VERSIONS.includes(raw.version) ? raw.version : null;
+  if (version === null || !taskId || !organizationId || !outcome || attempt === null) return null;
 
   const progress = BRIDGE_PROGRESS_STATES.find((value) => value === raw.progress) ?? null;
   if (raw.progress != null && progress === null) return null;
@@ -174,7 +195,7 @@ export function parseCallbackPayload(data: unknown): BridgeCallbackPayload | nul
   if (outcome !== "ACCEPTED" && failureCode === null) return null;
 
   return {
-    version: BRIDGE_CONTRACT_VERSION,
+    version,
     taskId,
     organizationId,
     attempt,

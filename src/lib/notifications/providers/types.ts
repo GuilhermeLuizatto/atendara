@@ -27,6 +27,12 @@ export interface SendRequest {
    * simulado ignora; a ponte manda ao n8n, que chama a Meta com ele.
    */
   template?: WhatsappMessage | null;
+  /**
+   * Resposta na conversa: `body` sai como texto, dentro da janela de 24 horas
+   * que a propria pessoa abriu. Nunca junto de `template` — um envio e uma
+   * coisa ou outra, e a ponte recusa os dois ao mesmo tempo.
+   */
+  freeText?: boolean;
 }
 
 export interface SendResult {

@@ -28,7 +28,7 @@ import {
   transitionTask,
 } from "./generated/automation.js";
 import {
-  AUTOMATION_CONTRACT_VERSION,
+  AUTOMATION_ACCEPTED_CONTRACT_VERSIONS,
   DISPATCHER_QUEUE_RETRY,
   DISPATCHER_TIMEOUT_SECONDS,
   PLANNING_EVENT_MAX_AGE_MINUTES,
@@ -74,7 +74,8 @@ const db = () => getFirestore();
 
 const payloadSchema = z
   .object({
-    version: z.literal(AUTOMATION_CONTRACT_VERSION),
+    // Ponteiro agendado antes da publicacao chega com a versao antiga.
+    version: z.number().int().refine((version) => AUTOMATION_ACCEPTED_CONTRACT_VERSIONS.includes(version)),
     organizationId: z.string().min(1).max(128),
     taskId: z.string().min(1).max(700),
     attempt: z.number().int().min(1).max(10),

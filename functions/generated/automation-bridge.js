@@ -1,5 +1,5 @@
 // Gerado por scripts/build-functions.mjs.
-import { AUTOMATION_CONTRACT_VERSION } from "./automation-config.js";
+import { AUTOMATION_ACCEPTED_CONTRACT_VERSIONS, AUTOMATION_CONTRACT_VERSION } from "./automation-config.js";
 import { DELIVERY_FAILURE_CODES } from "./types.js";
 import { isTaskExpired, isTerminalStatus } from "./automation-tasks.js";
 /**
@@ -23,7 +23,14 @@ export const BRIDGE_TIMESTAMP_HEADER = "x-atendara-timestamp";
 export const BRIDGE_SIGNATURE_HEADER = "x-atendara-signature";
 /** Janela de validade da assinatura, nos dois sentidos (secao 3 do plano). */
 export const BRIDGE_SIGNATURE_WINDOW_SECONDS = 300;
+export const BRIDGE_MESSAGE_TYPES = ["TEMPLATE", "TEXT"];
 export function bridgeTaskPayload(request) {
+    // Modelo e texto livre ao mesmo tempo e erro de quem montou o pedido: qual dos
+    // dois a Meta receberia dependeria de um detalhe do fluxo do n8n.
+    if (request.freeText && request.template) {
+        throw new Error("Envio com modelo e texto livre ao mesmo tempo.");
+    }
+    const messageType = request.template ? "TEMPLATE" : request.freeText ? "TEXT" : null;
     return {
         version: BRIDGE_CONTRACT_VERSION,
         taskId: request.taskId,
@@ -46,6 +53,7 @@ export function bridgeTaskPayload(request) {
                 },
             }
             : {}),
+        ...(messageType ? { messageType } : {}),
     };
 }
 /**
@@ -84,7 +92,9 @@ export function parseCallbackPayload(data) {
     const organizationId = text(raw.organizationId, 128);
     const outcome = OUTCOMES.find((value) => value === raw.outcome) ?? null;
     const attempt = typeof raw.attempt === "number" && Number.isInteger(raw.attempt) && raw.attempt >= 1 && raw.attempt <= 10 ? raw.attempt : null;
-    if (raw.version !== BRIDGE_CONTRACT_VERSION || !taskId || !organizationId || !outcome || attempt === null)
+    // Retorno de tarefa despachada antes da publicacao chega com a versao antiga.
+    const version = typeof raw.version === "number" && AUTOMATION_ACCEPTED_CONTRACT_VERSIONS.includes(raw.version) ? raw.version : null;
+    if (version === null || !taskId || !organizationId || !outcome || attempt === null)
         return null;
     const progress = BRIDGE_PROGRESS_STATES.find((value) => value === raw.progress) ?? null;
     if (raw.progress != null && progress === null)
@@ -108,7 +118,7 @@ export function parseCallbackPayload(data) {
     if (outcome !== "ACCEPTED" && failureCode === null)
         return null;
     return {
-        version: BRIDGE_CONTRACT_VERSION,
+        version,
         taskId,
         organizationId,
         attempt,

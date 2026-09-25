@@ -38,7 +38,7 @@ describe("fiacao da fila de automacao", () => {
   });
 
   it("ponteiro fora do contrato e descartado sem ler o banco", async () => {
-    for (const payload of [null, {}, { version: 2, organizationId: "org", taskId: "t", attempt: 1 }, { version: 1, organizationId: "org", taskId: "t", attempt: 1, destination: "+55" }]) {
+    for (const payload of [null, {}, { version: 3, organizationId: "org", taskId: "t", attempt: 1 }, { version: 1, organizationId: "org", taskId: "t", attempt: 1, destination: "+55" }]) {
       expect(await runAutomationTask(payload)).toEqual({ outcome: "INVALID_PAYLOAD" });
     }
     expect(mock.getFirestore).not.toHaveBeenCalled();

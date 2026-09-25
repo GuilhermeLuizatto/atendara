@@ -73,6 +73,10 @@ export const DELIVERY_FAILURE_CODES = [
     // Agenda Google (3C): a autorizacao caiu, ou a agenda "Atendara" nao existe.
     "CALENDAR_RECONNECT_REQUIRED",
     "CALENDAR_NOT_PROVISIONED",
+    // Resposta na conversa recusada pela Meta porque passaram as 24 horas desde a
+    // ultima mensagem da pessoa (codigo 131047). Nao e destino invalido: o mesmo
+    // numero volta a receber assim que a pessoa escrever de novo.
+    "OUTSIDE_REPLY_WINDOW",
 ];
 /** Por que um evento da agenda nao produziu envio. */
 export const NOTIFICATION_SKIP_REASONS = [

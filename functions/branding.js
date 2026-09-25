@@ -10,6 +10,7 @@ import { consumeRateLimit } from "./rate-limit.js";
 import { tenantActor, tenantAudit } from "./tenant-auth.js";
 
 const OPTIONS = { ...ACCOUNT_CALL_OPTIONS, ...runAs("contas") };
+const FIREBASE_STORAGE_HOST = "firebasestorage.googleapis.com";
 const db = () => getFirestore();
 const schema = z.object({
   logoUrl: z.url().max(2_000).nullable(),
@@ -26,7 +27,7 @@ export const updateOrganizationBranding = onCall(OPTIONS, async (request) => {
     if (!input.logoUrl || !input.logoStoragePath || !input.logoContentType) throw new HttpsError("invalid-argument", "O logo está incompleto.");
     if (!input.logoStoragePath.startsWith(`branding/${actor.organizationId}/`)) throw new HttpsError("invalid-argument", "O arquivo não pertence a esta organização.");
     const parsed = new URL(input.logoUrl);
-    if (parsed.protocol !== "https:" || !parsed.hostname.endsWith("googleapis.com")) throw new HttpsError("invalid-argument", "O endereço do logo não é aceito.");
+    if (parsed.protocol !== "https:" || parsed.hostname !== FIREBASE_STORAGE_HOST) throw new HttpsError("invalid-argument", "O endereço do logo não é aceito.");
   }
   const updatedAt = new Date().toISOString();
   const branding = { ...input, updatedAt };

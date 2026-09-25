@@ -20,6 +20,7 @@ export * from "./types-organization.js";
 export * from "./types-pagination.js";
 export * from "./platform-types.js";
 export * from "./privacy-types.js";
+export * from "./types-product.js";
 export * from "./profession.js";
 export * from "./types-professional.js";
 export * from "./types-rules.js";

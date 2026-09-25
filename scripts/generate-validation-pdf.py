@@ -20,8 +20,6 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
-    ListFlowable,
-    ListItem,
     PageBreak,
     Paragraph,
     SimpleDocTemplate,
@@ -91,7 +89,7 @@ def styles():
             textColor=colors.HexColor("#3B2373"),
             spaceBefore=6 * mm,
             spaceAfter=3 * mm,
-            keepWithNext=True,
+            keepWithNext=False,
         )
     )
     base.add(
@@ -103,7 +101,7 @@ def styles():
             textColor=colors.HexColor("#5A3A98"),
             spaceBefore=4 * mm,
             spaceAfter=2 * mm,
-            keepWithNext=True,
+            keepWithNext=False,
         )
     )
     base.add(
@@ -124,6 +122,18 @@ def styles():
             fontSize=8,
             leading=11,
             textColor=colors.HexColor("#625B6E"),
+        )
+    )
+    base.add(
+        ParagraphStyle(
+            "ListCustom",
+            parent=base["BodyCustom"],
+            leftIndent=7 * mm,
+            firstLineIndent=0,
+            bulletIndent=0,
+            bulletFontName=FONT,
+            bulletFontSize=8,
+            spaceAfter=1.5 * mm,
         )
     )
     return base
@@ -212,23 +222,12 @@ def parse_markdown(text: str):
                     match = re.match(r"- (.+)", candidate)
                 if not match:
                     break
-                items.append(
-                    ListItem(
-                        Paragraph(inline_markup(match.group(1)), style_sheet["BodyCustom"]),
-                        leftIndent=5 * mm,
-                    )
-                )
+                items.append(match.group(1))
                 index += 1
-            list_options = {
-                "bulletType": "1" if ordered else "bullet",
-                "leftIndent": 7 * mm,
-                "bulletFontName": FONT,
-                "bulletFontSize": 8,
-                "spaceAfter": 2 * mm,
-            }
-            if ordered:
-                list_options["start"] = "1"
-            story.append(ListFlowable(items, **list_options))
+            for item_number, item in enumerate(items, start=1):
+                bullet = f"{item_number}." if ordered else "•"
+                story.append(Paragraph(inline_markup(item), style_sheet["ListCustom"], bulletText=bullet))
+            story.append(Spacer(1, 2 * mm))
             continue
 
         paragraph = stripped

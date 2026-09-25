@@ -215,8 +215,26 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     onClientErasure: NOT_APPLICABLE,
     onOrganizationDeletion: DELETE,
   },
+  memberRequests: {
+    personalFields: ["requestedBy", "displayName", "email", "decidedBy", "decisionReason"],
+    retention: WHILE_ORGANIZATION,
+    onClientErasure: NOT_APPLICABLE,
+    onOrganizationDeletion: DELETE,
+  },
+  memberInvitations: {
+    personalFields: ["email", "displayName", "invitedBy", "tokenHash"],
+    retention: WHILE_ORGANIZATION,
+    onClientErasure: NOT_APPLICABLE,
+    onOrganizationDeletion: DELETE,
+  },
+  importMappings: {
+    personalFields: ["createdBy", "updatedBy"],
+    retention: WHILE_ORGANIZATION,
+    onClientErasure: NOT_APPLICABLE,
+    onOrganizationDeletion: DELETE,
+  },
   professionals: {
-    personalFields: ["displayName", "email", "phone", "licenseNumber", "avatarUrl"],
+    personalFields: ["displayName", "email", "phone", "licenseNumber", "specialties", "avatarUrl"],
     retention: WHILE_ORGANIZATION,
     onClientErasure: NOT_APPLICABLE,
     onOrganizationDeletion: DELETE,
@@ -510,6 +528,28 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     onOrganizationDeletion: {
       action: "KEEP",
       why: "Trilha append-only dos atos de plataforma, inclusive da própria exclusão. Guarda ids, nunca nome ou e-mail.",
+    },
+  },
+  platformSupportTickets: {
+    personalFields: [
+      "openedBy",
+      "openedByName",
+      "openedByEmail",
+      "subject",
+      "messages.authorId",
+      "messages.authorName",
+      "messages.body",
+      "messages.attachments",
+    ],
+    retention: { kind: "UNDEFINED" },
+    onClientErasure: NOT_APPLICABLE,
+    onOrganizationDeletion: {
+      action: "PSEUDONYMIZE",
+      fields: {
+        openedByName: "REDACTED_NAME",
+        openedByEmail: "MASKED_CONTACT",
+        subject: "REDACTED_TEXT",
+      },
     },
   },
   platformRateLimits: {

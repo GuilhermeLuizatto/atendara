@@ -13,6 +13,8 @@ export type NavIconName =
   | "messages"
   | "finance"
   | "agent"
+  | "upload"
+  | "support"
   | "settings";
 
 /**
@@ -26,6 +28,9 @@ export type AppRoute =
   | "/mensagens"
   | "/financeiro"
   | "/agente"
+  | "/equipe"
+  | "/importacao"
+  | "/suporte"
   | "/configuracoes";
 
 export interface NavItem {
@@ -92,6 +97,27 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Configurações",
     permission: "organization:read",
     description: "Profissão, equipe e privacidade",
+  },
+  {
+    href: "/equipe",
+    icon: "users",
+    label: "Equipe",
+    permission: "member:read",
+    description: "Convites, vínculos e acessos",
+  },
+  {
+    href: "/importacao",
+    icon: "upload",
+    label: "Importação",
+    permission: "import:manage",
+    description: "Trazer dados administrativos",
+  },
+  {
+    href: "/suporte",
+    icon: "support",
+    label: "Suporte",
+    permission: "support:read",
+    description: "Chamados e acompanhamento",
   },
 ];
 

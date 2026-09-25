@@ -43,6 +43,9 @@ export type PrivacyRequestChannel = (typeof PRIVACY_REQUEST_CHANNELS)[number];
  */
 export const ORGANIZATION_EXPORT_SECTIONS = [
   "members",
+  "memberRequests",
+  "memberInvitations",
+  "importMappings",
   "professionals",
   "clients",
   "appointments",

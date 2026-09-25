@@ -4,6 +4,8 @@ import {
   LayoutDashboard,
   MessageSquare,
   Settings,
+  Headphones,
+  Upload,
   Users,
   Wallet,
   type LucideIcon,
@@ -22,6 +24,8 @@ const ICONS: Record<NavIconName, LucideIcon> = {
   messages: MessageSquare,
   finance: Wallet,
   agent: Bot,
+  upload: Upload,
+  support: Headphones,
   settings: Settings,
 };
 

@@ -105,6 +105,9 @@ try {
       await setDoc(doc(db, paths.document(org, "calendarBusyBlocks", "a")), { organizationId: org, professionalId: "a", blocks: [] });
       await setDoc(doc(db, paths.document(org, "rescheduleRequests", "conversa")), { organizationId: org, clientId: "example", appointmentId: "example", status: "OFFERED" });
       await setDoc(doc(db, paths.document(org, "messagingSenders", "WHATSAPP")), { organizationId: org, channel: "WHATSAPP", providerId: "N8N_BRIDGE", providerSenderId: "123", displayNumber: "+5513999990000", displayName: "Clinica", status: "APPROVED", mode: "TEST", testRecipients: ["+5513999990000"] });
+      await setDoc(doc(db, paths.document(org, "memberRequests", "example")), { organizationId: org });
+      await setDoc(doc(db, paths.document(org, "memberInvitations", "example")), { organizationId: org });
+      await setDoc(doc(db, paths.document(org, "importMappings", "example")), { organizationId: org });
     }
     await setDoc(doc(db, paths.initialPassword("a")), { hash: "test-only" });
     await setDoc(doc(db, paths.document("org-a", "clients", "consentido")), { organizationId: "org-a", fullName: "Alex Ficticio", notificationConsent: recordConsent({ EMAIL: [SEEDED_EMAIL], SMS: [SEEDED_SMS] }) });
@@ -125,6 +128,7 @@ try {
     await setDoc(doc(db, paths.platformCustomer("cus_1")), { customerId: "cus_1", organizationId: "org-a", subscriberUserId: "a" });
     await setDoc(doc(db, paths.platformAuditLog("log-1")), { id: "log-1", action: "ACCESS_GRANTED", actorId: "admin", organizationId: "org-a", createdAt: new Date().toISOString() });
     await setDoc(doc(db, paths.platformRateLimit("createSubscriptionCheckout_a")), { count: 1, windowStartMs: Date.now() });
+    await setDoc(doc(db, paths.platformSupportTicket("example")), { organizationId: "org-a" });
   });
   const db = uid => tag(environment.authenticatedContext(uid).firestore(), uid === "admin" ? "operadora-sem-fator" : "tenant");
   const withTotp = uid => tag(environment.authenticatedContext(uid, TOTP).firestore(), uid === "admin" ? "operadora" : "tenant");
@@ -141,6 +145,12 @@ try {
   await denied(getDoc(doc(db("a"), paths.document("org-b", "clients", "example"))));
   await denied(updateDoc(doc(db("a"), paths.account("a")), { platformRole: "PLATFORM_ADMIN" }));
   await denied(setDoc(doc(db("a"), paths.document("org-a", "members", "forged")), { role: "OWNER", status: "ACTIVE" }));
+  for (const name of ["memberRequests", "memberInvitations", "importMappings"]) {
+    await denied(getDoc(doc(db("a"), own(name))));
+    await denied(getDoc(doc(withTotp("admin"), own(name))));
+  }
+  await denied(getDoc(doc(db("a"), paths.platformSupportTicket("example"))));
+  await denied(getDoc(doc(withTotp("admin"), paths.platformSupportTicket("example"))));
   for (const uid of ["initial", "suspended", "expired", "wrongProfession"]) await denied(getDoc(doc(db(uid), own("clients"))));
   await allowed(getDoc(doc(db("initial"), paths.account("initial"))));
   await allowed(getDoc(doc(db("restricted"), own("clients"))));
@@ -629,6 +639,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 374);
+  assert.equal(checks, 382);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

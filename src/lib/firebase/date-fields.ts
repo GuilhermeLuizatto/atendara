@@ -21,6 +21,9 @@ export const COLLECTION_DATE_FIELDS = {
   organizations: STAMP_FIELDS,
   professionals: STAMP_FIELDS,
   members: STAMP_FIELDS,
+  memberRequests: STAMP_FIELDS,
+  memberInvitations: [...STAMP_FIELDS, "expiresAt", "acceptedAt"],
+  importMappings: STAMP_FIELDS,
   clients: [...STAMP_FIELDS, "lastAppointmentAt", "nextAppointmentAt"],
   appointments: [
     ...STAMP_FIELDS,
@@ -63,6 +66,8 @@ export const COLLECTION_DATE_FIELDS = {
   ],
   auditLogs: [...STAMP_FIELDS, "occurredAt"],
   privacyRequests: [...STAMP_FIELDS, "executedAt"],
+  platformSupportTickets: [...STAMP_FIELDS, "lastMessageAt"],
+  platformSupportMessages: ["createdAt"],
 } as const;
 
 export type ConvertedCollection = keyof typeof COLLECTION_DATE_FIELDS;

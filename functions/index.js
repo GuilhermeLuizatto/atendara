@@ -167,3 +167,30 @@ export {
   cancelPlatformSubscription,
   stripeWebhook,
 } from "./billing.js";
+
+// Fase 5: equipe, importacao administrativa, suporte dentro do painel e marca
+// da organizacao. O navegador nunca escolhe organizationId: todas resolvem o
+// tenant pela conta autenticada.
+export {
+  listTeam,
+  requestTeamMember,
+  inviteTeamMember,
+  decideTeamRequest,
+  inspectTeamInvitation,
+  acceptTeamInvitation,
+  setTeamMemberStatus,
+  removeTeamMember,
+} from "./team.js";
+export {
+  listImportMappings,
+  saveImportMapping,
+  commitAdministrativeImport,
+} from "./administrative-import.js";
+export {
+  createSupportTicket,
+  listSupportTickets,
+  getSupportThread,
+  replySupportTicket,
+  updateSupportTicket,
+} from "./support.js";
+export { updateOrganizationBranding } from "./branding.js";

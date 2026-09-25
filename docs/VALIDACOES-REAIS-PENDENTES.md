@@ -18,7 +18,7 @@
 | 3B | Bloqueada pela etapa externa da Meta que, na conta atual, exige CNPJ |
 | 3C | Pendente repetir em produção o roteiro final das três frentes e concluir a verificação do app no Google |
 | 4 | Pendente a autorização e a validação controlada antes de liberar Gemini para uma organização real |
-| 5 | Ainda não executável; os fluxos precisam ser concluídos e quatro decisões do titular estão abertas |
+| 5 | Código concluído na branch; roteiro real pendente depois da integração e publicação |
 
 ## Fase 3B — WhatsApp e n8n
 
@@ -138,54 +138,86 @@ O Gemini está ativo somente para organizações de teste em allowlist. Antes de
 
 **Evidência esperada:** autorização registrada, organização escolhida e resultado agregado do roteiro, sem copiar mensagens reais para este documento.
 
-## Fase 5 — validações reais previstas
+## Fase 5 — produto operacional
 
-**Situação geral:** AINDA NÃO EXECUTÁVEL. O suporte público e a cobrança em modo de teste já existem. Gestão de equipe pelo assinante e importação administrativa ainda não estão concluídas; a cobrança real está bloqueada deliberadamente no código e os Termos ainda descrevem piloto gratuito.
+**Situação geral:** PRONTA NO CÓDIGO DA BRANCH. Equipe, importação, chamados, anexos, identidade visual e a política de três tentativas foram implementados e cobertos pelos testes que não dependem do titular. O roteiro abaixo passa a ser executável depois do merge e da publicação das Functions, regras, índices, Storage e interface. O catálogo e os preços dos planos continuam deliberadamente em espera; cobrança real permanece bloqueada.
 
-As validações abaixo só serão marcadas como prontas para execução depois que os respectivos fluxos estiverem implementados e testados automaticamente.
+Usar somente contas e dados fictícios. Não anexar dado de cliente, segredo, senha ou código de segundo fator às evidências.
 
-### 5.1 — Equipe
+### 5.1 — Convites e equipe
 
-- convidar uma segunda conta de teste usando um e-mail real controlado pelo titular;
-- aceitar o convite, entrar e concluir o primeiro acesso;
-- conferir na prática cada papel que o titular decidir disponibilizar;
-- suspender, reativar e remover a conta, confirmando o efeito sobre uma sessão já aberta;
-- confirmar que a conta nunca alcança outro tenant nem funções acima do papel concedido.
+**Situação:** PENDENTE, depende de contas de e-mail reais controladas pelo titular.
+
+1. Convidar, um de cada vez, ADMIN, PROFESSIONAL, ASSISTANT e VIEWER e confirmar que o Amazon SES entrega o e-mail automaticamente.
+2. Abrir o link, confirmar que ele identifica o e-mail convidado e criar a própria senha; para PROFESSIONAL, preencher profissão, registro e especialidades.
+3. Reenviar um convite e confirmar que somente o link mais recente funciona; repetir depois de sete dias com um convite próprio para confirmar a expiração.
+4. Confirmar que OWNER não pode ser transferido, convidado, suspenso nem removido; ADMIN não pode criar ou gerir outro ADMIN.
+5. Como PROFESSIONAL, solicitar a inclusão de um funcionário; confirmar que o e-mail só sai depois da aprovação por titular, OWNER ou ADMIN.
+6. Ligar ASSISTANT, VIEWER e PROFESSIONAL a mais de um profissional e confirmar os vínculos; confirmar que ADMIN permanece organizacional.
+7. Suspender e reativar uma conta, incluindo uma sessão que já estava aberta.
+8. Remover uma conta e confirmar que o acesso não volta, enquanto o histórico necessário permanece pseudonimizado.
+9. Tentar reutilizar um e-mail que já possui conta e confirmar que ele não entra em outra organização.
+
+**Evidência esperada:** capturas do convite, primeiro acesso, lista da equipe e negações, com e-mails mascarados.
 
 ### 5.2 — Importação administrativa
 
-- entregar um arquivo de exemplo no formato e no escopo que ainda serão definidos pelo titular;
-- conferir a prévia, erros por linha, duplicidades e totais antes de confirmar;
-- validar uma importação real controlada e a forma de desfazer ou corrigir o resultado definida para o produto;
-- confirmar que nenhuma linha entra em outro tenant.
+**Situação:** PENDENTE, depende de arquivos reais de teste preparados pelo titular.
 
-### 5.3 — Suporte
+Preparar CSV e XLSX fictícios para profissionais, clientes, atendimentos e financeiro. Em cada tipo:
 
-- enviar uma solicitação de teste para `suporte@atendara.app`;
-- confirmar recebimento, identificação segura da conta e resposta dentro da promessa publicada de até 2 dias úteis;
-- confirmar que o atendimento não solicita senha, segundo fator nem dado de saúde.
+- testar o modelo oficial e um arquivo vindo de outro sistema, mapeando as colunas;
+- salvar um modelo de mapeamento, recarregar e reutilizá-lo;
+- revisar a prévia e desfazer antes de confirmar, comprovando que nada foi gravado;
+- incluir linhas inválidas e referências ausentes, confirmando o bloqueio;
+- incluir duas linhas duplicadas no mesmo arquivo e duplicidades já existentes;
+- decidir linha por linha entre ignorar e atualizar o existente; nunca deve nascer uma terceira cópia;
+- tentar incluir uma coluna clínica e confirmar que o arquivo é recusado;
+- confirmar uma importação válida e conferir integridade, valores em centavos, datas, vínculos e isolamento da organização.
 
-### 5.4 — Planos e cobrança real da plataforma
+A chave de duplicidade deve ser conferida como definida: profissional por e-mail; cliente por e-mail ou telefone; atendimento por cliente, profissional, início e fim; financeiro por tipo, data, valor, cliente e descrição.
 
-- confirmar definitivamente nomes, módulos e preços dos planos antes de retirar a trava de teste;
-- atualizar e aprovar Termos e Política aplicáveis à cobrança antes da primeira contratação;
-- conferir na Stripe que os preços cadastrados são exatamente os mostrados pelo Atendara;
-- realizar uma contratação real de baixo valor autorizada pelo titular;
-- confirmar webhook assinado, liberação de acesso, fatura, portal do cliente e ausência de cobrança duplicada;
-- testar cancelamento no fim do período, falha de pagamento e recuperação;
-- realizar e conferir um reembolso autorizado;
-- confirmar no painel administrativo que valores e estados correspondem à Stripe.
+**Evidência esperada:** arquivos fictícios usados, quantidade de linhas, decisões por duplicidade e capturas antes/depois, sem dados reais.
 
-**Evidência esperada:** identificadores da Stripe sem segredo, valores, horários e capturas com dados pessoais mascarados. Toda movimentação financeira real exige autorização explícita do titular no momento do teste.
+### 5.3 — Chamados no painel
 
-## Decisões abertas que impedem concluir a Fase 5
+**Situação:** PENDENTE, depende da operação real do titular e do Amazon SES.
 
-Estas perguntas não são validações concluídas nem decisões tomadas:
+1. Abrir chamados fictícios em cada categoria e nível de queixa disponível.
+2. Confirmar que o autor vê os próprios chamados, OWNER/ADMIN veem toda a organização e outro membro comum não vê o chamado alheio.
+3. Na área de suporte da plataforma, definir prioridade e situação; confirmar que a prioridade é decisão do suporte e que a fila segue a data de abertura.
+4. Trocar mensagens nos dois lados, anexando uma imagem e um PDF permitidos; tentar tipo proibido e confirmar a recusa.
+5. Confirmar que as notificações chegam por e-mail pelo remetente `guilhermeluizatto@gmail.com`, mas que responder ao e-mail não entra na conversa oficial.
+6. Confirmar que toda resposta oficial fica no painel e que a primeira resposta respeita a promessa publicada de até 2 dias úteis.
+7. Sem conta, confirmar que existe somente o canal público legal, de privacidade e recuperação; suporte operacional deve exigir login.
 
-1. **Equipes:** quais papéis poderão ser convidados pelo assinante e como o convite deve chegar — e-mail automático ou senha inicial entregue manualmente?
-2. **Importação:** qual formato de entrada será aceito, quais entidades entram na primeira versão e como duplicidades devem ser tratadas?
-3. **Suporte:** o canal por e-mail já publicado é suficiente para a Fase 5 ou é necessário um sistema de chamados dentro do painel?
-4. **Planos e cobrança:** os três planos, preços e módulos atuais são definitivos, e a Fase 5 deve preparar o modo real sem ativá-lo ou já autoriza a futura ativação após os testes e documentos legais?
+**Evidência esperada:** ids não secretos dos chamados, horários e capturas com textos fictícios.
+
+### 5.4 — Logo da organização
+
+**Situação:** PENDENTE, depende de uma imagem escolhida pelo titular.
+
+- enviar PNG, JPEG e WebP quadrados de até 2 MB e confirmar o recorte; tentar SVG e arquivo acima do limite;
+- confirmar que o titular pagante, OWNER e ADMIN alteram o logo e os demais papéis não;
+- conferir o logo no identificador lateral e nos e-mails da organização;
+- conferir o fallback com a estrela roxa depois de remover a imagem;
+- quando um documento ou outra área do painel usar a identidade da organização, confirmar que consome o mesmo logo, sem nova cópia divergente.
+
+### 5.5 — Planos, piloto e Stripe
+
+**Situação:** PENDENTE E EM ESPERA POR DECISÃO COMERCIAL. Não ativar cobrança real ainda.
+
+- definir e aprovar o catálogo final: nomes, preços, módulos, limites e quais recursos dependem de cada plano;
+- decidir como os participantes atuais do piloto serão migrados;
+- validar o teste de 14 dias e a disponibilidade de recursos conforme o plano final;
+- confirmar com a Stripe e com a revisão jurídica/fiscal se cartão, Pix e boleto estarão realmente disponíveis;
+- atualizar e aprovar Termos e Política antes da primeira contratação;
+- somente com nova autorização explícita, realizar uma contratação real de baixo valor e conferir webhook assinado, acesso, fatura, portal e idempotência;
+- testar cancelamento no fim do período, recuperação de pagamento e reembolso autorizado;
+- provocar três tentativas de cobrança recusadas em ambiente controlado: a primeira e a segunda mantêm o painel; a terceira fecha o acesso;
+- conferir que o painel administrativo e a Stripe mostram os mesmos estados e valores.
+
+**Evidência esperada:** decisão escrita do catálogo e da migração; nos testes financeiros, identificadores sem segredo, valores, horários e capturas com dados pessoais mascarados. Toda movimentação real exige autorização explícita no momento do teste.
 
 ## Validações já concluídas e removidas da lista pendente
 

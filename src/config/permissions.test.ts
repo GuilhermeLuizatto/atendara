@@ -44,9 +44,9 @@ describe("matriz de permissoes", () => {
     }
   });
 
-  it("mantem o VIEWER estritamente em leitura", () => {
+  it("mantem o VIEWER em leitura, exceto a conversa do proprio suporte", () => {
     for (const permission of permissionsForRole("VIEWER")) {
-      expect(permission.split(":")[1]).toBe("read");
+      expect(permission.split(":")[1] === "read" || permission.startsWith("support:")).toBe(true);
     }
   });
 
@@ -93,6 +93,10 @@ describe("matriz de permissoes", () => {
         "notificationSettings:update",
         "agendaSettings:update",
         "automationSwitch:manage",
+        "member:invite",
+        "member:update",
+        "member:remove",
+        "organizationBranding:update",
         "privacy:export",
         "privacy:erase",
       ]),

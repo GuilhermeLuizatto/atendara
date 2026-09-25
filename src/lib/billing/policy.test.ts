@@ -50,7 +50,9 @@ describe("Politica de acesso a partir da cobranca", () => {
   it("traduz para o portao que as Security Rules leem", () => {
     expect(toAccountSubscriptionStatus("ACTIVE")).toBe("ACTIVE");
     expect(toAccountSubscriptionStatus("TRIALING")).toBe("ACTIVE");
-    expect(toAccountSubscriptionStatus("PAST_DUE")).toBe("PENDING");
+    expect(toAccountSubscriptionStatus("PAST_DUE", 1)).toBe("ACTIVE");
+    expect(toAccountSubscriptionStatus("PAST_DUE", 2)).toBe("ACTIVE");
+    expect(toAccountSubscriptionStatus("PAST_DUE", 3)).toBe("PENDING");
     expect(toAccountSubscriptionStatus("INCOMPLETE")).toBe("PENDING");
     expect(toAccountSubscriptionStatus("CANCELED")).toBe("CANCELLED");
     expect(toAccountSubscriptionStatus("UNPAID")).toBe("CANCELLED");

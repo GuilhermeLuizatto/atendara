@@ -48,8 +48,13 @@ src/
 │   │   ├── financeiro/       Financeiro do NEGOCIO do assinante
 │   │   ├── assinatura/       Mensalidade que o assinante paga a operadora
 │   │   ├── agente/
+│   │   ├── equipe/           Convites, solicitações e vínculos
+│   │   ├── importacao/       Mapeamento, prévia e confirmação administrativa
+│   │   ├── suporte/          Conversa oficial dos chamados autenticados
 │   │   ├── admin/            Cadastros, concessoes, cobranca e trilha da operadora
 │   │   └── configuracoes/
+│   ├── convite/              Aceite do e-mail e criação da senha
+│   ├── contato/              Canal público legal, privacidade e recuperação
 │   ├── login/                Entrar e pedir nova senha
 │   ├── redefinir-senha/      Destino do link de nova senha
 │   ├── layout.tsx            Raiz: fontes, metadata, providers
@@ -67,6 +72,7 @@ src/
 │   ├── labels.ts             Traducao de enums para pt-BR
 │   ├── navigation.ts         Itens de menu e permissao exigida
 │   ├── permissions.ts        Matriz RBAC
+│   ├── product.ts            Contratos de equipe, importação e suporte
 │   ├── system-rules.ts       Regras fundamentais (Nivel 1)
 │   └── professions/          Registry de profissoes
 │
@@ -111,6 +117,9 @@ Colecoes sob `organizations/{organizationId}`:
 | Colecao         | Conteudo                                 |
 | --------------- | ---------------------------------------- |
 | `members`       | Vinculo usuario ↔ organizacao, com papel |
+| `memberRequests` | Solicitação de profissional para incluir funcionário |
+| `memberInvitations` | Convite de sete dias, com token resumido e uso único |
+| `importMappings` | Mapeamentos de colunas salvos pela organização |
 | `professionals` | Perfil de quem atende                    |
 | `clients`       | CRM administrativo                       |
 | `appointments`  | Agenda                                   |
@@ -134,7 +143,8 @@ explicita — as condicoes vivem em `src/lib/notifications/eligibility.ts`.
 Na raiz, alem dessas, vivem as colecoes da **cobranca da plataforma** —
 `platformPlans`, `platformSubscriptions/{organizationId}`, `platformInvoices`,
 `platformGatewayEvents` e `platformCustomers` — e as dos atos da operadora,
-`platformAccessGrants`, `platformAuditLogs` e `platformRateLimits`. Elas nao
+`platformAccessGrants`, `platformAuditLogs`, `platformRateLimits` e
+`platformSupportTickets`. Elas nao
 pertencem a tenant nenhum: sao a mensalidade que a operadora cobra dos
 assinantes e o registro do que ela faz, e por isso ficam fora de
 `organizations/`. Ver a secao 13.
@@ -845,3 +855,56 @@ do despachante/callback e da conferência operacional.
 Publicação: aguardar o índice pronto e publicar a nova function separadamente.
 O fluxo atual de Hosting não publica functions; atualizar apenas a interface
 não ativa o agendamento. Este recurso independe da publicação do app na Meta.
+
+---
+
+## 16. Produto operacional da Fase 5
+
+### Equipe
+
+O vínculo continua pertencendo a uma única organização. Convites aceitam
+ADMIN, PROFESSIONAL, ASSISTANT e VIEWER; OWNER não é transferível. O token do
+link dura sete dias, fica somente como resumo criptográfico no Firestore e é
+invalidado por reenvio ou aceite. Abrir o link comprova o controle do e-mail e
+permite que a pessoa crie a própria senha. PROFISSIONAL completa profissão,
+registro e especialidades no primeiro acesso. ADMIN é organizacional; os demais
+papéis podem se vincular a vários profissionais da mesma organização.
+
+PROFESSIONAL não cria a conta de um funcionário diretamente: registra uma
+solicitação ligada a si; titular, OWNER ou ADMIN decide e só então o SES envia o
+convite. Suspensão é reversível. Remoção revoga sessões, encerra o acesso e
+pseudonimiza o cadastro que precisa permanecer no histórico.
+
+### Importação administrativa
+
+CSV e XLSX são lidos no navegador e convertidos para um contrato fechado antes
+de chegar à callable. A tela oferece modelo oficial, mapeamento de arquivos
+externos, modelos salvos, prévia e decisão por linha. Campos clínicos são
+recusados. A confirmação aceita até 350 linhas e revalida no servidor formato,
+ids, referências, duplicidades e tenant. Duplicidades nunca criam uma terceira
+cópia: são ignoradas ou atualizam o registro existente. Até confirmar, toda a
+prévia pode ser descartada; depois da transação não há botão de desfazer.
+
+### Suporte, marca e arquivos
+
+Todo papel ativo pode abrir chamado. O autor vê os próprios; titular,
+OWNER/ADMIN veem a organização; administradores da plataforma com TOTP veem a
+fila geral. A severidade informada pelo usuário não define a prioridade: apenas
+o suporte a atribui, mantendo a fila por data de abertura. Imagens e PDFs ficam
+no Storage, com as mesmas fronteiras de leitura do chamado. O Amazon SES envia
+somente avisos; a resposta oficial sempre é registrada no painel.
+
+O logo quadrado da organização aceita PNG, JPEG ou WebP de até 2 MB, rejeita
+SVG e mantém o símbolo padrão quando ausente. Titular pagante, OWNER e ADMIN
+podem alterá-lo. O arquivo aparece no identificador lateral e fica disponível
+para os modelos de e-mail e documentos que consumirem `organization.branding`.
+
+### Planos e falha de pagamento
+
+O catálogo final, preços e associação de recursos a planos permanecem em
+espera por decisão do titular. Cartão, Pix e boleto são meios desejados, não uma
+promessa de disponibilidade antes da validação da Stripe. A assinatura cancela
+no fim do período. A primeira e a segunda falhas preservam o painel; a terceira
+fecha o acesso. Nenhum desses preparativos remove a trava de cobrança real:
+catálogo, documentos legais/fiscais e teste financeiro explicitamente
+autorizado continuam pré-condições.

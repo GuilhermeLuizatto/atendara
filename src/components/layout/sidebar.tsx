@@ -55,9 +55,13 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2.5 px-4 py-4">
-        <span className="bg-accent text-accent-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
-          <Sparkles className="size-4" aria-hidden strokeWidth={2} />
-        </span>
+        {organization?.branding?.logoUrl ? (
+          <span role="img" aria-label={`Logo de ${organization.name}`} className="border-border size-8 shrink-0 rounded-lg border bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(organization.branding.logoUrl)})` }} />
+        ) : (
+          <span className="bg-accent text-accent-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
+            <Sparkles className="size-4" aria-hidden strokeWidth={2} />
+          </span>
+        )}
         <span className="min-w-0">
           <span className="text-foreground block truncate text-sm font-semibold">
             {organization?.name ?? APP_NAME}

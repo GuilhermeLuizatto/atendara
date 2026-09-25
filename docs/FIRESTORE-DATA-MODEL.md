@@ -20,6 +20,9 @@ userMemberships/{userId}                 indice de organizacoes do usuario
 
 organizations/{orgId}
 ├── members/{userId}                     papel e situacao dentro da organizacao
+├── memberRequests/{requestId}            pedido interno para convidar funcionario
+├── memberInvitations/{invitationId}      convite, validade e token resumido
+├── importMappings/{mappingId}            modelo de colunas salvo
 ├── professionals/{userId}               perfil de quem atende
 ├── clients/{clientId}                   CRM administrativo
 ├── services/{serviceId}                 catalogo de servicos (so profissao com a flag)
@@ -43,6 +46,8 @@ platformCustomers/{customerId}            indice cliente-do-gateway -> organizac
 platformAccessGrants/{organizationId}     concessao manual vigente, uma por organizacao
 platformAuditLogs/{logId}                 trilha append-only dos atos da operadora
 platformRateLimits/{callable_uid}         contador de abuso por usuario (so backend)
+platformSupportTickets/{ticketId}         chamado da organizacao (so backend)
+└── messages/{messageId}                  conversa oficial e imutavel por mensagem
 ```
 
 `messages` e subcolecao porque e a colecao que mais cresce e quase sempre e lida
@@ -106,6 +111,7 @@ backend grava na fila e o que a tela le.
 | Colecao         | Campos gravados como `Timestamp`                          |
 | --------------- | --------------------------------------------------------- |
 | todas           | `createdAt`, `updatedAt`                                   |
+| `memberInvitations` | + `expiresAt`, `acceptedAt`                          |
 | `clients`       | + `lastAppointmentAt`, `nextAppointmentAt`                 |
 | `appointments`  | + `startsAt`, `endsAt`, `confirmedAt`, `cancelledAt`       |
 | `conversations` | + `lastMessageAt`                                          |
@@ -118,6 +124,8 @@ backend grava na fila e o que a tela le.
 | `automationTasks` | + `scheduledFor`, `expiresAt`, `appointmentStartsAt`, `dispatchingSince`, `completedAt` |
 | `auditLogs`     | + `occurredAt`                                             |
 | `privacyRequests` | + `executedAt`, `expiresAt`                              |
+| `platformSupportTickets` | + `lastMessageAt`                                  |
+| mensagens de suporte | `createdAt`                                             |
 
 **Por que `Timestamp` e nao string.** E o tipo que o Firestore ordena, indexa e
 exporta nativamente; politicas de TTL, comparacao com `request.time` nas
@@ -410,7 +418,7 @@ A Fase 3 (13.2) acrescentou 39, sobre a fila no servidor:
 - listagem e escrita cruzadas entre tenants e a operadora com TOTP, tambem na
   fila de automacao — negadas.
 
-Total: **275 verificacoes**. O numero e conferido por `assert` no proprio
+Total: **382 verificacoes**. O numero e conferido por `assert` no proprio
 script, para que uma verificacao removida por engano quebre o teste.
 
 Do lado do dominio, `src/services/firestore/plans.test.ts` verifica que nenhum
@@ -423,10 +431,11 @@ comeca antes da rede.
 | ----------------------- | ------------------- | ------------------------------------------------- |
 | `npm test`              | nao                 | a regra de negocio esta certa?                    |
 | `npm run test:rules`    | sim                 | quem pode o que? (isolamento, modulos, append-only) |
+| `npm run test:storage`  | sim                 | quem lê/grava logos e anexos, com quais tipos e tamanhos? |
 | `npm run test:repository` | sim               | a fiacao grava e le o que promete?                |
 | `npm run test:access`   | sim                 | Auth, callables, webhook e regras concordam entre si? |
 
-`npm run test:emulator` roda as tres ultimas em sequencia.
+`npm run test:emulator` roda as quatro suites de emulador em sequencia.
 
 A suite de repositorio existe porque planos corretos e regras corretas ainda
 deixam um vao: conversao `Timestamp` <-> ISO, lote atomico, transacao e
@@ -496,3 +505,33 @@ caixa de entrada ja exige.
   `accounts` e as colecoes `platform*`, sempre com segundo fator na sessao.
   Organizacao e vinculo sao criados pelo backend. Admin SDK e console do
   Firebase continuam passando por cima das regras.
+
+---
+
+## 10. Dados da Fase 5
+
+`memberRequests`, `memberInvitations` e `importMappings` ficam dentro do tenant,
+mas o cliente não os acessa diretamente: as callables resolvem a organização a
+partir da conta autenticada. O convite guarda somente `tokenHash`; reenvio
+revoga os anteriores e o aceite apaga o resumo. Um e-mail já cadastrado não
+entra em outra organização.
+
+Importações confirmadas escrevem nas coleções operacionais existentes, em um
+lote com auditoria. O servidor revalida referências e as chaves de duplicidade:
+e-mail para profissional; e-mail ou telefone para cliente; cliente,
+profissional, início e fim para atendimento; tipo, data, valor, cliente e
+descrição para financeiro. Atualizar preserva ids, carimbos e campos internos
+que não pertencem ao arquivo, como credencial, consentimento, agregados e
+referências externas.
+
+Chamados ficam na raiz porque pertencem à relação entre organização e operadora,
+não ao financeiro do tenant. As callables são a única leitura e escrita no
+Firestore. O autor lê os próprios chamados; titular, OWNER e ADMIN leem os da
+organização; a operadora exige segundo fator. Os índices por organização,
+autor e data mantêm a fila em ordem de abertura.
+
+Os binários não ficam no Firestore. `branding/{orgId}/logo/*` aceita somente
+PNG, JPEG ou WebP até 2 MB. `support/{orgId}/{ticketId}/{messageId}/*` aceita os
+mesmos formatos e PDF até 5 MB. A leitura do anexo repete a visibilidade do
+chamado e a operadora precisa de TOTP; alteração e exclusão pelo cliente são
+negadas. A suíte de Storage mantém **14 verificações** dessas fronteiras.

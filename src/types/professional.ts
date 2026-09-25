@@ -28,9 +28,15 @@ export const PERMISSIONS = [
   "organization:delete",
   "billing:manage",
   "member:read",
+  "member:request",
   "member:invite",
   "member:update",
   "member:remove",
+  "organizationBranding:update",
+  "import:manage",
+  "support:create",
+  "support:read",
+  "support:reply",
   "client:read",
   "client:create",
   "client:update",
@@ -79,15 +85,18 @@ export const PERMISSIONS = [
 export type Permission = (typeof PERMISSIONS)[number];
 
 /**
- * Vinculo de um usuario com uma organizacao. Um mesmo usuario Firebase pode ter
- * varios memberships (ex.: atende em duas clinicas).
+ * Vinculo de um usuario com sua unica organizacao. O e-mail do Auth e unico e
+ * convites recusam contas existentes, impedindo participacao em outro tenant.
  */
 export interface Membership extends TenantScopedEntity {
   /** UID do Firebase Authentication. */
-  userId: ID;
+  userId: ID | null;
   role: Role;
-  status: "ACTIVE" | "INVITED" | "SUSPENDED";
+  status: "ACTIVE" | "INVITED" | "SUSPENDED" | "REMOVED";
   invitedBy: ID | null;
+  /** Funcionarios podem apoiar mais de um profissional da mesma organizacao. */
+  linkedProfessionalIds?: ID[];
+  removedAt?: string | null;
 }
 
 /**

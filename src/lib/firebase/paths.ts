@@ -37,6 +37,7 @@ export const PLATFORM_COLLECTIONS = {
   platformProfessionRequests: "platformProfessionRequests",
   platformAuditLogs: "platformAuditLogs",
   platformRateLimits: "platformRateLimits",
+  platformSupportTickets: "platformSupportTickets",
   // Chave de emergencia GERAL (13.9): um documento so, da plataforma inteira.
   // Escrito pela chave mestra com segundo fator; lido pelo despachante antes
   // de cada envio.
@@ -46,6 +47,9 @@ export const PLATFORM_COLLECTIONS = {
 export const TENANT_COLLECTIONS = {
   professionals: "professionals",
   members: "members",
+  memberRequests: "memberRequests",
+  memberInvitations: "memberInvitations",
+  importMappings: "importMappings",
   clients: "clients",
   // Catalogo de servicos da organizacao (E2.1). So existe em profissao com
   // `features.serviceCatalog`; o caminho, como todos, sai daqui.
@@ -170,6 +174,13 @@ export const paths = {
   /** Contador por usuario e callable. So o backend le e escreve. */
   platformRateLimit: (key: string) =>
     `${PLATFORM_COLLECTIONS.platformRateLimits}/${key}`,
+  platformSupportTickets: () => PLATFORM_COLLECTIONS.platformSupportTickets,
+  platformSupportTicket: (ticketId: ID) =>
+    `${PLATFORM_COLLECTIONS.platformSupportTickets}/${ticketId}`,
+  platformSupportMessages: (ticketId: ID) =>
+    `${PLATFORM_COLLECTIONS.platformSupportTickets}/${ticketId}/messages`,
+  platformSupportMessage: (ticketId: ID, messageId: ID) =>
+    `${PLATFORM_COLLECTIONS.platformSupportTickets}/${ticketId}/messages/${messageId}`,
   platformAutomationSwitch: () => `${PLATFORM_COLLECTIONS.platformAutomationSwitch}/global`,
 } as const;
 

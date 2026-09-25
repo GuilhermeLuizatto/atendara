@@ -58,7 +58,11 @@ export function gateFields(gate) {
 }
 
 function subscriptionSource(subscription) {
-  return subscription ? { status: subscription.status, accessUntil: subscription.accessUntil ?? null } : null;
+  return subscription ? {
+    status: subscription.status,
+    accessUntil: subscription.accessUntil ?? null,
+    failedPaymentAttempts: subscription.failedPaymentAttempts ?? 0,
+  } : null;
 }
 
 export function grantDocument({ organizationId, subscriberUserId, input, actorId, stamp }) {
@@ -89,7 +93,13 @@ async function readTitular(transaction, organizationId) {
   if (!account || account.platformRole !== "PROFESSIONAL" || account.organizationId !== organizationId) {
     throw new HttpsError("failed-precondition", "O titular desta organização não tem conta profissional.");
   }
-  return { accountRef, subscriberUserId: organization.ownerId };
+  const accounts = await transaction.get(
+    db().collection(paths.accounts()).where("organizationId", "==", organizationId),
+  );
+  const accountRefs = accounts.docs
+    .filter((document) => document.data().platformRole === "PROFESSIONAL")
+    .map((document) => document.ref);
+  return { accountRef, accountRefs, subscriberUserId: organization.ownerId };
 }
 
 export const grantAccess = onCall(OPERADORA_CALL_OPTIONS, async (request) => {
@@ -101,7 +111,7 @@ export const grantAccess = onCall(OPERADORA_CALL_OPTIONS, async (request) => {
   const grantRef = db().doc(paths.platformAccessGrant(input.organizationId));
   const subscriptionRef = db().doc(paths.platformSubscription(input.organizationId));
   const result = await db().runTransaction(async (transaction) => {
-    const { accountRef, subscriberUserId } = await readTitular(transaction, input.organizationId);
+    const { accountRefs, subscriberUserId } = await readTitular(transaction, input.organizationId);
     const previous = (await transaction.get(grantRef)).data() ?? null;
     const subscription = (await transaction.get(subscriptionRef)).data() ?? null;
 
@@ -124,7 +134,7 @@ export const grantAccess = onCall(OPERADORA_CALL_OPTIONS, async (request) => {
     });
 
     transaction.set(grantRef, grant);
-    transaction.update(accountRef, gateFields(gate));
+    for (const accountRef of accountRefs) transaction.update(accountRef, gateFields(gate));
     transaction.create(entry.ref, entry.data);
     return { until: grant.until, accessUntil: gate.accessUntil };
   });
@@ -143,7 +153,7 @@ export const revokeAccess = onCall(OPERADORA_CALL_OPTIONS, async (request) => {
   const grantRef = db().doc(paths.platformAccessGrant(input.organizationId));
   const subscriptionRef = db().doc(paths.platformSubscription(input.organizationId));
   const result = await db().runTransaction(async (transaction) => {
-    const { accountRef, subscriberUserId } = await readTitular(transaction, input.organizationId);
+    const { accountRefs, subscriberUserId } = await readTitular(transaction, input.organizationId);
     const grant = (await transaction.get(grantRef)).data() ?? null;
     const subscription = (await transaction.get(subscriptionRef)).data() ?? null;
     if (!isGrantInForce(grant, nowMs)) {
@@ -163,7 +173,7 @@ export const revokeAccess = onCall(OPERADORA_CALL_OPTIONS, async (request) => {
     });
 
     transaction.update(grantRef, { revokedAt: stamp, revokedBy: request.auth.uid, revokeReason: input.reason.trim() });
-    transaction.update(accountRef, gateFields(gate));
+    for (const accountRef of accountRefs) transaction.update(accountRef, gateFields(gate));
     transaction.create(entry.ref, entry.data);
     return { accessUntil: gate.accessUntil };
   });

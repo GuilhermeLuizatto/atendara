@@ -16,6 +16,10 @@ export const AUTOMATION_TASK_TYPES = [
     // Reflexo de um atendimento na agenda "Atendara" do Google (3C). Nao e aviso:
     // nao tem canal, entrega nem pessoa atendida como destino.
     "SYNC_CALENDAR_EVENT",
+    // Resposta da assistente a um pedido que a propria pessoa fez pelo canal
+    // (proposta de 24/09). E aviso — tem entrega e passa pela regra 11 —, mas sai
+    // como texto dentro da janela de 24 horas, e nao como modelo aprovado.
+    "SEND_CONVERSATION_REPLY",
 ];
 export const AUTOMATION_TASK_STATUSES = [
     "PLANNED",

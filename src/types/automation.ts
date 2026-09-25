@@ -24,6 +24,10 @@ export const AUTOMATION_TASK_TYPES = [
   // Reflexo de um atendimento na agenda "Atendara" do Google (3C). Nao e aviso:
   // nao tem canal, entrega nem pessoa atendida como destino.
   "SYNC_CALENDAR_EVENT",
+  // Resposta da assistente a um pedido que a propria pessoa fez pelo canal
+  // (proposta de 24/09). E aviso — tem entrega e passa pela regra 11 —, mas sai
+  // como texto dentro da janela de 24 horas, e nao como modelo aprovado.
+  "SEND_CONVERSATION_REPLY",
 ] as const;
 
 export type AutomationTaskType = (typeof AUTOMATION_TASK_TYPES)[number];
@@ -115,7 +119,8 @@ export interface AutomationTask extends TenantScopedEntity {
  * tarefa e o estado atual do banco, e nada do corpo e aceito como verdade.
  */
 export interface AutomationDispatchPayload {
-  version: 1;
+  /** `AUTOMATION_CONTRACT_VERSION` ao emitir; qualquer uma das aceitas ao receber. */
+  version: number;
   organizationId: ID;
   taskId: ID;
   attempt: number;

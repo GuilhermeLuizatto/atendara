@@ -35,6 +35,7 @@ export const AUTOMATION_TASK_META: Record<AutomationTaskType, AutomationTaskMeta
   // Executor de fora do Atendara — o Google —, chamado pelo backend enquanto
   // nao ha n8n em producao. Passa pela mesma fila, trilha e chave de emergencia.
   SYNC_CALENDAR_EVENT: { label: "Agenda Google", executor: "EXTERNAL", alertTitle: "Agenda Google não atualizada" },
+  SEND_CONVERSATION_REPLY: { label: "Resposta na conversa", executor: "EXTERNAL", alertTitle: "Resposta não enviada" },
 };
 
 /**
@@ -103,8 +104,24 @@ export const TERMINAL_AUTOMATION_STATUSES: readonly AutomationTaskStatus[] = [
 /** Nada saiu ainda: a agenda pode cancelar. Depois de adquirida, so o despachante decide. */
 export const WAITING_AUTOMATION_STATUSES: readonly AutomationTaskStatus[] = ["PLANNED", "SCHEDULED"];
 
-/** Versao do ponteiro que a Cloud Tasks entrega. Mudanca incompativel aumenta o numero. */
-export const AUTOMATION_CONTRACT_VERSION = 1;
+/**
+ * Versao do contrato que o Atendara EMITE: o ponteiro da Cloud Tasks e a tarefa
+ * que vai ao n8n. Mudanca incompativel aumenta o numero.
+ *
+ * - 1: aviso por modelo aprovado.
+ * - 2 (24/09): a tarefa ao n8n diz se a mensagem e modelo aprovado ou texto
+ *   dentro da janela (`messageType`), para a resposta na conversa.
+ */
+export const AUTOMATION_CONTRACT_VERSION = 2;
+
+/**
+ * Versoes que o Atendara ACEITA na volta: ponteiro da fila e retorno do n8n.
+ * Maior que a emitida de proposito — lembrete agendado dias antes da
+ * publicacao chega com a versao antiga, e recusa-lo derrubaria um aviso que
+ * a pessoa autorizou. Uma versao sai daqui so depois de nenhuma tarefa com ela
+ * poder estar na fila (`QUEUE_MAX_DELAY_DAYS`).
+ */
+export const AUTOMATION_ACCEPTED_CONTRACT_VERSIONS: readonly number[] = [1, 2];
 
 export const DISPATCHER_TIMEOUT_SECONDS = 60;
 

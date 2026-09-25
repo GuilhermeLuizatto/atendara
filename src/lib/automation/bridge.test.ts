@@ -50,6 +50,43 @@ function callback(patch: Partial<BridgeCallbackPayload> = {}): BridgeCallbackPay
   };
 }
 
+describe("modelo aprovado ou texto na conversa (versao 2)", () => {
+  const pedido = {
+    deliveryId: "entrega-1",
+    channel: "WHATSAPP" as const,
+    destination: "+5513999990000",
+    body: "Pronto! Seu atendimento ficou para quarta-feira, 30 de setembro, às 08:30.",
+    attempt: 1,
+    taskId: "tarefa-1",
+    organizationId: "org-1",
+    idempotencyKey: "chave-1",
+    expiresAt: "2026-09-20T13:00:00.000Z",
+    providerSenderId: "1236644296208358",
+  };
+  const modelo = { name: "atendara_lembrete_horario", language: "pt_BR", parameters: ["Alex"], buttons: [] };
+
+  it("a resposta na conversa vai como texto, sem modelo, e na versao 2", () => {
+    const payload = bridgeTaskPayload({ ...pedido, freeText: true });
+    expect(payload).toMatchObject({ version: 2, messageType: "TEXT", body: pedido.body });
+    expect(payload.template).toBeUndefined();
+  });
+
+  it("o aviso por modelo diz que e modelo", () => {
+    expect(bridgeTaskPayload({ ...pedido, template: modelo })).toMatchObject({
+      messageType: "TEMPLATE",
+      template: { name: "atendara_lembrete_horario" },
+    });
+  });
+
+  it("modelo e texto ao mesmo tempo e recusado antes de sair", () => {
+    expect(() => bridgeTaskPayload({ ...pedido, template: modelo, freeText: true })).toThrow();
+  });
+
+  it("canal so de texto nao ganha tipo de mensagem", () => {
+    expect(bridgeTaskPayload({ ...pedido, channel: "EMAIL" }).messageType).toBeUndefined();
+  });
+});
+
 describe("a tarefa que vai para o n8n", () => {
   it("leva so o minimo do contrato: nada de nome, cadastro nem dado do atendimento", () => {
     const payload = bridgeTaskPayload({
@@ -94,12 +131,18 @@ describe("a tarefa que vai para o n8n", () => {
 });
 
 describe("o formato do retorno", () => {
+  it("aceita o retorno da versao anterior, de tarefa despachada antes da publicacao", () => {
+    expect(parseCallbackPayload({ ...callback(), version: 1 })).toMatchObject({ version: 1, outcome: "ACCEPTED" });
+    expect(parseCallbackPayload({ ...callback(), version: 2 })).toMatchObject({ version: 2, outcome: "ACCEPTED" });
+  });
+
   it("aceita o contrato completo", () => {
     expect(parseCallbackPayload({ ...callback() })).toMatchObject({ outcome: "ACCEPTED", providerMessageId: "wamid.abc" });
   });
 
   it("recusa versao, campo faltando, tipo errado e codigo de falha inventado", () => {
-    expect(parseCallbackPayload({ ...callback(), version: 2 })).toBeNull();
+    expect(parseCallbackPayload({ ...callback(), version: 3 })).toBeNull();
+    expect(parseCallbackPayload({ ...callback(), version: "2" })).toBeNull();
     expect(parseCallbackPayload({ ...callback(), taskId: "" })).toBeNull();
     expect(parseCallbackPayload({ ...callback(), attempt: 1.5 })).toBeNull();
     expect(parseCallbackPayload({ ...callback(), outcome: "ENTREGUE" })).toBeNull();

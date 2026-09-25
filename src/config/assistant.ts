@@ -1,4 +1,4 @@
-import type { ConversationReplyEvent } from "@/types";
+import type { ConversationReplyEvent, ReplyStage } from "@/types";
 
 /**
  * O que a assistente diz na conversa, como DADO.
@@ -40,12 +40,12 @@ export const REPLY_VARIABLES = [
 
 export type ReplyVariable = (typeof REPLY_VARIABLES)[number];
 
-/**
- * Em que ponto do pedido a resposta sai. O encaminhamento muda de texto: antes
- * da oferta a assistente ainda não se apresentou; depois de uma escolha que não
- * vingou, a pessoa já sabe com quem fala e precisa saber que o horário caiu.
+/*
+ * O encaminhamento muda de texto conforme o ponto do pedido (`ReplyStage`):
+ * antes da oferta a assistente ainda não se apresentou; depois de uma escolha
+ * que não vingou, a pessoa já sabe com quem fala e precisa saber que o horário
+ * caiu.
  */
-export type ReplyStage = "REQUEST" | "CHOICE";
 
 /** Apresentação, só na primeira mensagem da assistente num pedido. */
 const INTRODUCTION =

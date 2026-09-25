@@ -1,4 +1,3 @@
-import type { ReplyStage } from "@/config/assistant";
 import { NOTICE_TASK_TYPES } from "@/config/automation";
 import { CHANNEL_META } from "@/config/notifications";
 import { formatDate, formatTime } from "@/lib/utils/format";
@@ -10,6 +9,7 @@ import type {
   Client,
   Conversation,
   ConversationReplyEvent,
+  ReplyStage,
   ID,
   ISODateString,
   MessagingSender,
@@ -259,7 +259,7 @@ export interface ConversationReplyInput {
 }
 
 export type ConversationReplyEligibility =
-  | { eligible: true; destination: string; body: string }
+  | { eligible: true; destination: string; contactHint: string; body: string }
   | { eligible: false; reason: NotificationSkipReason };
 
 /**
@@ -324,7 +324,7 @@ export function evaluateConversationReply(
   });
   if (!rendered.ok) return { eligible: false, reason: "TEMPLATE_REJECTED" };
 
-  return { eligible: true, destination: contact.destination, body: rendered.value };
+  return { eligible: true, destination: contact.destination, contactHint: contact.hint, body: rendered.value };
 }
 
 export function templateContext(input: TemplateInput): TemplateContext {

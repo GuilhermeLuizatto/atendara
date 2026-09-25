@@ -4,6 +4,7 @@ import type {
   DeliveryFailureCode,
   NotificationDispatchStopReason,
   OutboundChannel,
+  ReplyStage,
 } from "./notifications";
 import type { PrivacyRedactionMark } from "./privacy";
 
@@ -111,6 +112,13 @@ export interface AutomationTask extends TenantScopedEntity {
   dispatchingSince: ISODateString | null;
   completedAt: ISODateString | null;
   history: AutomationTransition[];
+  /**
+   * Resposta na conversa: em que ponto do pedido ela sai. E o que o despachante
+   * precisa para recompor o texto no envio. A conversa NAO e gravada aqui — o
+   * id dela carrega o do cadastro e escaparia da pseudonimizacao; ela se deduz
+   * de `clientId`, pela mesma regra do webhook.
+   */
+  replyStage?: ReplyStage | null;
   privacyRedaction?: PrivacyRedactionMark | null;
 }
 

@@ -3,12 +3,11 @@ import {
   CONVERSATION_REPLY_TEXTS,
   REPLY_MAX_BODY_LENGTH,
   REPLY_VARIABLES,
-  type ReplyStage,
   type ReplyVariable,
 } from "@/config/assistant";
 import { RESCHEDULE_HOLD_MINUTES } from "@/config/reschedule";
 import { formatTime, formatWeekday } from "@/lib/utils/format";
-import { err, ok, type ConversationReplyEvent, type ISODateString, type Result } from "@/types";
+import { err, ok, type ConversationReplyEvent, type ISODateString, type ReplyStage, type Result } from "@/types";
 
 import { hasForbiddenTerm, type TemplateRejection } from "./templates";
 

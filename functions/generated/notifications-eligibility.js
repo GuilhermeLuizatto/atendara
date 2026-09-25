@@ -203,7 +203,7 @@ export function evaluateConversationReply(input) {
     });
     if (!rendered.ok)
         return { eligible: false, reason: "TEMPLATE_REJECTED" };
-    return { eligible: true, destination: contact.destination, body: rendered.value };
+    return { eligible: true, destination: contact.destination, contactHint: contact.hint, body: rendered.value };
 }
 export function templateContext(input) {
     return {

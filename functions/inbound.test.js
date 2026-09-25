@@ -31,6 +31,21 @@ vi.mock("firebase-functions/logger", () => ({
 vi.mock("firebase-functions/v2/https", () => ({
   onRequest: (options, handler) => Object.assign(handler, { options }),
 }));
+// As respostas da assistente so ganham tarefa na etapa 4. Os testes da etapa 3
+// ligam a tabela para alcancar o planejamento; os demais usam a tabela real.
+const etapa4 = vi.hoisted(() => ({ ligada: false }));
+vi.mock("./generated/automation-config.js", async (original) => {
+  const real = await original();
+  return {
+    ...real,
+    NOTICE_TASK_TYPES: new Proxy(real.NOTICE_TASK_TYPES, {
+      get: (tabela, evento) =>
+        etapa4.ligada && typeof evento === "string" && evento.startsWith("RESCHEDULE_")
+          ? "SEND_CONVERSATION_REPLY"
+          : tabela[evento],
+    }),
+  };
+});
 vi.mock("firebase-admin/firestore", () => {
   const snapshot = (path) => ({
     id: path.split("/").pop(),
@@ -1358,5 +1373,267 @@ describe("agenda externa na oferta (13.7)", () => {
           comoIso(slot.startsAt) < "2026-09-22T11:00:00.000Z",
       ).toBe(true);
     }
+  });
+});
+
+describe("resposta da assistente planejada no webhook (etapa 3)", () => {
+  const CONVERSA = "wa-cliente-1";
+  const REGRAS = ["RESCHEDULE_OFFERED", "RESCHEDULE_CONFIRMED", "RESCHEDULE_HANDED_OFF"].map((event) => ({
+    id: `${event}:WHATSAPP`,
+    event,
+    channel: "WHATSAPP",
+    enabled: true,
+    leadMinutes: 0,
+    customTemplate: null,
+  }));
+  const REGISTRO = {
+    granted: { at: "2026-09-01T12:00:00.000Z", recordedBy: { kind: "STAFF", userId: "membro" }, medium: "FORM" },
+    textVersion: "2026-09-24-rascunho",
+    subjectIsMinor: false,
+    legalGuardian: null,
+    withdrawn: null,
+  };
+  const PEDIDO = {
+    kind: "BUTTON",
+    providerSenderId: SENDER_ID,
+    from: FROM,
+    providerMessageId: "wamid.remarcar",
+    button: "RESCHEDULE",
+    repliedTo: "wamid.lembrete",
+    sentAt: "2026-09-21T11:00:00.000Z",
+  };
+  const comoIso = (valor) => (typeof valor === "string" ? valor : valor.toDate().toISOString());
+  const caminho = (colecao, id) => paths.document(ORG, colecao, id);
+  let fila;
+
+  function atendimento(patch = {}) {
+    return {
+      id: "atendimento-1",
+      organizationId: ORG,
+      clientId: "cliente-1",
+      clientName: "Alex Fictício",
+      professionalId: "profissional-1",
+      professionalName: "Sam Fictício",
+      startsAt: "2026-09-25T13:00:00.000Z",
+      endsAt: "2026-09-25T13:50:00.000Z",
+      durationMinutes: 50,
+      modality: "IN_PERSON",
+      status: "SCHEDULED",
+      origin: "MANUAL",
+      confirmedAt: null,
+      rescheduledFromId: null,
+      updatedAt: "2026-09-01T12:00:00.000Z",
+      ...patch,
+    };
+  }
+
+  function organizacao({ remarcacao = true } = {}) {
+    return {
+      id: ORG,
+      name: "Consultório Fictício",
+      primaryProfession: "PSYCHOLOGIST",
+      ownerId: "dono",
+      timezone: "America/Sao_Paulo",
+      settings: {
+        agenda: {
+          workingDays: [1, 2, 3, 4, 5],
+          workdayStart: "08:00",
+          workdayEnd: "12:00",
+          slotIntervalMinutes: 30,
+          defaultModality: "IN_PERSON",
+          allowDoubleBooking: false,
+          reschedule: {
+            enabled: remarcacao,
+            minimumNoticeHours: 24,
+            maxReschedulesPerAppointment: 1,
+            offeredSlots: 3,
+            allowProfessionalChange: false,
+            searchWindowDays: 14,
+          },
+        },
+        notifications: { enabled: true, verifiedSenderChannels: ["WHATSAPP"], rules: REGRAS },
+      },
+    };
+  }
+
+  function cliente(patch = {}) {
+    return {
+      id: "cliente-1",
+      organizationId: ORG,
+      fullName: "Alex Fictício",
+      preferredName: null,
+      phone: `+${FROM}`,
+      email: null,
+      appointmentNotificationsEnabled: true,
+      notificationConsent: { formatVersion: 2, channels: { WHATSAPP: [REGISTRO] }, legacy: null },
+      ...patch,
+    };
+  }
+
+  const enqueue = async (payload, opcoes) => {
+    fila.push({ payload, ...opcoes });
+  };
+
+  function remarcar(patch = {}, quando = "2026-09-21T11:00:00.000Z") {
+    return applyInboundEvent({ ...PEDIDO, sentAt: quando, ...patch }, { clock: () => quando, enqueue });
+  }
+
+  function escolher(texto, id, quando = "2026-09-21T11:02:00.000Z") {
+    return applyInboundEvent(
+      { ...PEDIDO, kind: "TEXT", providerMessageId: id, text: texto, button: undefined, sentAt: quando },
+      { clock: () => quando, enqueue },
+    );
+  }
+
+  const tarefas = () => [...store.keys()].filter((chave) => chave.includes("/automationTasks/"));
+
+  beforeEach(() => {
+    etapa4.ligada = true;
+    fila = [];
+    consultas.clients = [cliente()];
+    consultas.appointments = [atendimento()];
+    store.set(paths.organization(ORG), organizacao());
+  });
+  afterEach(() => {
+    etapa4.ligada = false;
+  });
+
+  it("a oferta planeja a resposta na mesma transação e a põe na fila", async () => {
+    const resultado = await remarcar();
+
+    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_OFFERED", reply: "PLANNED" });
+    expect(resultado.replyTask).toBeUndefined();
+    const tarefa = store.get(caminho("automationTasks", "wa-wamid.remarcar-resposta"));
+    expect(tarefa).toMatchObject({
+      type: "SEND_CONVERSATION_REPLY",
+      event: "RESCHEDULE_OFFERED",
+      replyStage: "REQUEST",
+      appointmentId: "atendimento-1",
+      clientId: "cliente-1",
+      // Posta na fila, a tarefa passa a agendada.
+      status: "SCHEDULED",
+    });
+    // Vence com a reserva da oferta.
+    const pedido = store.get(caminho("rescheduleRequests", CONVERSA));
+    expect(comoIso(tarefa.expiresAt)).toBe(comoIso(pedido.holdEndsAt));
+    expect(store.get(caminho("notificationDeliveries", "wa-wamid.remarcar-resposta"))).toMatchObject({
+      event: "RESCHEDULE_OFFERED",
+      channel: "WHATSAPP",
+      templateId: "assistant:RESCHEDULE_OFFERED:REQUEST",
+    });
+    expect(fila).toHaveLength(1);
+    expect(fila[0].payload).toMatchObject({ version: 2, organizationId: ORG, taskId: "wa-wamid.remarcar-resposta" });
+  });
+
+  it("a escolha aceita planeja a confirmação", async () => {
+    await remarcar();
+    store.set(caminho("appointments", "atendimento-1"), atendimento());
+
+    const resultado = await escolher("1", "wamid.escolha");
+
+    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_CONFIRMED", reply: "PLANNED" });
+    expect(store.get(caminho("automationTasks", "wa-wamid.escolha-resposta"))).toMatchObject({
+      event: "RESCHEDULE_CONFIRMED",
+      replyStage: "CHOICE",
+    });
+    expect(fila.map((item) => item.payload.taskId)).toEqual([
+      "wa-wamid.remarcar-resposta",
+      "wa-wamid.escolha-resposta",
+    ]);
+  });
+
+  it("horário tomado no meio do caminho planeja o encaminhamento, sem nova oferta", async () => {
+    await remarcar();
+    const oferecidos = store.get(caminho("rescheduleRequests", CONVERSA)).slots;
+    store.set(caminho("appointments", "atendimento-1"), atendimento());
+    consultas.appointments.push(
+      atendimento({
+        id: "atendimento-2",
+        clientId: "cliente-2",
+        startsAt: comoIso(oferecidos[0].startsAt),
+        endsAt: comoIso(oferecidos[0].endsAt),
+      }),
+    );
+
+    const resultado = await escolher("1", "wamid.escolha");
+
+    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_RETRY", reply: "PLANNED" });
+    expect(store.get(caminho("automationTasks", "wa-wamid.escolha-resposta"))).toMatchObject({
+      event: "RESCHEDULE_HANDED_OFF",
+      replyStage: "CHOICE",
+    });
+  });
+
+  it("pedido fora da política planeja o aviso de encaminhamento", async () => {
+    store.set(paths.organization(ORG), organizacao({ remarcacao: false }));
+
+    const resultado = await remarcar();
+
+    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_ESCALATED", reason: "POLICY_DISABLED", reply: "PLANNED" });
+    expect(store.get(caminho("automationTasks", "wa-wamid.remarcar-resposta"))).toMatchObject({
+      event: "RESCHEDULE_HANDED_OFF",
+      replyStage: "REQUEST",
+    });
+  });
+
+  it("reentrega do pedido não planeja segunda resposta nem põe na fila de novo", async () => {
+    await remarcar();
+    const reentrega = await remarcar();
+
+    expect(reentrega.outcome).toBe("DUPLICATE");
+    expect(tarefas()).toHaveLength(1);
+    expect(fila).toHaveLength(1);
+  });
+
+  it("sem consentimento para o WhatsApp, nada é planejado e o motivo volta no resultado", async () => {
+    consultas.clients = [cliente({ notificationConsent: { formatVersion: 2, channels: {}, legacy: null } })];
+
+    const resultado = await remarcar();
+
+    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_OFFERED", reply: "CHANNEL_NOT_CONSENTED" });
+    expect(tarefas()).toHaveLength(0);
+    expect(fila).toHaveLength(0);
+  });
+
+  it("conversa com a equipe não recebe resposta automática", async () => {
+    store.set(caminho("conversations", CONVERSA), {
+      id: CONVERSA,
+      organizationId: ORG,
+      clientId: "cliente-1",
+      escalated: true,
+      attention: "CRITICAL",
+      status: "WAITING_PROFESSIONAL",
+      lastMessageAt: "2026-09-21T10:00:00.000Z",
+      lastInboundAt: "2026-09-21T10:00:00.000Z",
+      unreadCount: 1,
+    });
+
+    const resultado = await remarcar();
+
+    expect(resultado.reply).toBe("CONVERSATION_WITH_HUMAN");
+    expect(fila).toHaveLength(0);
+  });
+
+  it("fila fora do ar não desfaz o pedido: a resposta fica planejada para vencer com alerta", async () => {
+    const resultado = await applyInboundEvent(PEDIDO, {
+      clock: () => "2026-09-21T11:00:00.000Z",
+      enqueue: async () => {
+        throw new Error("fila indisponível");
+      },
+    });
+
+    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_OFFERED", reply: "PLANNED" });
+    expect(store.get(caminho("rescheduleRequests", CONVERSA)).status).toBe("OFFERED");
+    expect(store.get(caminho("automationTasks", "wa-wamid.remarcar-resposta")).status).toBe("PLANNED");
+  });
+
+  it("com a tabela real, antes da etapa 4, a oferta segue e nenhuma resposta é planejada", async () => {
+    etapa4.ligada = false;
+
+    const resultado = await remarcar();
+
+    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_OFFERED", reply: "EVENT_WITHOUT_AUTOMATION" });
+    expect(tarefas()).toHaveLength(0);
+    expect(fila).toHaveLength(0);
   });
 });

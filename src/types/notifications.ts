@@ -66,6 +66,14 @@ export const APPOINTMENT_NOTIFICATION_EVENTS = [
 export type AppointmentNotificationEvent =
   (typeof APPOINTMENT_NOTIFICATION_EVENTS)[number];
 
+/**
+ * Em que ponto do pedido a resposta sai: ao receber o pedido (`REQUEST`) ou
+ * depois da escolha de um horario oferecido (`CHOICE`).
+ */
+export const REPLY_STAGES = ["REQUEST", "CHOICE"] as const;
+
+export type ReplyStage = (typeof REPLY_STAGES)[number];
+
 export function isConversationReplyEvent(
   event: AppointmentNotificationEvent,
 ): event is ConversationReplyEvent {

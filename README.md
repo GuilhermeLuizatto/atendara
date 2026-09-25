@@ -269,7 +269,7 @@ testes de ponta a ponta.
 | **3A** | Automação interna: fila, HMAC, callback, controle de emergência e n8n local | ✅ |
 | **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco | ⏸️ Em espera; validação externa pendente |
 | **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | 🟨 Código integrado à `main` e Functions publicadas; validações reais pendentes |
-| **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | 🟨 Gemini ativo para organizações de teste; acerto revisado e entrega nos indicadores; expansão para tenants reais pendente |
+| **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | ✅ Gemini por allowlist em 6 organizações; acerto revisado e entrega nos indicadores |
 | **5** | Produto: equipes, importação administrativa, suporte, cobrança real e planos | 🟨 |
 | **6** | Expansão: portfólio da Estética, marketplace e cobrador dos clientes | ⬜ |
 
@@ -286,8 +286,8 @@ limites de palavras, variações de espaços e acentos, sinais sensíveis, nega�
 e múltiplos pedidos, e um `POSSIBLE_RISK` detectado localmente nunca é
 sobrescrito por resultado externo. Sobre essa base, a classificação semântica
 com Gemini (`gemini-3.1-flash-lite`) está ativa em produção, mas restrita por
-allowlist explícita (`GEMINI_ORGANIZATION_IDS`) a um conjunto de organizações
-de teste — nenhum tenant real está habilitado ainda. A chave fica no Secret
+allowlist explícita (`GEMINI_ORGANIZATION_IDS`, sem curinga): cada organização
+é liberada pelo titular, e em 25/09/2026 eram 6 de 8. A chave fica no Secret
 Manager, vinculada apenas a `previewAI` e `inboundWebhook`, com nível pago
 confirmado manualmente (`GEMINI_PAID_TIER_CONFIRMED`). Qualquer falha ou
 timeout do Gemini degrada para `UNKNOWN`, que sempre escala para um humano —
@@ -300,8 +300,14 @@ certa (e qual seria), numa coleção própria (`aiDecisionReviews`), sem tocar n
 decisão; decisão sem revisão fica fora da conta, e o acerto aparece separado
 entre Gemini e regras locais. O uso do Gemini mostra situação e tokens, não
 custo em reais. A entrega das respostas da Dara separa aceita pelo provedor,
-entregue ao aparelho, lida, simulada e falha. A expansão para tenants reais
-continua pendente: depende de base legal aprovada e da D26.
+entregue ao aparelho, lida, simulada e falha.
+
+A avaliação de 25/09/2026 deu 18 de 20, com uma resposta insegura do Gemini
+sozinho. Os dois casos divergentes (negação e injeção com pergunta de dose)
+não chegam ao Gemini em produção: a classificação local os marca como ambíguo
+ou clínico nas nove profissões, e o Gemini só é consultado quando a guarda
+local não vê ambiguidade. A liberação foi decidida pelo titular com esse
+resultado.
 
 1. Validar a saída do WhatsApp em modo de teste com o número e o destinatário
    autorizados pela Meta.
@@ -331,9 +337,9 @@ continua pendente: depende de base legal aprovada e da D26.
    de gateway sobre split, responsabilidade fiscal e consentimento.
 
 Planos e billing da plataforma continuam em modo de testes. A IA externa
-(Gemini) está ativa em produção apenas para organizações de teste, sob
-allowlist explícita; equipes, marketplace, cobrança de clientes e IA externa
-para tenants reais ainda não estão liberados. O sistema continua sem dados
+(Gemini) está ativa em produção só para as organizações da allowlist
+explícita; equipes, marketplace e cobrança de clientes ainda não estão
+liberados. O sistema continua sem dados
 reais e sem afirmar conformidade com a LGPD.
 
 ---

@@ -6,6 +6,7 @@ import { getProfession } from "@/config/professions";
 import { materializeSeededRules } from "@/config/system-rules";
 import type {
   AIDecision,
+  AIDecisionReview,
   AIRule,
   Appointment,
   AuditLog,
@@ -42,6 +43,7 @@ export interface SnapshotParts {
   transactions: Transaction[];
   aiRules: AIRule[];
   aiDecisions: AIDecision[];
+  aiDecisionReviews: AIDecisionReview[];
   notifications: Notification[];
   notificationDeliveries: NotificationDelivery[];
   automationTasks: AutomationTask[];
@@ -62,6 +64,7 @@ export function emptyParts(): SnapshotParts {
     transactions: [],
     aiRules: [],
     aiDecisions: [],
+    aiDecisionReviews: [],
     notifications: [],
     notificationDeliveries: [],
     automationTasks: [],
@@ -140,6 +143,7 @@ export function assembleSnapshot(
       ),
     ],
     decisions: parts.aiDecisions,
+    decisionReviews: parts.aiDecisionReviews,
     notifications: parts.notifications,
     notificationDeliveries: parts.notificationDeliveries,
     automationTasks: parts.automationTasks,

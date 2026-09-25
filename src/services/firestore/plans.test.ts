@@ -17,6 +17,7 @@ import {
   planUpdateClient,
 } from "./plans/clients";
 import { planCreateTransaction } from "./plans/finance";
+import { planReviewDecision } from "./plans/decision-reviews";
 import { planReceiveMessage, planReplyToConversation } from "./plans/messaging";
 import { planUpdateAgendaSettings, planUpdateAISettings } from "./plans/organization";
 import { planUpdateNotificationSettings } from "./plans/outbound";
@@ -49,6 +50,46 @@ describe("autorizações da Dara", () => {
     const ctx = makeContext();
     expect(() => planUpdateAISettings({ ...ctx, actor: { ...ctx.actor, role: "VIEWER", permissions: permissionsForRole("VIEWER") } }, ctx.snapshot.organization.settings.ai)).toThrow();
     expect(() => planUpdateAISettings(ctx, { ...ctx.snapshot.organization.settings.ai, autoResponseConfidenceThreshold: 0.1 })).toThrow();
+  });
+});
+
+describe("revisão das decisões da Dara", () => {
+  it("grava a revisão com o id da decisão e a trilha, sem tocar na decisão", () => {
+    const ctx = makeContext();
+    const decision = ctx.snapshot.decisions[0];
+    const plan = planReviewDecision(ctx, decision.id, { verdict: "CORRECT", expectedClassification: null });
+    expect(collections(plan.writes)).toEqual(["aiDecisionReviews", "auditLogs"]);
+    expect(plan.writes[0]).toMatchObject({
+      op: "set",
+      path: `organizations/${ctx.organizationId}/aiDecisionReviews/${decision.id}`,
+      data: { decisionId: decision.id, verdict: "CORRECT", expectedClassification: null, createdBy: "owner" },
+    });
+    expect(plan.writes[1]).toMatchObject({ data: { action: "CREATE", resource: { type: "aiDecisionReview", id: decision.id } } });
+    expect(collections(plan.writes)).not.toContain("aiDecisions");
+  });
+  it("corrigir a revisão preserva quem revisou primeiro e registra a troca", () => {
+    const base = makeContext();
+    const decision = base.snapshot.decisions[0];
+    const other = base.snapshot.decisions.find((item) => item.classification !== decision.classification)!;
+    const first = { id: decision.id, organizationId: base.organizationId, decisionId: decision.id, verdict: "CORRECT" as const, expectedClassification: null, createdAt: "2026-09-01T10:00:00.000Z", updatedAt: "2026-09-01T10:00:00.000Z", createdBy: "owner", updatedBy: "owner" };
+    const ctx = makeContext((s) => ({ ...s, decisionReviews: [first] }), { userId: "admin", role: "ADMIN", permissions: permissionsForRole("ADMIN") });
+    const plan = planReviewDecision(ctx, decision.id, { verdict: "INCORRECT", expectedClassification: other.classification });
+    expect(plan.writes[0]).toMatchObject({ data: { verdict: "INCORRECT", createdBy: "owner", createdAt: first.createdAt, updatedBy: "admin" } });
+    expect(plan.writes[1]).toMatchObject({ data: { action: "UPDATE", metadata: { previousVerdict: "CORRECT", verdict: "INCORRECT" } } });
+  });
+  it("recusa quem não é OWNER nem ADMIN, inclusive o titular PROFESSIONAL", () => {
+    const decision = makeContext().snapshot.decisions[0];
+    const input = { verdict: "CORRECT" as const, expectedClassification: null };
+    for (const role of ["PROFESSIONAL", "ASSISTANT", "VIEWER"] as const) {
+      const ctx = makeContext((s) => s, { role, permissions: permissionsForMembership(role, true) });
+      expect(() => planReviewDecision(ctx, decision.id, input)).toThrow();
+    }
+  });
+  it("recusa decisão inexistente e classificação igual à da decisão", () => {
+    const ctx = makeContext();
+    const decision = ctx.snapshot.decisions[0];
+    expect(() => planReviewDecision(ctx, "nao-existe", { verdict: "CORRECT", expectedClassification: null })).toThrow("Decisão não encontrada.");
+    expect(() => planReviewDecision(ctx, decision.id, { verdict: "INCORRECT", expectedClassification: decision.classification })).toThrow();
   });
 });
 

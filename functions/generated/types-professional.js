@@ -62,6 +62,9 @@ export const PERMISSIONS = [
     "rule:update",
     "rule:delete",
     "aiDecision:read",
+    // Marcar se a classificacao de uma decisao estava certa. E o que sustenta o
+    // indicador de acerto; nao altera a decisao, que e append-only.
+    "aiDecision:review",
     "notification:read",
     "notification:acknowledge",
     "auditLog:read",

@@ -1,9 +1,15 @@
 import { toDateKey, type DateKey } from "@/lib/utils/datetime";
 import { permissionsForRole } from "@/config/permissions";
-import { getProfession } from "@/config/professions";
+import { classificationsFor, getProfession } from "@/config/professions";
 import { ruleInputSchema, validateRuleInput } from "@/lib/rules/validation";
 import { decide } from "@/lib/ai/decision-engine";
 import { validateAISettings } from "@/lib/ai/settings";
+import {
+  buildDecisionReview,
+  decisionReviewAuditSummary,
+  validateDecisionReview,
+  type DecisionReviewInput,
+} from "@/lib/ai/decision-review";
 import { nextServicePosition, validateService } from "@/lib/agenda/services";
 import { amountForPart, partOf } from "@/lib/agenda/charges";
 import {
@@ -1663,6 +1669,47 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
         summary: "Autorizações da Dara atualizadas.",
         metadata: { enabled: settings.enabled, autonomous: settings.allowAutonomousReplies, threshold: settings.autoResponseConfidenceThreshold },
       }, now), ...this.snapshot.auditLogs],
+    });
+  }
+
+  async reviewDecision(decisionId: ID, raw: DecisionReviewInput): Promise<void> {
+    this.assertPermission("aiDecision:review");
+    const decision = this.snapshot.decisions.find((item) => item.id === decisionId);
+    if (!decision) throw new RepositoryError("Decisão não encontrada.");
+    const validation = validateDecisionReview(
+      decision,
+      raw,
+      classificationsFor(this.snapshot.organization.primaryProfession),
+    );
+    if (!validation.ok) throw new RepositoryError(validation.error);
+    const reviews = this.snapshot.decisionReviews ?? [];
+    const existing = reviews.find((item) => item.decisionId === decisionId) ?? null;
+    const now = this.now();
+    const review = buildDecisionReview(decision, validation.value, existing, {
+      now,
+      userId: this.actor.userId,
+    });
+    this.commit({
+      ...this.snapshot,
+      decisionReviews: [review, ...reviews.filter((item) => item.decisionId !== decisionId)],
+      auditLogs: [
+        this.audit(
+          {
+            action: existing ? "UPDATE" : "CREATE",
+            actorType: "USER",
+            resource: { type: "aiDecisionReview", id: decisionId },
+            summary: decisionReviewAuditSummary(review),
+            metadata: {
+              verdict: review.verdict,
+              classification: decision.classification,
+              expectedClassification: review.expectedClassification,
+              previousVerdict: existing?.verdict ?? null,
+            },
+          },
+          now,
+        ),
+        ...this.snapshot.auditLogs,
+      ],
     });
   }
 

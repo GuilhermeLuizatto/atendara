@@ -33,6 +33,7 @@ export const COLLECTION_DATE_FIELDS = {
     transactions: [...STAMP_FIELDS, "dueDate", "paidAt"],
     aiRules: [...STAMP_FIELDS, "lastAppliedAt"],
     aiDecisions: [...STAMP_FIELDS, "decidedAt", "evaluatedAt"],
+    aiDecisionReviews: [...STAMP_FIELDS],
     notifications: [...STAMP_FIELDS, "acknowledgedAt"],
     notificationDeliveries: [
         ...STAMP_FIELDS,

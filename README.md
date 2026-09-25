@@ -269,7 +269,7 @@ testes de ponta a ponta.
 | **3A** | Automação interna: fila, HMAC, callback, controle de emergência e n8n local | ✅ |
 | **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco | ⏸️ Em espera; validação externa pendente |
 | **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | 🟨 Conexão Google e consulta manual implementadas; ativação real pendente |
-| **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | 🟨 Gemini ativo para organizações de teste; expansão e analytics pendentes |
+| **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | 🟨 Gemini ativo para organizações de teste; acerto revisado e entrega nos indicadores; expansão para tenants reais pendente |
 | **5** | Produto: equipes, importação administrativa, suporte, cobrança real e planos | 🟨 |
 | **6** | Expansão: portfólio da Estética, marketplace e cobrador dos clientes | ⬜ |
 
@@ -294,9 +294,14 @@ timeout do Gemini degrada para `UNKNOWN`, que sempre escala para um humano —
 a chamada externa nunca decide sozinha. A avaliação automatizada
 (`npm run evaluate:gemini`) roda contra os fixtures de segurança antes de
 qualquer expansão da lista de organizações. Os indicadores continuam mostrando
-a amostra carregada e avisando quando há páginas anteriores; não medem
-acurácia nem comprovam entrega de mensagens — isso, junto da expansão para
-tenants reais, fica para a continuação da Fase 4.
+a amostra carregada e avisando quando há páginas anteriores. O acerto vem da
+revisão humana: na Auditoria, OWNER/ADMIN marcam se a classificação estava
+certa (e qual seria), numa coleção própria (`aiDecisionReviews`), sem tocar na
+decisão; decisão sem revisão fica fora da conta, e o acerto aparece separado
+entre Gemini e regras locais. O uso do Gemini mostra situação e tokens, não
+custo em reais. A entrega das respostas da Dara separa aceita pelo provedor,
+entregue ao aparelho, lida, simulada e falha. A expansão para tenants reais
+continua pendente: depende de base legal aprovada e da D26.
 
 1. Validar a saída do WhatsApp em modo de teste com o número e o destinatário
    autorizados pela Meta.

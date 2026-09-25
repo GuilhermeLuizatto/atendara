@@ -191,6 +191,28 @@ service cloud.firestore {
         .hasOnly(fields);
     }
 
+    // Espelho de `validateDecisionReview` (`src/lib/ai/decision-review.ts`),
+    // menos a lista da profissao, que as rules nao conhecem. O `exists` e
+    // explicito porque `let` so e avaliado quando usado: no veredito
+    // "correta" o `get` nunca rodaria, e a revisao nasceria sem decisao.
+    function decisionReviewOk(orgId, decisionId, data) {
+      let fields = ['id', 'organizationId', 'decisionId', 'verdict',
+        'expectedClassification', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy'];
+      let decisionPath = /databases/$(database)/documents/organizations/$(orgId)/aiDecisions/$(decisionId);
+      return exists(decisionPath)
+        && data.keys().hasOnly(fields) && data.keys().hasAll(fields)
+        && data.id == decisionId
+        && data.decisionId == decisionId
+        && data.organizationId == orgId
+        && data.updatedBy == uid()
+        && ((data.verdict == 'CORRECT' && data.expectedClassification == null)
+          || (data.verdict == 'INCORRECT'
+            && data.expectedClassification in ['ADMINISTRATIVE', 'PROFESSIONAL',
+              'CLINICAL', 'TRAINING', 'HEALTH_RELATED', 'URGENT', 'FINANCIAL',
+              'POSSIBLE_RISK', 'UNKNOWN']
+            && data.expectedClassification != get(decisionPath).data.classification));
+    }
+
     // ------------------------------------------ consentimento dos avisos
     //
     // Espelho de `isAllowedConsentTransition`
@@ -455,6 +477,23 @@ service cloud.firestore {
         // pseudonimizacao a pedido do titular e do backend, restrita aos campos
         // de `src/config/privacy.ts`; pelo cliente, nada muda.
         allow update, delete: if false;
+      }
+
+      // Revisao humana da classificacao (Fase 4): o que sustenta o indicador
+      // de acerto. Espelha `aiDecision:review` de `src/config/permissions.ts`
+      // — OWNER e ADMIN, sem a excecao de titular. A decisao revisada precisa
+      // existir e continua intocada; nao ha delete, para uma revisao nao sumir
+      // do calculo sem trilha.
+      match /aiDecisionReviews/{decisionId} {
+        allow read: if moduleAccess(orgId, 'agente');
+        allow create: if moduleAccess(orgId, 'agente') && isAdmin(orgId)
+          && decisionReviewOk(orgId, decisionId, request.resource.data)
+          && request.resource.data.createdBy == uid();
+        allow update: if moduleAccess(orgId, 'agente') && isAdmin(orgId)
+          && decisionReviewOk(orgId, decisionId, request.resource.data)
+          && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['createdAt', 'createdBy']);
+        allow delete: if false;
       }
 
       // -------------------------------------------------------- notificacoes

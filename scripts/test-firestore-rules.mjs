@@ -94,6 +94,7 @@ try {
       await setDoc(doc(db, paths.organization(org)), { primaryProfession: "PSYCHOLOGIST", ownerId: "a" });
       for (const collection of ["professionals", "clients", "appointments", "transactions", "aiDecisions", "automationTasks", "auditLogs"]) await setDoc(doc(db, paths.document(org, collection, "example")), { organizationId: org });
       await setDoc(doc(db, paths.document(org, "aiRules", "immutable")), { organizationId: org, immutable: true, level: "SYSTEM", enabled: true });
+      await setDoc(doc(db, paths.document(org, "aiDecisions", "revisada")), { organizationId: org, classification: "ADMINISTRATIVE" });
       await setDoc(doc(db, paths.document(org, "conversations", "conv")), { organizationId: org, clientId: "example", status: "OPEN" });
       await setDoc(doc(db, messagePath(org, "conv", "m1")), { organizationId: org, conversationId: "conv", body: "Bom dia", sentAt: new Date() });
       await setDoc(doc(db, paths.document(org, "notifications", "alert")), { organizationId: org, status: "UNREAD", title: "Alerta" });
@@ -153,6 +154,33 @@ try {
     await denied(updateDoc(doc(db("ownerRole"), own(collection)), { changed: true }));
     await denied(deleteDoc(doc(db("ownerRole"), own(collection))));
   }
+
+  // Revisao da classificacao (Fase 4): so OWNER e ADMIN, so sobre decisao que
+  // existe, e sem tocar na decisao.
+  const reviewOf = (uid, org = "org-a", id = "revisada") => doc(db(uid), paths.document(org, "aiDecisionReviews", id));
+  const review = (uid, patch = {}) => ({
+    id: "revisada", organizationId: "org-a", decisionId: "revisada", verdict: "CORRECT", expectedClassification: null,
+    createdAt: new Date("2026-09-25T10:00:00.000Z"), updatedAt: new Date(), createdBy: uid, updatedBy: uid, ...patch,
+  });
+  await deniedBecause("titular PROFESSIONAL revisando", setDoc(reviewOf("a"), review("a")));
+  await deniedBecause("secretaria revisando", setDoc(reviewOf("assistantRole"), review("assistantRole")));
+  await deniedBecause("visualizador revisando", setDoc(reviewOf("viewerRole"), review("viewerRole")));
+  await deniedBecause("decisao inexistente", setDoc(reviewOf("ownerRole", "org-a", "fantasma"), review("ownerRole", { id: "fantasma", decisionId: "fantasma" })));
+  await deniedBecause("id diferente da decisao", setDoc(reviewOf("ownerRole"), review("ownerRole", { decisionId: "example" })));
+  await deniedBecause("autor forjado", setDoc(reviewOf("ownerRole"), review("ownerRole", { createdBy: "adminRole", updatedBy: "adminRole" })));
+  await deniedBecause("campo a mais", setDoc(reviewOf("ownerRole"), review("ownerRole", { note: "texto livre" })));
+  await deniedBecause("correta com classificacao esperada", setDoc(reviewOf("ownerRole"), review("ownerRole", { expectedClassification: "CLINICAL" })));
+  await deniedBecause("errada sem classificacao esperada", setDoc(reviewOf("ownerRole"), review("ownerRole", { verdict: "INCORRECT" })));
+  await deniedBecause("errada com a mesma classificacao", setDoc(reviewOf("ownerRole"), review("ownerRole", { verdict: "INCORRECT", expectedClassification: "ADMINISTRATIVE" })));
+  await deniedBecause("classificacao inexistente", setDoc(reviewOf("ownerRole"), review("ownerRole", { verdict: "INCORRECT", expectedClassification: "OUTRA" })));
+  await deniedBecause("outro tenant", setDoc(reviewOf("ownerRole", "org-b"), review("ownerRole", { organizationId: "org-b" })));
+  await allowed(setDoc(reviewOf("ownerRole"), review("ownerRole")));
+  await allowed(getDoc(reviewOf("a")));
+  await allowed(getDoc(reviewOf("viewerRole")));
+  await denied(getDoc(reviewOf("restricted")));
+  await deniedBecause("reescrever quem revisou primeiro", setDoc(reviewOf("adminRole"), review("adminRole", { verdict: "INCORRECT", expectedClassification: "CLINICAL" })));
+  await allowed(setDoc(reviewOf("adminRole"), review("ownerRole", { verdict: "INCORRECT", expectedClassification: "CLINICAL", updatedBy: "adminRole" })));
+  await denied(deleteDoc(reviewOf("ownerRole")));
   await denied(setDoc(doc(db("a"), paths.document("org-a", "clients", "foreign")), { organizationId: "org-b" }));
   await denied(getDoc(doc(withTotp("admin"), paths.initialPassword("a"))));
   await denied(getDoc(doc(tag(environment.unauthenticatedContext().firestore(), "anonimo"), paths.account("a"))));
@@ -378,7 +406,7 @@ try {
   await denied(getDoc(doc(operator, paths.document("org-a", "members", "a"))));
   await denied(updateDoc(doc(operator, paths.document("org-a", "members", "a")), { role: "OWNER" }));
   await denied(deleteDoc(doc(operator, paths.document("org-a", "members", "restricted"))));
-  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "whatsappConnections", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "automationSwitches", "services", "auditLogs"]) {
+  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "whatsappConnections", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "automationSwitches", "services", "aiDecisionReviews", "auditLogs"]) {
     await denied(getDoc(doc(operator, own(name))));
     await denied(setDoc(doc(operator, paths.document("org-a", name, "da-operadora")), { organizationId: "org-a" }));
   }
@@ -629,6 +657,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 368);
+  assert.equal(checks, 395);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

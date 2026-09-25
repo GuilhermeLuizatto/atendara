@@ -23,12 +23,12 @@ export const NOTICE_TASK_TYPES = {
     APPOINTMENT_REMINDER: "SEND_REMINDER",
     APPOINTMENT_CONFIRMED: "CONFIRM_APPOINTMENT",
     APPOINTMENT_CANCELLED: null,
-    // Respostas da assistente na conversa. A tarefa que as leva ate a pessoa e a
-    // etapa 2 da proposta (docs/planos/DARA-RESPOSTA-REMARCACAO-2026-09-24.md);
-    // ate la, o portao recusa com EVENT_WITHOUT_AUTOMATION e nada sai.
-    RESCHEDULE_OFFERED: null,
-    RESCHEDULE_CONFIRMED: null,
-    RESCHEDULE_HANDED_OFF: null,
+    // Respostas da assistente na conversa (docs/planos/DARA-RESPOSTA-REMARCACAO-2026-09-24.md).
+    // Planejadas pelo webhook, nunca por mudanca da agenda; o despachante as
+    // confere e envia por `decideReplyDispatch`.
+    RESCHEDULE_OFFERED: "SEND_CONVERSATION_REPLY",
+    RESCHEDULE_CONFIRMED: "SEND_CONVERSATION_REPLY",
+    RESCHEDULE_HANDED_OFF: "SEND_CONVERSATION_REPLY",
 };
 const ANY = ["INTERNAL", "EXTERNAL"];
 const EXTERNAL = ["EXTERNAL"];

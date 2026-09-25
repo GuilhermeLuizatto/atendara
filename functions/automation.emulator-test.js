@@ -133,7 +133,8 @@ function harness(planningClock = CHANGED) {
   };
 }
 
-const pointer = (task) => ({ version: 1, organizationId: ORG, taskId: task.id, attempt: task.attempt });
+// Versao que o Atendara emite hoje; a 1 continua aceita na volta.
+const pointer = (task) => ({ version: 2, organizationId: ORG, taskId: task.id, attempt: task.attempt });
 
 beforeAll(async () => {
   initializeApp({ projectId: "demo-atendara" });

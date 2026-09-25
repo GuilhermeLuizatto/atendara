@@ -1,33 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+
+import { getProfession } from "@/config/professions";
 
 import { renderReply } from "@/lib/notifications/replies";
 import { hashBody } from "@/lib/notifications/templates";
 import { ANCHOR, FICTITIOUS, client, organization } from "@/lib/notifications/fixtures";
 import type { MessagingSender, NotificationRule } from "@/types";
 
-/**
- * A resposta planejada (etapa 3). Como no portão, a tabela real ainda não liga
- * as respostas a uma tarefa — isso é a etapa 4 —, então os testes simulam a
- * tabela ligada para alcançar o planejamento.
- */
+import { conversationReplyId, planConversationReply } from "./conversation-replies";
 
-const etapa4 = vi.hoisted(() => ({ ligada: true }));
-
-vi.mock("@/config/automation", async (original) => {
-  const real = await original<typeof import("@/config/automation")>();
-  return {
-    ...real,
-    NOTICE_TASK_TYPES: new Proxy(real.NOTICE_TASK_TYPES, {
-      get: (tabela, evento) =>
-        etapa4.ligada && typeof evento === "string" && evento.startsWith("RESCHEDULE_")
-          ? "SEND_CONVERSATION_REPLY"
-          : tabela[evento as keyof typeof tabela],
-    }),
-  };
-});
-
-const { getProfession } = await import("@/config/professions");
-const { conversationReplyId, planConversationReply } = await import("./conversation-replies");
+/** A resposta planejada: o que vira entrega e tarefa, e quando nada vira. */
 
 const JANELA = "2026-09-11T12:00:00.000Z";
 const RESERVA = "2026-09-10T12:10:00.000Z";
@@ -172,12 +154,11 @@ describe("quando a resposta não é planejada", () => {
     ).toEqual({ kind: "SKIPPED", reason: "CONVERSATION_WITH_HUMAN" });
   });
 
-  it("com a tabela real, antes da etapa 4, nada é planejado", () => {
-    etapa4.ligada = false;
-    try {
-      expect(planConversationReply(entrada())).toEqual({ kind: "SKIPPED", reason: "EVENT_WITHOUT_AUTOMATION" });
-    } finally {
-      etapa4.ligada = true;
-    }
+  it("regra da resposta desligada: nada é planejado", () => {
+    const org = organization({
+      verifiedSenderChannels: ["WHATSAPP"],
+      rules: regras().map((regra) => ({ ...regra, enabled: false })),
+    });
+    expect(planConversationReply(entrada({ organization: org }))).toEqual({ kind: "SKIPPED", reason: "RULE_DISABLED" });
   });
 });

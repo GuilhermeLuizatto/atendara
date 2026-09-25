@@ -1,7 +1,9 @@
 // Gerado por scripts/build-functions.mjs.
 import { AUTOMATION_TASK_META, DISPATCH_CLOCK_SKEW_SECONDS } from "./automation-config.js";
 import { applyAttempt } from "./notifications-delivery.js";
-import { recheckBeforeSend } from "./notifications-eligibility.js";
+import { evaluateConversationReply, recheckBeforeSend } from "./notifications-eligibility.js";
+import { hashBody } from "./notifications-templates.js";
+import { isConversationReplyEvent } from "./types.js";
 import { alertEffect, auditEffect } from "./automation-effects.js";
 import { expireWaitingTask } from "./automation-expiry.js";
 import { outboundBlock, switchRetryAt } from "./automation-emergency.js";
@@ -111,30 +113,105 @@ export function decideDispatch(input) {
     });
     if (!check.ok)
         return cancel(task, input.delivery, check.reason, now);
+    return sendStep(task, input.delivery, input.sender, now, {
+        destination: check.destination,
+        body: check.body,
+        template: check.template,
+    });
+}
+/** Adquire a tarefa e monta o pedido ao provedor. */
+function sendStep(task, delivery, sender, now, message) {
     const scheduled = task.status === "PLANNED" ? transitionTask(task, "SCHEDULED", { at: now }) : task;
     const dispatching = transitionTask(scheduled, "DISPATCHING", { at: now });
     return {
         kind: "SEND",
         task: dispatching,
-        delivery: { ...input.delivery, status: "SENDING", updatedAt: now, updatedBy: null },
+        delivery: { ...delivery, status: "SENDING", updatedAt: now, updatedBy: null },
         // Destino e texto existem so aqui, na memoria do despachante. Nenhum dos
         // dois e gravado.
         request: {
-            deliveryId: input.delivery.id,
-            channel: input.delivery.channel,
-            destination: check.destination,
-            ...(input.delivery.channel === "WHATSAPP" && input.sender?.providerSenderId
-                ? { providerSenderId: input.sender.providerSenderId }
+            deliveryId: delivery.id,
+            channel: delivery.channel,
+            ...(delivery.channel === "WHATSAPP" && sender?.providerSenderId
+                ? { providerSenderId: sender.providerSenderId }
                 : {}),
-            body: check.body,
             attempt: task.attempt,
             taskId: task.id,
             organizationId: task.organizationId,
             idempotencyKey: task.idempotencyKey,
             expiresAt: task.expiresAt,
-            template: check.template,
+            ...message,
         },
     };
+}
+/**
+ * O envio de uma resposta da assistente (etapa 4 da proposta de 24/09).
+ *
+ * Mesma parte comum de qualquer tarefa (`guardDispatch`) e, no lugar do
+ * `recheckBeforeSend` dos avisos, o portão da resposta de novo, contra o estado
+ * de AGORA: consentimento, regra, remetente, conversa com gente, janela de 24
+ * horas e reserva. O texto é recomposto e só sai se for o mesmo que foi
+ * planejado — a oferta com os mesmos horários, a confirmação com o mesmo
+ * horário novo.
+ */
+export function decideReplyDispatch(input) {
+    const guarded = guardDispatch(input);
+    if (guarded.kind !== "CONTINUE")
+        return guarded;
+    const { task } = guarded;
+    const { now, delivery, appointment, client } = input;
+    if (!delivery)
+        return cancel(task, null, "DELIVERY_NOT_FOUND", now);
+    if (!input.organization || !input.profession)
+        return cancel(task, delivery, "ORGANIZATION_DISABLED", now);
+    const event = task.event;
+    if (!event || !isConversationReplyEvent(event) || !task.replyStage) {
+        return cancel(task, delivery, "EVENT_WITHOUT_AUTOMATION", now);
+    }
+    if (!client || client.id !== delivery.clientId)
+        return cancel(task, delivery, "CLIENT_NOT_FOUND", now);
+    if (!appointment || appointment.id !== delivery.appointmentId) {
+        return cancel(task, delivery, "APPOINTMENT_NOT_FOUND", now);
+    }
+    // Sem conversa nao ha janela conhecida — e sem janela a Meta nao aceita texto.
+    if (!input.conversation)
+        return cancel(task, delivery, "REPLY_WINDOW_CLOSED", now);
+    let details = {};
+    let validUntil = null;
+    if (event === "RESCHEDULE_OFFERED") {
+        const { offer } = input;
+        if (!offer || offer.status !== "OFFERED" || offer.appointmentId !== appointment.id) {
+            return cancel(task, delivery, "OFFER_CLOSED", now);
+        }
+        details = { slots: offer.slots };
+        validUntil = offer.holdEndsAt;
+    }
+    else if (event === "RESCHEDULE_CONFIRMED") {
+        details = { startsAt: appointment.startsAt };
+    }
+    const decision = evaluateConversationReply({
+        organization: input.organization,
+        profession: input.profession,
+        client,
+        sender: input.sender,
+        event,
+        stage: task.replyStage,
+        channel: delivery.channel,
+        conversation: input.conversation,
+        now,
+        validUntil,
+        details,
+    });
+    if (!decision.eligible)
+        return cancel(task, delivery, decision.reason, now);
+    if (hashBody(decision.body) !== delivery.bodyHash)
+        return cancel(task, delivery, "BODY_CHANGED", now);
+    return sendStep(task, delivery, input.sender, now, {
+        destination: decision.destination,
+        body: decision.body,
+        // Dentro da janela que a pessoa abriu: texto, nao modelo aprovado.
+        freeText: true,
+    });
 }
 /**
  * A tarefa saiu das nossas maos: `DISPATCHING` -> `DISPATCHED` (Fase 3, 13.3).

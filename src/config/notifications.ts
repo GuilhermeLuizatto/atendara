@@ -388,6 +388,7 @@ export const NOTIFICATION_DISPATCH_STOP_LABELS: Record<NotificationDispatchOnlyS
   APPOINTMENT_CLIENT_CHANGED: "O atendimento passou para outro cadastro.",
   CLIENT_NOT_FOUND: "O cadastro de quem recebe o aviso não foi encontrado.",
   BODY_CHANGED: "O texto mudou entre o planejamento e o envio.",
+  OFFER_CLOSED: "A oferta de horários já foi respondida ou encerrada antes de a mensagem sair.",
 };
 
 export const PLATFORM_NOTICE_LABELS: Record<PlatformNoticeEvent, string> = {

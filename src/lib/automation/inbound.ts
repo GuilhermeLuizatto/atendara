@@ -228,6 +228,16 @@ export function decideInbound(input: {
   return { kind: "CLASSIFY" };
 }
 
+/**
+ * A conversa de WhatsApp de uma pessoa. Por cadastro quando ha vinculo; por
+ * numero quando nao ha — numero desconhecido conversa com a clinica sem virar
+ * cadastro sozinho. O despachante usa a mesma regra para achar a conversa de
+ * uma resposta sem que a tarefa guarde o id dela.
+ */
+export function whatsappConversationId(clientId: ID | null, phone: string): ID {
+  return clientId ? `wa-${clientId}` : `wa-anonimo-${phone}`;
+}
+
 /** Identidade estável da mensagem recebida, derivada do id da Meta. */
 export function inboundMessageId(providerMessageId: string): ID {
   // A codificação preserva a identidade: retirar pontuação ou truncar fundiria

@@ -16,6 +16,7 @@ import {
   inboundWindowEndsAt,
   normalizeInboundPhone,
   parseInboundPayload,
+  whatsappConversationId,
 } from "./generated/automation-inbound.js";
 import {
   INBOUND_CONFIRMATION_NOTE,
@@ -141,7 +142,7 @@ async function semanticBeforeTransaction(ctx) {
     .limit(2)
     .get();
   const client = found.size === 1 ? stored("clients", found.docs[0]) : null;
-  const conversationId = client ? `wa-${client.id}` : `wa-anonimo-${phone}`;
+  const conversationId = whatsappConversationId(client?.id ?? null, phone);
 
   const [orgSnapshot, previousSnapshot, existingSnapshot] = await Promise.all([
     firestore.doc(paths.organization(organizationId)).get(),
@@ -247,7 +248,7 @@ export async function applyInboundEvent(event, deps = {}) {
       // A leitura participa da transação para não sobrescrever consentimento ou
       // cadastro alterado pela equipe enquanto a mensagem está sendo processada.
       const client = await clientOfPhone(transaction, organizationId, phone);
-      const conversationId = client ? `wa-${client.id}` : `wa-anonimo-${phone}`;
+      const conversationId = whatsappConversationId(client?.id ?? null, phone);
       const messageRef = firestore.doc(
         messagePath(organizationId, conversationId, messageId),
       );
@@ -905,7 +906,14 @@ async function handleRescheduleRequest(ctx) {
   } = ctx;
 
   const organization = stored("organizations", organizationSnapshot);
-  const agenda = organization?.settings?.agenda ?? null;
+  // Agenda completada pelos padroes da profissao, como a tela a mostra. O
+  // documento cru pode ter so parte dos campos — a politica gravada sem o
+  // expediente, por exemplo — e calcular horario com campo ausente derrubava
+  // o webhook, que a Meta reentregava para derrubar de novo.
+  const agenda =
+    organization && isProfessionId(organization.primaryProfession)
+      ? withOrganizationDefaults(organization, organizationId, organization.primaryProfession, now).settings.agenda
+      : null;
   const policy = policyOf(agenda?.reschedule ?? null);
 
   // Atendimentos futuros da pessoa, que sao ao mesmo tempo o candidato a

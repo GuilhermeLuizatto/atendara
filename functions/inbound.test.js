@@ -31,21 +31,6 @@ vi.mock("firebase-functions/logger", () => ({
 vi.mock("firebase-functions/v2/https", () => ({
   onRequest: (options, handler) => Object.assign(handler, { options }),
 }));
-// As respostas da assistente so ganham tarefa na etapa 4. Os testes da etapa 3
-// ligam a tabela para alcancar o planejamento; os demais usam a tabela real.
-const etapa4 = vi.hoisted(() => ({ ligada: false }));
-vi.mock("./generated/automation-config.js", async (original) => {
-  const real = await original();
-  return {
-    ...real,
-    NOTICE_TASK_TYPES: new Proxy(real.NOTICE_TASK_TYPES, {
-      get: (tabela, evento) =>
-        etapa4.ligada && typeof evento === "string" && evento.startsWith("RESCHEDULE_")
-          ? "SEND_CONVERSATION_REPLY"
-          : tabela[evento],
-    }),
-  };
-});
 vi.mock("firebase-admin/firestore", () => {
   const snapshot = (path) => ({
     id: path.split("/").pop(),
@@ -1376,7 +1361,7 @@ describe("agenda externa na oferta (13.7)", () => {
   });
 });
 
-describe("resposta da assistente planejada no webhook (etapa 3)", () => {
+describe("resposta da assistente planejada no webhook", () => {
   const CONVERSA = "wa-cliente-1";
   const REGRAS = ["RESCHEDULE_OFFERED", "RESCHEDULE_CONFIRMED", "RESCHEDULE_HANDED_OFF"].map((event) => ({
     id: `${event}:WHATSAPP`,
@@ -1488,14 +1473,10 @@ describe("resposta da assistente planejada no webhook (etapa 3)", () => {
   const tarefas = () => [...store.keys()].filter((chave) => chave.includes("/automationTasks/"));
 
   beforeEach(() => {
-    etapa4.ligada = true;
     fila = [];
     consultas.clients = [cliente()];
     consultas.appointments = [atendimento()];
     store.set(paths.organization(ORG), organizacao());
-  });
-  afterEach(() => {
-    etapa4.ligada = false;
   });
 
   it("a oferta planeja a resposta na mesma transação e a põe na fila", async () => {
@@ -1627,12 +1608,25 @@ describe("resposta da assistente planejada no webhook (etapa 3)", () => {
     expect(store.get(caminho("automationTasks", "wa-wamid.remarcar-resposta")).status).toBe("PLANNED");
   });
 
-  it("com a tabela real, antes da etapa 4, a oferta segue e nenhuma resposta é planejada", async () => {
-    etapa4.ligada = false;
+  it("agenda gravada só com a política de remarcação não derruba o webhook: usa o expediente padrão", async () => {
+    const parcial = organizacao();
+    parcial.settings.agenda = { reschedule: parcial.settings.agenda.reschedule };
+    store.set(paths.organization(ORG), parcial);
 
     const resultado = await remarcar();
 
-    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_OFFERED", reply: "EVENT_WITHOUT_AUTOMATION" });
+    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_OFFERED", reply: "PLANNED" });
+    expect(store.get(caminho("rescheduleRequests", CONVERSA)).slots.length).toBeGreaterThan(0);
+  });
+
+  it("regra da resposta desligada: a oferta segue e nenhuma resposta é planejada", async () => {
+    const semRespostas = organizacao();
+    semRespostas.settings.notifications.rules = REGRAS.map((regra) => ({ ...regra, enabled: false }));
+    store.set(paths.organization(ORG), semRespostas);
+
+    const resultado = await remarcar();
+
+    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_OFFERED", reply: "RULE_DISABLED" });
     expect(tarefas()).toHaveLength(0);
     expect(fila).toHaveLength(0);
   });

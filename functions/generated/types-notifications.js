@@ -124,6 +124,10 @@ export const NOTIFICATION_DISPATCH_ONLY_STOP_REASONS = [
     "APPOINTMENT_CLIENT_CHANGED",
     "CLIENT_NOT_FOUND",
     "BODY_CHANGED",
+    // Resposta na conversa: a oferta de horarios ja foi respondida, substituida
+    // ou encerrada antes de a mensagem sair. Mostra-la agora seria oferecer o que
+    // nao esta mais segurado.
+    "OFFER_CLOSED",
 ];
 // ------------------------------------------------ avisos da plataforma
 export const PLATFORM_NOTICE_EVENTS = [

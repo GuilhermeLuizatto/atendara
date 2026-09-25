@@ -15,6 +15,7 @@ import {
   completeDispatch,
   decideCalendarDispatch,
   decideDispatch,
+  decideReplyDispatch,
   dispatchPayloadFor,
   handoffDispatch,
   isTerminalStatus,
@@ -32,6 +33,7 @@ import {
   PLANNING_EVENT_MAX_AGE_MINUTES,
 } from "./generated/automation-config.js";
 import { providerFor } from "./generated/notifications-providers.js";
+import { whatsappConversationId } from "./generated/automation-inbound.js";
 import { bridgeProviderFrom } from "./n8n-bridge.js";
 import { runAs, SERVICE_ACCOUNTS } from "./service-accounts.js";
 import { withOrganizationDefaults } from "./generated/organization-config.js";
@@ -541,7 +543,16 @@ export async function runAutomationTask(data, deps = {}) {
   let ciphertext = null;
   const step = await firestore.runTransaction(async (transaction) => {
     const task = stored("automationTasks", await transaction.get(taskRef));
-    const context = { delivery: null, organization: null, appointment: null, client: null, professional: null, sender: null };
+    const context = {
+      delivery: null,
+      organization: null,
+      appointment: null,
+      client: null,
+      professional: null,
+      sender: null,
+      conversation: null,
+      offer: null,
+    };
     // As duas chaves, lidas na MESMA transacao que adquire a tarefa: desligar
     // no meio do caminho para o envio que ja estava a caminho.
     const switches = {
@@ -593,9 +604,16 @@ export async function runAutomationTask(data, deps = {}) {
           await transaction.get(scope.doc("professionals", context.appointment.professionalId)),
         );
       }
+      if (task.type === "SEND_CONVERSATION_REPLY" && task.clientId) {
+        // A conversa e o pedido se deduzem do cadastro, pela regra do webhook:
+        // a tarefa nao guarda o id da conversa, que carrega o do cadastro.
+        const conversationId = whatsappConversationId(task.clientId, "");
+        context.conversation = stored("conversations", await transaction.get(scope.doc("conversations", conversationId)));
+        context.offer = stored("rescheduleRequests", await transaction.get(scope.doc("rescheduleRequests", conversationId)));
+      }
     }
 
-    const decided = decideDispatch({
+    const common = {
       payload,
       task,
       delivery: context.delivery,
@@ -607,7 +625,11 @@ export async function runAutomationTask(data, deps = {}) {
       sender: context.sender,
       switches,
       now,
-    });
+    };
+    const decided =
+      task?.type === "SEND_CONVERSATION_REPLY"
+        ? decideReplyDispatch({ ...common, conversation: context.conversation, offer: context.offer })
+        : decideDispatch(common);
 
     if (decided.kind === "STOP" || decided.kind === "SEND") {
       transaction.set(taskRef, toStored("automationTasks", decided.task));

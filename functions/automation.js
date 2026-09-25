@@ -453,6 +453,12 @@ async function handoff(step, scope, { clock }) {
   const taskRef = scope.doc("automationTasks", step.task.id);
   return firestore.runTransaction(async (transaction) => {
     const current = stored("automationTasks", await transaction.get(taskRef));
+    // O retorno do executor pode chegar antes deste registro — o fluxo do
+    // WhatsApp chama o retorno e so depois responde — e ja ter aplicado o
+    // resultado. Nao e perda da execucao: o estado dele vale.
+    if (current && current.attempt >= step.task.attempt && current.status !== "DISPATCHING") {
+      return current.status;
+    }
     if (
       !current ||
       current.status !== "DISPATCHING" ||

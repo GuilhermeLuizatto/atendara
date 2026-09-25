@@ -20,9 +20,14 @@ import { messagePath, paths } from "../functions/generated/paths.js";
 import {
   PHONE,
   metaEvent,
+  rescheduleButton,
+  rescheduleText,
   seedInbound,
+  seedReschedule,
   seedTask,
 } from "./whatsapp-sandbox-fixtures.mjs";
+import { createN8nBridgeProvider } from "../functions/generated/notifications-providers-n8n-bridge.js";
+import { providerFor } from "../functions/generated/notifications-providers.js";
 
 // O sandbox não pode usar um projeto real nem alcançar um Firestore remoto.
 assert.match(
@@ -51,10 +56,14 @@ process.env.META_APP_SECRET = metaSecret;
 const { inboundWebhook } = await import("../functions/inbound.js");
 const { automationCallback } =
   await import("../functions/automation-callback.js");
+const { runAutomationTask } = await import("../functions/automation.js");
 const app = initializeApp({ projectId: "demo-atendara" });
 const db = getFirestore(app);
 const org = `whatsapp-sandbox-${Date.now()}`;
 const other = `${org}-other`;
+const rescheduleOrg = `${org}-remarcacao`;
+// O que o backend pediu à Cloud Tasks, capturado pelo endereço de emulador.
+const queuedTasks = [];
 const container = org;
 const checks = [];
 const providerCalls = [];
@@ -103,6 +112,15 @@ try {
   );
   backend.post("/inbound", inboundWebhook);
   backend.post("/callback", automationCallback);
+  // Emulador mínimo da Cloud Tasks: guarda o ponteiro em vez de agendar. O
+  // sandbox chama o despachante com ele, na hora, para ver o caminho inteiro.
+  backend.post("/projects/:project/locations/:location/queues/:queue/tasks", (req, res) => {
+    const task = req.body?.task ?? {};
+    const encoded = task.httpRequest?.body;
+    const data = encoded ? JSON.parse(Buffer.from(encoded, "base64").toString("utf8")).data : null;
+    if (data) queuedTasks.push(data);
+    res.json({ name: task.name ?? `sandbox-${queuedTasks.length}` });
+  });
   backend.post("/fake-meta", (req, res) => {
     providerCalls.push(req.body);
     if (providerError)
@@ -116,6 +134,8 @@ try {
   await once(server, "listening");
   const callbackBase = `http://host.docker.internal:${server.address().port}`;
   const localBase = `http://127.0.0.1:${server.address().port}`;
+  // A fila do backend vai para o emulador mínimo acima, nunca para o Google.
+  process.env.CLOUD_TASKS_EMULATOR_HOST = `127.0.0.1:${server.address().port}`;
   await mkdir(resolve(root, ".local"), { recursive: true });
   directory = await mkdtemp(resolve(root, ".local/whatsapp-sandbox-"));
   const workflows = [];
@@ -393,6 +413,60 @@ try {
   record(
     "Restrição geográfica do provedor encerra a tarefa com código correto",
   );
+
+  // --- Remarcação de ponta a ponta: a resposta da assistente pelo caminho real.
+  // Organização própria, com remetente e telefone próprios: o cenário SAIR acima
+  // retirou o consentimento do contato da organização principal.
+  // O cenário anterior deixa a Meta fictícia recusando; aqui ela volta a aceitar.
+  providerError = false;
+  const reschedule = await seedReschedule(db, rescheduleOrg, new Date().toISOString());
+  const bridge = createN8nBridgeProvider({
+    webhookUrl: outbound,
+    sign: (timestamp, body) => hmac(taskSecret, `${timestamp}.${body}`),
+  });
+  const providers = (channel) => providerFor(channel, { N8N_BRIDGE: () => bridge });
+  const dispatch = (pointer) =>
+    runAutomationTask(pointer, { providers, enqueue: async (payload) => queuedTasks.push(payload) });
+  const callsBefore = providerCalls.length;
+
+  assert.equal((await postMeta(rescheduleButton("wamid.remarcar", reschedule))).status, 200);
+  const offerTask = "wa-wamid.remarcar-resposta";
+  const offerPointer = queuedTasks.find((pointer) => pointer.taskId === offerTask);
+  assert.ok(offerPointer, "a oferta não chegou à fila");
+  const offerOutcome = await dispatch(offerPointer);
+  assert.equal(providerCalls.length, callsBefore + 1, "a oferta não chegou ao provedor");
+  const offerCall = providerCalls.at(-1);
+  assert.equal(offerCall.type, "text");
+  assert.equal(offerCall.to, reschedule.phone.slice(1));
+  assert.match(offerCall.text.body, /assistente virtual de Consultório do Sandbox/);
+  assert.match(offerCall.text.body, /^1\. /m);
+  assert.equal(offerCall.template, undefined);
+  const offerState = (await ref("automationTasks", offerTask, rescheduleOrg).get()).data();
+  assert.equal(offerState.status, "SUCCEEDED", `oferta terminou em ${offerState.status} (${offerOutcome.outcome})`);
+  assert.equal(
+    (await ref("notificationDeliveries", offerTask, rescheduleOrg).get()).data().status,
+    "SENT",
+  );
+  // Reentrega do mesmo ponteiro pela Cloud Tasks: nada sai de novo.
+  await dispatch(offerPointer);
+  assert.equal(providerCalls.length, callsBefore + 1);
+  record("Remarcar pelo n8n: oferta planejada, despachada e entregue como texto uma vez só");
+
+  assert.equal((await postMeta(rescheduleText("wamid.escolha", "1", reschedule))).status, 200);
+  const confirmTask = "wa-wamid.escolha-resposta";
+  const confirmPointer = queuedTasks.find((pointer) => pointer.taskId === confirmTask);
+  assert.ok(confirmPointer, "a confirmação não chegou à fila");
+  await dispatch(confirmPointer);
+  assert.equal(providerCalls.length, callsBefore + 2);
+  assert.match(providerCalls.at(-1).text.body, /^Pronto! Seu atendimento ficou para /);
+  assert.equal((await ref("automationTasks", confirmTask, rescheduleOrg).get()).data().status, "SUCCEEDED");
+  const moved = (await ref("appointments", "appointment", rescheduleOrg).get()).data();
+  assert.equal(moved.origin, "CLIENT_SELF_SERVICE");
+  assert.ok(
+    (await ref("auditLogs", "wa-wamid.escolha-remarcado", rescheduleOrg).get()).exists,
+    "a remarcação não deixou trilha",
+  );
+  record("Escolha '1' remarca o atendimento com trilha e a confirmação chega como texto");
   await writeFile(
     resolve(root, ".local/whatsapp-sandbox-result.json"),
     JSON.stringify(
@@ -415,7 +489,7 @@ try {
     server.closeAllConnections();
     await new Promise((done) => server.close(done));
   }
-  for (const id of [org, other])
+  for (const id of [org, other, rescheduleOrg])
     await db.recursiveDelete(db.doc(paths.organization(id)));
   await deleteApp(app);
   if (directory) {

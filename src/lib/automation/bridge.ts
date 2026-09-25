@@ -10,7 +10,7 @@ import type {
 } from "@/types";
 import { DELIVERY_FAILURE_CODES } from "@/types";
 
-import { isTaskExpired, isTerminalStatus } from "./tasks";
+import { isTaskExpired, isTerminalStatus, transitionTask } from "./tasks";
 
 /**
  * O contrato entre o Atendara e o n8n (Fase 3, 13.3), sem I/O.
@@ -246,15 +246,22 @@ export function decideCallback(input: {
   }
   if (payload.attempt !== task.attempt) return { kind: "IGNORE", why: "STALE_ATTEMPT" };
 
-  // So tarefa entregue ao executor aceita resultado. `SCHEDULED` ou
-  // `DISPATCHING` significam que o retorno chegou por um caminho que nao
-  // existe — e um retorno forjado tentaria exatamente isso.
-  if (task.status !== "DISPATCHED") return { kind: "REJECT", why: "NOT_AWAITING" };
+  // So tarefa entregue ao executor aceita resultado. `PLANNED` ou
+  // `SCHEDULED` significam que o retorno chegou por um caminho que nao existe —
+  // e um retorno forjado tentaria exatamente isso.
+  //
+  // `DISPATCHING` da MESMA tentativa e diferente: o executor recebeu a tarefa
+  // e respondeu antes de o despachante gravar a entrega. O fluxo do WhatsApp faz
+  // isso sempre — chama este retorno e so depois responde ao despachante —, e
+  // recusar deixava a mensagem entregue registrada como pendente ate vencer com
+  // alerta falso. A entrega e registrada aqui, e o resultado aplicado em cima.
+  if (task.status !== "DISPATCHED" && task.status !== "DISPATCHING") return { kind: "REJECT", why: "NOT_AWAITING" };
 
   if (isTaskExpired(task, now)) return { kind: "REJECT", why: "TASK_EXPIRED" };
   if (!delivery || delivery.id !== task.deliveryId) return { kind: "REJECT", why: "DELIVERY_NOT_FOUND" };
 
-  return { kind: "APPLY", task, delivery };
+  const awaiting = task.status === "DISPATCHING" ? transitionTask(task, "DISPATCHED", { at: now }) : task;
+  return { kind: "APPLY", task: awaiting, delivery };
 }
 
 /**

@@ -141,12 +141,22 @@ e aprovado para a organização; não use um ID global no n8n.
 
 **O que o fluxo faz e o que ele não faz:**
 
-- traduz o modelo aprovado que veio do Atendara (`template`) para o formato de
-  `components` da Meta, e recusa a tarefa que chegar **sem modelo** — fora da
-  janela de 24 horas a Meta só entrega modelo, e lembrete nunca acontece dentro
-  dela;
+- monta o que a tarefa pede no campo `messageType` (contrato versão 2):
+  - `TEMPLATE` — o aviso. Traduz o modelo aprovado que veio do Atendara
+    (`template`) para o formato de `components` da Meta, e recusa a tarefa
+    que chegar **sem modelo**: fora da janela de 24 horas a Meta só entrega
+    modelo, e lembrete nunca acontece dentro dela. Tarefa da versão 1, sem
+    `messageType`, é tratada como `TEMPLATE`;
+  - `TEXT` — a resposta da assistente na conversa. Manda o `body` pronto
+    como texto, sem pré-visualização de link, e recusa texto vazio ou texto
+    acompanhado de modelo. Quem confere a janela de 24 horas é o Atendara,
+    antes de despachar;
+  - qualquer outro valor é recusado (`UNKNOWN_MESSAGE_TYPE`);
 - traduz o erro da Meta para um código **nosso** (`INVALID_DESTINATION`,
-  `SENDER_NOT_ALLOWED`, `RATE_LIMITED`, `PROVIDER_UNAVAILABLE`). A mensagem
+  `SENDER_NOT_ALLOWED`, `RATE_LIMITED`, `OUTSIDE_REPLY_WINDOW`,
+  `PROVIDER_UNAVAILABLE`). O código Meta `131047` (passaram as 24 horas desde
+  a última mensagem da pessoa) vira `OUTSIDE_REPLY_WINDOW`: só acontece com
+  texto, e o número volta a receber quando a pessoa escrever de novo. A mensagem
   dela costuma repetir o número, que é contato de paciente, e por isso nunca é
   copiada. O código Meta `130497` vira `SENDER_NOT_ALLOWED`: ele indica uma
   restrição da conta remetente para o país do destinatário, não um telefone
@@ -180,8 +190,9 @@ tratado depois da validação local.
 5. No Atendara, registre o remetente em modo `TEST` com o mesmo destinatário
    permitido. O cadastro é uma operação de operadora e exige segundo fator;
    nenhuma credencial da Meta é salva no Firestore.
-6. Use um modelo aprovado pela Meta. O fluxo recusa tarefas sem modelo porque
-   mensagens fora da janela de 24 horas não podem ser texto livre.
+6. Use um modelo aprovado pela Meta para os avisos. O fluxo recusa aviso sem
+   modelo porque mensagens fora da janela de 24 horas não podem ser texto
+   livre. A resposta da assistente, que sai dentro da janela, vai como texto.
 
 ## Entrada de mensagens da Meta (13.5)
 

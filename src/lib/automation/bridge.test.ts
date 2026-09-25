@@ -15,7 +15,7 @@ import {
 import { ANCHOR, plannedReminder } from "./fixtures";
 import { transitionTask } from "./tasks";
 
-/** Uma tarefa ja entregue ao executor, que e o unico estado que aceita retorno. */
+/** Uma tarefa ja entregue ao executor. `DISPATCHING` da mesma tentativa tambem aceita retorno. */
 function awaiting(): { task: AutomationTask; delivery: NotificationDelivery } {
   const planned = plannedReminder();
   const task = ["SCHEDULED", "DISPATCHING", "DISPATCHED"].reduce(
@@ -178,12 +178,30 @@ describe("quem pode aplicar o retorno", () => {
   });
 
   it("recusa tarefa que nao esta esperando resultado", () => {
-    for (const status of ["PLANNED", "SCHEDULED", "DISPATCHING"] as const) {
+    for (const status of ["PLANNED", "SCHEDULED"] as const) {
       expect(decideCallback({ payload: callback(), task: task({ status }), delivery: delivery("x"), now: NOW })).toEqual({
         kind: "REJECT",
         why: "NOT_AWAITING",
       });
     }
+  });
+
+  it("aceita o retorno que chega antes de o despachante registrar a entrega", () => {
+    // O fluxo do WhatsApp chama o retorno e so depois responde ao despachante.
+    const emExecucao = task({ status: "DISPATCHING", dispatchingSince: NOW, history: task().history.slice(0, -1) });
+    const decision = decideCallback({ payload: callback(), task: emExecucao, delivery: delivery(emExecucao.deliveryId!), now: NOW });
+
+    if (decision.kind !== "APPLY") throw new Error(decision.kind);
+    expect(decision.task.status).toBe("DISPATCHED");
+    expect(decision.task.history.at(-1)).toMatchObject({ from: "DISPATCHING", to: "DISPATCHED" });
+  });
+
+  it("retorno de outra tentativa, com a tarefa em execucao, nao vale", () => {
+    const emExecucao = task({ status: "DISPATCHING", attempt: 2 });
+    expect(decideCallback({ payload: callback({ attempt: 1 }), task: emExecucao, delivery: delivery("x"), now: NOW })).toEqual({
+      kind: "IGNORE",
+      why: "STALE_ATTEMPT",
+    });
   });
 
   it("ignora repeticao do mesmo retorno e retorno de tentativa velha", () => {

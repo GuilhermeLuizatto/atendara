@@ -42,7 +42,7 @@ vi.mock("firebase-functions/v2/https", () => ({
 }));
 vi.mock("./rate-limit.js", () => ({ consumeRateLimit: mock.reserve }));
 vi.mock("./gemini.js", () => ({ classifyWithGemini: mock.classify }));
-const { previewAI } = await import("./ai-preview.js");
+const { previewAI, providerLabel, failureLabel } = await import("./ai-preview.js");
 const { paths, messagePath } = await import("./generated/paths.js");
 const now = new Date("2026-09-22T15:00:00Z");
 const data = buildMockDataset("PSYCHOLOGIST", now);
@@ -230,5 +230,35 @@ describe("prévia autenticada do agente", () => {
       code: "resource-exhausted",
     });
     expect(mock.classify).not.toHaveBeenCalled();
+  });
+});
+
+describe("motivo da falha do Gemini no simulador", () => {
+  it.each([
+    ["HTTP_401", "acesso negado pelo Google: credencial ou configuração do projeto (HTTP 401)"],
+    ["HTTP_403", "acesso negado pelo Google: credencial ou configuração do projeto (HTTP 403)"],
+    ["HTTP_404", "modelo não encontrado (HTTP 404)"],
+    [
+      "HTTP_429",
+      "o Google limitou as chamadas: cota, limite por minuto ou faturamento (HTTP 429)",
+    ],
+    ["HTTP_503", "erro no Google (HTTP 503)"],
+    ["HTTP_400", "o Google recusou o pedido (HTTP 400)"],
+    ["TIMEOUT", "o Google não respondeu a tempo"],
+    ["FINISH_SAFETY", "resposta interrompida pelo Google (SAFETY)"],
+    [undefined, "erro inesperado"],
+  ])("%s", (reason, label) => {
+    expect(failureLabel(reason)).toBe(label);
+  });
+  it("mostra o motivo na linha Interpretação", () => {
+    expect(providerLabel({ status: "UNAVAILABLE", failureReason: "HTTP_403" })).toBe(
+      "Gemini sem resultado: acesso negado pelo Google: credencial ou configuração do projeto (HTTP 403). Revisão humana necessária.",
+    );
+  });
+  // O limite do Atendara e o 429 do Google pedem ações diferentes.
+  it("separa o limite interno da cota do Google", () => {
+    expect(providerLabel({ status: "LIMITED" })).toBe(
+      "Limite interno do Atendara para o Gemini atingido. Revisão humana necessária.",
+    );
   });
 });

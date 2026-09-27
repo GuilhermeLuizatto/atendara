@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { getProfession } from "./generated/professions.js";
 import {
   classifyWithGemini,
+  GeminiFailure,
   generateClassification,
   geminiEnabledFor,
   minimizeMessage,
@@ -98,7 +99,7 @@ describe("Gemini sem acesso à rede", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
     await expect(
       generateClassification(input.text, { apiKey: "test", fetchImpl }),
-    ).rejects.toThrow("Provedor indisponível");
+    ).rejects.toThrow("HTTP_429");
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
   it("exige ativação por organização e ignora ativação global isolada", async () => {
@@ -195,5 +196,46 @@ describe("Gemini sem acesso à rede", () => {
     expect(
       minimizeMessage("CPF 123.456.789-00 veja https://example.com/x"),
     ).toBe("CPF [documento] veja [link]");
+  });
+  // Validação de 27/09: sem motivo não havia como separar chave, cota e modelo.
+  it.each([
+    [new GeminiFailure("HTTP_403"), "HTTP_403"],
+    [Object.assign(new Error("x"), { name: "TimeoutError" }), "TIMEOUT"],
+    [new TypeError("fetch failed"), "NETWORK"],
+    [new SyntaxError("Unexpected token"), "INVALID_JSON"],
+    [new Error("segredo paciente"), "UNEXPECTED"],
+  ])("guarda só o motivo seguro da falha %#", async (thrown, reason) => {
+    const result = await classifyWithGemini(input, {
+      env,
+      reserve: async () => {},
+      generate: async () => {
+        throw thrown;
+      },
+    });
+    expect(result.metadata).toMatchObject({ status: "UNAVAILABLE", failureReason: reason });
+    expect(JSON.stringify(result)).not.toContain("segredo paciente");
+  });
+  it("separa falha ao reservar cota de cota esgotada", async () => {
+    const generate = vi.fn();
+    const result = await classifyWithGemini(input, {
+      env,
+      generate,
+      reserve: async () => {
+        throw new Error("firestore fora");
+      },
+    });
+    expect(result.metadata).toMatchObject({ status: "UNAVAILABLE", failureReason: "QUOTA_STORE" });
+    expect(generate).not.toHaveBeenCalled();
+  });
+  it("traduz o término do Google em motivo sem texto livre", async () => {
+    await expect(
+      generateClassification(input.text, {
+        apiKey: "test",
+        fetchImpl: async () => ({
+          ok: true,
+          text: async () => JSON.stringify({ candidates: [{ finishReason: "MAX_TOKENS <x>" }] }),
+        }),
+      }),
+    ).rejects.toThrow("FINISH_MAX_TOKENS");
   });
 });

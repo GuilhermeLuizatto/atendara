@@ -6,7 +6,31 @@ import {
   needsSemanticClassification,
   parseSemanticClassification,
 } from "./generated/ai-semantic.js";
+import * as logger from "firebase-functions/logger";
 import { consumeRateLimit } from "./rate-limit.js";
+
+/**
+ * Falha do Gemini com motivo seguro para registrar: etapa e código HTTP.
+ * O corpo da resposta do provedor pode repetir a mensagem ou a credencial e
+ * continua descartado; sem motivo nenhum, porém, a validação de 27/09 não teve
+ * como distinguir chave recusada de cota ou modelo inexistente.
+ */
+export class GeminiFailure extends Error {
+  constructor(reason) {
+    super(reason);
+    this.reason = reason;
+  }
+}
+
+export function geminiFailureReason(error) {
+  if (error instanceof GeminiFailure) return error.reason;
+  if (error?.name === "TimeoutError" || error?.name === "AbortError")
+    return "TIMEOUT";
+  if (error?.name === "TypeError" && error?.message === "fetch failed")
+    return "NETWORK";
+  if (error instanceof SyntaxError) return "INVALID_JSON";
+  return "UNEXPECTED";
+}
 
 const UNKNOWN = Object.freeze({
   classification: "UNKNOWN",
@@ -74,7 +98,7 @@ export async function generateClassification(
     !text.trim() ||
     text.length > GEMINI_POLICY.maxInputCharacters
   ) {
-    throw new Error("Entrada ou configuração inválida para classificação.");
+    throw new GeminiFailure("CONFIG");
   }
   const response = await fetchImpl(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_POLICY.model}:generateContent`,
@@ -95,24 +119,22 @@ export async function generateClassification(
     },
   );
   // Erros do provedor podem repetir a entrada ou a credencial; nunca os propagamos.
-  if (!response.ok) throw new Error("Provedor indisponível.");
+  if (!response.ok) throw new GeminiFailure(`HTTP_${response.status}`);
   const raw = await response.text();
-  if (raw.length > 32768) throw new Error("Resposta excessiva do provedor.");
+  if (raw.length > 32768) throw new GeminiFailure("OVERSIZED");
   const result = JSON.parse(raw);
   const candidate = result.candidates?.[0];
-  if (
-    result.promptFeedback?.blockReason ||
-    result.candidates?.length !== 1 ||
-    candidate?.finishReason !== "STOP"
-  ) {
-    throw new Error("Classificação incompleta ou bloqueada.");
+  if (result.promptFeedback?.blockReason) throw new GeminiFailure("BLOCKED");
+  if (result.candidates?.length !== 1 || candidate?.finishReason !== "STOP") {
+    const finish = String(candidate?.finishReason ?? "NONE").replace(/[^A-Z_]/g, "").slice(0, 32);
+    throw new GeminiFailure(`FINISH_${finish || "NONE"}`);
   }
   const parts = candidate.content?.parts;
   if (
     !Array.isArray(parts) ||
     parts.some((part) => !part.thought && typeof part.text !== "string")
   ) {
-    throw new Error("Formato inválido de classificação.");
+    throw new GeminiFailure("FORMAT");
   }
   const classification = parseSemanticClassification(
     JSON.parse(
@@ -122,7 +144,7 @@ export async function generateClassification(
         .join(""),
     ),
   );
-  if (!classification) throw new Error("Classificação inválida.");
+  if (!classification) throw new GeminiFailure("INVALID_CLASSIFICATION");
   const tokenCount = (value) =>
     Number.isSafeInteger(value) && value >= 0 ? value : 0;
   return {
@@ -174,10 +196,15 @@ export async function classifyWithGemini(
       !env.GEMINI_API_KEY ||
       text.length > GEMINI_POLICY.maxInputCharacters
     ) {
-      throw new Error("Integração sem configuração completa.");
+      throw new GeminiFailure("CONFIG");
     }
-    await reserve(organizationId, "geminiOrganization");
-    await reserve("all", "geminiGlobal");
+    try {
+      await reserve(organizationId, "geminiOrganization");
+      await reserve("all", "geminiGlobal");
+    } catch (error) {
+      if (error?.code === "resource-exhausted") throw error;
+      throw new GeminiFailure("QUOTA_STORE");
+    }
     const { classification, ...usage } = await generate(text, {
       apiKey: env.GEMINI_API_KEY,
     });
@@ -191,12 +218,20 @@ export async function classifyWithGemini(
       },
     };
   } catch (error) {
+    if (error?.code === "resource-exhausted") {
+      return {
+        classification: { ...UNKNOWN },
+        metadata: { ...external, status: "LIMITED", latencyMs: Date.now() - started },
+      };
+    }
+    const failureReason = geminiFailureReason(error);
+    logger.warn("Gemini sem resultado", { organizationId, failureReason });
     return {
       classification: { ...UNKNOWN },
       metadata: {
         ...external,
-        status:
-          error?.code === "resource-exhausted" ? "LIMITED" : "UNAVAILABLE",
+        status: "UNAVAILABLE",
+        failureReason,
         latencyMs: Date.now() - started,
       },
     };

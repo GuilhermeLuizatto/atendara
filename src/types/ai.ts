@@ -61,6 +61,11 @@ export interface AIDecision extends TenantScopedEntity {
     outputTokens: number;
     thinkingTokens: number;
     latencyMs: number;
+    /**
+     * So em `UNAVAILABLE`: etapa da falha ou `HTTP_<codigo>`. Nunca o corpo da
+     * resposta do provedor, que pode repetir a mensagem ou a credencial.
+     */
+    failureReason?: string;
   };
   /**
    * Presente quando o backend retirou o conteudo pessoal a pedido do titular.

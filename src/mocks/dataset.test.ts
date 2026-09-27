@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CLASSIFICATION_META } from "@/config/classifications";
+import { getProfession } from "@/config/professions";
 import { PROFESSION_IDS } from "@/types";
 
 import { buildMockDataset } from "./dataset";
@@ -148,6 +149,23 @@ describe("conjunto de dados de demonstracao", () => {
         );
         expect(appointment).toBeDefined();
         expect(transaction.amountInCents).toBe(appointment?.priceInCents);
+      }
+    }
+  });
+
+  it("nao deixa placeholder nem erra o genero do termo nas mensagens", () => {
+    // Validacao real de 26/09: a demonstracao mostrava "O valor do sessao".
+    for (const professionId of PROFESSION_IDS) {
+      const data = buildMockDataset(professionId, ANCHOR);
+      const { appointment } = getProfession(professionId).terminology;
+      const wrong = appointment.feminine ? ["do", "o", "meu", "seu"] : ["da", "a", "minha", "sua"];
+      for (const message of data.messages) {
+        expect(message.body).not.toMatch(/\{[^}]*\}/);
+        for (const article of wrong) {
+          expect(message.body).not.toMatch(
+            new RegExp(`(^|\\s)${article} ${appointment.singularLower}\\b`, "iu"),
+          );
+        }
       }
     }
   });

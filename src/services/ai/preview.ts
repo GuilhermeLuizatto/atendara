@@ -39,9 +39,32 @@ export async function previewDecision(
       { timeout: 30000 },
     );
     return (await call(input)).data.decision;
-  } catch {
-    throw new Error(
-      "Não foi possível consultar a Dara no servidor. Verifique seu acesso e tente novamente.",
-    );
+  } catch (error) {
+    throw new Error(previewFailureMessage(error));
+  }
+}
+
+/**
+ * A mesma frase para tudo escondia a causa: na validação de 26/09 não dava
+ * para saber se faltava liberação, se o Gemini demorou ou se a chamada nem
+ * saiu. O texto do servidor não é repassado — pode citar detalhe interno.
+ */
+function previewFailureMessage(error: unknown): string {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code: unknown }).code)
+      : "";
+  switch (code) {
+    case "functions/permission-denied":
+    case "functions/unauthenticated":
+      return "Esta conta não pode consultar o Gemini: ele exige conta de profissional, com acesso ativo e o módulo liberado nesta organização.";
+    case "functions/deadline-exceeded":
+      return "O Gemini demorou mais de 30 segundos para responder. Tente de novo em instantes.";
+    case "functions/resource-exhausted":
+      return "Muitas consultas seguidas ao Gemini. Espere um minuto e tente de novo.";
+    case "functions/not-found":
+      return "Esta mensagem não está mais disponível para avaliação.";
+    default:
+      return "Não foi possível consultar a Dara no servidor. Tente novamente em instantes.";
   }
 }

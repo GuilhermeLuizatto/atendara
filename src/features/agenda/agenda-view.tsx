@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
 import { isBusySnapshotFresh } from "@/lib/agenda/calendar";
+import { isWorkingDay } from "@/lib/agenda/working-hours";
 import { cn } from "@/lib/utils/cn";
 import {
   dayLabel,
@@ -251,6 +252,7 @@ export function AgendaView() {
                       key={key}
                       dateKey={key}
                       isToday={key === agenda.today}
+                      offDay={agenda.settings ? !isWorkingDay(agenda.settings, key) : false}
                       count={agenda.byDay.get(key)?.length ?? 0}
                     />
                   ))}
@@ -272,6 +274,7 @@ export function AgendaView() {
                       now={now}
                       compact={agenda.mode === "week"}
                       busy={busyBlocks}
+                      offDay={agenda.settings ? !isWorkingDay(agenda.settings, key) : false}
                       onSelect={(appointment) => setSelectedId(appointment.id)}
                       onCreateAt={(dateKey, time) => openCreate(dateKey, time)}
                     />
@@ -314,14 +317,21 @@ export function AgendaView() {
 function DayHeading({
   dateKey,
   isToday,
+  offDay,
   count,
 }: {
   dateKey: DateKey;
   isToday: boolean;
+  offDay: boolean;
   count: number;
 }) {
   return (
-    <div className="border-border flex-1 border-l px-2 py-2 text-center first:border-l-0">
+    <div
+      className={cn(
+        "border-border flex-1 border-l px-2 py-2 text-center first:border-l-0",
+        offDay && "bg-surface-muted/60",
+      )}
+    >
       <p className="text-subtle-foreground text-[11px] uppercase">
         {shortWeekdayLabel(dateKey)}
       </p>
@@ -334,7 +344,7 @@ function DayHeading({
         {dayOfMonth(dateKey)}
       </p>
       <p className="text-subtle-foreground mt-0.5 text-[10px]">
-        {count > 0 ? `${count}` : "—"}
+        {count > 0 ? `${count}` : offDay ? "Sem atendimento" : "—"}
       </p>
     </div>
   );

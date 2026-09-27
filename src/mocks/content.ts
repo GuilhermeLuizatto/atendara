@@ -6,7 +6,9 @@ import type { MessageClassificationId, ProfessionId } from "@/types";
  * Os placeholders `{atendimento}` e `{cliente}` sao substituidos pela
  * terminologia da profissao ativa — e assim que a mesma mensagem aparece como
  * "remarcar minha sessao" para o psicologo e "remarcar meu treino" para o
- * personal trainer, sem duplicar conteudo.
+ * personal trainer, sem duplicar conteudo. O placeholder carrega junto o
+ * artigo ou o possessivo (`{meu atendimento}`, `{do atendimento}`) porque eles
+ * concordam com o termo, e o termo muda de genero entre profissoes.
  */
 
 /**
@@ -22,9 +24,9 @@ export interface AdminExchange {
 export const ADMIN_EXCHANGES: AdminExchange[] = [
   {
     category: "RESCHEDULING",
-    question: "Oi! Consigo remarcar meu {atendimento} desta semana?",
+    question: "Oi! Consigo remarcar {meu atendimento} desta semana?",
   },
-  { category: "PRICING", question: "Bom dia, qual o valor do {atendimento}?" },
+  { category: "PRICING", question: "Bom dia, qual o valor {do atendimento}?" },
   {
     category: "SCHEDULING",
     question: "Você tem horário livre na próxima terça à tarde?",
@@ -43,7 +45,7 @@ export const ADMIN_EXCHANGES: AdminExchange[] = [
   },
   {
     category: "PRICING",
-    question: "O {atendimento} online tem o mesmo valor do presencial?",
+    question: "{O atendimento} online tem o mesmo valor do presencial?",
   },
   { category: "SCHEDULING", question: "Você atende no sábado de manhã?" },
 ];
@@ -188,17 +190,17 @@ export function templatesFor(
  */
 export const AGENT_REPLIES = {
   PRICING:
-    "Oi! O valor do {atendimento} é {preco} e a duração é de {duracao} minutos. Qualquer dúvida, {profissional} responde por aqui.",
+    "Oi! O valor {do atendimento} é {preco} e a duração é de {duracao} minutos. Qualquer dúvida, {o profissional} responde por aqui.",
   SCHEDULING:
-    "Temos horários livres nesta semana. Posso reservar um deles para você e {profissional} confirma em seguida.",
+    "Temos horários livres nesta semana. Posso reservar um deles para você e {o profissional} confirma em seguida.",
   RESCHEDULING:
-    "Claro! Encontrei horários alternativos para o seu {atendimento}. Assim que você escolher, deixo reservado.",
+    "Claro! Encontrei horários alternativos para {o seu atendimento}. Assim que você escolher, deixo reservado.",
   CONFIRMATION:
-    "Seu {atendimento} está confirmado. Se precisar alterar, é só me avisar por aqui.",
+    "{Seu atendimento} está {confirmado}. Se precisar alterar, é só me avisar por aqui.",
   LOCATION:
     "O atendimento acontece no endereço cadastrado e há estacionamento na mesma rua. Envio o mapa se ajudar.",
   PAYMENT:
-    "Aceitamos Pix, cartão e transferência. O pagamento pode ser feito antes ou logo após o {atendimento}.",
+    "Aceitamos Pix, cartão e transferência. O pagamento pode ser feito antes ou logo após {o atendimento}.",
 };
 
 export const ESCALATION_REASONS: Record<MessageClassificationId, string> = {

@@ -344,7 +344,7 @@ function DayHeading({
         {dayOfMonth(dateKey)}
       </p>
       <p className="text-subtle-foreground mt-0.5 text-[10px]">
-        {count > 0 ? `${count}` : offDay ? "Sem atendimento" : "—"}
+        {count > 0 ? `${count}` : offDay ? "Fechado" : "—"}
       </p>
     </div>
   );

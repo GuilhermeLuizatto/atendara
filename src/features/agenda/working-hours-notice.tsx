@@ -1,6 +1,6 @@
 "use client";
 
-import { WEEKDAY_LABELS } from "@/config/labels";
+import { WEEKDAY_RECURRING_LABELS } from "@/config/labels";
 import { workingScheduleWarning } from "@/lib/agenda/working-hours";
 import { cn } from "@/lib/utils/cn";
 import { weekdayOf } from "@/lib/utils/datetime";
@@ -42,8 +42,8 @@ export function WorkingHoursNotice({
       className={cn("bg-warning-soft text-warning-soft-foreground rounded-lg px-3 py-2 text-sm", className)}
     >
       {warning === "OFF_DAY"
-        ? `${WEEKDAY_LABELS[weekdayOf(date)]} não é dia de atendimento na configuração da agenda.`
-        : `Este horário sai do expediente (${agenda.workdayStart}–${agenda.workdayEnd}).`}{" "}
+        ? `Fechado ${WEEKDAY_RECURRING_LABELS[weekdayOf(date)]}: este dia está fora do funcionamento na configuração da agenda.`
+        : `Fora do horário de funcionamento (${agenda.workdayStart}–${agenda.workdayEnd}).`}{" "}
       Você pode marcar mesmo assim.
     </p>
   );

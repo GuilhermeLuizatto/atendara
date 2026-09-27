@@ -8,6 +8,7 @@ import {
 } from "@/mocks/content";
 import { addMinutesISO, atTime, shiftDays } from "@/mocks/dates";
 import { formatCurrency } from "@/lib/utils/format";
+import { byGender } from "@/lib/utils/terms";
 import { decisionInputPreview } from "@/lib/privacy/decision-preview";
 import type {
   AIDecision,
@@ -86,17 +87,23 @@ export function buildInbox(
     plan.length,
   );
 
+  const { appointment, client: clientTerm, professional } = profession.terminology;
+  const phrases: Record<string, string> = {
+    "{meu atendimento}": `${byGender(appointment, "meu", "minha")} ${appointment.singularLower}`,
+    "{do atendimento}": `${byGender(appointment, "do", "da")} ${appointment.singularLower}`,
+    "{o atendimento}": `${byGender(appointment, "o", "a")} ${appointment.singularLower}`,
+    "{O atendimento}": `${byGender(appointment, "O", "A")} ${appointment.singularLower}`,
+    "{o seu atendimento}": `${byGender(appointment, "o seu", "a sua")} ${appointment.singularLower}`,
+    "{Seu atendimento}": `${byGender(appointment, "Seu", "Sua")} ${appointment.singularLower}`,
+    "{confirmado}": byGender(appointment, "confirmado", "confirmada"),
+    "{o profissional}": `${byGender(professional, "o", "a")} ${professional.singularLower}`,
+    "{atendimento}": appointment.singularLower,
+    "{cliente}": clientTerm.singularLower,
+    "{profissional}": professional.singularLower,
+  };
   const interpolate = (text: string): string =>
-    text
-      .replaceAll(
-        "{atendimento}",
-        profession.terminology.appointment.singularLower,
-      )
-      .replaceAll("{cliente}", profession.terminology.client.singularLower)
-      .replaceAll(
-        "{profissional}",
-        profession.terminology.professional.singularLower,
-      )
+    Object.entries(phrases)
+      .reduce((result, [token, value]) => result.replaceAll(token, value), text)
       .replaceAll(
         "{preco}",
         profession.defaultPriceInCents === null

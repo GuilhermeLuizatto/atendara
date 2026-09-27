@@ -56,6 +56,7 @@ export const SOURCES = [
   ["src/config/professions/index.ts", "professions"],
   ["src/config/professions/definitions.ts", "profession-definitions"],
   ["src/lib/utils/format.ts", "format"],
+  ["src/lib/utils/terms.ts", "terms"],
   ["src/lib/utils/datetime.ts", "datetime"],
   ["src/lib/finance/recurring.ts", "finance-recurring"],
   ["src/lib/finance/payment-proof.ts", "finance-payment-proof"],

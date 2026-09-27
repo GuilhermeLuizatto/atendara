@@ -66,6 +66,7 @@ export function DayColumn({
   now,
   compact = false,
   busy = [],
+  offDay = false,
   onSelect,
   onCreateAt,
 }: {
@@ -77,6 +78,8 @@ export function DayColumn({
   compact?: boolean;
   /** Ocupado recente do Google de quem está sendo visto. */
   busy?: readonly BusyBlock[];
+  /** Dia fora dos dias de atendimento configurados. */
+  offDay?: boolean;
   onSelect: (appointment: Appointment) => void;
   onCreateAt: (dateKey: DateKey, time: string) => void;
 }) {
@@ -93,7 +96,9 @@ export function DayColumn({
       className="relative flex-1"
       style={{ height: hours * PIXELS_PER_HOUR }}
     >
-      {/* Faixas de hora clicaveis: agendar comeca pelo horario vago. */}
+      {/* Faixas de hora clicaveis: agendar comeca pelo horario vago. No dia
+          sem atendimento continuam clicaveis (encaixe e decisao de quem
+          atende), mas a cor e o nome acessivel dizem que o dia esta fechado. */}
       {Array.from({ length: hours }, (_, index) => {
         const hour = startHour + index;
         return (
@@ -103,9 +108,12 @@ export function DayColumn({
             onClick={() =>
               onCreateAt(dateKey, `${String(hour).padStart(2, "0")}:00`)
             }
-            aria-label={`Agendar em ${dayLabel(dateKey)}, às ${String(hour).padStart(2, "0")}:00`}
+            aria-label={`Agendar em ${dayLabel(dateKey)}, às ${String(hour).padStart(2, "0")}:00${offDay ? ", fora dos dias de atendimento" : ""}`}
             style={{ height: PIXELS_PER_HOUR }}
-            className="border-border hover:bg-surface-muted/50 block w-full border-b transition-colors"
+            className={cn(
+              "border-border hover:bg-surface-muted/50 block w-full border-b transition-colors",
+              offDay && "bg-surface-muted/60",
+            )}
           />
         );
       })}

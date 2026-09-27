@@ -1,4 +1,5 @@
 import { formatCurrency } from "@/lib/utils/format";
+import { byGender } from "@/lib/utils/terms";
 import type {
   AIRule,
   Organization,
@@ -43,8 +44,18 @@ export function composeResponse(
   { profession, organization, rule }: ResponseContext,
 ): string | null {
   const agent = organization.settings.ai.displayName;
-  const appointment = profession.terminology.appointment.singularLower;
-  const professional = profession.terminology.professional.singularLower;
+  const { appointment: appointmentTerm, professional: professionalTerm } =
+    profession.terminology;
+  const appointment = appointmentTerm.singularLower;
+  const professional = professionalTerm.singularLower;
+  // O termo muda por profissão ("sessão", "treino"); a contração em volta
+  // precisa acompanhar, senão a Dara escreve "o valor do sessão" ao cliente.
+  const ofAppointment = `${byGender(appointmentTerm, "do", "da")} ${appointment}`;
+  const theAppointment = `${byGender(appointmentTerm, "o", "a")} ${appointment}`;
+  const ofProfessional = `${byGender(professionalTerm, "do", "da")} ${professional}`;
+  const byProfessional = `${byGender(professionalTerm, "pelo", "pela")} ${professional}`;
+  const theProfessionalLower = `${byGender(professionalTerm, "o", "a")} ${professional}`;
+  const theProfessional = `${byGender(professionalTerm, "O", "A")} ${professional}`;
   const signature = `Sou o assistente virtual do consultório — ${agent}.`;
   const payload = rule.actions.find((action) =>
     ["ALLOW_TOPIC", "PROVIDE_INFO", "AUTO_RESPONSE"].includes(action.type),
@@ -64,36 +75,36 @@ export function composeResponse(
       if (price === null) return null;
       return [
         duration === null
-          ? `O valor do ${appointment} é ${formatCurrency(price)}.`
-          : `O valor do ${appointment} é ${formatCurrency(price)} e a duração é de ${duration} minutos.`,
+          ? `O valor ${ofAppointment} é ${formatCurrency(price)}.`
+          : `O valor ${ofAppointment} é ${formatCurrency(price)} e a duração é de ${duration} minutos.`,
         signature,
       ].join(" ");
 
     case "SCHEDULING":
       return [
-        `Informe o dia e turno desejados para o ${appointment}.`,
-        `A disponibilidade e a reserva precisam ser confirmadas pelo ${professional}.`,
+        `Informe o dia e turno desejados para ${theAppointment}.`,
+        `A disponibilidade e a reserva precisam ser confirmadas ${byProfessional}.`,
         signature,
       ].join(" ");
 
     case "RESCHEDULING":
       return [
-        `Para solicitar a remarcação do ${appointment}, informe o dia e horário desejados.`,
-        `A alteração depende da confirmação do ${professional}.`,
+        `Para solicitar a remarcação ${ofAppointment}, informe o dia e horário desejados.`,
+        `A alteração depende da confirmação ${ofProfessional}.`,
         signature,
       ].join(" ");
 
     case "CONFIRMATION":
       return [
-        `Informe a data e o horário do ${appointment} que deseja confirmar.`,
-        `O ${professional} verificará a confirmação na agenda.`,
+        `Informe a data e o horário ${ofAppointment} que deseja confirmar.`,
+        `${theProfessional} verificará a confirmação na agenda.`,
         signature,
       ].join(" ");
 
     case "CANCELLATION":
       return [
         `Informe qual ${appointment} deseja cancelar.`,
-        `O cancelamento precisa ser registrado pelo ${professional}.`,
+        `O cancelamento precisa ser registrado ${byProfessional}.`,
         signature,
       ].join(" ");
 
@@ -111,7 +122,7 @@ export function composeResponse(
     case "SERVICES":
       return [
         `Posso explicar como funciona o atendimento e o que levar na primeira vez.`,
-        `Detalhes específicos ficam com o ${professional}.`,
+        `Detalhes específicos ficam com ${theProfessionalLower}.`,
         signature,
       ].join(" ");
   }

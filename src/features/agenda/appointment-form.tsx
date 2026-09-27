@@ -27,6 +27,7 @@ import type { AppointmentInput } from "@/services";
 import type { Appointment, AppointmentStatus, ServiceModality } from "@/types";
 
 import { BusyConflictNotice } from "./busy-conflict-notice";
+import { WorkingHoursNotice } from "./working-hours-notice";
 
 interface Draft {
   clientId: string;
@@ -407,6 +408,14 @@ export function AppointmentForm({
             time={draft.time}
             durationMinutes={draft.durationMinutes}
             snapshots={data?.calendarBusy ?? []}
+          />
+
+          <WorkingHoursNotice
+            className="sm:col-span-2"
+            agenda={data?.organization.settings.agenda ?? null}
+            date={draft.date}
+            time={draft.time}
+            durationMinutes={draft.durationMinutes}
           />
 
           <Field label="Valor (R$)" error={errors.priceInReais}>

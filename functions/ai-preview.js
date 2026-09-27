@@ -252,8 +252,42 @@ export function providerLabel(metadata) {
   if (metadata.status === "LOCAL_GUARD")
     return "As regras locais exigiram revisão humana; o texto não foi enviado ao Gemini.";
   if (metadata.status === "LIMITED")
-    return "Limite de uso do Gemini atingido. Revisão humana necessária.";
+    return "Limite interno do Atendara para o Gemini atingido. Revisão humana necessária.";
   if (metadata.status === "UNAVAILABLE")
-    return "Gemini indisponível ou resposta inválida. Revisão humana necessária.";
+    return `Gemini sem resultado: ${failureLabel(metadata.failureReason)}. Revisão humana necessária.`;
   return "Avaliação por regras locais. Gemini não está ativo para esta avaliação.";
+}
+
+/**
+ * Motivo legível para quem testa a Dara. Só etapa e código HTTP chegam até
+ * aqui (`geminiFailureReason`), então nada do provedor é repetido na tela.
+ */
+export function failureLabel(reason) {
+  const http = /^HTTP_(\d{3})$/.exec(reason ?? "");
+  if (http) {
+    const status = Number(http[1]);
+    // 401/403 não provam chave errada: API desligada, restrição da chave ou
+    // permissão do projeto dão o mesmo código, e o corpo que diria qual é descartado.
+    if (status === 401 || status === 403)
+      return `acesso negado pelo Google: credencial ou configuração do projeto (HTTP ${status})`;
+    if (status === 404) return "modelo não encontrado (HTTP 404)";
+    if (status === 429)
+      return "o Google limitou as chamadas: cota, limite por minuto ou faturamento (HTTP 429)";
+    if (status >= 500) return `erro no Google (HTTP ${status})`;
+    return `o Google recusou o pedido (HTTP ${status})`;
+  }
+  if (reason?.startsWith("FINISH_"))
+    return `resposta interrompida pelo Google (${reason.slice(7)})`;
+  const labels = {
+    CONFIG: "configuração incompleta no servidor",
+    QUOTA_STORE: "falha ao reservar a cota de uso",
+    TIMEOUT: "o Google não respondeu a tempo",
+    NETWORK: "sem conexão com o Google",
+    BLOCKED: "mensagem bloqueada pelo filtro do Google",
+    OVERSIZED: "resposta grande demais",
+    FORMAT: "resposta em formato inválido",
+    INVALID_JSON: "resposta em formato inválido",
+    INVALID_CLASSIFICATION: "classificação fora do formato esperado",
+  };
+  return labels[reason] ?? "erro inesperado";
 }

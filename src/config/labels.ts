@@ -122,6 +122,17 @@ export const WEEKDAY_LABELS = [
   "Sábado",
 ] as const;
 
+/** "Fechado aos sábados", "Fechado às segundas": o artigo acompanha o dia. */
+export const WEEKDAY_RECURRING_LABELS = [
+  "aos domingos",
+  "às segundas",
+  "às terças",
+  "às quartas",
+  "às quintas",
+  "às sextas",
+  "aos sábados",
+] as const;
+
 export const TRANSACTION_STATUS_LABELS: Record<TransactionStatus, string> = {
   PENDING: "Pendente",
   PAID: "Pago",

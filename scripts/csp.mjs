@@ -52,6 +52,9 @@ export function contentSecurityPolicy({ scriptHashes, projectId, authDomain, reg
       "https://graph.facebook.com",
       "https://www.facebook.com",
       "https://www.google.com/recaptcha/",
+      // Endereco pelo CEP no emissor dos recibos: so o CEP sai, e consta da
+      // Politica de Privacidade (`src/lib/geo/cep.ts`).
+      "https://viacep.com.br",
       ...(projectId ? [`https://${region}-${projectId}.cloudfunctions.net`] : []),
     ],
     "frame-src": [

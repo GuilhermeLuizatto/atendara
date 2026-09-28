@@ -71,6 +71,7 @@ describe("CSP do export estatico", () => {
     const connect = policy.split("; ").find((part) => part.startsWith("connect-src"));
 
     expect(connect).toContain("https://southamerica-east1-atendo-teste.cloudfunctions.net");
+    expect(connect, "o CEP do emissor dos recibos e buscado no ViaCEP").toContain("https://viacep.com.br");
     expect(connect).not.toMatch(/\*|stripe/);
     expect(policy).toContain("object-src 'none'");
   });

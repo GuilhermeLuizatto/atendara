@@ -6,9 +6,9 @@
  * esta versao — que e o que permite saber sobre qual texto alguem concordou.
  */
 
-export const LEGAL_VERSION = "2026-09-21-preliminar";
+export const LEGAL_VERSION = "2026-09-28-preliminar";
 
-export const LEGAL_UPDATED_AT = "21 de setembro de 2026";
+export const LEGAL_UPDATED_AT = "28 de setembro de 2026";
 
 /** Quem responde pelo servico. Vira razao social e CNPJ quando houver empresa. */
 export const OPERATOR_LEGAL_NAME = "Guilherme Luizatto";

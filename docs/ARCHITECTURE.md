@@ -870,10 +870,29 @@ permite que a pessoa crie a própria senha. PROFISSIONAL completa profissão,
 registro e especialidades no primeiro acesso. ADMIN é organizacional; os demais
 papéis podem se vincular a vários profissionais da mesma organização.
 
-PROFESSIONAL não cria a conta de um funcionário diretamente: registra uma
-solicitação ligada a si; titular, OWNER ou ADMIN decide e só então o SES envia o
-convite. Suspensão é reversível. Remoção revoga sessões, encerra o acesso e
-pseudonimiza o cadastro que precisa permanecer no histórico.
+**Limite atual antes do piloto multiprofissional.** `linkedProfessionalIds` já
+é validado e persistido no convite e no vínculo, mas ainda não participa das
+consultas do workspace nem das autorizações por documento nas Security Rules.
+Portanto, ele é metadado cadastral, não uma fronteira de segurança. Até os
+sprints 5.1–5.5 do roadmap serem concluídos, uma pessoa com acesso a um módulo
+pode alcançar os dados daquele módulo na organização inteira. A interface não
+deve apresentar as futuras abas como isolamento antes de consultas, callables e
+Rules aplicarem o mesmo vínculo.
+
+No modelo aprovado para o piloto, cliente continua sendo registro
+administrativo, sem conta. O profissional e o assistente com vínculo ativo o
+cadastram diretamente; administrar membros da equipe é outra operação e não
+entra no fluxo de cadastro de clientes. Os atos de convidar, suspender, reativar
+e remover membros passarão para operações específicas da administração da
+Atendara, com segundo fator e auditoria, sem conceder à operadora leitura geral
+dos dados do tenant.
+
+Na implementação atual, PROFESSIONAL não cria a conta de um funcionário
+diretamente: registra uma solicitação ligada a si; titular, OWNER ou ADMIN
+decide e só então o SES envia o convite. O sprint 5.2 substitui essa decisão
+pela administração da Atendara, sem mudar a origem da solicitação. Suspensão é
+reversível. Remoção revoga sessões, encerra o acesso e pseudonimiza o cadastro
+que precisa permanecer no histórico.
 
 ### Importação administrativa
 

@@ -82,8 +82,16 @@ export function amountInWords(amountInCents) {
 }
 // ------------------------------------------------------------ CPF e CNPJ
 export const onlyDigits = (value) => value.replace(/\D/g, "");
-function checkDigit(digits, weights) {
-    const sum = weights.reduce((total, weight, index) => total + Number(digits[index]) * weight, 0);
+/**
+ * Letras e numeros, em maiusculas. Desde 31/07/2026 a Receita emite CNPJ com
+ * letras nas 12 primeiras posicoes (IN RFB 2.229/2024); os dois digitos
+ * verificadores continuam numericos.
+ */
+export const documentCharacters = (value) => value.toUpperCase().replace(/[^0-9A-Z]/g, "");
+const CNPJ_PATTERN = /^[0-9A-Z]{12}[0-9]{2}$/;
+/** No CNPJ com letras, cada posicao vale o codigo ASCII menos 48; para numero da o mesmo de antes. */
+function checkDigit(characters, weights) {
+    const sum = weights.reduce((total, weight, index) => total + (characters.charCodeAt(index) - 48) * weight, 0);
     const rest = sum % 11;
     return rest < 2 ? 0 : 11 - rest;
 }
@@ -96,30 +104,74 @@ export function isValidCpf(value) {
     return first === Number(cpf[9]) && second === Number(cpf[10]);
 }
 export function isValidCnpj(value) {
-    const cnpj = onlyDigits(value);
-    if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj))
+    const cnpj = documentCharacters(value);
+    if (!CNPJ_PATTERN.test(cnpj) || /^(.)\1{13}$/.test(cnpj))
         return false;
     const first = checkDigit(cnpj, [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
     const second = checkDigit(cnpj, [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
     return first === Number(cnpj[12]) && second === Number(cnpj[13]);
 }
+/** CPF so tem numeros; qualquer letra ou mais de 11 posicoes ja e CNPJ. */
+export function documentKind(value) {
+    const characters = documentCharacters(value);
+    return /^\d{0,11}$/.test(characters) ? "CPF" : "CNPJ";
+}
+const CPF_GROUPS = [[3, ""], [3, "."], [3, "."], [2, "-"]];
+const CNPJ_GROUPS = [[2, ""], [3, "."], [3, "."], [4, "/"], [2, "-"]];
+function applyGroups(characters, groups) {
+    let result = "";
+    let start = 0;
+    for (const [size, separator] of groups) {
+        if (start >= characters.length)
+            break;
+        result += separator + characters.slice(start, start + size);
+        start += size;
+    }
+    return result;
+}
+/**
+ * Mascara enquanto se digita: ate 11 numeros, CPF; do 12o caractere em diante
+ * ou com letra, CNPJ. Letra nas duas ultimas posicoes some, porque o digito
+ * verificador do CNPJ e sempre numero.
+ */
+export function formatDocumentInput(value) {
+    const characters = [...documentCharacters(value)]
+        .filter((character, index) => index < 12 || /\d/.test(character))
+        .slice(0, 14)
+        .join("");
+    return applyGroups(characters, documentKind(characters) === "CPF" ? CPF_GROUPS : CNPJ_GROUPS);
+}
+/** Ao sair do campo: diz o que falta ou o que esta errado, sem esperar o salvar. */
+export function documentInputError(value) {
+    const characters = documentCharacters(value);
+    if (!characters)
+        return null;
+    if (documentKind(characters) === "CPF") {
+        if (characters.length < 11)
+            return "CPF incompleto: são 11 números.";
+        return isValidCpf(characters) ? null : "CPF inválido: confira os números.";
+    }
+    if (characters.length < 14)
+        return "CNPJ incompleto: são 14 caracteres.";
+    return isValidCnpj(characters) ? null : "CNPJ inválido: confira os caracteres.";
+}
 export function formatDocument(value) {
-    const digits = onlyDigits(value);
-    if (digits.length === 11)
-        return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-    if (digits.length === 14)
-        return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+    const characters = documentCharacters(value);
+    if (/^\d{11}$/.test(characters))
+        return applyGroups(characters, CPF_GROUPS);
+    if (CNPJ_PATTERN.test(characters))
+        return applyGroups(characters, CNPJ_GROUPS);
     return value;
 }
 /** Fora do recibo o documento aparece mascarado: lista, trilha, alerta. */
 export function maskDocument(value) {
     if (!value)
         return null;
-    const digits = onlyDigits(value);
-    if (digits.length === 11)
-        return `***.${digits.slice(3, 6)}.${digits.slice(6, 9)}-**`;
-    if (digits.length === 14)
-        return `**.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-**`;
+    const characters = documentCharacters(value);
+    if (/^\d{11}$/.test(characters))
+        return `***.${characters.slice(3, 6)}.${characters.slice(6, 9)}-**`;
+    if (CNPJ_PATTERN.test(characters))
+        return `**.${characters.slice(2, 5)}.${characters.slice(5, 8)}/${characters.slice(8, 12)}-**`;
     return "***";
 }
 // ------------------------------------------------------------ validacao
@@ -130,18 +182,30 @@ export const RECEIPT_LIMITS = {
     descriptionMax: 200,
     cancelReasonMax: 200,
 };
-/** Quem emite: CPF (autonomo) ou CNPJ (clinica), sempre com os digitos verificadores. */
+/**
+ * Quem emite: CPF (autonomo) ou CNPJ (clinica, inclusive o com letras), sempre
+ * com os digitos verificadores. A cidade escolhida da lista do IBGE e conferida
+ * so na tela: a lista nao cabe nas Security Rules nem precisa ir ao backend.
+ */
 export function validateIssuer(input) {
     const name = input.issuerName?.trim() ?? "";
-    const document = onlyDigits(input.issuerDocument ?? "");
+    const document = documentCharacters(input.issuerDocument ?? "");
     const address = input.issuerAddress?.trim() ?? "";
     const city = input.issuerCity?.trim() ?? "";
     if (!name || name.length > RECEIPT_LIMITS.nameMax)
         return err("Informe o nome de quem emite o recibo.");
-    if (!(isValidCpf(document) || isValidCnpj(document)))
+    const validDocument = /^\d{11}$/.test(document) ? isValidCpf(document) : isValidCnpj(document);
+    if (!validDocument)
         return err("Informe um CPF ou CNPJ válido de quem emite.");
-    if (!address || address.length > RECEIPT_LIMITS.addressMax)
+    if (!address)
         return err("Informe o endereço de quem emite.");
+    if (address.length > RECEIPT_LIMITS.addressMax) {
+        return err(`O endereço tem no máximo ${RECEIPT_LIMITS.addressMax} caracteres; hoje tem ${address.length}.`);
+    }
+    // O endereco vindo do CEP deixa o lugar do numero vazio ("Rua Um, , Centro");
+    // sem esta trava o recibo sairia impresso assim.
+    if (/,\s*,/.test(address))
+        return err("Complete o número do endereço: há um espaço vazio entre duas vírgulas.");
     if (!city || city.length > RECEIPT_LIMITS.cityMax)
         return err("Informe a cidade da emissão.");
     return ok({ issuerName: name, issuerDocument: document, issuerAddress: address, issuerCity: city });

@@ -87,6 +87,12 @@ export default function PrivacidadePage() {
             autenticação e funções. O banco e as funções ficam em São Paulo.
           </li>
           <li>
+            <strong>ViaCEP</strong> — busca do endereço pelo CEP na tela do
+            emissor dos recibos, quando a pessoa digita um CEP completo. Só o CEP
+            vai ao serviço, e o Atendara não o grava. Como em qualquer acesso a um
+            site, o ViaCEP recebe também o endereço IP do navegador.
+          </li>
+          <li>
             <strong>Autoridades</strong>, quando a lei ou uma ordem judicial
             exigir.
           </li>

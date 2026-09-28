@@ -254,11 +254,15 @@ try {
   await denied(getDoc(counterOf("ownerRole")));
   await deniedBecause("mexendo no contador", setDoc(counterOf("ownerRole"), { organizationId: "org-a", next: 1 }));
   await deniedBecause("secretaria configurando emissor", setDoc(issuerOf("assistantRole"), issuer()));
-  await deniedBecause("documento com letras", setDoc(issuerOf("a"), issuer({ issuerDocument: "529.982.247-25" })));
+  await deniedBecause("documento com pontuacao", setDoc(issuerOf("a"), issuer({ issuerDocument: "529.982.247-25" })));
+  await deniedBecause("CNPJ com letra minuscula", setDoc(issuerOf("a"), issuer({ issuerDocument: "12abc34501de35" })));
+  await deniedBecause("CNPJ com letra no digito verificador", setDoc(issuerOf("a"), issuer({ issuerDocument: "12ABC34501DE3X" })));
+  await deniedBecause("CPF com letra", setDoc(issuerOf("a"), issuer({ issuerDocument: "5299822472A" })));
   await deniedBecause("outro id de emissor", setDoc(issuerOf("a", "org-a", "segundo"), issuer({ id: "segundo" })));
   await deniedBecause("emissor de outro tenant", setDoc(issuerOf("a", "org-b"), issuer({ organizationId: "org-b" })));
   await allowed(setDoc(issuerOf("a"), issuer()));
   await allowed(setDoc(issuerOf("adminRole"), issuer({ issuerDocument: "11222333000181" })));
+  await allowed(setDoc(issuerOf("adminRole"), issuer({ issuerDocument: "12ABC34501DE35", issuerCity: "Santos/SP" })));
   await denied(deleteDoc(issuerOf("ownerRole")));
   await denied(setDoc(doc(db("a"), paths.document("org-a", "clients", "foreign")), { organizationId: "org-b" }));
   await denied(getDoc(doc(withTotp("admin"), paths.initialPassword("a"))));
@@ -736,6 +740,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 459);
+  assert.equal(checks, 463);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

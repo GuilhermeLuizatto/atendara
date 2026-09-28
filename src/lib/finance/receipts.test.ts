@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   amountInWords,
   cancelReasonError,
+  documentInputError,
+  documentKind,
   formatDocument,
+  formatDocumentInput,
   isValidCnpj,
   isValidCpf,
   maskDocument,
@@ -69,6 +72,75 @@ describe("CPF e CNPJ", () => {
   });
 });
 
+describe("CNPJ com letras (Receita, desde 31/07/2026)", () => {
+  // Exemplo da documentação da Receita e o primeiro CNPJ emitido no formato novo.
+  const ALPHA = "12ABC34501DE35";
+  const FIRST_ISSUED = "00.000.000/E08G-12";
+
+  it("confere os dígitos verificadores pelo código ASCII menos 48", () => {
+    expect(isValidCnpj(ALPHA)).toBe(true);
+    expect(isValidCnpj(FIRST_ISSUED)).toBe(true);
+    expect(isValidCnpj("12.abc.345/01de-35")).toBe(true);
+    expect(isValidCnpj("12ABC34501DE36")).toBe(false);
+    expect(isValidCnpj("12ABC34501DE3X")).toBe(false);
+    expect(isValidCnpj("AAAAAAAAAAAAAA")).toBe(false);
+  });
+
+  it("formata e mascara", () => {
+    expect(formatDocument(ALPHA)).toBe("12.ABC.345/01DE-35");
+    expect(maskDocument(ALPHA)).toBe("**.ABC.345/01DE-**");
+  });
+
+  it("emissor guarda o CNPJ em maiúsculas, sem pontuação", () => {
+    const issuer = { issuerName: "Clínica Nova", issuerDocument: "12.abc.345/01de-35", issuerAddress: "Rua Um, 10", issuerCity: "Santos/SP" };
+    expect(validateIssuer(issuer)).toMatchObject({ ok: true, value: { issuerDocument: ALPHA } });
+  });
+
+  it("CPF não aceita letra no meio", () => {
+    const issuer = { issuerName: "Ana", issuerDocument: "529.982.247-2A5", issuerAddress: "Rua Um, 10", issuerCity: "Santos/SP" };
+    expect(validateIssuer(issuer).ok).toBe(false);
+  });
+});
+
+describe("máscara enquanto se digita", () => {
+  it.each([
+    ["", ""],
+    ["529", "529"],
+    ["5299", "529.9"],
+    ["5299822", "529.982.2"],
+    ["52998224725", "529.982.247-25"],
+    ["529982247250", "52.998.224/7250"],
+    ["11222333000181", "11.222.333/0001-81"],
+    ["112223330001819999", "11.222.333/0001-81"],
+    ["12abc", "12.ABC"],
+    ["12ABC34501DE35", "12.ABC.345/01DE-35"],
+    ["12ABC34501DEX5", "12.ABC.345/01DE-5"],
+    [" 529.982.247-25 ", "529.982.247-25"],
+  ])("%j vira %j", (typed, shown) => {
+    expect(formatDocumentInput(typed)).toBe(shown);
+  });
+
+  it("limita o campo a 18 caracteres, o tamanho do CNPJ formatado", () => {
+    expect(formatDocumentInput("x".repeat(60) + "1".repeat(60)).length).toBeLessThanOrEqual(18);
+  });
+
+  it("reconhece o tipo pelo que foi digitado", () => {
+    expect(documentKind("529.982.247-25")).toBe("CPF");
+    expect(documentKind("529982247250")).toBe("CNPJ");
+    expect(documentKind("12A")).toBe("CNPJ");
+  });
+
+  it("explica o erro ao sair do campo", () => {
+    expect(documentInputError("")).toBeNull();
+    expect(documentInputError("529.982")).toBe("CPF incompleto: são 11 números.");
+    expect(documentInputError("529.982.247-24")).toBe("CPF inválido: confira os números.");
+    expect(documentInputError("529.982.247-25")).toBeNull();
+    expect(documentInputError("11.222.333/0001")).toBe("CNPJ incompleto: são 14 caracteres.");
+    expect(documentInputError("11.222.333/0001-80")).toBe("CNPJ inválido: confira os caracteres.");
+    expect(documentInputError("12.ABC.345/01DE-35")).toBeNull();
+  });
+});
+
 describe("validação", () => {
   const issuer = { issuerName: " Ana Psicologa ", issuerDocument: "529.982.247-25", issuerAddress: "Rua Um, 10", issuerCity: "Santos" };
 
@@ -77,6 +149,19 @@ describe("validação", () => {
     expect(validateIssuer({ ...issuer, issuerDocument: CNPJ }).ok).toBe(true);
     expect(validateIssuer({ ...issuer, issuerDocument: "123" }).ok).toBe(false);
     expect(validateIssuer({ ...issuer, issuerCity: "" }).ok).toBe(false);
+  });
+
+  it("emissor explica o que falta no endereço", () => {
+    expect(validateIssuer({ ...issuer, issuerAddress: "  " })).toEqual({ ok: false, error: "Informe o endereço de quem emite." });
+    expect(validateIssuer({ ...issuer, issuerAddress: "R".repeat(201) })).toEqual({
+      ok: false,
+      error: "O endereço tem no máximo 200 caracteres; hoje tem 201.",
+    });
+    expect(validateIssuer({ ...issuer, issuerAddress: "Praça da Sé, , Sé, CEP 01001-000" })).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("Complete o número"),
+    });
+    expect(validateIssuer({ ...issuer, issuerAddress: "Praça da Sé, 100, Sé, CEP 01001-000" }).ok).toBe(true);
   });
 
   const request = { payerName: "Bruno", payerDocument: null, beneficiaryName: null, beneficiaryDocument: null, description: "Sessão" };

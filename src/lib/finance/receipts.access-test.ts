@@ -49,7 +49,7 @@ beforeAll(async () => {
   initializeAdminSdk(PROJECT);
   await adminDb().doc(paths.organization(ORG)).set({ id: ORG, name: "Consultório Recibos", primaryProfession: "PSYCHOLOGIST", ownerId: "dono-r" });
   await adminDb().doc(paths.document(ORG, "professionals", "prof-r")).set({ id: "prof-r", organizationId: ORG, profession: "PSYCHOLOGIST", licenseNumber: "06/12345", displayName: "Profissional R" });
-  for (const id of ["pago-1", "pago-2", "pago-3"]) await transaction(id, "PAID");
+  for (const id of ["pago-1", "pago-2", "pago-3", "pago-4"]) await transaction(id, "PAID");
   await transaction("aberto", "PENDING");
   owner = await member("dono-r", "OWNER");
   assistant = await member("secretaria-r", "ASSISTANT");
@@ -104,5 +104,15 @@ describe("Cobrador C3 — recibos", () => {
 
     const reissued = await issue(owner, "pago-1");
     expect(reissued.number).toBe(4);
+  });
+
+  it("emissor com CNPJ de letras (Receita, desde 31/07/2026) e cidade com UF emite", async () => {
+    await adminDb().doc(paths.document(ORG, "receiptSettings", "organization")).set({
+      id: "organization", organizationId: ORG, issuerName: "Clínica Nova", issuerDocument: "12ABC34501DE35", issuerAddress: "Rua Um, 10, Centro, CEP 11010-000", issuerCity: "Santos/SP",
+    });
+    const { receiptId, number } = await issue(owner, "pago-4");
+    expect(number).toBe(5);
+    const stored = (await adminDb().doc(paths.document(ORG, "receipts", receiptId)).get()).data();
+    expect(stored).toMatchObject({ issuerDocument: "12ABC34501DE35", issuerCity: "Santos/SP" });
   });
 });

@@ -14,7 +14,7 @@ export interface MemberRequest {
   requestedBy: ID;
   displayName: string;
   email: string;
-  role: Exclude<Role, "OWNER" | "ADMIN">;
+  role: Extract<Role, "PROFESSIONAL" | "ASSISTANT">;
   linkedProfessionalIds: ID[];
   status: MemberRequestStatus;
   decidedBy: ID | null;
@@ -37,7 +37,7 @@ export interface MemberInvitation {
   organizationId: ID;
   email: string;
   displayName: string;
-  role: Exclude<Role, "OWNER">;
+  role: Extract<Role, "PROFESSIONAL" | "ASSISTANT">;
   linkedProfessionalIds: ID[];
   status: MemberInvitationStatus;
   invitedBy: ID;

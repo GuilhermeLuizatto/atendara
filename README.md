@@ -372,6 +372,11 @@ mesmo escopo.
 | **5.4 — Contexto por abas e clientes** | Criar um contexto global por profissional, com uma aba para cada vínculo ativo e sem opção silenciosa de combinar dados. O profissional ou assistente autorizado cadastra clientes diretamente; a administração da Atendara não participa do fluxo cotidiano. Um cliente da organização pode ser associado explicitamente a mais de um profissional sem duplicar o cadastro. | Agenda, clientes, mensagens, financeiro e Dara seguem a mesma aba ativa. Trocar ou perder vínculo troca ou fecha o contexto imediatamente. O cadastro do cliente não cria conta de acesso. |
 | **5.5 — Migração e liberação** | Preservar UID, e-mail, senha, organização, perfis e histórico; mapear papéis antigos, preencher vínculos explícitos e revisar manualmente organizações multiprofissionais ambíguas. | Migração repetível e auditável, sem concessão implícita de acesso. Contagens antes/depois conferidas, testes completos aprovados e piloto bloqueado enquanto houver membro ativo sem escopo resolvido. |
 
+Situação do sprint 5.2: concluído no código. Aprovação/recusa, convite,
+suspensão, reativação e remoção são exclusivos da administração da Atendara,
+com TOTP, motivo e trilha append-only. Remover revoga sessões, pseudonimiza os
+dados pessoais e apaga o login sem alterar assinatura nem validade da plataforma.
+
 Fica fora destes sprints: portal do cliente, assistente em várias organizações,
 permissões personalizadas por usuário, transferência de titularidade e visão
 consolidada de vários profissionais. Essas expansões só entram depois de o

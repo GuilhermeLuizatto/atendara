@@ -416,9 +416,9 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // Pedidos, convites e modelos de importacao passam por callables. Isso
-      // permite conferir papel, titularidade, uma unica organizacao por conta,
-      // token de convite e a gravacao da trilha no mesmo ato.
+      // Pedidos, convites e modelos de importacao passam por callables. A
+      // organizacao so solicita membros; decidir, suspender, reativar e remover
+      // sao atos da operadora, com segundo fator e trilha de plataforma.
       match /memberRequests/{requestId} {
         allow read, write: if false;
       }

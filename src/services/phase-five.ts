@@ -44,8 +44,23 @@ export interface TeamView {
 export interface TeamInviteInput {
   displayName: string;
   email: string;
-  role: Exclude<Role, "OWNER">;
+  role: Extract<Role, "PROFESSIONAL" | "ASSISTANT">;
   linkedProfessionalIds: string[];
+}
+
+export interface PlatformTeamRequestView extends MemberRequest {
+  organizationName: string;
+}
+
+export interface PlatformTeamMemberView extends TeamMemberView {
+  organizationName: string;
+  ownerId: string | null;
+  isOrganizationHolder: boolean;
+}
+
+export interface PlatformTeamAdministrationView {
+  requests: PlatformTeamRequestView[];
+  members: PlatformTeamMemberView[];
 }
 
 export interface ImportCommitRow {
@@ -63,13 +78,18 @@ export interface SupportThread {
 export const phaseFiveService = {
   team: {
     list: () => call<Record<string, never>, TeamView>("listTeam", {}),
-    invite: (input: TeamInviteInput) => call<TeamInviteInput, { invitationId: string; expiresAt: string }>("inviteTeamMember", input),
-    request: (input: Omit<TeamInviteInput, "role"> & { role: "PROFESSIONAL" | "ASSISTANT" | "VIEWER" }) => call("requestTeamMember", input),
-    decide: (requestId: string, decision: "APPROVED" | "REJECTED", reason: string) => call("decideTeamRequest", { requestId, decision, reason }),
-    setStatus: (memberId: string, status: "ACTIVE" | "SUSPENDED") => call("setTeamMemberStatus", { memberId, status }),
-    remove: (memberId: string) => call("removeTeamMember", { memberId }),
+    request: (input: TeamInviteInput) => call("requestTeamMember", input),
     inspectInvitation: (token: string) => call<{ token: string }, { email: string; displayName: string; role: Role; organizationName: string; professions: string[] }>("inspectTeamInvitation", { token }),
     acceptInvitation: (input: { token: string; password: string; profession?: string; phone?: string | null; licenseNumber?: string | null; specialties?: string[] }) => call("acceptTeamInvitation", input),
+  },
+  platformTeam: {
+    list: () => call<Record<string, never>, PlatformTeamAdministrationView>("listPlatformTeamAdministration", {}),
+    decide: (organizationId: string, requestId: string, decision: "APPROVED" | "REJECTED", reason: string) =>
+      call("decidePlatformTeamRequest", { organizationId, requestId, decision, reason }),
+    setStatus: (organizationId: string, memberId: string, status: "ACTIVE" | "SUSPENDED", reason: string) =>
+      call("setPlatformTeamMemberStatus", { organizationId, memberId, status, reason }),
+    remove: (organizationId: string, memberId: string, reason: string) =>
+      call("removePlatformTeamMember", { organizationId, memberId, reason }),
   },
   imports: {
     mappings: () => call<Record<string, never>, { mappings: ImportMapping[] }>("listImportMappings", {}),

@@ -51,8 +51,7 @@ describe("matriz de permissoes", () => {
   });
 
   it("nao deixa a secretaria gerenciar equipe nem excluir cadastros", () => {
-    expect(hasPermission("ASSISTANT", "member:invite")).toBe(false);
-    expect(hasPermission("ASSISTANT", "member:remove")).toBe(false);
+    expect(hasPermission("ASSISTANT", "member:request")).toBe(false);
     expect(hasPermission("ASSISTANT", "client:delete")).toBe(false);
     // Mas opera o dia a dia:
     expect(hasPermission("ASSISTANT", "appointment:create")).toBe(true);
@@ -113,9 +112,6 @@ describe("matriz de permissoes", () => {
         "notificationSettings:update",
         "agendaSettings:update",
         "automationSwitch:manage",
-        "member:invite",
-        "member:update",
-        "member:remove",
         "organizationBranding:update",
         "privacy:export",
         "privacy:erase",
@@ -129,6 +125,15 @@ describe("matriz de permissoes", () => {
     expect(new Set(gained)).toEqual(new Set(ORGANIZATION_HOLDER_PERMISSIONS));
     expect(gained).not.toContain("organization:update");
     expect(gained).not.toContain("auditLog:read");
+  });
+
+  it("reserva a administracao de membros a operadora", () => {
+    for (const role of ROLES) {
+      expect(permissionsForRole(role)).not.toContain("member:invite");
+      expect(permissionsForRole(role)).not.toContain("member:update");
+      expect(permissionsForRole(role)).not.toContain("member:remove");
+    }
+    expect(hasPermission("PROFESSIONAL", "member:request")).toBe(true);
   });
 
   it("nao amplia o papel de quem nao e titular", () => {

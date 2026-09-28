@@ -96,6 +96,13 @@ export const PLATFORM_AUDIT_ACTIONS = [
   "PLATFORM_ADMIN_CREATED",
   "PLATFORM_ADMIN_SUSPENDED",
   "PLATFORM_ADMIN_REACTIVATED",
+  // A gestao de membros e ato da operadora: o tenant solicita, mas nao cria,
+  // suspende nem remove contas por conta propria.
+  "TEAM_REQUEST_APPROVED",
+  "TEAM_REQUEST_REJECTED",
+  "TEAM_MEMBER_SUSPENDED",
+  "TEAM_MEMBER_REACTIVATED",
+  "TEAM_MEMBER_REMOVED",
   // Unico ato desta trilha que nao e da operadora: o titular encerra a propria
   // organizacao. Fica aqui porque o tenant deixa de existir para guardar o
   // registro, e porque encerrar organizacao e assunto do contrato com a
@@ -161,6 +168,8 @@ export const PLATFORM_PERMISSIONS = [
   "accessGrant:revoke",
   "professionChange:read",
   "professionChange:decide",
+  "teamAdministration:read",
+  "teamAdministration:decide",
   "platformBilling:read",
   "platformAudit:read",
   // So da chave mestra: criar, suspender e reativar administradores.

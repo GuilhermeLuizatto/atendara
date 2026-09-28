@@ -277,7 +277,7 @@ testes de ponta a ponta.
 | **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco | ⏸️ Em espera; validação externa pendente |
 | **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | 🟨 Código integrado à `main` e Functions publicadas; validações reais pendentes |
 | **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | ✅ Gemini por allowlist em 6 organizações; acerto revisado e entrega nos indicadores |
-| **5** | Produto: equipes, importação administrativa, suporte, marca e preparação da cobrança | 🟨 Código concluído; validações reais e catálogo de planos pendentes |
+| **5** | Produto: equipes, importação administrativa, suporte, marca e preparação da cobrança | 🟨 Base concluída; escopo multiprofissional, administração de membros e migração pendentes |
 | **6** | Expansão: portfólio da Estética, marketplace e cobrador dos clientes | ⬜ |
 
 As validações externas ou manuais que dependem do titular ficam no
@@ -344,15 +344,38 @@ resultado.
    O reteste real do e-mail passou em 25/09/2026 com um endereço inédito: a
    mensagem chegou à caixa principal e o link confirmou o endereço. A 3B
    continua em espera pela validação externa da Meta.
-6. A Fase 5 está concluída no código em branch isolada: equipe por convite de
-   sete dias, solicitação interna por profissional, importação CSV/XLSX com
+6. A Fase 5 tem a base concluída no código: equipe por convite de sete dias,
+   solicitação interna por profissional, importação CSV/XLSX com
    mapeamento e decisão por duplicidade, chamados autenticados no painel,
    anexos protegidos e logo da organização. O Amazon SES envia somente os
-   convites e avisos; a conversa de suporte permanece no painel. O catálogo e
-   os preços dos planos continuam deliberadamente em espera, e a Stripe segue
-   travada para uso real até a decisão comercial, jurídica, fiscal e o teste
+   convites e avisos; a conversa de suporte permanece no painel. O vínculo com
+   vários profissionais já é armazenado, mas ainda não limita as consultas,
+   escritas e Security Rules dentro da organização. Por isso a frente de equipe
+   não está liberada para o piloto multiprofissional. O catálogo e os preços
+   dos planos continuam deliberadamente em espera, e a Stripe segue travada
+   para uso real até a decisão comercial, jurídica, fiscal e o teste
    explicitamente autorizado. O roteiro que depende do titular está no
    [checklist vivo](docs/VALIDACOES-REAIS-PENDENTES.pdf).
+
+### Sprints seguintes — acesso multiprofissional do piloto
+
+Estes sprints fecham a diferença entre registrar um vínculo e usá-lo como
+fronteira real de autorização. A ordem é deliberada: nenhuma aba pode ser
+tratada como proteção antes de consultas, backend e Security Rules aplicarem o
+mesmo escopo.
+
+| Sprint | Entrega | Critério de aceite |
+| --- | --- | --- |
+| **5.1 — Contrato de acesso** | Consolidar `PLATFORM_ADMIN` como papel interno da Atendara, `PROFESSIONAL` e `ASSISTANT` como acessos da organização, e `Client` como cadastro administrativo sem login no piloto. Titularidade continua separada do papel. | Novos convites não oferecem OWNER, ADMIN organizacional ou VIEWER; compatibilidade com contas antigas permanece documentada e testada. |
+| **5.2 — Administração de membros** | Fazer convite, suspensão, reativação e remoção por operações específicas da administração da Atendara, com segundo fator, motivo e auditoria. O profissional solicita a inclusão, mas não cria a conta diretamente. | O administrador não ganha leitura geral do tenant; cada ato administrativo é autorizado no backend, revoga sessões quando necessário e gera registro append-only. |
+| **5.3 — Escopo por vínculo** | Aplicar `linkedProfessionalIds` nas consultas, escritas, callables e Security Rules de agenda, clientes, mensagens, financeiro, regras e alertas. Vínculo vazio nunca significa acesso a todos. | Um assistente ligado aos profissionais A e B não lê nem altera dados do profissional C, inclusive por chamada direta ao Firestore ou às Functions. Testes de emulador cobrem leitura, criação, alteração e remoção de vínculo. |
+| **5.4 — Contexto por abas e clientes** | Criar um contexto global por profissional, com uma aba para cada vínculo ativo e sem opção silenciosa de combinar dados. O profissional ou assistente autorizado cadastra clientes diretamente; a administração da Atendara não participa do fluxo cotidiano. Um cliente da organização pode ser associado explicitamente a mais de um profissional sem duplicar o cadastro. | Agenda, clientes, mensagens, financeiro e Dara seguem a mesma aba ativa. Trocar ou perder vínculo troca ou fecha o contexto imediatamente. O cadastro do cliente não cria conta de acesso. |
+| **5.5 — Migração e liberação** | Preservar UID, e-mail, senha, organização, perfis e histórico; mapear papéis antigos, preencher vínculos explícitos e revisar manualmente organizações multiprofissionais ambíguas. | Migração repetível e auditável, sem concessão implícita de acesso. Contagens antes/depois conferidas, testes completos aprovados e piloto bloqueado enquanto houver membro ativo sem escopo resolvido. |
+
+Fica fora destes sprints: portal do cliente, assistente em várias organizações,
+permissões personalizadas por usuário, transferência de titularidade e visão
+consolidada de vários profissionais. Essas expansões só entram depois de o
+isolamento individual do piloto estar validado.
 
 Planos e billing da plataforma continuam em modo de testes. A IA externa
 (Gemini) está ativa em produção só para as organizações da allowlist

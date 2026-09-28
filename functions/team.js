@@ -4,10 +4,12 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 
-import { ACCOUNT_CALL_OPTIONS, parse } from "./platform-auth.js";
+import { ACCOUNT_CALL_OPTIONS, adminOf, parse } from "./platform-auth.js";
 import { passwordPolicyError } from "./generated/password-policy.js";
+import { TEAM_ADMIN_REASON_LENGTH } from "./generated/platform-config.js";
 import { paths } from "./generated/paths.js";
 import { fromStored, toStored } from "./firestore-dates.js";
+import { auditEntry } from "./platform.js";
 import { runAs } from "./service-accounts.js";
 import { consumeRateLimit, networkSubject } from "./rate-limit.js";
 import { escapeHtml, emailShell, sendEmail } from "./ses.js";
@@ -19,16 +21,28 @@ const OPTIONS = { ...ACCOUNT_CALL_OPTIONS, secrets: SECRETS, ...runAs("contas") 
 const INVITATION_DAYS = 7;
 const id = z.string().trim().min(1).max(128).refine((value) => !value.includes("/"));
 const email = z.email().trim().toLowerCase();
-const role = z.enum(["ADMIN", "PROFESSIONAL", "ASSISTANT", "VIEWER"]);
+const role = z.enum(["PROFESSIONAL", "ASSISTANT"]);
 const linked = z.array(id).max(50);
-const inviteSchema = z.object({
+const requestSchema = z.object({
   displayName: z.string().trim().min(3).max(100),
   email,
   role,
   linkedProfessionalIds: linked,
 }).strict();
-const requestSchema = inviteSchema.extend({ role: z.enum(["PROFESSIONAL", "ASSISTANT", "VIEWER"]) }).strict();
-const decisionSchema = z.object({ requestId: id, decision: z.enum(["APPROVED", "REJECTED"]), reason: z.string().trim().max(300) }).strict();
+const reason = z.string().trim().min(TEAM_ADMIN_REASON_LENGTH.min).max(TEAM_ADMIN_REASON_LENGTH.max);
+const platformDecisionSchema = z.object({
+  organizationId: id,
+  requestId: id,
+  decision: z.enum(["APPROVED", "REJECTED"]),
+  reason,
+}).strict();
+const platformMemberStatusSchema = z.object({
+  organizationId: id,
+  memberId: id,
+  status: z.enum(["ACTIVE", "SUSPENDED"]),
+  reason,
+}).strict();
+const platformMemberRemovalSchema = z.object({ organizationId: id, memberId: id, reason }).strict();
 const invitationTokenSchema = z.object({ token: z.string().min(32).max(512) }).strict();
 const acceptSchema = invitationTokenSchema.extend({
   password: z.string().min(1).max(128),
@@ -37,8 +51,6 @@ const acceptSchema = invitationTokenSchema.extend({
   licenseNumber: z.string().trim().max(60).optional().nullable(),
   specialties: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
 }).strict();
-const memberSchema = z.object({ memberId: id, status: z.enum(["ACTIVE", "SUSPENDED"]).optional() }).strict();
-const memberStatusSchema = z.object({ memberId: id, status: z.enum(["ACTIVE", "SUSPENDED"]) }).strict();
 const emptySchema = z.object({}).strict();
 
 function tokenHash(token) {
@@ -72,13 +84,6 @@ async function ensureEmailAvailable(address) {
   }
 }
 
-function authorizeRole(actor, targetRole) {
-  if (targetRole === "OWNER") throw new HttpsError("invalid-argument", "O titular da organização é intransferível.");
-  if (targetRole === "ADMIN" && !actor.isHolder && actor.membership.role !== "OWNER") {
-    throw new HttpsError("permission-denied", "Somente o titular gerencia administradores.");
-  }
-}
-
 function invitationDraft(actor, input, token, createdAt = now()) {
   return {
     id: randomUUID(),
@@ -86,7 +91,7 @@ function invitationDraft(actor, input, token, createdAt = now()) {
     email: input.email,
     displayName: input.displayName,
     role: input.role,
-    linkedProfessionalIds: input.role === "ADMIN" ? [] : input.linkedProfessionalIds,
+    linkedProfessionalIds: input.linkedProfessionalIds,
     status: "PENDING",
     invitedBy: actor.userId,
     tokenHash: tokenHash(token),
@@ -114,30 +119,6 @@ async function deliverInvitation(invitation, token, organization) {
     }),
     text: `Olá, ${invitation.displayName}. Confirme o convite para ${organization.name} e crie sua senha: ${url}\nO link vence em ${INVITATION_DAYS} dias.`,
   });
-}
-
-async function createAndSendInvitation(actor, input) {
-  authorizeRole(actor, input.role);
-  await ensureEmailAvailable(input.email);
-  const linkedProfessionalIds = input.role === "ADMIN" ? [] : await validateLinkedProfessionals(actor.organizationId, input.linkedProfessionalIds);
-  const token = randomBytes(32).toString("base64url");
-  const invitation = invitationDraft(actor, { ...input, linkedProfessionalIds }, token);
-  const ref = db().doc(paths.document(actor.organizationId, "memberInvitations", invitation.id));
-  const previous = await db().collection(paths.collection(actor.organizationId, "memberInvitations"))
-    .where("email", "==", input.email).get();
-  const batch = db().batch();
-  for (const document of previous.docs.filter((item) => item.data().status === "PENDING")) {
-    batch.update(document.ref, { status: "REVOKED", tokenHash: null, updatedAt: new Date(), updatedBy: actor.userId });
-  }
-  batch.create(ref, toStored("memberInvitations", invitation));
-  await batch.commit();
-  try {
-    await deliverInvitation(invitation, token, actor.organization);
-  } catch {
-    await ref.update({ status: "DELIVERY_FAILED", updatedAt: new Date() });
-    throw new HttpsError("unavailable", "O convite foi criado, mas o e-mail não saiu. Use reenviar depois de conferir o SES.");
-  }
-  return { invitationId: invitation.id, expiresAt: invitation.expiresAt };
 }
 
 export const listTeam = onCall(OPTIONS, async (request) => {
@@ -178,27 +159,106 @@ export const requestTeamMember = onCall(OPTIONS, async (request) => {
   return { requestId: record.id };
 });
 
-export const inviteTeamMember = onCall(OPTIONS, async (request) => {
-  const actor = await tenantActor(request, "member:invite");
-  await consumeRateLimit(actor.userId, "teamWrite");
-  return await createAndSendInvitation(actor, parse(inviteSchema, request.data));
+/**
+ * Visao administrativa minima da equipe. A operadora recebe apenas metadados
+ * de conta, vinculo e solicitacao; agenda, clientes, mensagens e financeiro
+ * nunca entram na resposta.
+ */
+export const listPlatformTeamAdministration = onCall(OPTIONS, async (request) => {
+  const actor = await adminOf(request);
+  parse(emptySchema, request.data);
+  await consumeRateLimit(actor.userId, "platformTeamRead");
+  const [requestsSnapshot, membersSnapshot] = await Promise.all([
+    db().collectionGroup("memberRequests").where("status", "==", "PENDING").limit(100).get(),
+    db().collectionGroup("members").where("status", "in", ["ACTIVE", "SUSPENDED"]).limit(200).get(),
+  ]);
+  const entries = [...requestsSnapshot.docs, ...membersSnapshot.docs];
+  const organizationIds = [...new Set(entries.map((document) => document.ref.parent.parent?.id).filter(Boolean))];
+  const organizations = new Map((await Promise.all(organizationIds.map((organizationId) => db().doc(paths.organization(organizationId)).get())))
+    .filter((document) => document.exists).map((document) => [document.id, document.data()]));
+  const accountIds = [...new Set(membersSnapshot.docs.map((document) => document.id))];
+  const accounts = new Map((await Promise.all(accountIds.map((userId) => db().doc(paths.account(userId)).get())))
+    .filter((document) => document.exists).map((document) => [document.id, document.data()]));
+  const organizationOf = (document) => {
+    const organizationId = document.ref.parent.parent?.id;
+    const organization = organizationId ? organizations.get(organizationId) : null;
+    return { organizationId, organizationName: organization?.name ?? "Organização", ownerId: organization?.ownerId ?? null };
+  };
+  return {
+    requests: requestsSnapshot.docs
+      .map((document) => ({ ...fromStored("memberRequests", document.id, document.data()), ...organizationOf(document) }))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    members: membersSnapshot.docs
+      .map((document) => {
+        const organization = organizationOf(document);
+        const account = accounts.get(document.id);
+        return {
+          ...fromStored("members", document.id, document.data()),
+          ...organization,
+          isOrganizationHolder: organization.ownerId === document.id,
+          account: account ? { displayName: account.displayName, email: account.email } : null,
+        };
+      })
+      .sort((a, b) => a.organizationName.localeCompare(b.organizationName) || (a.account?.displayName ?? "").localeCompare(b.account?.displayName ?? "")),
+  };
 });
 
-export const decideTeamRequest = onCall(OPTIONS, async (request) => {
-  const actor = await tenantActor(request, "member:invite");
-  await consumeRateLimit(actor.userId, "teamWrite");
-  const input = parse(decisionSchema, request.data);
-  const ref = db().doc(paths.document(actor.organizationId, "memberRequests", input.requestId));
-  const snapshot = await ref.get();
-  const record = snapshot.data();
-  if (!record || record.status !== "PENDING") throw new HttpsError("failed-precondition", "Esta solicitação já foi decidida.");
-  if (input.decision === "REJECTED") {
-    await ref.update({ status: "REJECTED", decidedBy: actor.userId, decisionReason: input.reason || null, updatedAt: new Date(), updatedBy: actor.userId });
-    return { invitationId: null };
+export const decidePlatformTeamRequest = onCall(OPTIONS, async (request) => {
+  const actor = await adminOf(request);
+  await consumeRateLimit(actor.userId, "platformTeamWrite");
+  const input = parse(platformDecisionSchema, request.data);
+  const organization = (await db().doc(paths.organization(input.organizationId)).get()).data();
+  if (!organization) throw new HttpsError("not-found", "Organização não encontrada.");
+  const ref = db().doc(paths.document(input.organizationId, "memberRequests", input.requestId));
+  const record = (await ref.get()).data();
+  if (!record || record.organizationId !== input.organizationId || record.status !== "PENDING") {
+    throw new HttpsError("failed-precondition", "Esta solicitação já foi decidida ou não existe.");
   }
-  const result = await createAndSendInvitation(actor, record);
-  await ref.update({ status: "APPROVED", decidedBy: actor.userId, decisionReason: input.reason || null, updatedAt: new Date(), updatedBy: actor.userId });
-  return result;
+  const createdAt = now();
+  const action = input.decision === "APPROVED" ? "TEAM_REQUEST_APPROVED" : "TEAM_REQUEST_REJECTED";
+  const entry = auditEntry({
+    action,
+    actorId: actor.userId,
+    organizationId: input.organizationId,
+    reason: input.reason,
+    details: { requestId: input.requestId, role: record.role, requestedBy: record.requestedBy },
+    createdAt,
+  });
+  if (input.decision === "REJECTED") {
+    const batch = db().batch();
+    batch.update(ref, { status: "REJECTED", decidedBy: actor.userId, decisionReason: input.reason, updatedAt: new Date(createdAt), updatedBy: actor.userId });
+    batch.create(entry.ref, entry.data);
+    await batch.commit();
+    return { invitationId: null, expiresAt: null };
+  }
+
+  await ensureEmailAvailable(record.email);
+  const linkedProfessionalIds = await validateLinkedProfessionals(input.organizationId, record.linkedProfessionalIds ?? []);
+  const token = randomBytes(32).toString("base64url");
+  const invitation = invitationDraft(
+    { organizationId: input.organizationId, userId: actor.userId },
+    { ...record, linkedProfessionalIds },
+    token,
+    createdAt,
+  );
+  const invitationRef = db().doc(paths.document(input.organizationId, "memberInvitations", invitation.id));
+  const previous = await db().collection(paths.collection(input.organizationId, "memberInvitations"))
+    .where("email", "==", record.email).get();
+  const batch = db().batch();
+  for (const document of previous.docs.filter((item) => item.data().status === "PENDING")) {
+    batch.update(document.ref, { status: "REVOKED", tokenHash: null, updatedAt: new Date(createdAt), updatedBy: actor.userId });
+  }
+  batch.create(invitationRef, toStored("memberInvitations", invitation));
+  batch.update(ref, { status: "APPROVED", decidedBy: actor.userId, decisionReason: input.reason, updatedAt: new Date(createdAt), updatedBy: actor.userId });
+  batch.create(entry.ref, entry.data);
+  await batch.commit();
+  try {
+    await deliverInvitation(invitation, token, organization);
+  } catch {
+    await invitationRef.update({ status: "DELIVERY_FAILED", updatedAt: new Date() });
+    throw new HttpsError("unavailable", "A solicitação foi aprovada, mas o e-mail não saiu. Confira o SES antes de reenviar.");
+  }
+  return { invitationId: invitation.id, expiresAt: invitation.expiresAt };
 });
 
 export const inspectTeamInvitation = onCall(OPTIONS, async (request) => {
@@ -248,7 +308,11 @@ export const acceptTeamInvitation = onCall(OPTIONS, async (request) => {
   const membership = {
     id: user.uid, userId: user.uid, organizationId: invitation.organizationId,
     role: invitation.role, status: "ACTIVE", invitedBy: invitation.invitedBy,
-    linkedProfessionalIds: invitation.linkedProfessionalIds ?? [], removedAt: null, ...stamp,
+    linkedProfessionalIds: [...new Set([
+      ...(invitation.linkedProfessionalIds ?? []),
+      ...(invitation.role === "PROFESSIONAL" ? [user.uid] : []),
+    ])],
+    removedAt: null, ...stamp,
   };
   const batch = db().batch();
   batch.create(db().doc(paths.account(user.uid)), account);
@@ -268,42 +332,131 @@ export const acceptTeamInvitation = onCall(OPTIONS, async (request) => {
   return { ok: true };
 });
 
-export const setTeamMemberStatus = onCall(OPTIONS, async (request) => {
-  const actor = await tenantActor(request, "member:update");
-  await consumeRateLimit(actor.userId, "teamWrite");
-  const input = parse(memberStatusSchema, request.data);
-  if (input.memberId === actor.organization.ownerId) throw new HttpsError("failed-precondition", "O titular não pode ser suspenso.");
-  const ref = db().doc(paths.document(actor.organizationId, "members", input.memberId));
-  const target = (await ref.get()).data();
-  if (!target || target.status === "REMOVED") throw new HttpsError("not-found", "Membro não encontrado.");
-  authorizeRole(actor, target.role);
-  await getAuth().updateUser(input.memberId, { disabled: input.status === "SUSPENDED" });
-  if (input.status === "SUSPENDED") await getAuth().revokeRefreshTokens(input.memberId);
-  await ref.update({ status: input.status, updatedAt: new Date(), updatedBy: actor.userId });
+export const setPlatformTeamMemberStatus = onCall(OPTIONS, async (request) => {
+  const actor = await adminOf(request);
+  await consumeRateLimit(actor.userId, "platformTeamWrite");
+  const input = parse(platformMemberStatusSchema, request.data);
+  const organization = (await db().doc(paths.organization(input.organizationId)).get()).data();
+  if (!organization) throw new HttpsError("not-found", "Organização não encontrada.");
+  if (input.memberId === organization.ownerId) throw new HttpsError("failed-precondition", "O titular não pode ser suspenso.");
+  const ref = db().doc(paths.document(input.organizationId, "members", input.memberId));
+  const changed = await db().runTransaction(async (transaction) => {
+    const target = (await transaction.get(ref)).data();
+    if (!target || target.organizationId !== input.organizationId || target.status === "REMOVED") {
+      throw new HttpsError("not-found", "Membro não encontrado.");
+    }
+    if (target.status === input.status) return false;
+    const createdAt = now();
+    const entry = auditEntry({
+      action: input.status === "SUSPENDED" ? "TEAM_MEMBER_SUSPENDED" : "TEAM_MEMBER_REACTIVATED",
+      actorId: actor.userId,
+      organizationId: input.organizationId,
+      targetUserId: input.memberId,
+      reason: input.reason,
+      details: { role: target.role, status: { from: target.status, to: input.status } },
+      createdAt,
+    });
+    transaction.update(ref, { status: input.status, updatedAt: new Date(createdAt), updatedBy: actor.userId });
+    transaction.create(entry.ref, entry.data);
+    return true;
+  });
+  if (changed) {
+    await getAuth().updateUser(input.memberId, { disabled: input.status === "SUSPENDED" });
+    if (input.status === "SUSPENDED") await getAuth().revokeRefreshTokens(input.memberId);
+  }
   return { ok: true };
 });
 
-export const removeTeamMember = onCall(OPTIONS, async (request) => {
-  const actor = await tenantActor(request, "member:remove");
-  await consumeRateLimit(actor.userId, "teamWrite");
-  const { memberId } = parse(memberSchema, request.data);
-  if (memberId === actor.organization.ownerId) throw new HttpsError("failed-precondition", "O titular é intransferível e não pode ser removido.");
-  const membershipRef = db().doc(paths.document(actor.organizationId, "members", memberId));
+export const removePlatformTeamMember = onCall(OPTIONS, async (request) => {
+  const actor = await adminOf(request);
+  await consumeRateLimit(actor.userId, "platformTeamWrite");
+  const input = parse(platformMemberRemovalSchema, request.data);
+  const organization = (await db().doc(paths.organization(input.organizationId)).get()).data();
+  if (!organization) throw new HttpsError("not-found", "Organização não encontrada.");
+  if (input.memberId === organization.ownerId) {
+    throw new HttpsError("failed-precondition", "O titular é intransferível e não pode ser removido.");
+  }
+  const membershipRef = db().doc(paths.document(input.organizationId, "members", input.memberId));
   const membership = (await membershipRef.get()).data();
-  if (!membership || membership.status === "REMOVED") throw new HttpsError("not-found", "Membro não encontrado.");
-  authorizeRole(actor, membership.role);
-  try { await getAuth().updateUser(memberId, { disabled: true }); await getAuth().revokeRefreshTokens(memberId); } catch (error) { if (error?.code !== "auth/user-not-found") throw error; }
+  if (!membership || membership.organizationId !== input.organizationId) {
+    throw new HttpsError("not-found", "Membro não encontrado.");
+  }
+  if (membership.status === "REMOVED") {
+    try { await getAuth().deleteUser(input.memberId); } catch (error) { if (error?.code !== "auth/user-not-found") throw error; }
+    return { ok: true };
+  }
+
+  try {
+    await getAuth().updateUser(input.memberId, { disabled: true });
+    await getAuth().revokeRefreshTokens(input.memberId);
+  } catch (error) {
+    if (error?.code !== "auth/user-not-found") throw error;
+  }
+
   const removedAt = now();
-  const pseudonym = `removido-${createHash("sha256").update(`${actor.organizationId}:${memberId}`).digest("hex").slice(0, 12)}`;
+  const pseudonym = `removido-${createHash("sha256").update(`${input.organizationId}:${input.memberId}`).digest("hex").slice(0, 12)}`;
   const batch = db().batch();
-  batch.update(membershipRef, { userId: null, status: "REMOVED", invitedBy: null, linkedProfessionalIds: [], removedAt: new Date(removedAt), updatedAt: new Date(removedAt), updatedBy: actor.userId });
-  const professionalRef = db().doc(paths.document(actor.organizationId, "professionals", memberId));
+  batch.update(membershipRef, {
+    userId: null,
+    status: "REMOVED",
+    invitedBy: null,
+    linkedProfessionalIds: [],
+    removedAt: new Date(removedAt),
+    updatedAt: new Date(removedAt),
+    updatedBy: actor.userId,
+  });
+  const professionalRef = db().doc(paths.document(input.organizationId, "professionals", input.memberId));
   const professional = await professionalRef.get();
-  if (professional.exists) batch.update(professionalRef, { userId: null, displayName: "Profissional removido", email: `${pseudonym}@removed.atendara.invalid`, phone: null, licenseNumber: null, specialties: [], avatarUrl: null, active: false, updatedAt: new Date(removedAt), updatedBy: actor.userId });
-  batch.set(db().doc(paths.account(memberId)), { userId: memberId, email: `${pseudonym}@removed.atendara.invalid`, displayName: "Membro removido", status: "SUSPENDED", organizationId: actor.organizationId, platformRole: "PROFESSIONAL", professionId: actor.organization.primaryProfession, modules: [], subscriptionStatus: "CANCELLED", accessUntil: null, accessUntilMs: 0, mustChangePassword: false, origin: "INVITATION", createdAt: removedAt, removedAt }, { merge: true });
-  const audit = tenantAudit({ organizationId: actor.organizationId, actorId: actor.userId, action: "PERMISSION_CHANGED", resourceType: "member", resourceId: memberId, summary: "Membro removido e cadastro pseudonimizado.", metadata: { previousRole: membership.role } });
-  batch.create(db().doc(paths.document(actor.organizationId, "auditLogs", audit.id)), toStored("auditLogs", audit));
+  if (professional.exists) {
+    batch.update(professionalRef, {
+      userId: null,
+      displayName: "Profissional removido",
+      email: `${pseudonym}@removed.atendara.invalid`,
+      phone: null,
+      licenseNumber: null,
+      specialties: [],
+      avatarUrl: null,
+      active: false,
+      updatedAt: new Date(removedAt),
+      updatedBy: actor.userId,
+    });
+  }
+  batch.set(db().doc(paths.account(input.memberId)), {
+    email: `${pseudonym}@removed.atendara.invalid`,
+    displayName: "Membro removido",
+    status: "SUSPENDED",
+    modules: [],
+    mustChangePassword: false,
+    removedAt,
+  }, { merge: true });
+  const tenantEntry = tenantAudit({
+    organizationId: input.organizationId,
+    actorId: actor.userId,
+    action: "PERMISSION_CHANGED",
+    resourceType: "member",
+    resourceId: input.memberId,
+    summary: "Membro removido pela administração da Atendara e cadastro pseudonimizado.",
+    metadata: { previousRole: membership.role },
+  });
+  batch.create(db().doc(paths.document(input.organizationId, "auditLogs", tenantEntry.id)), toStored("auditLogs", tenantEntry));
+  const platformEntry = auditEntry({
+    action: "TEAM_MEMBER_REMOVED",
+    actorId: actor.userId,
+    organizationId: input.organizationId,
+    targetUserId: input.memberId,
+    reason: input.reason,
+    details: { previousRole: membership.role },
+    createdAt: removedAt,
+  });
+  batch.create(platformEntry.ref, platformEntry.data);
   await batch.commit();
-  try { await getAuth().deleteUser(memberId); } catch (error) { if (error?.code !== "auth/user-not-found") throw error; }
+
+  try {
+    await getAuth().deleteUser(input.memberId);
+  } catch (error) {
+    if (error?.code !== "auth/user-not-found") {
+      throw new HttpsError("unavailable", "O acesso foi removido, mas o login ainda aguarda limpeza administrativa.");
+    }
+  }
   return { ok: true };
 });

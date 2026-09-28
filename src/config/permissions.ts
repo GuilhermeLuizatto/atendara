@@ -86,9 +86,6 @@ const ADMIN_PERMISSIONS: Permission[] = [
   "aiDecision:review",
   "notificationSettings:update",
   "agendaSettings:update",
-  "member:invite",
-  "member:update",
-  "member:remove",
   "organizationBranding:update",
   "receiptSettings:update",
   "auditLog:read",
@@ -142,9 +139,6 @@ export const ORGANIZATION_HOLDER_PERMISSIONS: readonly Permission[] = [
   "privacy:export",
   "privacy:erase",
   "organizationBranding:update",
-  "member:invite",
-  "member:update",
-  "member:remove",
   // O autonomo e o emissor do proprio recibo.
   "receiptSettings:update",
 ];

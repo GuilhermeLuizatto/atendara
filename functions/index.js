@@ -185,12 +185,12 @@ export {
 export {
   listTeam,
   requestTeamMember,
-  inviteTeamMember,
-  decideTeamRequest,
+  listPlatformTeamAdministration,
+  decidePlatformTeamRequest,
   inspectTeamInvitation,
   acceptTeamInvitation,
-  setTeamMemberStatus,
-  removeTeamMember,
+  setPlatformTeamMemberStatus,
+  removePlatformTeamMember,
 } from "./team.js";
 export {
   listImportMappings,

@@ -882,17 +882,23 @@ Rules aplicarem o mesmo vínculo.
 No modelo aprovado para o piloto, cliente continua sendo registro
 administrativo, sem conta. O profissional e o assistente com vínculo ativo o
 cadastram diretamente; administrar membros da equipe é outra operação e não
-entra no fluxo de cadastro de clientes. Os atos de convidar, suspender, reativar
-e remover membros passarão para operações específicas da administração da
-Atendara, com segundo fator e auditoria, sem conceder à operadora leitura geral
-dos dados do tenant.
+entra no fluxo de cadastro de clientes. Aprovar ou recusar uma solicitação,
+enviar o convite, suspender e reativar membros passam por operações específicas
+da administração da Atendara, com segundo fator, motivo obrigatório e auditoria
+append-only. A visão da operadora recebe somente dados administrativos da conta,
+do vínculo e da solicitação; não abre agenda, clientes, mensagens nem financeiro.
+A remoção irreversível revoga sessões, fecha o vínculo, pseudonimiza os dados
+pessoais, preserva as duas trilhas e só então apaga o login. Repetir o pedido é
+idempotente, para que uma falha tardia na limpeza do Authentication possa ser
+recuperada sem repetir a pseudonimização.
 
 Na implementação atual, PROFESSIONAL não cria a conta de um funcionário
-diretamente: registra uma solicitação ligada a si; titular, OWNER ou ADMIN
-decide e só então o SES envia o convite. O sprint 5.2 substitui essa decisão
-pela administração da Atendara, sem mudar a origem da solicitação. Suspensão é
-reversível. Remoção revoga sessões, encerra o acesso e pseudonimiza o cadastro
-que precisa permanecer no histórico.
+diretamente: registra uma solicitação ligada a si; a administração da Atendara
+decide e só então o SES envia o convite. Novas solicitações aceitam somente
+PROFESSIONAL e ASSISTANT. Suspensão é reversível, fecha as regras imediatamente,
+desativa o login e revoga as sessões. OWNER, ADMIN e o titular não recebem mais
+permissão para convidar, suspender ou remover membros. A remoção definitiva é
+exclusiva da operadora e exige uma confirmação separada na interface.
 
 ### Importação administrativa
 

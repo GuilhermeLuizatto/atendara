@@ -37,6 +37,9 @@ export const ACCESS_GRANT_REASON_LENGTH = { min: 10, max: 500 } as const;
  */
 export const PROFESSION_CHANGE_REASON_LENGTH = { min: 10, max: 500 } as const;
 
+/** Justificativa obrigatoria para cada decisao da operadora sobre uma equipe. */
+export const TEAM_ADMIN_REASON_LENGTH = { min: 10, max: 500 } as const;
+
 export const ACCESS_GRANT_KIND_LABELS: Record<AccessGrantKind, string> = {
   COURTESY: "Cortesia",
   PILOT: "Piloto",
@@ -134,6 +137,11 @@ export const PLATFORM_AUDIT_ACTION_LABELS: Record<PlatformAuditAction, string> =
   PLATFORM_ADMIN_CREATED: "Cadastro de administrador",
   PLATFORM_ADMIN_SUSPENDED: "Suspensão de administrador",
   PLATFORM_ADMIN_REACTIVATED: "Reativação de administrador",
+  TEAM_REQUEST_APPROVED: "Solicitação de equipe aprovada",
+  TEAM_REQUEST_REJECTED: "Solicitação de equipe recusada",
+  TEAM_MEMBER_SUSPENDED: "Suspensão de membro",
+  TEAM_MEMBER_REACTIVATED: "Reativação de membro",
+  TEAM_MEMBER_REMOVED: "Remoção de membro",
   ORGANIZATION_DELETED: "Exclusão de organização pelo titular",
 };
 
@@ -185,6 +193,8 @@ export const CALLABLE_RATE_LIMITS = {
   teamRead: { max: 120, windowSeconds: 3600 },
   teamWrite: { max: 30, windowSeconds: 3600 },
   teamInvitationByNetwork: { max: 20, windowSeconds: 3600 },
+  platformTeamRead: { max: 120, windowSeconds: 3600 },
+  platformTeamWrite: { max: 30, windowSeconds: 3600 },
   administrativeImportRead: { max: 120, windowSeconds: 3600 },
   administrativeImportWrite: { max: 30, windowSeconds: 3600 },
   supportRead: { max: 180, windowSeconds: 3600 },

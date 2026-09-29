@@ -150,6 +150,8 @@ export interface RepositoryActor {
   userId: ID | null;
   name: string;
   role?: import("@/types").Role;
+  linkedProfessionalIds?: ID[];
+  organizationWideProfessionalScope?: boolean;
 }
 
 // --------------------------------------------------------------- entradas

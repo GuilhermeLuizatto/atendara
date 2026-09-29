@@ -12,7 +12,7 @@ import {
 import { addMinutesISO } from "@/lib/utils/datetime";
 import type { Appointment, AppointmentPart, AppointmentStatus, ID, Transaction } from "@/types";
 
-import { assertPermission } from "../../guards";
+import { assertPermission, assertProfessionalScope } from "../../guards";
 import { findConflict } from "../../aggregates";
 import { RepositoryError, type AppointmentInput } from "../../types";
 import {
@@ -126,6 +126,8 @@ export function planCreateAppointment(
 ): Plan<ID> {
   assertPermission(ctx.actor, "appointment:create");
   const client = requireClient(ctx, input.clientId);
+  assertProfessionalScope(ctx.actor, client.assignedProfessionalId);
+  assertProfessionalScope(ctx.actor, input.professionalId);
   const professional = requireProfessional(ctx, input.professionalId);
   const endsAt = addMinutesISO(input.startsAt, input.durationMinutes);
 
@@ -242,10 +244,12 @@ export function planUpdateAppointment(
 ): Plan {
   assertPermission(ctx.actor, "appointment:update");
   const existing = requireAppointment(ctx, id);
+  assertProfessionalScope(ctx.actor, existing.professionalId);
 
   const startsAt = input.startsAt ?? existing.startsAt;
   const durationMinutes = input.durationMinutes ?? existing.durationMinutes;
   const professionalId = input.professionalId ?? existing.professionalId;
+  assertProfessionalScope(ctx.actor, professionalId);
   const endsAt = addMinutesISO(startsAt, durationMinutes);
 
   assertNoConflict(ctx, { id, professionalId, startsAt, endsAt });
@@ -253,6 +257,7 @@ export function planUpdateAppointment(
   const client = input.clientId
     ? requireClient(ctx, input.clientId)
     : ctx.snapshot.clients.find((item) => item.id === existing.clientId);
+  assertProfessionalScope(ctx.actor, client?.assignedProfessionalId);
   const professional = requireProfessional(ctx, professionalId);
 
   const clientName = client?.fullName ?? existing.clientName;
@@ -387,6 +392,7 @@ export function planSetAppointmentStatus(
     status === "CANCELLED" ? "appointment:cancel" : "appointment:update",
   );
   const existing = requireAppointment(ctx, id);
+  assertProfessionalScope(ctx.actor, existing.professionalId);
 
   const cancellationReason =
     status === "CANCELLED"

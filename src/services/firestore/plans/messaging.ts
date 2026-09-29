@@ -4,7 +4,11 @@ import { decide } from "@/lib/ai/decision-engine";
 import { decisionInputPreview } from "@/lib/privacy/decision-preview";
 import type { AIDecision, Conversation, ID, Message } from "@/types";
 
-import { assertPermission, validateMessageBody } from "../../guards";
+import {
+  assertPermission,
+  assertProfessionalScope,
+  validateMessageBody,
+} from "../../guards";
 import {
   RepositoryError,
   type DecisionInput,
@@ -59,6 +63,7 @@ export function planAppendMessage(
   input: MessageInput,
 ): Plan<ID> {
   const conversation = requireConversation(ctx, input.conversationId);
+  assertProfessionalScope(ctx.actor, conversation.professionalId);
   if (conversation.clientId !== input.clientId) {
     throw new RepositoryError("Cliente não pertence à conversa.");
   }
@@ -70,6 +75,7 @@ export function planAppendMessage(
     organizationId: ctx.organizationId,
     ...stamp(ctx),
     ...input,
+    professionalId: conversation.professionalId,
     body,
     sentAt: ctx.now,
     readAt: input.direction === "OUTBOUND" ? ctx.now : null,
@@ -96,6 +102,7 @@ export function planReplyToConversation(
 ): Plan {
   assertPermission(ctx.actor, "conversation:reply");
   const conversation = requireConversation(ctx, conversationId);
+  assertProfessionalScope(ctx.actor, conversation.professionalId);
   const body = validateMessageBody(text);
   const id = ctx.newMessageId(conversationId);
 
@@ -105,6 +112,7 @@ export function planReplyToConversation(
     ...stamp(ctx),
     conversationId,
     clientId: conversation.clientId,
+    professionalId: conversation.professionalId,
     direction: "OUTBOUND",
     authorType: "PROFESSIONAL",
     authorName: ctx.actor.name,
@@ -146,7 +154,8 @@ export function planUpdateConversation(
   >,
 ): Plan {
   assertPermission(ctx.actor, "conversation:reply");
-  requireConversation(ctx, id);
+  const conversation = requireConversation(ctx, id);
+  assertProfessionalScope(ctx.actor, conversation.professionalId);
   return {
     result: undefined,
     writes: [conversationUpdate(ctx, id, { ...patch })],
@@ -157,6 +166,7 @@ export function planRecordDecision(
   ctx: PlanContext,
   input: DecisionInput,
 ): Plan<ID> {
+  assertProfessionalScope(ctx.actor, input.professionalId);
   const id = ctx.newId("aiDecisions");
   const decision: AIDecision = {
     id,
@@ -204,6 +214,7 @@ export function planReceiveMessage(
 ): Plan<ID> {
   assertPermission(ctx.actor, "conversation:reply");
   const conversation = requireConversation(ctx, conversationId);
+  assertProfessionalScope(ctx.actor, conversation.professionalId);
   const client = requireClient(ctx, conversation.clientId);
   const body = validateMessageBody(text);
   const started = performance.now();
@@ -241,6 +252,7 @@ export function planReceiveMessage(
     ...stamp(ctx),
     conversationId,
     clientId: client.id,
+    professionalId: conversation.professionalId,
     direction: "INBOUND",
     authorType: "CLIENT",
     authorName: client.fullName,

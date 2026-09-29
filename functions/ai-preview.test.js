@@ -173,6 +173,17 @@ describe("prévia autenticada do agente", () => {
       code: "permission-denied",
     });
   });
+  it("não simula atendimento fora dos vínculos do autor", async () => {
+    mock.store.set(paths.document(org, "members", "prof-owner"), {
+      role: "PROFESSIONAL",
+      status: "ACTIVE",
+      linkedProfessionalIds: ["prof-a", "prof-b"],
+    });
+    await expect(
+      previewAI(request({ ...input, professionalId: "prof-c" })),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+    expect(mock.classify).not.toHaveBeenCalled();
+  });
   it("lê mensagem e conversa no tenant da conta e não aceita texto escolhido pelo navegador", async () => {
     const conversation = {
       id: "c1",

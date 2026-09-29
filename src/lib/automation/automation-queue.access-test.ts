@@ -14,6 +14,7 @@ import {
   setDoc,
   terminate,
   updateDoc,
+  where,
   type Firestore,
 } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -205,7 +206,15 @@ describe("Fase 3, 13.2 — fila de automacao no servidor", () => {
     const queued = (await getDoc(doc(db, paths.document(organizationId, "automationTasks", notice.id)))).data() as Stored;
     expect(queued.status).toBe("SUCCEEDED");
     expect(JSON.stringify(queued)).not.toContain("+5500900000000");
-    await expect(getDocs(query(collection(db, paths.collection(organizationId, "automationTasks")), limit(5)))).resolves.toBeTruthy();
+    await expect(
+      getDocs(
+        query(
+          collection(db, paths.collection(organizationId, "automationTasks")),
+          where("professionalId", "==", uid),
+          limit(5),
+        ),
+      ),
+    ).resolves.toBeTruthy();
     await expect(
       setDoc(doc(db, paths.document(organizationId, "automationTasks", "forjada")), { organizationId, type: "WRITE_AUDIT", status: "SUCCEEDED" }),
     ).rejects.toMatchObject({ code: "permission-denied" });

@@ -262,6 +262,13 @@ beforeAll(async () => {
   const owner = await register(OWNER, "Assinante de Teste");
   ownerUid = owner.uid;
   ownerOrg = owner.organizationId;
+  await adminDb().doc(paths.document(ownerOrg, "clients", "qualquer")).set({
+    id: "qualquer",
+    organizationId: ownerOrg,
+    assignedProfessionalId: ownerUid,
+    fullName: "Cadastro da cobrança",
+    status: "ACTIVE",
+  });
 
   const neighbour = await register(NEIGHBOUR, "Vizinho de Teste");
   neighbourUid = neighbour.uid;
@@ -291,7 +298,7 @@ beforeAll(async () => {
   });
   await adminDb()
     .doc(paths.document(ownerOrg, "members", employee.uid))
-    .set({ id: employee.uid, userId: employee.uid, organizationId: ownerOrg, role: "ASSISTANT", status: "ACTIVE" });
+    .set({ id: employee.uid, userId: employee.uid, organizationId: ownerOrg, role: "ASSISTANT", status: "ACTIVE", linkedProfessionalIds: [ownerUid] });
 }, 120_000);
 
 afterAll(async () => {

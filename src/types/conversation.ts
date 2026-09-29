@@ -36,6 +36,8 @@ export interface Conversation extends TenantScopedEntity {
 export interface Message extends TenantScopedEntity {
   conversationId: ID;
   clientId: ID | null;
+  /** Repete o escopo da conversa para consultas `collectionGroup` seguras. */
+  professionalId: ID | null;
   providerMessageId?: string;
   direction: MessageDirection;
   authorType: MessageAuthorType;

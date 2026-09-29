@@ -45,7 +45,7 @@ export const registerProfessional = onCall(CONTAS_CALL_OPTIONS, async request =>
   batch.create(db.doc(paths.account(user.uid)), account);
   batch.create(db.doc(paths.initialPassword(user.uid)), verifier);
   batch.create(db.doc(paths.organization(organizationId)), { id: organizationId, name: input.displayName, slug: organizationId, primaryProfession: input.professionId, professions: [input.professionId], ownerId: user.uid, ...stamp });
-  batch.create(db.doc(paths.document(organizationId, "members", user.uid)), { id: user.uid, userId: user.uid, organizationId, role: "PROFESSIONAL", status: "ACTIVE", invitedBy: request.auth.uid, ...stamp });
+  batch.create(db.doc(paths.document(organizationId, "members", user.uid)), { id: user.uid, userId: user.uid, organizationId, role: "PROFESSIONAL", status: "ACTIVE", linkedProfessionalIds: [user.uid], invitedBy: request.auth.uid, ...stamp });
   // Sem perfil profissional a organizacao nasce sem quem atenda: a agenda
   // recusaria o primeiro atendimento. O cliente nao pode cria-lo (as regras
   // exigem papel administrativo), entao ele nasce aqui, junto do resto.

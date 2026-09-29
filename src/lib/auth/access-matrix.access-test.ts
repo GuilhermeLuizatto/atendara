@@ -216,6 +216,18 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
       profession: "PSYCHOLOGIST",
       active: true,
     });
+    await database.doc(paths.document(organizationId, "clients", "qualquer")).set({
+      id: "qualquer",
+      organizationId,
+      assignedProfessionalId: professionalUid,
+      fullName: "Cadastro de acesso",
+      status: "ACTIVE",
+    });
+    await database.doc(paths.document(organizationId, "appointments", "qualquer")).set({
+      id: "qualquer",
+      organizationId,
+      professionalId: professionalUid,
+    });
   });
 
   it("com senha inicial pendente o painel fica bloqueado", async () => {

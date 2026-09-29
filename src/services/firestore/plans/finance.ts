@@ -1,6 +1,6 @@
 import type { ID, Transaction } from "@/types";
 
-import { assertPermission } from "../../guards";
+import { assertPermission, assertProfessionalScope } from "../../guards";
 import type { TransactionInput } from "../../types";
 import {
   auditWrite,
@@ -22,6 +22,7 @@ export function planCreateTransaction(
   input: TransactionInput,
 ): Plan<ID> {
   assertPermission(ctx.actor, "transaction:create");
+  assertProfessionalScope(ctx.actor, input.professionalId);
   const id = ctx.newId("transactions");
   const client = input.clientId
     ? ctx.snapshot.clients.find((item) => item.id === input.clientId)
@@ -66,6 +67,10 @@ export function planUpdateTransaction(
 ): Plan {
   assertPermission(ctx.actor, "transaction:update");
   const existing = requireTransaction(ctx, id);
+  assertProfessionalScope(ctx.actor, existing.professionalId);
+  if (input.professionalId !== undefined) {
+    assertProfessionalScope(ctx.actor, input.professionalId);
+  }
   const status = input.status ?? existing.status;
   const client = input.clientId
     ? ctx.snapshot.clients.find((item) => item.id === input.clientId)
@@ -107,6 +112,7 @@ export function planUpdateTransaction(
 export function planDeleteTransaction(ctx: PlanContext, id: ID): Plan {
   assertPermission(ctx.actor, "transaction:delete");
   const existing = requireTransaction(ctx, id);
+  assertProfessionalScope(ctx.actor, existing.professionalId);
 
   return {
     result: undefined,

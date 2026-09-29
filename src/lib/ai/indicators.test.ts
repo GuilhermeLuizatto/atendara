@@ -67,6 +67,7 @@ const review = (decisionId: string, patch: Partial<AIDecisionReview> = {}): AIDe
   id: decisionId,
   organizationId: "org",
   decisionId,
+  professionalId: "prof-1",
   verdict: "CORRECT",
   expectedClassification: null,
   createdAt: "2026-09-11T10:00:00Z",

@@ -19,7 +19,7 @@ import { fromStored, toStored } from "./firestore-dates.js";
 import { ACCOUNT_CALL_OPTIONS, parse } from "./platform-auth.js";
 import { consumeRateLimit } from "./rate-limit.js";
 import { runAs } from "./service-accounts.js";
-import { tenantActor } from "./tenant-auth.js";
+import { assertProfessionalScope, tenantActor } from "./tenant-auth.js";
 
 /**
  * Recibos (ADR 0004, 14.9 — cobrador C3).
@@ -102,6 +102,7 @@ export const issueReceipt = onCall(OPTIONS, async (request) => {
     const paid = txSnapshot.exists ? fromStored("transactions", txSnapshot.id, txSnapshot.data()) : null;
     const refused = issueReceiptError(paid, issued.size);
     if (refused) throw new HttpsError("failed-precondition", refused);
+    assertProfessionalScope(actor, paid.professionalId ?? null);
     const issuer = settingsSnapshot.exists ? validateIssuer(settingsSnapshot.data()) : null;
     if (!issuer?.ok) throw new HttpsError("failed-precondition", "Preencha quem emite os recibos em Configurações → Recibos.");
 
@@ -171,6 +172,7 @@ export const cancelReceipt = onCall(OPTIONS, async (request) => {
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists) throw new HttpsError("not-found", "Recibo não encontrado.");
     const receipt = snapshot.data();
+    assertProfessionalScope(actor, receipt.professionalId ?? null);
     if (receipt.status !== "ISSUED") throw new HttpsError("failed-precondition", "Este recibo já foi cancelado.");
     const now = new Date().toISOString();
     transaction.update(ref, toStored("receipts", {

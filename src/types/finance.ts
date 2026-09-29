@@ -123,6 +123,7 @@ export interface FinanceSummary {
  */
 export interface PaymentLink extends TenantScopedEntity {
   transactionId: ID;
+  professionalId: ID | null;
   token: string;
   tokenHash: string;
 }
@@ -137,6 +138,7 @@ export type PaymentProofStatus = (typeof PAYMENT_PROOF_STATUSES)[number];
  */
 export interface PaymentProof extends TenantScopedEntity {
   transactionId: ID;
+  professionalId: ID | null;
   recurringChargeId: ID | null;
   clientId: ID | null;
   status: PaymentProofStatus;

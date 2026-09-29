@@ -1637,6 +1637,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       ...this.stamp(now),
       conversationId,
       clientId: client.id,
+      professionalId: conversation.professionalId,
       direction: "INBOUND",
       authorType: "CLIENT",
       authorName: client.fullName,
@@ -1770,6 +1771,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       organizationId: this.organizationId,
       ...this.stamp(now),
       ...input,
+      professionalId: conversation.professionalId,
       sentAt: now,
       readAt: input.direction === "OUTBOUND" ? now : null,
     };

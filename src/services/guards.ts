@@ -11,6 +11,7 @@ import type {
   ServiceModality,
   StoredNotificationConsent,
 } from "@/types";
+import { hasProfessionalScope } from "@/lib/access/professional-scope";
 
 import { RepositoryError, type RepositoryActor } from "./types";
 
@@ -31,6 +32,28 @@ export function assertPermission(
     : hasPermission(actor.role ?? "VIEWER", permission);
 
   if (!allowed) throw new RepositoryError("Sem permissão para esta ação.");
+}
+
+export function assertProfessionalScope(
+  actor: RepositoryActor,
+  professionalId: string | null | undefined,
+): void {
+  if (
+    !hasProfessionalScope(
+      {
+        organizationWide:
+          actor.organizationWideProfessionalScope === true ||
+          actor.role === "OWNER" ||
+          actor.role === "ADMIN",
+        professionalIds: actor.linkedProfessionalIds ?? [],
+      },
+      professionalId,
+    )
+  ) {
+    throw new RepositoryError(
+      "Este registro pertence a um profissional fora dos seus vínculos ativos.",
+    );
+  }
 }
 
 /**

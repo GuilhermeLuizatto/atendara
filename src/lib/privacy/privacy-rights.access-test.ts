@@ -169,7 +169,14 @@ async function seedMember(uid: string, organizationId: string, role: string): Pr
     accessUntilMs: Date.parse(inDays(30)),
     createdAt: new Date().toISOString(),
   });
-  await fs().doc(paths.document(organizationId, "members", uid)).set({ id: uid, userId: uid, organizationId, role, status: "ACTIVE" });
+  await fs().doc(paths.document(organizationId, "members", uid)).set({
+    id: uid,
+    userId: uid,
+    organizationId,
+    role,
+    status: "ACTIVE",
+    linkedProfessionalIds: [uid],
+  });
   return tokenSession(uid, null);
 }
 
@@ -222,12 +229,12 @@ async function seedClient(organizationId: string, by: string, person: { name: st
       lastMessageAt: at, unreadCount: 0, escalated: false, escalationReason: null,
     }),
     set(messagePath(organizationId, id.conversation, id.inbound), {
-      id: id.inbound, ...stamp, conversationId: id.conversation, clientId: id.client, direction: "INBOUND", authorType: "CLIENT",
+      id: id.inbound, ...stamp, conversationId: id.conversation, clientId: id.client, professionalId: by, direction: "INBOUND", authorType: "CLIENT",
       authorName: person.name, channel: "WHATSAPP", body: `Oi, aqui e ${person.name}. Quanto custa?`,
       sentAt: timestamp("2026-09-01T10:00:00.000Z"), readAt: null, classification: "ADMINISTRATIVE", classificationConfidence: 0.9, aiDecisionId: id.decision,
     }),
     set(messagePath(organizationId, id.conversation, id.outbound), {
-      id: id.outbound, ...stamp, conversationId: id.conversation, clientId: id.client, direction: "OUTBOUND", authorType: "AI_AGENT",
+      id: id.outbound, ...stamp, conversationId: id.conversation, clientId: id.client, professionalId: by, direction: "OUTBOUND", authorType: "AI_AGENT",
       authorName: "Assistente", channel: "WHATSAPP", body: `Ola, ${person.name}. A sessao custa R$ 200.`,
       sentAt: timestamp("2026-09-01T10:00:05.000Z"), readAt: null, classification: null, classificationConfidence: null, aiDecisionId: id.decision,
     }),

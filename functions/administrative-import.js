@@ -10,7 +10,11 @@ import { IMPORT_ENTITY_TYPES } from "./generated/types-product.js";
 import { fromStored, toStored } from "./firestore-dates.js";
 import { runAs } from "./service-accounts.js";
 import { consumeRateLimit } from "./rate-limit.js";
-import { tenantActor, tenantAudit } from "./tenant-auth.js";
+import {
+  assertProfessionalScope,
+  tenantActor,
+  tenantAudit,
+} from "./tenant-auth.js";
 
 const db = () => getFirestore();
 const OPTIONS = { ...ACCOUNT_CALL_OPTIONS, ...runAs("contas") };
@@ -141,6 +145,24 @@ export const commitAdministrativeImport = onCall(OPTIONS, async (request) => {
   rows.forEach((item, index) => {
     if (item.action === "CREATE" && snapshots[index].exists) throw new HttpsError("already-exists", `A linha ${index + 1} passou a duplicar um registro. Revise a prévia.`);
     if (item.action === "UPDATE" && !snapshots[index].exists) throw new HttpsError("failed-precondition", `O registro da linha ${index + 1} não existe mais. Revise a prévia.`);
+  });
+  const professionalIdOf = (item, data) => {
+    if (item.entityType === "PROFESSIONALS") return item.targetId;
+    if (item.entityType === "CLIENTS") return data.assignedProfessionalId ?? null;
+    return data.professionalId ?? null;
+  };
+  rows.forEach((item, index) => {
+    if (item.action === "UPDATE") {
+      assertProfessionalScope(
+        actor,
+        professionalIdOf(item, fromStored(
+          { PROFESSIONALS: "professionals", CLIENTS: "clients", APPOINTMENTS: "appointments", TRANSACTIONS: "transactions" }[item.entityType],
+          snapshots[index].id,
+          snapshots[index].data(),
+        )),
+      );
+    }
+    assertProfessionalScope(actor, professionalIdOf(item, item.data));
   });
   const matches = await mapWithConcurrency(rows, 20, (item) => existingDuplicates(actor.organizationId, item));
   rows.forEach((item, index) => {

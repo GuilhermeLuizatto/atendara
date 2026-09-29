@@ -206,6 +206,7 @@ export const registerSelfService = onCall(SIGNUP_CALL_OPTIONS, async (request) =
     organizationId,
     role: "PROFESSIONAL",
     status: "ACTIVE",
+    linkedProfessionalIds: [userId],
     invitedBy: SELF_SERVICE_ACTOR,
     ...stamp,
   });

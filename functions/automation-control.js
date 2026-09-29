@@ -13,6 +13,7 @@ import { requeueTask } from "./automation.js";
 import { ACCOUNT_CALL_OPTIONS, accountOf, masterOf, parse } from "./platform-auth.js";
 import { consumeRateLimit } from "./rate-limit.js";
 import { runAs } from "./service-accounts.js";
+import { assertProfessionalScope } from "./tenant-auth.js";
 
 /**
  * Controle da automacao (Fase 3, 13.9): a chave de emergencia e o reenvio.
@@ -71,7 +72,7 @@ async function membershipOf(request, permission) {
   if (!permissions.includes(permission)) {
     throw new HttpsError("permission-denied", "Seu papel não permite esta ação.");
   }
-  return { account, organizationId };
+  return { account, organizationId, membership: member };
 }
 
 /**
@@ -181,7 +182,8 @@ export const setGlobalAutomationSwitch = onCall(CALL_OPTIONS, async (request) =>
  * quem ve o problema nao e necessariamente quem decide reenviar.
  */
 export const retryAutomationTask = onCall(CALL_OPTIONS, async (request) => {
-  const { organizationId } = await membershipOf(request, "automationTask:retry");
+  const actor = await membershipOf(request, "automationTask:retry");
+  const { organizationId } = actor;
   await consumeRateLimit(request.auth.uid, "automationRetry");
   const input = parse(retrySchema, request.data);
 
@@ -192,6 +194,7 @@ export const retryAutomationTask = onCall(CALL_OPTIONS, async (request) => {
   const reposta = await firestore.runTransaction(async (transaction) => {
     const task = stored("automationTasks", await transaction.get(ref));
     if (!task) throw new HttpsError("not-found", "Tarefa não encontrada.");
+    assertProfessionalScope(actor, task.professionalId ?? null);
     if (task.status !== "FAILED") {
       throw new HttpsError("failed-precondition", "Só tarefa que falhou pode ser reenviada.");
     }

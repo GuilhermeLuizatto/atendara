@@ -1,7 +1,7 @@
 import { ruleInputSchema, validateRuleInput } from "@/lib/rules/validation";
 import type { AIRule, ID } from "@/types";
 
-import { assertPermission } from "../../guards";
+import { assertPermission, assertProfessionalScope } from "../../guards";
 import { RepositoryError, type RuleInput } from "../../types";
 import {
   auditWrite,
@@ -53,6 +53,7 @@ function requireEditableRule(ctx: PlanContext, id: ID): AIRule {
 export function planCreateRule(ctx: PlanContext, raw: RuleInput): Plan<ID> {
   assertPermission(ctx.actor, "rule:create");
   const input = validate(ctx, raw);
+  assertProfessionalScope(ctx.actor, input.professionalId);
   assertEditableLevel(input.level);
 
   const id = ctx.newId("aiRules");
@@ -93,7 +94,9 @@ export function planUpdateRule(
 ): Plan {
   assertPermission(ctx.actor, "rule:update");
   const existing = requireEditableRule(ctx, id);
+  assertProfessionalScope(ctx.actor, existing.professionalId);
   const input = validate(ctx, { ...existing, ...patch });
+  assertProfessionalScope(ctx.actor, input.professionalId);
   if (patch.level) assertEditableLevel(patch.level);
 
   // Cada alteracao gera uma versao nova: a auditoria cita a versao aplicada,
@@ -123,6 +126,7 @@ export function planUpdateRule(
 export function planDeleteRule(ctx: PlanContext, id: ID): Plan {
   assertPermission(ctx.actor, "rule:delete");
   const existing = requireEditableRule(ctx, id);
+  assertProfessionalScope(ctx.actor, existing.professionalId);
 
   return {
     result: undefined,
@@ -145,6 +149,7 @@ export function planSetRuleEnabled(
 ): Plan {
   assertPermission(ctx.actor, "rule:update");
   const existing = requireEditableRule(ctx, id);
+  assertProfessionalScope(ctx.actor, existing.professionalId);
   validate(ctx, { ...existing, enabled });
 
   return {

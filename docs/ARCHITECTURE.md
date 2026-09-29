@@ -870,14 +870,28 @@ permite que a pessoa crie a própria senha. PROFISSIONAL completa profissão,
 registro e especialidades no primeiro acesso. ADMIN é organizacional; os demais
 papéis podem se vincular a vários profissionais da mesma organização.
 
-**Limite atual antes do piloto multiprofissional.** `linkedProfessionalIds` já
-é validado e persistido no convite e no vínculo, mas ainda não participa das
-consultas do workspace nem das autorizações por documento nas Security Rules.
-Portanto, ele é metadado cadastral, não uma fronteira de segurança. Até os
-sprints 5.1–5.5 do roadmap serem concluídos, uma pessoa com acesso a um módulo
-pode alcançar os dados daquele módulo na organização inteira. A interface não
-deve apresentar as futuras abas como isolamento antes de consultas, callables e
-Rules aplicarem o mesmo vínculo.
+**Fronteira atual do piloto multiprofissional.** `linkedProfessionalIds` é uma
+fronteira de segurança, não apenas metadado cadastral. OWNER e ADMIN têm escopo
+da organização; PROFESSIONAL, ASSISTANT e VIEWER dependem da lista explícita.
+Campo ausente, `null` ou lista vazia negam tudo. Consultas do workspace, planos
+de escrita, callables e Security Rules aplicam a mesma política. Ao mudar o
+vínculo, o repositório limpa imediatamente as coleções afetadas antes de abrir
+os novos listeners, para que a sessão não conserve dados removidos enquanto a
+consulta atualizada está a caminho.
+
+O campo de escopo é desnormalizado em cada documento operacional. Clientes usam
+`assignedProfessionalId`; mensagens, comprovantes, links de pagamento e revisões
+de decisão também carregam `professionalId`, copiado da entidade que os origina.
+Alterar um documento exige escopo tanto no valor anterior quanto no novo, então
+uma atualização não serve para mover dados para fora do vínculo. Regras globais
+do agente continuam legíveis por uma consulta separada com `professionalId ==
+null`. As consultas dividem vínculos em blocos de 30 ids, limite do operador
+`in`, e recombinam os resultados sem duplicação.
+
+Isso ainda não libera o piloto: documentos antigos sem o campo ficam fechados
+por padrão e precisam da migração auditável do sprint 5.5; a interface ainda
+precisa do contexto explícito por abas do sprint 5.4. Não existe fallback que
+transforme dado antigo ou vínculo vazio em acesso geral.
 
 No modelo aprovado para o piloto, cliente continua sendo registro
 administrativo, sem conta. O profissional e o assistente com vínculo ativo o

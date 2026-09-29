@@ -20,6 +20,7 @@ import {
   createPreferenceStore,
   hydrationStore,
 } from "@/lib/storage/preference-store";
+import { professionalScopeFor } from "@/lib/access/professional-scope";
 import {
   createWorkspaceRepository,
   type WorkspaceLoadState,
@@ -188,6 +189,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     // rules conferem. A operadora abre so o conjunto demonstrativo, como OWNER.
     const role: Role = admin ? "OWNER" : (data.membership?.role ?? "PROFESSIONAL");
     const isOrganizationHolder = !admin && data.organization.ownerId === user.userId;
+    const professionalScope = admin
+      ? { organizationWide: true, professionalIds: data.professionals.map((item) => item.id) }
+      : professionalScopeFor(
+          data.membership ?? { role, linkedProfessionalIds: [] },
+        );
     return {
       user,
       organizationId: data.organization.id,
@@ -203,6 +209,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         )?.id ??
         data.professionals[0]?.id ??
         null,
+      linkedProfessionalIds: professionalScope.professionalIds,
+      organizationWideProfessionalScope: professionalScope.organizationWide,
     };
   }, [user, data]);
 
@@ -214,6 +222,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       name: user?.displayName ?? "Sistema",
       role: session?.role ?? (isPlatformAdmin(user?.access) ? "OWNER" : "PROFESSIONAL"),
       permissions: session?.permissions ?? accountPermissions(user?.access),
+      linkedProfessionalIds: session?.linkedProfessionalIds ?? [],
+      organizationWideProfessionalScope:
+        session?.organizationWideProfessionalScope ?? isPlatformAdmin(user?.access),
     });
   }, [repository, user, session]);
 

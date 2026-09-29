@@ -129,6 +129,13 @@ beforeAll(async () => {
   });
   titularUid = created.userId;
   organizationId = (await accountOf(titularUid)).organizationId as string;
+  await adminDb().doc(paths.document(organizationId, "clients", "qualquer")).set({
+    id: "qualquer",
+    organizationId,
+    assignedProfessionalId: titularUid,
+    fullName: "Cadastro da concessão",
+    status: "ACTIVE",
+  });
 
   await signInWithEmailAndPassword(auth, TITULAR.email, created.temporaryPassword);
   await titularCall("completeInitialPassword", { password: TITULAR.password });

@@ -1,7 +1,7 @@
 import { reviewProofError } from "@/lib/finance/payment-proof";
 import type { ID, PaymentProof } from "@/types";
 
-import { assertPermission } from "../../guards";
+import { assertPermission, assertProfessionalScope } from "../../guards";
 import { RepositoryError } from "../../types";
 import { auditWrite, docPath, requireTransaction, touch, type Plan, type PlanContext, type WriteOperation } from "../plan";
 
@@ -23,6 +23,7 @@ export function planApprovePaymentProof(ctx: PlanContext, id: ID): Plan {
   const error = reviewProofError(proof, { verdict: "APPROVED" });
   if (error) throw new RepositoryError(error);
   const transaction = requireTransaction(ctx, proof.transactionId);
+  assertProfessionalScope(ctx.actor, transaction.professionalId);
   const opens = transaction.status === "PENDING" || transaction.status === "OVERDUE";
 
   const writes: WriteOperation[] = [
@@ -58,6 +59,7 @@ export function planApprovePaymentProof(ctx: PlanContext, id: ID): Plan {
 export function planRejectPaymentProof(ctx: PlanContext, id: ID, reason: string): Plan {
   assertPermission(ctx.actor, "transaction:update");
   const proof = requireProof(ctx, id);
+  assertProfessionalScope(ctx.actor, proof.professionalId);
   const error = reviewProofError(proof, { verdict: "REJECTED", reason });
   if (error) throw new RepositoryError(error);
 

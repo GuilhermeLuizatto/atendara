@@ -95,6 +95,8 @@ export type DecisionReviewVerdict = (typeof DECISION_REVIEW_VERDICTS)[number];
  */
 export interface AIDecisionReview extends TenantScopedEntity {
   decisionId: ID;
+  /** Repete o escopo da decisão para leitura paginada sem abrir a trilha inteira. */
+  professionalId: ID | null;
   verdict: DecisionReviewVerdict;
   /** Classificacao que deveria ter saido. `null` quando o veredito e `CORRECT`. */
   expectedClassification: MessageClassificationId | null;

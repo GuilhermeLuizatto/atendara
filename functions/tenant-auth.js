@@ -41,6 +41,24 @@ export async function tenantActor(request, permission = null) {
   };
 }
 
+export function hasProfessionalScope(actor, professionalId) {
+  if (["OWNER", "ADMIN"].includes(actor.membership?.role)) return true;
+  return (
+    typeof professionalId === "string" &&
+    Array.isArray(actor.membership?.linkedProfessionalIds) &&
+    actor.membership.linkedProfessionalIds.includes(professionalId)
+  );
+}
+
+export function assertProfessionalScope(actor, professionalId) {
+  if (!hasProfessionalScope(actor, professionalId)) {
+    throw new HttpsError(
+      "permission-denied",
+      "Este registro pertence a um profissional fora dos seus vínculos ativos.",
+    );
+  }
+}
+
 export function tenantAudit({ organizationId, actorId, action, resourceType, resourceId, summary, metadata = {} }) {
   const now = new Date().toISOString();
   return {

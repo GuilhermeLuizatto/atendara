@@ -105,9 +105,37 @@ service cloud.firestore {
       return hasRole(orgId, ['OWNER', 'ADMIN', 'PROFESSIONAL', 'ASSISTANT']);
     }
 
+    // Evita repetir toda a cadeia de `isMember()` quando a mesma escrita
+    // precisa conferir modulo e papel. Alem de economizar leituras em cache,
+    // mantem o caso mais completo de consentimento abaixo do limite de mil
+    // expressoes do motor de Rules.
+    function moduleWriteAccess(orgId, moduleName) {
+      return moduleAccess(orgId, moduleName)
+        && roleOf(orgId) in ['OWNER', 'ADMIN', 'PROFESSIONAL', 'ASSISTANT'];
+    }
+
     // Papeis com autonomia sobre a operacao (excluem a secretaria).
     function canManage(orgId) {
       return hasRole(orgId, ['OWNER', 'ADMIN', 'PROFESSIONAL']);
+    }
+
+    // Escopo operacional do piloto multiprofissional. OWNER/ADMIN continuam
+    // organizacionais para compatibilidade; os demais papeis dependem da lista
+    // explicita do vinculo. Campo ausente, lista vazia e `null` nunca viram
+    // acesso geral.
+    function professionalScope(orgId, professionalId) {
+      let membership = get(memberRef(orgId)).data;
+      return membership.role in ['OWNER', 'ADMIN']
+        || (professionalId != null
+          && professionalId in membership.get('linkedProfessionalIds', []));
+    }
+
+    function existingProfessionalScope(orgId, field) {
+      return professionalScope(orgId, resource.data.get(field, null));
+    }
+
+    function requestedProfessionalScope(orgId, field) {
+      return professionalScope(orgId, request.resource.data.get(field, null));
     }
 
     // Endereco do atendimento a domicilio (E2.3). E dado pessoal, entao o
@@ -231,7 +259,7 @@ service cloud.firestore {
     // explicito porque `let` so e avaliado quando usado: no veredito
     // "correta" o `get` nunca rodaria, e a revisao nasceria sem decisao.
     function decisionReviewOk(orgId, decisionId, data) {
-      let fields = ['id', 'organizationId', 'decisionId', 'verdict',
+      let fields = ['id', 'organizationId', 'decisionId', 'professionalId', 'verdict',
         'expectedClassification', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy'];
       let decisionPath = /databases/$(database)/documents/organizations/$(orgId)/aiDecisions/$(decisionId);
       return exists(decisionPath)
@@ -239,6 +267,7 @@ service cloud.firestore {
         && data.id == decisionId
         && data.decisionId == decisionId
         && data.organizationId == orgId
+        && data.professionalId == get(decisionPath).data.get('professionalId', null)
         && data.updatedBy == uid()
         && ((data.verdict == 'CORRECT' && data.expectedClassification == null)
           || (data.verdict == 'INCORRECT'
@@ -440,27 +469,42 @@ service cloud.firestore {
       // ------------------------------------------------------------ clientes
 
       match /clients/{clientId} {
-        allow read: if moduleAccess(orgId, 'clientes');
+        allow read: if moduleAccess(orgId, 'clientes')
+          && existingProfessionalScope(orgId, 'assignedProfessionalId');
         // O consentimento de aviso so ganha ou retira registro (`consentWriteOk`),
-        // e `canWriteOperational()` responde tambem por `notificationConsent:record`.
+        // e `moduleWriteAccess()` responde tambem por `notificationConsent:record`.
         // Uma instrucao so para criar e alterar: o motor avalia cada instrucao
         // que casa com a escrita, e duas refariam a cadeia de vinculo.
         // Excluir o cadastro inteiro continua sendo `client:delete`, e a
         // eliminacao a pedido do titular e ato do backend.
-        allow create, update: if moduleAccess(orgId, 'clientes') && canWriteOperational(orgId) && belongsToOrg(orgId)
+        allow create: if moduleWriteAccess(orgId, 'clientes')
+          && belongsToOrg(orgId)
+          && requestedProfessionalScope(orgId, 'assignedProfessionalId')
           // Ternario de mapa com mapa, e o `get` com padrao por fora: o compilador de
           // producao avisava `[W] 352:48` no `null` literal que ficava num dos
           // lados. Mesmo resultado — cadastro novo nao tem consentimento anterior.
           && consentWriteOk((resource == null ? {} : resource.data).get('notificationConsent', null));
-        allow delete: if moduleAccess(orgId, 'clientes') && canManage(orgId);
+        allow update: if moduleWriteAccess(orgId, 'clientes')
+          && belongsToOrg(orgId)
+          && existingProfessionalScope(orgId, 'assignedProfessionalId')
+          && requestedProfessionalScope(orgId, 'assignedProfessionalId')
+          && consentWriteOk(resource.data.get('notificationConsent', null));
+        allow delete: if moduleAccess(orgId, 'clientes') && canManage(orgId)
+          && existingProfessionalScope(orgId, 'assignedProfessionalId');
       }
 
       // -------------------------------------------------------- atendimentos
 
       match /appointments/{appointmentId} {
-        allow read: if moduleAccess(orgId, 'agenda');
-        allow create, update: if moduleAccess(orgId, 'agenda') && canWriteOperational(orgId)
-          && belongsToOrg(orgId) && visitAddressOk();
+        allow read: if moduleAccess(orgId, 'agenda')
+          && existingProfessionalScope(orgId, 'professionalId');
+        allow create: if moduleAccess(orgId, 'agenda') && canWriteOperational(orgId)
+          && belongsToOrg(orgId) && visitAddressOk()
+          && requestedProfessionalScope(orgId, 'professionalId');
+        allow update: if moduleAccess(orgId, 'agenda') && canWriteOperational(orgId)
+          && belongsToOrg(orgId) && visitAddressOk()
+          && existingProfessionalScope(orgId, 'professionalId')
+          && requestedProfessionalScope(orgId, 'professionalId');
         // Atendimento nao e apagado: e cancelado via update, preservando o
         // historico para o financeiro e para a auditoria.
         allow delete: if false;
@@ -469,15 +513,27 @@ service cloud.firestore {
       // ------------------------------------------------------------ conversas
 
       match /conversations/{conversationId} {
-        allow read: if moduleAccess(orgId, 'mensagens');
-        allow create, update: if moduleAccess(orgId, 'mensagens') && canWriteOperational(orgId) && belongsToOrg(orgId);
+        allow read: if moduleAccess(orgId, 'mensagens')
+          && existingProfessionalScope(orgId, 'professionalId');
+        allow create: if moduleAccess(orgId, 'mensagens') && canWriteOperational(orgId)
+          && belongsToOrg(orgId)
+          && requestedProfessionalScope(orgId, 'professionalId');
+        allow update: if moduleAccess(orgId, 'mensagens') && canWriteOperational(orgId)
+          && belongsToOrg(orgId)
+          && existingProfessionalScope(orgId, 'professionalId')
+          && requestedProfessionalScope(orgId, 'professionalId');
         allow delete: if false;
 
         // Mensagens sao imutaveis: registrar o que foi dito e o que permite
         // auditar as decisoes do agente depois.
         match /messages/{messageId} {
-          allow read: if moduleAccess(orgId, 'mensagens');
-          allow create: if moduleAccess(orgId, 'mensagens') && canWriteOperational(orgId) && belongsToOrg(orgId);
+          allow read: if moduleAccess(orgId, 'mensagens')
+            && existingProfessionalScope(orgId, 'professionalId');
+          allow create: if moduleAccess(orgId, 'mensagens') && canWriteOperational(orgId)
+            && belongsToOrg(orgId)
+            && requestedProfessionalScope(orgId, 'professionalId')
+            && request.resource.data.professionalId
+              == getAfter(/databases/$(database)/documents/organizations/$(orgId)/conversations/$(conversationId)).data.get('professionalId', null);
           allow update, delete: if false;
         }
       }
@@ -485,11 +541,17 @@ service cloud.firestore {
       // ----------------------------------------------------------- financeiro
 
       match /transactions/{transactionId} {
-        allow read: if moduleAccess(orgId, 'financeiro');
-        allow create: if moduleAccess(orgId, 'financeiro') && canWriteOperational(orgId) && belongsToOrg(orgId);
-        allow update: if moduleAccess(orgId, 'financeiro') && canManage(orgId) && belongsToOrg(orgId);
+        allow read: if moduleAccess(orgId, 'financeiro')
+          && existingProfessionalScope(orgId, 'professionalId');
+        allow create: if moduleAccess(orgId, 'financeiro') && canWriteOperational(orgId)
+          && belongsToOrg(orgId) && requestedProfessionalScope(orgId, 'professionalId');
+        allow update: if moduleAccess(orgId, 'financeiro') && canManage(orgId)
+          && belongsToOrg(orgId)
+          && existingProfessionalScope(orgId, 'professionalId')
+          && requestedProfessionalScope(orgId, 'professionalId');
         // transaction:delete acompanha ADMIN/OWNER na matriz TypeScript.
-        allow delete: if moduleAccess(orgId, 'financeiro') && isAdmin(orgId);
+        allow delete: if moduleAccess(orgId, 'financeiro') && isAdmin(orgId)
+          && existingProfessionalScope(orgId, 'professionalId');
       }
 
       // Mensalidade do cliente (cobrador, C1). Criar espelha transaction:create
@@ -497,13 +559,17 @@ service cloud.firestore {
       // o historico dos meses lancados depende dela. Quem cobra e o
       // profissional; nenhum dinheiro passa pelo Atendara.
       match /recurringCharges/{chargeId} {
-        allow read: if moduleAccess(orgId, 'financeiro');
+        allow read: if moduleAccess(orgId, 'financeiro')
+          && existingProfessionalScope(orgId, 'professionalId');
         allow create: if moduleAccess(orgId, 'financeiro') && canWriteOperational(orgId)
           && belongsToOrg(orgId)
+          && requestedProfessionalScope(orgId, 'professionalId')
           && recurringChargeOk(request.resource.data)
           && request.resource.data.status == 'ACTIVE';
         allow update: if moduleAccess(orgId, 'financeiro') && canManage(orgId)
           && belongsToOrg(orgId)
+          && existingProfessionalScope(orgId, 'professionalId')
+          && requestedProfessionalScope(orgId, 'professionalId')
           && resource.data.status != 'ENDED'
           && recurringChargeOk(request.resource.data)
           && !request.resource.data.diff(resource.data).affectedKeys()
@@ -515,7 +581,8 @@ service cloud.firestore {
       // financeiro le, para copiar o link de novo. O link abre so o que essa
       // mesma pessoa ja ve.
       match /paymentLinks/{transactionId} {
-        allow read: if moduleAccess(orgId, 'financeiro');
+        allow read: if moduleAccess(orgId, 'financeiro')
+          && existingProfessionalScope(orgId, 'professionalId');
         allow write: if false;
       }
 
@@ -523,8 +590,11 @@ service cloud.firestore {
       // A conferencia muda so a situacao — de aguardando para aprovado ou
       // recusado —, com quem conferiu e, na recusa, o motivo que a pessoa ve.
       match /paymentProofs/{proofId} {
-        allow read: if moduleAccess(orgId, 'financeiro');
+        allow read: if moduleAccess(orgId, 'financeiro')
+          && existingProfessionalScope(orgId, 'professionalId');
         allow update: if moduleAccess(orgId, 'financeiro') && canManage(orgId)
+          && existingProfessionalScope(orgId, 'professionalId')
+          && requestedProfessionalScope(orgId, 'professionalId')
           && resource.data.status == 'SUBMITTED'
           && request.resource.data.status in ['APPROVED', 'REJECTED']
           && request.resource.data.reviewedBy == uid()
@@ -541,7 +611,8 @@ service cloud.firestore {
       // que conferem receipt:create / receipt:cancel e reservam o numero numa
       // transacao. Recibo emitido nao muda pelo cliente, nem para OWNER.
       match /receipts/{receiptId} {
-        allow read: if moduleAccess(orgId, 'financeiro');
+        allow read: if moduleAccess(orgId, 'financeiro')
+          && existingProfessionalScope(orgId, 'professionalId');
         allow write: if false;
       }
 
@@ -565,12 +636,15 @@ service cloud.firestore {
       // ------------------------------------------------- regras do agente IA
 
       match /aiRules/{ruleId} {
-        allow read: if moduleAccess(orgId, 'agente');
+        allow read: if moduleAccess(orgId, 'agente')
+          && (resource.data.get('professionalId', null) == null
+            || existingProfessionalScope(orgId, 'professionalId'));
 
         // Regras fundamentais e da profissao nunca sao criadas pelo cliente:
         // vem da semente do sistema. E nada pode nascer ja imutavel por aqui.
         allow create: if moduleAccess(orgId, 'agente') && canManage(orgId)
           && belongsToOrg(orgId)
+          && requestedProfessionalScope(orgId, 'professionalId')
           && request.resource.data.immutable == false
           && !(request.resource.data.level in ['SECURITY', 'SYSTEM', 'PROFESSION']);
 
@@ -579,18 +653,24 @@ service cloud.firestore {
         // convencao da interface.
         allow update: if moduleAccess(orgId, 'agente') && canManage(orgId)
           && belongsToOrg(orgId)
+          && existingProfessionalScope(orgId, 'professionalId')
+          && requestedProfessionalScope(orgId, 'professionalId')
           && resource.data.immutable == false
           && request.resource.data.immutable == false
           && request.resource.data.level == resource.data.level;
 
-        allow delete: if moduleAccess(orgId, 'agente') && canManage(orgId) && resource.data.immutable == false;
+        allow delete: if moduleAccess(orgId, 'agente') && canManage(orgId)
+          && resource.data.immutable == false
+          && existingProfessionalScope(orgId, 'professionalId');
       }
 
       // ------------------------------------------- decisoes do agente (audit)
 
       match /aiDecisions/{decisionId} {
-        allow read: if moduleAccess(orgId, 'agente');
-        allow create: if moduleAccess(orgId, 'agente') && belongsToOrg(orgId);
+        allow read: if moduleAccess(orgId, 'agente')
+          && existingProfessionalScope(orgId, 'professionalId');
+        allow create: if moduleAccess(orgId, 'agente') && belongsToOrg(orgId)
+          && requestedProfessionalScope(orgId, 'professionalId');
         // Registro imutavel. Se pudesse ser alterado, nao seria auditoria. A
         // pseudonimizacao a pedido do titular e do backend, restrita aos campos
         // de `src/config/privacy.ts`; pelo cliente, nada muda.
@@ -603,12 +683,16 @@ service cloud.firestore {
       // existir e continua intocada; nao ha delete, para uma revisao nao sumir
       // do calculo sem trilha.
       match /aiDecisionReviews/{decisionId} {
-        allow read: if moduleAccess(orgId, 'agente');
+        allow read: if moduleAccess(orgId, 'agente')
+          && existingProfessionalScope(orgId, 'professionalId');
         allow create: if moduleAccess(orgId, 'agente') && isAdmin(orgId)
           && decisionReviewOk(orgId, decisionId, request.resource.data)
+          && requestedProfessionalScope(orgId, 'professionalId')
           && request.resource.data.createdBy == uid();
         allow update: if moduleAccess(orgId, 'agente') && isAdmin(orgId)
           && decisionReviewOk(orgId, decisionId, request.resource.data)
+          && existingProfessionalScope(orgId, 'professionalId')
+          && requestedProfessionalScope(orgId, 'professionalId')
           && !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['createdAt', 'createdBy']);
         allow delete: if false;
@@ -617,10 +701,14 @@ service cloud.firestore {
       // -------------------------------------------------------- notificacoes
 
       match /notifications/{notificationId} {
-        allow read: if isMember(orgId);
-        allow create: if isMember(orgId) && belongsToOrg(orgId);
+        allow read: if isMember(orgId)
+          && existingProfessionalScope(orgId, 'professionalId');
+        allow create: if isMember(orgId) && belongsToOrg(orgId)
+          && requestedProfessionalScope(orgId, 'professionalId');
         // O usuario apenas marca como lida/reconhecida; nao reescreve o alerta.
         allow update: if canWriteOperational(orgId)
+          && existingProfessionalScope(orgId, 'professionalId')
+          && requestedProfessionalScope(orgId, 'professionalId')
           && onlyChanges(['status', 'acknowledgedBy', 'acknowledgedAt', 'updatedAt', 'updatedBy']);
         allow delete: if false;
       }
@@ -639,7 +727,8 @@ service cloud.firestore {
       // travas de novo. Se o navegador escrevesse aqui, um membro marcaria como
       // enviado o que nunca saiu, ou zeraria tentativas e reenviaria sem limite.
       match /notificationDeliveries/{deliveryId} {
-        allow read: if moduleAccess(orgId, 'agenda');
+        allow read: if moduleAccess(orgId, 'agenda')
+          && existingProfessionalScope(orgId, 'professionalId');
         allow write: if false;
       }
 
@@ -688,7 +777,9 @@ service cloud.firestore {
       // convidado. Quem tem o modulo de agenda LE, porque e isso que explica um
       // horario indisponivel na tela; escrita e do backend.
       match /calendarBusyBlocks/{professionalId} {
-        allow read: if moduleAccess(orgId, 'agenda');
+        allow read: if moduleAccess(orgId, 'agenda')
+          && professionalScope(orgId, professionalId)
+          && resource.data.get('professionalId', null) == professionalId;
         allow write: if false;
       }
 
@@ -737,7 +828,9 @@ service cloud.firestore {
       match /automationTasks/{taskId} {
         // Modulo de agenda E papel: a fila explica por que um aviso da agenda
         // nao saiu, entao quem nao tem a agenda nao tem o que ver aqui.
-        allow read: if moduleAccess(orgId, 'agenda') && hasRole(orgId, ['OWNER', 'ADMIN', 'PROFESSIONAL']);
+        allow read: if moduleAccess(orgId, 'agenda')
+          && hasRole(orgId, ['OWNER', 'ADMIN', 'PROFESSIONAL'])
+          && existingProfessionalScope(orgId, 'professionalId');
         allow write: if false;
       }
 
@@ -779,7 +872,11 @@ service cloud.firestore {
     // mensagem continua sendo decidida pela regra aninhada da conversa, que ja
     // aceita somente `create`.
     match /{path=**}/messages/{messageId} {
-      allow read: if moduleAccess(resource.data.organizationId, 'mensagens');
+      allow read: if moduleAccess(resource.data.organizationId, 'mensagens')
+        && professionalScope(
+          resource.data.organizationId,
+          resource.data.get('professionalId', null)
+        );
     }
 
     // ------------------------------------------- cobranca DA PLATAFORMA

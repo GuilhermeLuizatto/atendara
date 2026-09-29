@@ -1,7 +1,11 @@
 import type { Client, ID } from "@/types";
 import { openRecurringChargeError } from "@/lib/finance/recurring";
 
-import { assertConsentWrite, assertPermission } from "../../guards";
+import {
+  assertConsentWrite,
+  assertPermission,
+  assertProfessionalScope,
+} from "../../guards";
 import { RepositoryError, type ClientInput } from "../../types";
 import {
   auditWrite,
@@ -21,6 +25,7 @@ export function planCreateClient(
   input: ClientInput,
 ): Plan<ID> {
   assertPermission(ctx.actor, "client:create");
+  assertProfessionalScope(ctx.actor, input.assignedProfessionalId);
   const consent = assertConsentWrite(ctx.actor, null, input.notificationConsent);
   const id = ctx.newId("clients");
 
@@ -73,6 +78,10 @@ export function planUpdateClient(
 ): Plan {
   assertPermission(ctx.actor, "client:update");
   const existing = requireClient(ctx, id);
+  assertProfessionalScope(ctx.actor, existing.assignedProfessionalId);
+  if (input.assignedProfessionalId !== undefined) {
+    assertProfessionalScope(ctx.actor, input.assignedProfessionalId);
+  }
   const consent = assertConsentWrite(ctx.actor, existing.notificationConsent, input.notificationConsent);
   const fullName = input.fullName ?? existing.fullName;
 
@@ -124,6 +133,7 @@ export function planUpdateClient(
 export function planDeleteClient(ctx: PlanContext, id: ID): Plan {
   assertPermission(ctx.actor, "client:delete");
   const existing = requireClient(ctx, id);
+  assertProfessionalScope(ctx.actor, existing.assignedProfessionalId);
 
   // Excluir alguem com agenda futura apagaria compromissos silenciosamente.
   const future = ctx.snapshot.appointments.filter(

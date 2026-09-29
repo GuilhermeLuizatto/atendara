@@ -245,6 +245,7 @@ describe("montagem do snapshot do Firestore", () => {
       updatedBy: null,
       conversationId: "conv-1",
       clientId: "client-1",
+      professionalId: "prof-1",
       direction: "INBOUND" as const,
       authorType: "CLIENT" as const,
       authorName: "Cliente",

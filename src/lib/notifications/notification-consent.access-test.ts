@@ -149,13 +149,21 @@ async function seedMember(uid: string, organizationId: string, role: string): Pr
     accessUntilMs: Date.parse(inDays(30)),
     createdAt: new Date().toISOString(),
   });
-  await fs().doc(paths.document(organizationId, "members", uid)).set({ id: uid, userId: uid, organizationId, role, status: "ACTIVE" });
+  await fs().doc(paths.document(organizationId, "members", uid)).set({
+    id: uid,
+    userId: uid,
+    organizationId,
+    role,
+    status: "ACTIVE",
+    linkedProfessionalIds: [titularA.uid],
+  });
   return tokenSession(uid, null);
 }
 
 function clientDocument(organizationId: string, consent: StoredNotificationConsent | null): Record<string, unknown> {
   return {
     organizationId,
+    assignedProfessionalId: titularA.uid,
     fullName: "Bia Exemplo Consentimento",
     preferredName: null,
     email: "bia@exemplo.invalid",

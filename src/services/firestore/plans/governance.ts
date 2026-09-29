@@ -1,6 +1,7 @@
 import type { ID } from "@/types";
 
 import type { AuditInput, NotificationInput } from "../../types";
+import { assertProfessionalScope } from "../../guards";
 import {
   auditWrite,
   docPath,
@@ -23,6 +24,7 @@ export function planCreateNotification(
   ctx: PlanContext,
   input: NotificationInput,
 ): Plan<ID> {
+  assertProfessionalScope(ctx.actor, input.professionalId);
   const { write, id } = notificationWrite(ctx, input);
   return { result: id, writes: [write] };
 }
@@ -31,6 +33,8 @@ export function planAcknowledgeNotification(
   ctx: PlanContext,
   id: ID,
 ): Plan {
+  const notification = ctx.snapshot.notifications.find((item) => item.id === id);
+  assertProfessionalScope(ctx.actor, notification?.professionalId);
   return {
     result: undefined,
     writes: [

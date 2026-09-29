@@ -6,10 +6,15 @@ import {
   type DocumentData,
   type DocumentReference,
   type Firestore,
+  type QueryDocumentSnapshot,
   type UpdateData,
   type WithFieldValue,
 } from "firebase/firestore";
 
+import {
+  professionalScopeFor,
+  type ProfessionalScope,
+} from "@/lib/access/professional-scope";
 import {
   fromFirestoreData,
   toFirestoreData,
@@ -158,6 +163,60 @@ const COLLECTION_PARTS: Array<[PagedPart, ConvertedCollection, WorkspaceCollecti
   ["auditLogs", "auditLogs", "auditLogs"],
 ];
 
+const SCOPED_PARTS = new Set<PagedPart>([
+  "clients",
+  "appointments",
+  "conversations",
+  "messages",
+  "transactions",
+  "recurringCharges",
+  "paymentLinks",
+  "paymentProofs",
+  "receipts",
+  "aiRules",
+  "aiDecisions",
+  "aiDecisionReviews",
+  "notifications",
+  "notificationDeliveries",
+  "automationTasks",
+  "calendarBusyBlocks",
+]);
+
+const PART_ORDER: Partial<
+  Record<PagedPart, { field: string; direction: "asc" | "desc" }>
+> = {
+  professionals: { field: "displayName", direction: "asc" },
+  clients: { field: "fullName", direction: "asc" },
+  services: { field: "position", direction: "asc" },
+  appointments: { field: "startsAt", direction: "desc" },
+  conversations: { field: "lastMessageAt", direction: "desc" },
+  messages: { field: "sentAt", direction: "desc" },
+  transactions: { field: "dueDate", direction: "desc" },
+  recurringCharges: { field: "createdAt", direction: "desc" },
+  paymentLinks: { field: "createdAt", direction: "desc" },
+  paymentProofs: { field: "submittedAt", direction: "desc" },
+  receipts: { field: "number", direction: "desc" },
+  aiRules: { field: "priority", direction: "desc" },
+  aiDecisions: { field: "decidedAt", direction: "desc" },
+  aiDecisionReviews: { field: "updatedAt", direction: "desc" },
+  notifications: { field: "createdAt", direction: "desc" },
+  notificationDeliveries: { field: "scheduledFor", direction: "desc" },
+  automationTasks: { field: "createdAt", direction: "desc" },
+  auditLogs: { field: "occurredAt", direction: "desc" },
+};
+
+function comparePart(part: PagedPart, left: unknown, right: unknown): number {
+  const order = PART_ORDER[part];
+  if (!order) return 0;
+  const a = (left as Record<string, unknown>)[order.field];
+  const b = (right as Record<string, unknown>)[order.field];
+  const result =
+    typeof a === "number" && typeof b === "number"
+      ? a - b
+      : String(a ?? "").localeCompare(String(b ?? ""), "pt-BR");
+  return order.direction === "asc" ? result : -result;
+}
+
 /** Limite do Firestore por lote; a folga cobre a escrita de auditoria. */
 const BATCH_LIMIT = 450;
 
@@ -201,6 +260,7 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
   private readonly loadListeners = new Set<() => void>();
   private readonly unsubscribes = new Map<PartName, () => void>();
   private actor: RepositoryActor = { userId: null, name: "Sistema" };
+  private professionalScope: ProfessionalScope | null = null;
 
   private readonly userId: ID | null;
   private readonly pageSizes: Record<PagedPart, number>;
@@ -238,14 +298,46 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
     this.pending.clear();
     this.pending.add("organization");
     if (this.userId) this.pending.add("membership");
-    for (const [part] of COLLECTION_PARTS) this.pending.add(part);
 
     this.startSlowTimer();
     this.watchOrganization();
     if (this.userId) this.watchMembership(this.userId);
-    for (const [part, collection] of COLLECTION_PARTS) {
+    else {
+      this.professionalScope = { organizationWide: false, professionalIds: [] };
+      this.startCollectionListeners(COLLECTION_PARTS);
+    }
+  }
+
+  private startCollectionListeners(
+    entries: Array<[PagedPart, ConvertedCollection, WorkspaceCollection]>,
+  ): void {
+    for (const [part, collection] of entries) {
+      this.pending.add(part);
       this.watchCollection(part, collection);
     }
+  }
+
+  private applyMembershipScope(membership: Membership): void {
+    const next = professionalScopeFor(membership);
+    const initial = this.professionalScope === null;
+    const changed = JSON.stringify(next) !== JSON.stringify(this.professionalScope);
+    this.professionalScope = next;
+    if (!changed) return;
+
+    const entries = initial
+      ? COLLECTION_PARTS
+      : COLLECTION_PARTS.filter(([part]) => SCOPED_PARTS.has(part));
+    if (!initial) {
+      const cleared = { ...this.parts } as SnapshotParts;
+      for (const [part] of entries) {
+        (cleared as unknown as Record<string, unknown>)[part] = [];
+      }
+      this.parts = cleared;
+      // Perder um vínculo fecha o dado imediatamente; a nova consulta não
+      // precisa chegar para retirar da tela o que deixou de ser autorizado.
+      this.publish();
+    }
+    this.startCollectionListeners(entries);
   }
 
   private nextGeneration(part: PartName): number {
@@ -303,12 +395,14 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
         membershipRef(this.db, this.organizationId, userId),
         (document) => {
           if (generation !== this.generations.get("membership")) return;
+          const membership = document.exists()
+            ? fromFirestoreData<Membership>("members", document.id, document.data())
+            : null;
           this.parts = {
             ...this.parts,
-            membership: document.exists()
-              ? fromFirestoreData<Membership>("members", document.id, document.data())
-              : null,
+            membership,
           };
+          if (membership) this.applyMembershipScope(membership);
           this.settle("membership");
         },
         // Vinculo ilegivel nao derruba o painel: o papel fica o padrao e as
@@ -324,25 +418,55 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
   private watchCollection(part: PagedPart, collection: ConvertedCollection): void {
     const generation = this.nextGeneration(part);
     const count = this.limits[part];
+    const queries = snapshotQueries[part](
+      this.db,
+      this.organizationId,
+      count + 1,
+      this.professionalScope ?? { organizationWide: false, professionalIds: [] },
+    );
 
-    this.replaceListener(
-      part,
+    if (queries.length === 0) {
+      this.replaceListener(part, () => {});
+      this.parts = { ...this.parts, [part]: [] };
+      this.hasMore.delete(part);
+      this.loadingMore.delete(part);
+      this.failed.delete(part);
+      this.releasePageWaiters(part);
+      this.settle(part);
+      return;
+    }
+
+    const buckets = new Map<
+      number,
+      QueryDocumentSnapshot<DocumentData, DocumentData>[]
+    >();
+    const unsubscribes = queries.map((builtQuery, index) =>
       onSnapshot(
-        snapshotQueries[part](this.db, this.organizationId, count + 1),
+        builtQuery,
         (result) => {
           if (generation !== this.generations.get(part)) return;
-          const documents = result.docs.slice(0, count);
-          if (result.docs.length > count) this.hasMore.add(part);
+          buckets.set(index, result.docs);
+          if (buckets.size !== queries.length) return;
+
+          const unique = new Map<
+            string,
+            QueryDocumentSnapshot<DocumentData, DocumentData>
+          >();
+          for (const documents of buckets.values()) {
+            for (const document of documents) unique.set(document.ref.path, document);
+          }
+          const converted = [...unique.values()]
+            .map((document) =>
+              fromFirestoreData(collection, document.id, document.data()),
+            )
+            .sort((left, right) => comparePart(part, left, right));
+          const documents = converted.slice(0, count);
+          if (converted.length > count) this.hasMore.add(part);
           else this.hasMore.delete(part);
           this.loadingMore.delete(part);
           this.failed.delete(part);
 
-          this.parts = {
-            ...this.parts,
-            [part]: documents.map((document) =>
-              fromFirestoreData(collection, document.id, document.data() as DocumentData),
-            ),
-          };
+          this.parts = { ...this.parts, [part]: documents };
           this.releasePageWaiters(part);
           this.settle(part);
         },
@@ -351,6 +475,13 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
           this.onCollectionError(part, error);
         },
       ),
+    );
+
+    this.replaceListener(
+      part,
+      () => {
+        for (const unsubscribe of unsubscribes) unsubscribe();
+      },
     );
   }
 

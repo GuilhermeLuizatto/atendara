@@ -19,7 +19,7 @@ import { fromStored, toStored } from "./firestore-dates.js";
 import { ACCOUNT_CALL_OPTIONS, parse } from "./platform-auth.js";
 import { consumeRateLimit, networkSubject } from "./rate-limit.js";
 import { runAs } from "./service-accounts.js";
-import { tenantActor } from "./tenant-auth.js";
+import { assertProfessionalScope, tenantActor } from "./tenant-auth.js";
 
 /**
  * Link de pagamento e comprovante (cobrador, C2).
@@ -83,6 +83,7 @@ export const createPaymentLink = onCall(OPTIONS, async (request) => {
   const transaction = snapshot.exists ? fromStored("transactions", snapshot.id, snapshot.data()) : null;
   const refused = paymentLinkError(transaction);
   if (refused) throw new HttpsError("failed-precondition", refused);
+  assertProfessionalScope(actor, transaction.professionalId ?? null);
 
   const token = randomBytes(32).toString("base64url");
   const now = new Date().toISOString();
@@ -94,6 +95,7 @@ export const createPaymentLink = onCall(OPTIONS, async (request) => {
       id: transactionId,
       organizationId,
       transactionId,
+      professionalId: transaction.professionalId ?? null,
       token,
       tokenHash: hashOf(token),
       createdAt: now,
@@ -181,6 +183,7 @@ export const submitPaymentProof = onCall(PROOF_OPTIONS, async (request) => {
       id: proofId,
       organizationId,
       transactionId: transaction.id,
+      professionalId: transaction.professionalId ?? null,
       recurringChargeId: transaction.recurringChargeId ?? null,
       clientId: transaction.clientId ?? null,
       status: "SUBMITTED",

@@ -79,6 +79,11 @@ vi.mock("firebase-functions/v2/https", () => ({
 }));
 vi.mock("./rate-limit.js", () => ({ consumeRateLimit: vi.fn(async () => {}), networkSubject: () => "rede" }));
 vi.mock("./tenant-auth.js", () => ({
+  assertProfessionalScope: vi.fn((actor, professionalId) => {
+    if (!actor.membership.linkedProfessionalIds.includes(professionalId)) {
+      throw Object.assign(new Error("Fora do vínculo."), { code: "permission-denied" });
+    }
+  }),
   tenantActor: vi.fn(async (_request, permission) => {
     if (!mock.actor.permissions.includes(permission)) {
       throw Object.assign(new Error("Seu papel não permite esta operação."), { code: "permission-denied" });
@@ -99,11 +104,11 @@ const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a
 function seed(transaction = {}) {
   mock.documents.set(paths.organization(ORG), { name: "Consultório Núcleo" });
   mock.documents.set(paths.document(ORG, "transactions", TX), {
-    organizationId: ORG, type: "INCOME", clientId: "c1", clientName: "Ana Ficticia", professionalId: null,
+    organizationId: ORG, type: "INCOME", clientId: "c1", clientName: "Ana Ficticia", professionalId: "prof-1",
     description: "Mensalidade — setembro de 2026", amountInCents: 45000, status: "PENDING", method: "PIX",
     dueDate: "2026-09-28T15:00:00.000Z", paidAt: null, recurringChargeId: "m1", period: "2026-09", ...transaction,
   });
-  mock.documents.set(paths.document(ORG, "paymentLinks", TX), { organizationId: ORG, transactionId: TX, token: TOKEN, tokenHash: hash(TOKEN) });
+  mock.documents.set(paths.document(ORG, "paymentLinks", TX), { organizationId: ORG, transactionId: TX, professionalId: "prof-1", token: TOKEN, tokenHash: hash(TOKEN) });
 }
 
 beforeEach(() => {
@@ -117,6 +122,7 @@ beforeEach(() => {
     userId: "u1",
     account: { displayName: "Profissional", modules: ["financeiro"] },
     permissions: ["transaction:create", "transaction:update"],
+    membership: { role: "PROFESSIONAL", linkedProfessionalIds: ["prof-1"] },
   };
 });
 
@@ -141,6 +147,14 @@ describe("gerar link", () => {
     mock.actor.account.modules = ["financeiro"];
     mock.actor.permissions = [];
     await expect(createPaymentLink({ auth: { uid: "u1" }, data: { transactionId: TX } })).rejects.toMatchObject({ code: "permission-denied" });
+    expect(mock.writes).toEqual([]);
+  });
+
+  it("não gera link para lançamento fora dos vínculos do autor", async () => {
+    seed({ professionalId: "prof-2" });
+    await expect(
+      createPaymentLink({ auth: { uid: "u1" }, data: { transactionId: TX } }),
+    ).rejects.toMatchObject({ code: "permission-denied" });
     expect(mock.writes).toEqual([]);
   });
 });

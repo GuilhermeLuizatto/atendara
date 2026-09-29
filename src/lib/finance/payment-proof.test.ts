@@ -44,6 +44,7 @@ const proof = (id: string, patch: Partial<PaymentProof> = {}): PaymentProof => (
   id,
   organizationId: "org",
   transactionId: "m1-202609",
+  professionalId: "prof-1",
   recurringChargeId: "m1",
   clientId: "c1",
   status: "SUBMITTED",

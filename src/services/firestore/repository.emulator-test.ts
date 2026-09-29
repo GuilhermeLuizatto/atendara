@@ -2,6 +2,7 @@ import { deleteApp, initializeApp, type FirebaseApp } from "firebase/app";
 import {
   Timestamp,
   connectFirestoreEmulator,
+  deleteDoc,
   doc,
   getDoc,
   getFirestore,
@@ -112,13 +113,27 @@ beforeAll(async () => {
     escalationReason: null,
     ...stamp,
   });
+  await setDoc(doc(db, paths.document(ORG, "members", "user-1")), {
+    id: "user-1",
+    organizationId: ORG,
+    userId: "user-1",
+    role: "ADMIN",
+    status: "ACTIVE",
+    linkedProfessionalIds: [],
+    invitedBy: null,
+    ...stamp,
+  });
 
-  repository = new FirestoreWorkspaceRepository(db, ORG, "PSYCHOLOGIST");
+  repository = new FirestoreWorkspaceRepository(db, ORG, "PSYCHOLOGIST", {
+    userId: "user-1",
+  });
   repository.setActor({
     userId: "user-1",
     name: "Profissional Um",
     role: "PROFESSIONAL",
     permissions: permissionsForRole("PROFESSIONAL"),
+    linkedProfessionalIds: [PROFESSIONAL],
+    organizationWideProfessionalScope: false,
   });
 
   await nextSnapshot((snapshot) => snapshot.professionals.length === 1);
@@ -141,7 +156,10 @@ describe("repositorio do Firestore contra o emulador", () => {
     await setDoc(doc(db, paths.document("other-queue-org", "automationTasks", "foreign")), toFirestoreData("automationTasks", {
       ...task, organizationId: "other-queue-org", createdAt: "2026-09-30T12:00:00.000Z",
     }));
-    const paged = new FirestoreWorkspaceRepository(db, ORG, "PSYCHOLOGIST", { pageSizes: { automationTasks: 2 } });
+    const paged = new FirestoreWorkspaceRepository(db, ORG, "PSYCHOLOGIST", {
+      userId: "user-1",
+      pageSizes: { automationTasks: 2 },
+    });
     try {
       const first = await nextSnapshot((snapshot) => snapshot.automationTasks.length === 2, paged);
       expect(first.automationTasks.map((item) => item.id)).toEqual(["queue-3", "queue-2"]);
@@ -316,18 +334,6 @@ describe("repositorio do Firestore contra o emulador", () => {
   });
 
   it("le o vinculo de quem usa o painel e pagina a colecao ate o fim", async () => {
-    await setDoc(doc(db, paths.document(ORG, "members", "user-1")), {
-      id: "user-1",
-      organizationId: ORG,
-      userId: "user-1",
-      role: "ADMIN",
-      status: "ACTIVE",
-      invitedBy: null,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-      createdBy: null,
-      updatedBy: null,
-    });
     for (const name of ["Ana", "Bruno", "Carla", "Diego"]) {
       await repository.createClient({
         fullName: `${name} Paginacao`,
@@ -370,6 +376,60 @@ describe("repositorio do Firestore contra o emulador", () => {
       expect(paged.getLoadState()).toEqual({ status: "ready", failed: [] });
     } finally {
       paged.dispose();
+    }
+  });
+
+  it("retira imediatamente da fotografia o profissional removido do vínculo", async () => {
+    const memberReference = doc(db, paths.document(ORG, "members", "user-1"));
+    const externalReference = doc(db, paths.document(ORG, "clients", "fora-do-vinculo"));
+    const membership = (role: "ADMIN" | "PROFESSIONAL", linkedProfessionalIds: string[]) => ({
+      id: "user-1",
+      organizationId: ORG,
+      userId: "user-1",
+      role,
+      status: "ACTIVE",
+      linkedProfessionalIds,
+      invitedBy: null,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      createdBy: null,
+      updatedBy: null,
+    });
+
+    await setDoc(externalReference, {
+      id: "fora-do-vinculo",
+      organizationId: ORG,
+      assignedProfessionalId: "prof-fora",
+      fullName: "Z Cliente fora do vínculo",
+      status: "ACTIVE",
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      createdBy: null,
+      updatedBy: null,
+    });
+
+    try {
+      await setDoc(memberReference, membership("PROFESSIONAL", [PROFESSIONAL, "prof-fora"]));
+      await nextSnapshot(
+        (snapshot) => snapshot.membership?.role === "PROFESSIONAL"
+          && snapshot.clients.some((client) => client.id === "fora-do-vinculo"),
+      );
+
+      await setDoc(memberReference, membership("PROFESSIONAL", [PROFESSIONAL]));
+      const restricted = await nextSnapshot(
+        (snapshot) => snapshot.membership?.linkedProfessionalIds?.length === 1
+          && !snapshot.clients.some((client) => client.id === "fora-do-vinculo"),
+      );
+      expect(restricted.clients.some((client) => client.id === "fora-do-vinculo")).toBe(false);
+      const reloaded = await nextSnapshot(
+        (snapshot) => snapshot.clients.some((client) => client.assignedProfessionalId === PROFESSIONAL)
+          && !snapshot.clients.some((client) => client.id === "fora-do-vinculo"),
+      );
+      expect(reloaded.clients.every((client) => client.assignedProfessionalId === PROFESSIONAL)).toBe(true);
+    } finally {
+      await deleteDoc(externalReference);
+      await setDoc(memberReference, membership("ADMIN", []));
+      await nextSnapshot((snapshot) => snapshot.membership?.role === "ADMIN");
     }
   });
 
@@ -492,13 +552,27 @@ describe("repositorio do Firestore contra o emulador", () => {
       active: true,
       ...stamp,
     });
+    await setDoc(doc(db, paths.document(ORG_ESTETICA, "members", "user-2")), {
+      id: "user-2",
+      organizationId: ORG_ESTETICA,
+      userId: "user-2",
+      role: "PROFESSIONAL",
+      status: "ACTIVE",
+      linkedProfessionalIds: ["prof-2"],
+      invitedBy: null,
+      ...stamp,
+    });
 
-    const estudio = new FirestoreWorkspaceRepository(db, ORG_ESTETICA, "AESTHETICS");
+    const estudio = new FirestoreWorkspaceRepository(db, ORG_ESTETICA, "AESTHETICS", {
+      userId: "user-2",
+    });
     estudio.setActor({
       userId: "user-2",
       name: "Esteticista Dois",
       role: "PROFESSIONAL",
       permissions: permissionsForRole("PROFESSIONAL"),
+      linkedProfessionalIds: ["prof-2"],
+      organizationWideProfessionalScope: false,
     });
 
     try {
@@ -575,7 +649,22 @@ describe("repositorio do Firestore contra o emulador", () => {
     };
     await setDoc(doc(db, paths.document(ORG, "aiDecisions", decisionId)), toFirestoreData("aiDecisions", decision));
 
-    const owner = new FirestoreWorkspaceRepository(db, ORG, "PSYCHOLOGIST");
+    await setDoc(doc(db, paths.document(ORG, "members", "user-owner")), {
+      id: "user-owner",
+      organizationId: ORG,
+      userId: "user-owner",
+      role: "OWNER",
+      status: "ACTIVE",
+      linkedProfessionalIds: [],
+      invitedBy: null,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      createdBy: null,
+      updatedBy: null,
+    });
+    const owner = new FirestoreWorkspaceRepository(db, ORG, "PSYCHOLOGIST", {
+      userId: "user-owner",
+    });
     try {
       owner.setActor({ userId: "user-owner", name: "Titular", role: "OWNER", permissions: permissionsForRole("OWNER") });
       await nextSnapshot((snapshot) => snapshot.decisions.some((item) => item.id === decisionId), owner);

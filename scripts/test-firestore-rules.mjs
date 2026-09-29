@@ -82,26 +82,29 @@ try {
     };
     for (const [uid, profile] of Object.entries(profiles)) {
       await setDoc(doc(db, paths.account(uid)), profile);
-      if (profile.organizationId) await setDoc(doc(db, paths.document(profile.organizationId, "members", uid)), { role: "PROFESSIONAL", status: "ACTIVE" });
+      if (profile.organizationId) await setDoc(doc(db, paths.document(profile.organizationId, "members", uid)), { role: "PROFESSIONAL", status: "ACTIVE", linkedProfessionalIds: [profile.organizationId === "org-b" ? "b" : "a"] });
     }
     // Membros promovidos a OWNER ou ADMIN sem serem o titular (`ownerId`). O
     // papel so alcanca a cobranca com o vinculo ativo.
     for (const [uid, role, status] of [["ownerRole", "OWNER", "ACTIVE"], ["ownerRoleSuspended", "OWNER", "SUSPENDED"], ["adminRole", "ADMIN", "ACTIVE"], ["assistantRole", "ASSISTANT", "ACTIVE"], ["viewerRole", "VIEWER", "ACTIVE"]]) {
       await setDoc(doc(db, paths.account(uid)), account("org-a"));
-      await setDoc(doc(db, paths.document("org-a", "members", uid)), { role, status });
+      await setDoc(doc(db, paths.document("org-a", "members", uid)), { role, status, linkedProfessionalIds: role === "ASSISTANT" ? ["a", "professional-b"] : ["a"] });
     }
     for (const org of ["org-a", "org-b"]) {
       await setDoc(doc(db, paths.organization(org)), { primaryProfession: "PSYCHOLOGIST", ownerId: "a" });
-      for (const collection of ["professionals", "clients", "appointments", "transactions", "aiDecisions", "automationTasks", "auditLogs"]) await setDoc(doc(db, paths.document(org, collection, "example")), { organizationId: org });
-      await setDoc(doc(db, paths.document(org, "aiRules", "immutable")), { organizationId: org, immutable: true, level: "SYSTEM", enabled: true });
-      await setDoc(doc(db, paths.document(org, "aiDecisions", "revisada")), { organizationId: org, classification: "ADMINISTRATIVE" });
-      await setDoc(doc(db, paths.document(org, "receipts", "r1")), { organizationId: org, number: 1, status: "ISSUED", amountInCents: 45000 });
-      await setDoc(doc(db, paths.document(org, "paymentLinks", "m1-202609")), { organizationId: org, transactionId: "m1-202609", token: "t", tokenHash: "h" });
-      await setDoc(doc(db, paths.document(org, "paymentProofs", "p1")), { organizationId: org, transactionId: "m1-202609", status: "SUBMITTED", storagePath: `paymentProofs/${org}/m1-202609/p1`, reviewedAt: null, reviewedBy: null, rejectionReason: null });
-      await setDoc(doc(db, paths.document(org, "conversations", "conv")), { organizationId: org, clientId: "example", status: "OPEN" });
-      await setDoc(doc(db, messagePath(org, "conv", "m1")), { organizationId: org, conversationId: "conv", body: "Bom dia", sentAt: new Date() });
-      await setDoc(doc(db, paths.document(org, "notifications", "alert")), { organizationId: org, status: "UNREAD", title: "Alerta" });
-      await setDoc(doc(db, paths.document(org, "notificationDeliveries", "envio")), { organizationId: org, status: "PLANNED", attempts: 0, sentAt: null, channel: "SMS", event: "APPOINTMENT_REMINDER", bodyHash: "abcdef12", contactHint: "***0000" });
+      await setDoc(doc(db, paths.document(org, "professionals", "example")), { organizationId: org });
+      await setDoc(doc(db, paths.document(org, "clients", "example")), { organizationId: org, assignedProfessionalId: org === "org-b" ? "b" : "a" });
+      for (const collection of ["appointments", "transactions", "aiDecisions", "automationTasks"]) await setDoc(doc(db, paths.document(org, collection, "example")), { organizationId: org, professionalId: org === "org-b" ? "b" : "a" });
+      await setDoc(doc(db, paths.document(org, "auditLogs", "example")), { organizationId: org });
+      await setDoc(doc(db, paths.document(org, "aiRules", "immutable")), { organizationId: org, professionalId: null, immutable: true, level: "SYSTEM", enabled: true });
+      await setDoc(doc(db, paths.document(org, "aiDecisions", "revisada")), { organizationId: org, professionalId: org === "org-b" ? "b" : "a", classification: "ADMINISTRATIVE" });
+      await setDoc(doc(db, paths.document(org, "receipts", "r1")), { organizationId: org, professionalId: org === "org-b" ? "b" : "a", number: 1, status: "ISSUED", amountInCents: 45000 });
+      await setDoc(doc(db, paths.document(org, "paymentLinks", "m1-202609")), { organizationId: org, professionalId: org === "org-b" ? "b" : "a", transactionId: "m1-202609", token: "t", tokenHash: "h" });
+      await setDoc(doc(db, paths.document(org, "paymentProofs", "p1")), { organizationId: org, professionalId: org === "org-b" ? "b" : "a", transactionId: "m1-202609", status: "SUBMITTED", storagePath: `paymentProofs/${org}/m1-202609/p1`, reviewedAt: null, reviewedBy: null, rejectionReason: null });
+      await setDoc(doc(db, paths.document(org, "conversations", "conv")), { organizationId: org, professionalId: org === "org-b" ? "b" : "a", clientId: "example", status: "OPEN" });
+      await setDoc(doc(db, messagePath(org, "conv", "m1")), { organizationId: org, professionalId: org === "org-b" ? "b" : "a", conversationId: "conv", body: "Bom dia", sentAt: new Date() });
+      await setDoc(doc(db, paths.document(org, "notifications", "alert")), { organizationId: org, professionalId: org === "org-b" ? "b" : "a", status: "UNREAD", title: "Alerta" });
+      await setDoc(doc(db, paths.document(org, "notificationDeliveries", "envio")), { organizationId: org, professionalId: org === "org-b" ? "b" : "a", status: "PLANNED", attempts: 0, sentAt: null, channel: "SMS", event: "APPOINTMENT_REMINDER", bodyHash: "abcdef12", contactHint: "***0000" });
       await setDoc(doc(db, paths.document(org, "privacyRequests", "pedido")), { organizationId: org, type: "CLIENT_EXPORT", subjectId: "example", requestedBy: "a" });
       await setDoc(doc(db, paths.document(org, "services", "manicure")), { organizationId: org, name: "Manicure", durationMinutes: 60, priceInCents: 5000, enabled: true, position: 0, archivedAt: null });
       await setDoc(doc(db, paths.document(org, "automationSwitches", "organization")), { organizationId: org, enabled: false, reason: "Investigando" });
@@ -114,9 +117,32 @@ try {
       await setDoc(doc(db, paths.document(org, "importMappings", "example")), { organizationId: org });
     }
     await setDoc(doc(db, paths.initialPassword("a")), { hash: "test-only" });
-    await setDoc(doc(db, paths.document("org-a", "clients", "consentido")), { organizationId: "org-a", fullName: "Alex Ficticio", notificationConsent: recordConsent({ EMAIL: [SEEDED_EMAIL], SMS: [SEEDED_SMS] }) });
-    await setDoc(doc(db, paths.document("org-a", "clients", "antigo")), { organizationId: "org-a", fullName: "Cadastro Antigo", notificationConsent: LEGACY_CONSENT });
-    await setDoc(doc(db, paths.document("org-a", "clients", "tres-canais")), { organizationId: "org-a", fullName: "Tres Canais", notificationConsent: recordConsent({ EMAIL: [consentRecord("a")], SMS: [consentRecord("a")], WHATSAPP: [consentRecord("a")] }) });
+    await setDoc(doc(db, paths.document("org-a", "clients", "consentido")), { organizationId: "org-a", assignedProfessionalId: "a", fullName: "Alex Ficticio", notificationConsent: recordConsent({ EMAIL: [SEEDED_EMAIL], SMS: [SEEDED_SMS] }) });
+    await setDoc(doc(db, paths.document("org-a", "clients", "antigo")), { organizationId: "org-a", assignedProfessionalId: "a", fullName: "Cadastro Antigo", notificationConsent: LEGACY_CONSENT });
+    await setDoc(doc(db, paths.document("org-a", "clients", "tres-canais")), { organizationId: "org-a", assignedProfessionalId: "a", fullName: "Tres Canais", notificationConsent: recordConsent({ EMAIL: [consentRecord("a")], SMS: [consentRecord("a")], WHATSAPP: [consentRecord("a")] }) });
+
+    // Sprint 5.3: A e B pertencem ao escopo da assistente; C fica fora. Os
+    // documentos repetem o profissional para que consultas e rules provem a
+    // mesma fronteira sem confiar na aba da interface.
+    for (const professionalId of ["professional-b", "professional-c"]) {
+      const suffix = professionalId.at(-1);
+      await setDoc(doc(db, paths.document("org-a", "professionals", professionalId)), { organizationId: "org-a", professionalId, active: true, displayName: `Profissional ${suffix}` });
+      await setDoc(doc(db, paths.document("org-a", "clients", `client-${suffix}`)), { organizationId: "org-a", assignedProfessionalId: professionalId, fullName: `Cliente ${suffix}` });
+      for (const collection of ["appointments", "transactions", "aiDecisions", "automationTasks"]) {
+        await setDoc(doc(db, paths.document("org-a", collection, `scope-${suffix}`)), { organizationId: "org-a", professionalId });
+      }
+      await setDoc(doc(db, paths.document("org-a", "conversations", `conv-${suffix}`)), { organizationId: "org-a", professionalId, clientId: `client-${suffix}`, status: "OPEN", lastMessageAt: new Date() });
+      await setDoc(doc(db, messagePath("org-a", `conv-${suffix}`, `message-${suffix}`)), { organizationId: "org-a", professionalId, conversationId: `conv-${suffix}`, body: `Mensagem ${suffix}`, sentAt: new Date() });
+      await setDoc(doc(db, paths.document("org-a", "recurringCharges", `charge-${suffix}`)), { organizationId: "org-a", professionalId, createdAt: new Date() });
+      await setDoc(doc(db, paths.document("org-a", "paymentLinks", `link-${suffix}`)), { organizationId: "org-a", professionalId, createdAt: new Date() });
+      await setDoc(doc(db, paths.document("org-a", "paymentProofs", `proof-${suffix}`)), { organizationId: "org-a", professionalId, submittedAt: new Date() });
+      await setDoc(doc(db, paths.document("org-a", "receipts", `receipt-${suffix}`)), { organizationId: "org-a", professionalId, number: suffix === "b" ? 2 : 3 });
+      await setDoc(doc(db, paths.document("org-a", "aiRules", `rule-${suffix}`)), { organizationId: "org-a", professionalId, immutable: false, level: "PROFESSIONAL", priority: 1 });
+      await setDoc(doc(db, paths.document("org-a", "aiDecisionReviews", `review-${suffix}`)), { organizationId: "org-a", professionalId, decisionId: `scope-${suffix}`, updatedAt: new Date() });
+      await setDoc(doc(db, paths.document("org-a", "notifications", `alert-${suffix}`)), { organizationId: "org-a", professionalId, status: "UNREAD", createdAt: new Date() });
+      await setDoc(doc(db, paths.document("org-a", "notificationDeliveries", `delivery-${suffix}`)), { organizationId: "org-a", professionalId, scheduledFor: new Date() });
+      await setDoc(doc(db, paths.document("org-a", "calendarBusyBlocks", professionalId)), { organizationId: "org-a", professionalId, blocks: [] });
+    }
 
     // Cobranca da plataforma: colecoes de raiz, da operadora, fora de qualquer
     // tenant. `org-c` existe so para o caso do dono com mensalidade vencida.
@@ -139,6 +165,57 @@ try {
   const withPhone = uid => tag(environment.authenticatedContext(uid, PHONE).firestore(), uid === "admin" ? "operadora-sem-fator" : "tenant");
   const own = collection => paths.document("org-a", collection, "example");
   await allowed(getDoc(doc(db("a"), own("clients"))));
+
+  // Sprint 5.3 — vínculo explícito: a assistente apoia A e B, nunca C. A
+  // mesma fronteira vale em cada família operacional e em chamada direta ao
+  // SDK, sem depender de item de menu ou filtro da interface.
+  const scopedPath = (collection, suffix) => paths.document("org-a", collection, {
+    clients: `client-${suffix}`,
+    appointments: `scope-${suffix}`,
+    conversations: `conv-${suffix}`,
+    transactions: `scope-${suffix}`,
+    recurringCharges: `charge-${suffix}`,
+    paymentLinks: `link-${suffix}`,
+    paymentProofs: `proof-${suffix}`,
+    receipts: `receipt-${suffix}`,
+    aiRules: `rule-${suffix}`,
+    aiDecisions: `scope-${suffix}`,
+    aiDecisionReviews: `review-${suffix}`,
+    notifications: `alert-${suffix}`,
+    notificationDeliveries: `delivery-${suffix}`,
+  }[collection]);
+  for (const collection of ["clients", "appointments", "conversations", "transactions", "recurringCharges", "paymentLinks", "paymentProofs", "receipts", "aiRules", "aiDecisions", "aiDecisionReviews", "notifications", "notificationDeliveries"]) {
+    await allowed(getDoc(doc(db("assistantRole"), scopedPath(collection, "b"))));
+    await deniedBecause(`assistente lendo ${collection} de C`, getDoc(doc(db("assistantRole"), scopedPath(collection, "c"))));
+  }
+  await allowed(getDoc(doc(db("assistantRole"), messagePath("org-a", "conv-b", "message-b"))));
+  await deniedBecause("assistente lendo mensagem de C", getDoc(doc(db("assistantRole"), messagePath("org-a", "conv-c", "message-c"))));
+  await allowed(getDoc(doc(db("assistantRole"), paths.document("org-a", "calendarBusyBlocks", "professional-b"))));
+  await deniedBecause("assistente lendo ocupado de C", getDoc(doc(db("assistantRole"), paths.document("org-a", "calendarBusyBlocks", "professional-c"))));
+
+  const assistantClients = collection(db("assistantRole"), paths.collection("org-a", "clients"));
+  await allowed(getDocs(query(assistantClients, where("assignedProfessionalId", "in", ["a", "professional-b"]))));
+  await deniedBecause("consulta de clientes incluindo C", getDocs(query(assistantClients, where("assignedProfessionalId", "in", ["a", "professional-c"]))));
+  await deniedBecause("consulta de clientes sem escopo", getDocs(query(assistantClients, limit(50))));
+  const assistantMessages = collectionGroup(db("assistantRole"), "messages");
+  await allowed(getDocs(query(assistantMessages, where("organizationId", "==", "org-a"), where("professionalId", "in", ["a", "professional-b"]))));
+  await deniedBecause("consulta de mensagens sem vínculo", getDocs(query(assistantMessages, where("organizationId", "==", "org-a"))));
+
+  await allowed(setDoc(doc(db("assistantRole"), paths.document("org-a", "clients", "novo-b")), { organizationId: "org-a", assignedProfessionalId: "professional-b", fullName: "Novo B" }));
+  await deniedBecause("assistente criando cliente para C", setDoc(doc(db("assistantRole"), paths.document("org-a", "clients", "novo-c")), { organizationId: "org-a", assignedProfessionalId: "professional-c", fullName: "Novo C" }));
+  await deniedBecause("assistente movendo cliente de B para C", updateDoc(doc(db("assistantRole"), scopedPath("clients", "b")), { assignedProfessionalId: "professional-c" }));
+  await deniedBecause("assistente alterando cliente de C", updateDoc(doc(db("assistantRole"), scopedPath("clients", "c")), { fullName: "Invadido" }));
+  await deniedBecause("assistente criando agenda de C", setDoc(doc(db("assistantRole"), paths.document("org-a", "appointments", "novo-c")), { organizationId: "org-a", professionalId: "professional-c", clientId: "client-c", startsAt: new Date(), status: "SCHEDULED" }));
+  await deniedBecause("assistente movendo agenda de B para C", updateDoc(doc(db("assistantRole"), scopedPath("appointments", "b")), { professionalId: "professional-c" }));
+
+  await environment.withSecurityRulesDisabled(async context => {
+    await updateDoc(doc(context.firestore(), paths.document("org-a", "members", "assistantRole")), { linkedProfessionalIds: ["a"] });
+  });
+  await allowed(getDoc(doc(db("assistantRole"), own("clients"))));
+  await deniedBecause("vínculo B removido", getDoc(doc(db("assistantRole"), scopedPath("clients", "b"))));
+  await environment.withSecurityRulesDisabled(async context => {
+    await updateDoc(doc(context.firestore(), paths.document("org-a", "members", "assistantRole")), { linkedProfessionalIds: ["a", "professional-b"] });
+  });
   // Estas tres afirmavam acesso da operadora aos tenants e foram
   // invertidas: nem com segundo fator ela le cliente, cria vinculo ou regra.
   await denied(getDoc(doc(withTotp("admin"), paths.document("org-b", "clients", "example"))));
@@ -172,7 +249,7 @@ try {
   // existe, e sem tocar na decisao.
   const reviewOf = (uid, org = "org-a", id = "revisada") => doc(db(uid), paths.document(org, "aiDecisionReviews", id));
   const review = (uid, patch = {}) => ({
-    id: "revisada", organizationId: "org-a", decisionId: "revisada", verdict: "CORRECT", expectedClassification: null,
+    id: "revisada", organizationId: "org-a", decisionId: "revisada", professionalId: "a", verdict: "CORRECT", expectedClassification: null,
     createdAt: new Date("2026-09-25T10:00:00.000Z"), updatedAt: new Date(), createdBy: uid, updatedBy: uid, ...patch,
   });
   await deniedBecause("titular PROFESSIONAL revisando", setDoc(reviewOf("a"), review("a")));
@@ -199,7 +276,7 @@ try {
   // nasce ativa, encerrada nao muda e nada se apaga.
   const chargeOf = (uid, org = "org-a", id = "nova") => doc(db(uid), paths.document(org, "recurringCharges", id));
   const charge = (uid, patch = {}) => ({
-    id: "nova", organizationId: "org-a", clientId: "consentido", clientName: "Alex Ficticio", professionalId: null,
+    id: "nova", organizationId: "org-a", clientId: "consentido", clientName: "Alex Ficticio", professionalId: "a",
     description: "Mensalidade", amountInCents: 45000, method: "PIX", dueDay: 10, startPeriod: "2026-09", lastLaunchedPeriod: "2026-09", status: "ACTIVE",
     endedAt: null, createdAt: new Date("2026-09-25T10:00:00.000Z"), updatedAt: new Date(), createdBy: uid, updatedBy: uid, ...patch,
   });
@@ -281,13 +358,14 @@ try {
   // Criterio de conclusao: duas organizacoes nao leem nem alteram os dados uma
   // da outra, inclusive por chamada direta ao SDK.
 
-  const messagesOf = org => query(collectionGroup(db("a"), "messages"), where("organizationId", "==", org));
+  const messagesOf = org => query(collectionGroup(db("a"), "messages"), where("organizationId", "==", org), where("professionalId", "==", "a"));
 
   // Leitura operacional dentro do proprio tenant, do jeito que o repositorio le.
-  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications"]) {
-    await allowed(getDocs(query(collection(db("a"), paths.collection("org-a", name)), limit(5))));
+  for (const [name, field] of [["clients", "assignedProfessionalId"], ["appointments", "professionalId"], ["transactions", "professionalId"], ["conversations", "professionalId"], ["notifications", "professionalId"]]) {
+    await allowed(getDocs(query(collection(db("a"), paths.collection("org-a", name)), where(field, "==", "a"), limit(5))));
   }
-  await allowed(getDocs(collection(db("a"), messagesPath("org-a", "conv"))));
+  await allowed(getDocs(query(collection(db("a"), paths.collection("org-a", "aiRules")), where("professionalId", "==", null), limit(5))));
+  await allowed(getDocs(query(collection(db("a"), messagesPath("org-a", "conv")), where("professionalId", "==", "a"))));
   await allowed(getDocs(messagesOf("org-a")));
 
   // A mesma consulta apontada para outro tenant, e a consulta sem filtro de
@@ -313,7 +391,7 @@ try {
   await denied(setDoc(doc(db("a"), messagePath("org-b", "conv", "intrusa")), { organizationId: "org-b", conversationId: "conv", body: "oi" }));
 
   // Mensagem nasce imutavel: cria, nunca altera nem apaga.
-  await allowed(setDoc(doc(db("a"), messagePath("org-a", "conv", "m2")), { organizationId: "org-a", conversationId: "conv", body: "resposta", sentAt: new Date() }));
+  await allowed(setDoc(doc(db("a"), messagePath("org-a", "conv", "m2")), { organizationId: "org-a", conversationId: "conv", professionalId: "a", body: "resposta", sentAt: new Date() }));
   await denied(updateDoc(doc(db("a"), messagePath("org-a", "conv", "m1")), { body: "reescrita" }));
   await denied(deleteDoc(doc(db("a"), messagePath("org-a", "conv", "m1"))));
 
@@ -333,7 +411,7 @@ try {
   const delivery = extra => ({ organizationId: "org-a", status: "PLANNED", attempts: 0, sentAt: null, channel: "SMS", event: "APPOINTMENT_REMINDER", bodyHash: "abcdef12", contactHint: "***0000", ...extra });
   const deliveryOf = (uid, id) => doc(db(uid), paths.document("org-a", "notificationDeliveries", id));
   await allowed(getDoc(deliveryOf("a", "envio")));
-  await allowed(getDocs(query(collection(db("a"), paths.collection("org-a", "notificationDeliveries")), limit(5))));
+  await allowed(getDocs(query(collection(db("a"), paths.collection("org-a", "notificationDeliveries")), where("professionalId", "==", "a"), limit(5))));
   for (const uid of ["a", "ownerRole", "adminRole", "assistantRole"]) {
     await deniedBecause(`${uid} planejando entrega pelo navegador`, setDoc(deliveryOf(uid, `planejada-${uid}`), delivery()));
     await deniedBecause(`${uid} marcando envio que nao saiu`, updateDoc(deliveryOf(uid, "envio"), { status: "SENT", attempts: 1, sentAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
@@ -672,7 +750,7 @@ try {
   // Consentimento por canal. So se acrescenta ou retira registro, o navegador
   // so registra em nome de quem esta nele, e retirar nao apaga o historico.
   const clientOf = (uid, id) => doc(db(uid), paths.document("org-a", "clients", id));
-  const withConsent = value => ({ organizationId: "org-a", fullName: "Cadastro Novo", notificationConsent: value });
+  const withConsent = value => ({ organizationId: "org-a", assignedProfessionalId: "a", fullName: "Cadastro Novo", notificationConsent: value });
   const guardian = { fullName: "Rui Ficticio", relationship: "PARENT" };
 
   await allowed(setDoc(clientOf("a", "novo-adulto"), withConsent(recordConsent({ WHATSAPP: [consentRecord("a")] }))));
@@ -740,6 +818,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 463);
+  assert.equal(checks, 506);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

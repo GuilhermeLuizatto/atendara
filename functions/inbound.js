@@ -334,6 +334,7 @@ export async function applyInboundEvent(event, deps = {}) {
           organizationId,
           conversationId,
           clientId: client?.id ?? null,
+          professionalId: conversation?.professionalId ?? null,
           direction: "INBOUND",
           authorType: "CLIENT",
           authorName: client?.fullName ?? "Contato não identificado",

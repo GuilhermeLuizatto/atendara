@@ -51,6 +51,7 @@ export function buildDecisionReview(
     id: decision.id,
     organizationId: decision.organizationId,
     decisionId: decision.id,
+    professionalId: decision.professionalId,
     verdict: input.verdict,
     expectedClassification: input.expectedClassification,
     createdAt: existing?.createdAt ?? meta.now,

@@ -13,6 +13,7 @@ import { decide } from "./generated/decision-engine.js";
 import { GEMINI_POLICY } from "./generated/ai-provider-config.js";
 import { fromStored } from "./firestore-dates.js";
 import { classifyWithGemini } from "./gemini.js";
+import { assertProfessionalScope } from "./tenant-auth.js";
 
 const id = z
   .string()
@@ -125,11 +126,13 @@ export const previewAI = onCall(
     ];
     let context;
     if (input.mode === "SIMULATOR") {
+      const professionalId = input.professionalId ?? request.auth.uid;
+      assertProfessionalScope({ membership: member }, professionalId);
       context = {
         text: input.text,
         channel: input.channel,
         client: input.client,
-        professionalId: input.professionalId ?? request.auth.uid,
+        professionalId,
         humanHandoff: input.humanHandoff,
         now: input.at ? new Date(input.at) : now,
       };
@@ -192,6 +195,10 @@ export const previewAI = onCall(
           "Mensagem indisponível para avaliação.",
         );
       }
+      assertProfessionalScope(
+        { membership: member },
+        conversation.professionalId ?? null,
+      );
       const client = conversation.clientId
         ? stored(
             "clients",

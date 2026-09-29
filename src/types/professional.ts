@@ -148,4 +148,7 @@ export interface ActiveSession {
   isOrganizationHolder: boolean;
   permissions: Permission[];
   professionalId: ID | null;
+  /** Fronteira operacional autoritativa lida de `members/{uid}`. */
+  linkedProfessionalIds: ID[];
+  organizationWideProfessionalScope: boolean;
 }

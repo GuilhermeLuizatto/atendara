@@ -7,7 +7,7 @@ import {
 } from "@/lib/ai/decision-review";
 import type { ID } from "@/types";
 
-import { assertPermission } from "../../guards";
+import { assertPermission, assertProfessionalScope } from "../../guards";
 import { RepositoryError } from "../../types";
 import { auditWrite, docPath, type Plan, type PlanContext } from "../plan";
 
@@ -26,6 +26,7 @@ export function planReviewDecision(
   assertPermission(ctx.actor, "aiDecision:review");
   const decision = ctx.snapshot.decisions.find((item) => item.id === decisionId);
   if (!decision) throw new RepositoryError("Decisão não encontrada.");
+  assertProfessionalScope(ctx.actor, decision.professionalId);
   const validation = validateDecisionReview(
     decision,
     raw,

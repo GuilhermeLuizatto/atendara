@@ -8,7 +8,7 @@ import {
 } from "@/lib/finance/recurring";
 import type { ID, RecurringCharge, RecurringChargeStatus } from "@/types";
 
-import { assertPermission } from "../../guards";
+import { assertPermission, assertProfessionalScope } from "../../guards";
 import { RepositoryError, type RecurringChargeUpdate } from "../../types";
 import {
   auditWrite,
@@ -54,6 +54,7 @@ export function planCreateRecurringCharge(ctx: PlanContext, raw: RecurringCharge
   const validation = validateRecurringCharge(raw);
   if (!validation.ok) throw new RepositoryError(validation.error);
   const input = validation.value;
+  assertProfessionalScope(ctx.actor, input.professionalId);
   const client = requireClient(ctx, input.clientId);
 
   const id = ctx.newId("recurringCharges");
@@ -93,6 +94,7 @@ export function planCreateRecurringCharge(ctx: PlanContext, raw: RecurringCharge
 export function planUpdateRecurringCharge(ctx: PlanContext, id: ID, patch: RecurringChargeUpdate): Plan {
   assertPermission(ctx.actor, "transaction:update");
   const existing = requireCharge(ctx, id);
+  assertProfessionalScope(ctx.actor, existing.professionalId);
   if (existing.status === "ENDED") throw new RepositoryError("Mensalidade encerrada não muda.");
   const validation = validateRecurringCharge({ ...existing, ...patch, clientId: existing.clientId });
   if (!validation.ok) throw new RepositoryError(validation.error);
@@ -127,6 +129,7 @@ export function planUpdateRecurringCharge(ctx: PlanContext, id: ID, patch: Recur
 export function planSetRecurringChargeStatus(ctx: PlanContext, id: ID, status: RecurringChargeStatus): Plan {
   assertPermission(ctx.actor, "transaction:update");
   const existing = requireCharge(ctx, id);
+  assertProfessionalScope(ctx.actor, existing.professionalId);
   const error = statusTransitionError(existing.status, status);
   if (error) throw new RepositoryError(error);
   const resumed = status === "ACTIVE"

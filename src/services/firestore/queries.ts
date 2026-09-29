@@ -9,8 +9,10 @@ import {
   type DocumentReference,
   type Firestore,
   type Query,
+  type QueryConstraint,
 } from "firebase/firestore";
 
+import type { ProfessionalScope } from "@/lib/access/professional-scope";
 import { messagesPath, paths, type TenantCollection } from "@/lib/firebase/paths";
 import type { ID } from "@/types";
 
@@ -86,41 +88,78 @@ function tenantQuery(
  * `count` e o total pedido naquele momento. Quem chama pede um documento a
  * mais do que mostra, para saber se existe proxima pagina.
  */
-export const snapshotQueries: Record<
-  PagedPart,
-  (db: Firestore, organizationId: ID, count: number) => Query
-> = {
-  professionals: (db, organizationId, count) =>
-    query(
-      tenantQuery(db, organizationId, "professionals"),
-      orderBy("displayName"),
-      limit(count),
-    ),
+type SnapshotQueryFactory = (
+  db: Firestore,
+  organizationId: ID,
+  count: number,
+  scope: ProfessionalScope,
+) => Query[];
 
-  clients: (db, organizationId, count) =>
+const FIRESTORE_IN_LIMIT = 30;
+
+function chunks(values: ID[]): ID[][] {
+  const result: ID[][] = [];
+  for (let index = 0; index < values.length; index += FIRESTORE_IN_LIMIT) {
+    result.push(values.slice(index, index + FIRESTORE_IN_LIMIT));
+  }
+  return result;
+}
+
+function scopedTenantQueries(
+  db: Firestore,
+  organizationId: ID,
+  name: TenantCollection,
+  field: string,
+  scope: ProfessionalScope,
+  count: number,
+  constraints: QueryConstraint[],
+): Query[] {
+  const source = tenantQuery(db, organizationId, name);
+  if (scope.organizationWide) return [query(source, ...constraints, limit(count))];
+  return chunks(scope.professionalIds).map((professionalIds) =>
     query(
-      tenantQuery(db, organizationId, "clients"),
-      orderBy("fullName"),
+      source,
+      where(field, "in", professionalIds),
+      ...constraints,
       limit(count),
     ),
+  );
+}
+
+function unscopedTenantQuery(
+  db: Firestore,
+  organizationId: ID,
+  name: TenantCollection,
+  count: number,
+  constraints: QueryConstraint[] = [],
+): Query[] {
+  return [query(tenantQuery(db, organizationId, name), ...constraints, limit(count))];
+}
+
+export const snapshotQueries: Record<PagedPart, SnapshotQueryFactory> = {
+  professionals: (db, organizationId, count) =>
+    unscopedTenantQuery(db, organizationId, "professionals", count, [
+      orderBy("displayName"),
+    ]),
+
+  clients: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "clients", "assignedProfessionalId", scope, count, [
+      orderBy("fullName"),
+    ]),
 
   // A ordem da lista e a que ela escolheu (`position`).
   services: (db, organizationId, count) =>
-    query(tenantQuery(db, organizationId, "services"), orderBy("position"), limit(count)),
+    unscopedTenantQuery(db, organizationId, "services", count, [orderBy("position")]),
 
-  appointments: (db, organizationId, count) =>
-    query(
-      tenantQuery(db, organizationId, "appointments"),
+  appointments: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "appointments", "professionalId", scope, count, [
       orderBy("startsAt", "desc"),
-      limit(count),
-    ),
+    ]),
 
-  conversations: (db, organizationId, count) =>
-    query(
-      tenantQuery(db, organizationId, "conversations"),
+  conversations: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "conversations", "professionalId", scope, count, [
       orderBy("lastMessageAt", "desc"),
-      limit(count),
-    ),
+    ]),
 
   /**
    * Mensagens sao subcolecao de cada conversa; um listener por conversa nao
@@ -128,87 +167,104 @@ export const snapshotQueries: Record<
    * e o filtro nao e conveniencia: as Security Rules so aprovam a consulta
    * porque ele garante que todo documento retornado pertence a organizacao.
    */
-  messages: (db, organizationId, count) =>
-    query(
-      collectionGroup(db, "messages"),
-      where("organizationId", "==", organizationId),
-      orderBy("sentAt", "desc"),
-      limit(count),
-    ),
+  messages: (db, organizationId, count, scope) => {
+    const source = collectionGroup(db, "messages");
+    if (scope.organizationWide) {
+      return [
+        query(
+          source,
+          where("organizationId", "==", organizationId),
+          orderBy("sentAt", "desc"),
+          limit(count),
+        ),
+      ];
+    }
+    return chunks(scope.professionalIds).map((professionalIds) =>
+      query(
+        source,
+        where("organizationId", "==", organizationId),
+        where("professionalId", "in", professionalIds),
+        orderBy("sentAt", "desc"),
+        limit(count),
+      ),
+    );
+  },
 
-  transactions: (db, organizationId, count) =>
-    query(
-      tenantQuery(db, organizationId, "transactions"),
+  transactions: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "transactions", "professionalId", scope, count, [
       orderBy("dueDate", "desc"),
-      limit(count),
-    ),
+    ]),
 
-  recurringCharges: (db, organizationId, count) =>
-    query(
-      tenantQuery(db, organizationId, "recurringCharges"),
+  recurringCharges: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "recurringCharges", "professionalId", scope, count, [
       orderBy("createdAt", "desc"),
-      limit(count),
-    ),
+    ]),
 
-  paymentLinks: (db, organizationId, count) =>
-    query(tenantQuery(db, organizationId, "paymentLinks"), orderBy("createdAt", "desc"), limit(count)),
+  paymentLinks: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "paymentLinks", "professionalId", scope, count, [
+      orderBy("createdAt", "desc"),
+    ]),
 
-  paymentProofs: (db, organizationId, count) =>
-    query(tenantQuery(db, organizationId, "paymentProofs"), orderBy("submittedAt", "desc"), limit(count)),
+  paymentProofs: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "paymentProofs", "professionalId", scope, count, [
+      orderBy("submittedAt", "desc"),
+    ]),
 
-  receipts: (db, organizationId, count) =>
-    query(tenantQuery(db, organizationId, "receipts"), orderBy("number", "desc"), limit(count)),
+  receipts: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "receipts", "professionalId", scope, count, [
+      orderBy("number", "desc"),
+    ]),
 
   receiptSettings: (db, organizationId, count) =>
-    query(tenantQuery(db, organizationId, "receiptSettings"), limit(count)),
+    unscopedTenantQuery(db, organizationId, "receiptSettings", count),
 
-  aiRules: (db, organizationId, count) =>
-    query(
-      tenantQuery(db, organizationId, "aiRules"),
-      orderBy("priority", "desc"),
-      limit(count),
-    ),
+  aiRules: (db, organizationId, count, scope) => {
+    if (scope.organizationWide) {
+      return unscopedTenantQuery(db, organizationId, "aiRules", count, [
+        orderBy("priority", "desc"),
+      ]);
+    }
+    return [
+      ...unscopedTenantQuery(db, organizationId, "aiRules", count, [
+        where("professionalId", "==", null),
+        orderBy("priority", "desc"),
+      ]),
+      ...scopedTenantQueries(db, organizationId, "aiRules", "professionalId", scope, count, [
+        orderBy("priority", "desc"),
+      ]),
+    ];
+  },
 
-  aiDecisions: (db, organizationId, count) =>
-    query(
-      tenantQuery(db, organizationId, "aiDecisions"),
+  aiDecisions: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "aiDecisions", "professionalId", scope, count, [
       orderBy("decidedAt", "desc"),
-      limit(count),
-    ),
+    ]),
 
-  aiDecisionReviews: (db, organizationId, count) =>
-    query(
-      tenantQuery(db, organizationId, "aiDecisionReviews"),
+  aiDecisionReviews: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "aiDecisionReviews", "professionalId", scope, count, [
       orderBy("updatedAt", "desc"),
-      limit(count),
-    ),
+    ]),
 
-  notifications: (db, organizationId, count) =>
-    query(
-      tenantQuery(db, organizationId, "notifications"),
+  notifications: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "notifications", "professionalId", scope, count, [
       orderBy("createdAt", "desc"),
-      limit(count),
-    ),
+    ]),
 
-  notificationDeliveries: (db, organizationId, count) =>
-    query(
-      tenantQuery(db, organizationId, "notificationDeliveries"),
+  notificationDeliveries: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "notificationDeliveries", "professionalId", scope, count, [
       orderBy("scheduledFor", "desc"),
-      limit(count),
-    ),
+    ]),
 
   auditLogs: (db, organizationId, count) =>
-    query(
-      tenantQuery(db, organizationId, "auditLogs"),
-      orderBy("occurredAt", "desc"),
-      limit(count),
-    ),
-  automationTasks: (db, organizationId, count) =>
-    query(tenantQuery(db, organizationId, "automationTasks"), orderBy("createdAt", "desc"), limit(count)),
+    unscopedTenantQuery(db, organizationId, "auditLogs", count, [orderBy("occurredAt", "desc")]),
+  automationTasks: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "automationTasks", "professionalId", scope, count, [
+      orderBy("createdAt", "desc"),
+    ]),
 
   // Um documento por profissional; sem ordem de negócio, só um teto.
-  calendarBusyBlocks: (db, organizationId, count) =>
-    query(tenantQuery(db, organizationId, "calendarBusyBlocks"), limit(count)),
+  calendarBusyBlocks: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "calendarBusyBlocks", "professionalId", scope, count, []),
 };
 
 /** Id gerado pelo Firestore, sem ida ao servidor. */

@@ -78,7 +78,7 @@ describe("revisão das decisões da Dara", () => {
     const base = makeContext();
     const decision = base.snapshot.decisions[0];
     const other = base.snapshot.decisions.find((item) => item.classification !== decision.classification)!;
-    const first = { id: decision.id, organizationId: base.organizationId, decisionId: decision.id, verdict: "CORRECT" as const, expectedClassification: null, createdAt: "2026-09-01T10:00:00.000Z", updatedAt: "2026-09-01T10:00:00.000Z", createdBy: "owner", updatedBy: "owner" };
+    const first = { id: decision.id, organizationId: base.organizationId, decisionId: decision.id, professionalId: decision.professionalId, verdict: "CORRECT" as const, expectedClassification: null, createdAt: "2026-09-01T10:00:00.000Z", updatedAt: "2026-09-01T10:00:00.000Z", createdBy: "owner", updatedBy: "owner" };
     const ctx = makeContext((s) => ({ ...s, decisionReviews: [first] }), { userId: "admin", role: "ADMIN", permissions: permissionsForRole("ADMIN") });
     const plan = planReviewDecision(ctx, decision.id, { verdict: "INCORRECT", expectedClassification: other.classification });
     expect(plan.writes[0]).toMatchObject({ data: { verdict: "INCORRECT", createdBy: "owner", createdAt: first.createdAt, updatedBy: "admin" } });
@@ -183,7 +183,7 @@ describe("conferência do comprovante (cobrador, C2)", () => {
         transactions: [tx, ...s.transactions],
         paymentProofs: [
           {
-            id: "p1", organizationId: s.organization.id, transactionId: "m1-202609", recurringChargeId: "m1", clientId: tx.clientId,
+            id: "p1", organizationId: s.organization.id, transactionId: "m1-202609", professionalId: tx.professionalId, recurringChargeId: "m1", clientId: tx.clientId,
             status: proofStatus, storagePath: "paymentProofs/org/m1-202609/p1", contentType: "image/png", sizeBytes: 10, sha256: "x",
             submittedAt: NOW, reviewedAt: null, reviewedBy: null, rejectionReason: null, createdAt: NOW, updatedAt: NOW, createdBy: null, updatedBy: null,
           },

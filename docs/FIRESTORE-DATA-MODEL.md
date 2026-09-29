@@ -60,6 +60,15 @@ platformSupportTickets/{ticketId}         chamado da organizacao (so backend)
 `messages` e subcolecao porque e a colecao que mais cresce e quase sempre e lida
 por conversa. As demais sao colecoes diretas da organizacao.
 
+O escopo multiprofissional é desnormalizado nos documentos consultados. Clientes
+usam `assignedProfessionalId`; agenda, conversas, mensagens, financeiro,
+recorrências, links e comprovantes, recibos, regras e decisões da IA, revisões,
+alertas, entregas, ocupado do calendário e tarefas usam `professionalId`. O
+campo de mensagem vem da conversa; link, comprovante e recibo vêm do lançamento;
+revisão vem da decisão. Essa repetição é deliberada: o Firestore não faz join e
+as Security Rules precisam decidir por documento. Ausência do campo nunca
+significa toda a organização e será tratada pela migração da Fase 5.5.
+
 `transactions` passou a ter DOIS lancamentos por atendimento quando ha sinal
 (E2.2): `appointmentPart` vale `SERVICE` para o que fica a pagar e `DEPOSIT`
 para o sinal antecipado, e `null` em lancamento que nao nasce de atendimento.
@@ -223,6 +232,14 @@ antiga nao transforme a abertura do painel numa conta inesperada. As colecoes
 que crescem sem parar vem das mais recentes para as mais antigas. Cada consulta
 pede um documento a mais do que mostra: e o que preenche
 `snapshot.pagination[colecao].hasMore` sem uma ida extra ao servidor.
+
+OWNER e ADMIN consultam a coleção da organização. Os demais papéis acrescentam
+`where("professionalId", "in", ids)` — ou `assignedProfessionalId` em clientes —
+e uma lista vazia não abre listener. Como o Firestore aceita no máximo 30 valores
+por `in`, listas maiores são divididas em consultas, recombinadas por id e
+ordenadas antes da paginação. `aiRules` soma uma segunda consulta para regras
+globais (`professionalId == null`). Os índices compostos correspondentes ficam
+em `firestore.indexes.json`.
 
 `repository.loadMore(colecao)` soma uma pagina ao limite do listener daquela
 colecao. A tela diz o que esta carregado antes de oferecer o botao — clientes

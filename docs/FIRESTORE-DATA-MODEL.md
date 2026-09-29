@@ -61,7 +61,7 @@ platformSupportTickets/{ticketId}         chamado da organizacao (so backend)
 por conversa. As demais sao colecoes diretas da organizacao.
 
 O escopo multiprofissional é desnormalizado nos documentos consultados. Clientes
-usam `assignedProfessionalId`; agenda, conversas, mensagens, financeiro,
+usam `assignedProfessionalIds`; agenda, conversas, mensagens, financeiro,
 recorrências, links e comprovantes, recibos, regras e decisões da IA, revisões,
 alertas, entregas, ocupado do calendário e tarefas usam `professionalId`. O
 campo de mensagem vem da conversa; link, comprovante e recibo vêm do lançamento;
@@ -234,7 +234,8 @@ pede um documento a mais do que mostra: e o que preenche
 `snapshot.pagination[colecao].hasMore` sem uma ida extra ao servidor.
 
 OWNER e ADMIN consultam a coleção da organização. Os demais papéis acrescentam
-`where("professionalId", "in", ids)` — ou `assignedProfessionalId` em clientes —
+`where("professionalId", "in", ids)` — ou
+`where("assignedProfessionalIds", "array-contains-any", ids)` em clientes —
 e uma lista vazia não abre listener. Como o Firestore aceita no máximo 30 valores
 por `in`, listas maiores são divididas em consultas, recombinadas por id e
 ordenadas antes da paginação. `aiRules` soma uma segunda consulta para regras

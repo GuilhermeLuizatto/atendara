@@ -172,7 +172,8 @@ export interface ClientInput {
   phone: string | null;
   status: Client["status"];
   preferredModality: Client["preferredModality"];
-  assignedProfessionalId: ID | null;
+  /** Um cadastro pode pertencer a mais de um contexto sem ser duplicado. */
+  assignedProfessionalIds: ID[];
   acquisitionChannel: Client["acquisitionChannel"];
   tags: string[];
   administrativeNotes: string | null;

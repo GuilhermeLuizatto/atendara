@@ -1,7 +1,11 @@
 import type { ID, Transaction } from "@/types";
 
-import { assertPermission, assertProfessionalScope } from "../../guards";
-import type { TransactionInput } from "../../types";
+import {
+  assertClientProfessionalAssignment,
+  assertPermission,
+  assertProfessionalScope,
+} from "../../guards";
+import { RepositoryError, type TransactionInput } from "../../types";
 import {
   auditWrite,
   docPath,
@@ -27,6 +31,16 @@ export function planCreateTransaction(
   const client = input.clientId
     ? ctx.snapshot.clients.find((item) => item.id === input.clientId)
     : null;
+  if (input.clientId && !client) throw new RepositoryError("Cadastro não encontrado.");
+  if (client) {
+    if (!input.professionalId) {
+      throw new RepositoryError("Escolha o profissional responsável.");
+    }
+    assertClientProfessionalAssignment(
+      client.assignedProfessionalIds,
+      input.professionalId,
+    );
+  }
 
   const transaction: Transaction = {
     id,
@@ -72,9 +86,21 @@ export function planUpdateTransaction(
     assertProfessionalScope(ctx.actor, input.professionalId);
   }
   const status = input.status ?? existing.status;
-  const client = input.clientId
-    ? ctx.snapshot.clients.find((item) => item.id === input.clientId)
+  const clientId = input.clientId === undefined ? existing.clientId : input.clientId;
+  const professionalId =
+    input.professionalId === undefined
+      ? existing.professionalId
+      : input.professionalId;
+  const client = clientId
+    ? ctx.snapshot.clients.find((item) => item.id === clientId)
     : null;
+  if (clientId && !client) throw new RepositoryError("Cadastro não encontrado.");
+  if (client) {
+    if (!professionalId) {
+      throw new RepositoryError("Escolha o profissional responsável.");
+    }
+    assertClientProfessionalAssignment(client.assignedProfessionalIds, professionalId);
+  }
 
   return {
     result: undefined,

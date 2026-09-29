@@ -3,21 +3,19 @@
 import { useMemo, useState } from "react";
 
 import { useWorkspace } from "@/providers/workspace-provider";
-import type { Client, ClientStatus, ID } from "@/types";
+import type { Client, ClientStatus } from "@/types";
 
 export type ClientSort = "name" | "recent" | "next" | "balance";
 
 export interface ClientFilters {
   search: string;
   status: ClientStatus | "ALL";
-  professionalId: ID | "ALL";
   sort: ClientSort;
 }
 
 const INITIAL_FILTERS: ClientFilters = {
   search: "",
   status: "ALL",
-  professionalId: "ALL",
   sort: "name",
 };
 
@@ -59,12 +57,6 @@ export function useClients() {
       if (filters.status !== "ALL" && client.status !== filters.status) {
         return false;
       }
-      if (
-        filters.professionalId !== "ALL" &&
-        client.assignedProfessionalId !== filters.professionalId
-      ) {
-        return false;
-      }
       if (!term) return true;
 
       return (
@@ -92,7 +84,6 @@ export function useClients() {
     clients: filtered,
     total: clients.length,
     countsByStatus,
-    professionals: data?.professionals ?? [],
   };
 }
 

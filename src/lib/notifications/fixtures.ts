@@ -132,7 +132,7 @@ export function client(overrides: Partial<Client> = {}): Client {
     phone: FICTITIOUS.phone,
     status: "ACTIVE",
     preferredModality: "IN_PERSON",
-    assignedProfessionalId: "prof-1",
+    assignedProfessionalIds: ["prof-1"],
     acquisitionChannel: "OTHER",
     tags: [],
     lastAppointmentAt: null,

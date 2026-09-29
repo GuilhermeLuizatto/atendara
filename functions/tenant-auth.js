@@ -59,6 +59,36 @@ export function assertProfessionalScope(actor, professionalId) {
   }
 }
 
+export function assertAllProfessionalScopes(actor, professionalIds) {
+  if (
+    !Array.isArray(professionalIds) ||
+    professionalIds.length === 0 ||
+    !professionalIds.every((professionalId) =>
+      hasProfessionalScope(actor, professionalId),
+    )
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "A associação inclui um profissional fora dos seus vínculos ativos.",
+    );
+  }
+}
+
+export function assertAnyProfessionalScope(actor, professionalIds) {
+  if (
+    !Array.isArray(professionalIds) ||
+    professionalIds.length === 0 ||
+    !professionalIds.some((professionalId) =>
+      hasProfessionalScope(actor, professionalId),
+    )
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "Este cadastro não pertence a nenhum dos seus vínculos ativos.",
+    );
+  }
+}
+
 export function tenantAudit({ organizationId, actorId, action, resourceType, resourceId, summary, metadata = {} }) {
   const now = new Date().toISOString();
   return {

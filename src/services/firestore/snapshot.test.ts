@@ -61,7 +61,7 @@ function client(patch: Partial<Client> = {}): Client {
     phone: null,
     status: "ACTIVE",
     preferredModality: "ONLINE",
-    assignedProfessionalId: null,
+    assignedProfessionalIds: ["prof-1"],
     acquisitionChannel: "OTHER",
     tags: [],
     lastAppointmentAt: null,

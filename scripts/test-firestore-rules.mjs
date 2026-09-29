@@ -93,7 +93,7 @@ try {
     for (const org of ["org-a", "org-b"]) {
       await setDoc(doc(db, paths.organization(org)), { primaryProfession: "PSYCHOLOGIST", ownerId: "a" });
       await setDoc(doc(db, paths.document(org, "professionals", "example")), { organizationId: org });
-      await setDoc(doc(db, paths.document(org, "clients", "example")), { organizationId: org, assignedProfessionalId: org === "org-b" ? "b" : "a" });
+      await setDoc(doc(db, paths.document(org, "clients", "example")), { organizationId: org, assignedProfessionalIds: [org === "org-b" ? "b" : "a"] });
       for (const collection of ["appointments", "transactions", "aiDecisions", "automationTasks"]) await setDoc(doc(db, paths.document(org, collection, "example")), { organizationId: org, professionalId: org === "org-b" ? "b" : "a" });
       await setDoc(doc(db, paths.document(org, "auditLogs", "example")), { organizationId: org });
       await setDoc(doc(db, paths.document(org, "aiRules", "immutable")), { organizationId: org, professionalId: null, immutable: true, level: "SYSTEM", enabled: true });
@@ -117,9 +117,10 @@ try {
       await setDoc(doc(db, paths.document(org, "importMappings", "example")), { organizationId: org });
     }
     await setDoc(doc(db, paths.initialPassword("a")), { hash: "test-only" });
-    await setDoc(doc(db, paths.document("org-a", "clients", "consentido")), { organizationId: "org-a", assignedProfessionalId: "a", fullName: "Alex Ficticio", notificationConsent: recordConsent({ EMAIL: [SEEDED_EMAIL], SMS: [SEEDED_SMS] }) });
-    await setDoc(doc(db, paths.document("org-a", "clients", "antigo")), { organizationId: "org-a", assignedProfessionalId: "a", fullName: "Cadastro Antigo", notificationConsent: LEGACY_CONSENT });
-    await setDoc(doc(db, paths.document("org-a", "clients", "tres-canais")), { organizationId: "org-a", assignedProfessionalId: "a", fullName: "Tres Canais", notificationConsent: recordConsent({ EMAIL: [consentRecord("a")], SMS: [consentRecord("a")], WHATSAPP: [consentRecord("a")] }) });
+    await setDoc(doc(db, paths.document("org-a", "clients", "consentido")), { organizationId: "org-a", assignedProfessionalIds: ["a"], fullName: "Alex Ficticio", notificationConsent: recordConsent({ EMAIL: [SEEDED_EMAIL], SMS: [SEEDED_SMS] }) });
+    await setDoc(doc(db, paths.document("org-a", "clients", "antigo")), { organizationId: "org-a", assignedProfessionalIds: ["a"], fullName: "Cadastro Antigo", notificationConsent: LEGACY_CONSENT });
+    await setDoc(doc(db, paths.document("org-a", "clients", "tres-canais")), { organizationId: "org-a", assignedProfessionalIds: ["a"], fullName: "Tres Canais", notificationConsent: recordConsent({ EMAIL: [consentRecord("a")], SMS: [consentRecord("a")], WHATSAPP: [consentRecord("a")] }) });
+    await setDoc(doc(db, paths.document("org-a", "clients", "cliente-1")), { organizationId: "org-a", assignedProfessionalIds: ["a"], fullName: "Cliente Visita" });
 
     // Sprint 5.3: A e B pertencem ao escopo da assistente; C fica fora. Os
     // documentos repetem o profissional para que consultas e rules provem a
@@ -127,7 +128,7 @@ try {
     for (const professionalId of ["professional-b", "professional-c"]) {
       const suffix = professionalId.at(-1);
       await setDoc(doc(db, paths.document("org-a", "professionals", professionalId)), { organizationId: "org-a", professionalId, active: true, displayName: `Profissional ${suffix}` });
-      await setDoc(doc(db, paths.document("org-a", "clients", `client-${suffix}`)), { organizationId: "org-a", assignedProfessionalId: professionalId, fullName: `Cliente ${suffix}` });
+      await setDoc(doc(db, paths.document("org-a", "clients", `client-${suffix}`)), { organizationId: "org-a", assignedProfessionalIds: [professionalId], fullName: `Cliente ${suffix}` });
       for (const collection of ["appointments", "transactions", "aiDecisions", "automationTasks"]) {
         await setDoc(doc(db, paths.document("org-a", collection, `scope-${suffix}`)), { organizationId: "org-a", professionalId });
       }
@@ -194,16 +195,17 @@ try {
   await deniedBecause("assistente lendo ocupado de C", getDoc(doc(db("assistantRole"), paths.document("org-a", "calendarBusyBlocks", "professional-c"))));
 
   const assistantClients = collection(db("assistantRole"), paths.collection("org-a", "clients"));
-  await allowed(getDocs(query(assistantClients, where("assignedProfessionalId", "in", ["a", "professional-b"]))));
-  await deniedBecause("consulta de clientes incluindo C", getDocs(query(assistantClients, where("assignedProfessionalId", "in", ["a", "professional-c"]))));
+  await allowed(getDocs(query(assistantClients, where("assignedProfessionalIds", "array-contains-any", ["a", "professional-b"]))));
+  await deniedBecause("consulta de clientes incluindo C", getDocs(query(assistantClients, where("assignedProfessionalIds", "array-contains-any", ["a", "professional-c"]))));
   await deniedBecause("consulta de clientes sem escopo", getDocs(query(assistantClients, limit(50))));
   const assistantMessages = collectionGroup(db("assistantRole"), "messages");
   await allowed(getDocs(query(assistantMessages, where("organizationId", "==", "org-a"), where("professionalId", "in", ["a", "professional-b"]))));
   await deniedBecause("consulta de mensagens sem vínculo", getDocs(query(assistantMessages, where("organizationId", "==", "org-a"))));
 
-  await allowed(setDoc(doc(db("assistantRole"), paths.document("org-a", "clients", "novo-b")), { organizationId: "org-a", assignedProfessionalId: "professional-b", fullName: "Novo B" }));
-  await deniedBecause("assistente criando cliente para C", setDoc(doc(db("assistantRole"), paths.document("org-a", "clients", "novo-c")), { organizationId: "org-a", assignedProfessionalId: "professional-c", fullName: "Novo C" }));
-  await deniedBecause("assistente movendo cliente de B para C", updateDoc(doc(db("assistantRole"), scopedPath("clients", "b")), { assignedProfessionalId: "professional-c" }));
+  await allowed(setDoc(doc(db("assistantRole"), paths.document("org-a", "clients", "novo-b")), { organizationId: "org-a", assignedProfessionalIds: ["professional-b"], fullName: "Novo B" }));
+  await allowed(setDoc(doc(db("assistantRole"), paths.document("org-a", "clients", "compartilhado")), { organizationId: "org-a", assignedProfessionalIds: ["a", "professional-b"], fullName: "Compartilhado A e B" }));
+  await deniedBecause("assistente criando cliente para C", setDoc(doc(db("assistantRole"), paths.document("org-a", "clients", "novo-c")), { organizationId: "org-a", assignedProfessionalIds: ["professional-c"], fullName: "Novo C" }));
+  await deniedBecause("assistente movendo cliente de B para C", updateDoc(doc(db("assistantRole"), scopedPath("clients", "b")), { assignedProfessionalIds: ["professional-c"] }));
   await deniedBecause("assistente alterando cliente de C", updateDoc(doc(db("assistantRole"), scopedPath("clients", "c")), { fullName: "Invadido" }));
   await deniedBecause("assistente criando agenda de C", setDoc(doc(db("assistantRole"), paths.document("org-a", "appointments", "novo-c")), { organizationId: "org-a", professionalId: "professional-c", clientId: "client-c", startsAt: new Date(), status: "SCHEDULED" }));
   await deniedBecause("assistente movendo agenda de B para C", updateDoc(doc(db("assistantRole"), scopedPath("appointments", "b")), { professionalId: "professional-c" }));
@@ -212,6 +214,9 @@ try {
     await updateDoc(doc(context.firestore(), paths.document("org-a", "members", "assistantRole")), { linkedProfessionalIds: ["a"] });
   });
   await allowed(getDoc(doc(db("assistantRole"), own("clients"))));
+  await allowed(getDoc(doc(db("assistantRole"), paths.document("org-a", "clients", "compartilhado"))));
+  await allowed(updateDoc(doc(db("assistantRole"), paths.document("org-a", "clients", "compartilhado")), { fullName: "Compartilhado atualizado por A" }));
+  await deniedBecause("assistente removendo associação de B sem vínculo", updateDoc(doc(db("assistantRole"), paths.document("org-a", "clients", "compartilhado")), { assignedProfessionalIds: ["a"] }));
   await deniedBecause("vínculo B removido", getDoc(doc(db("assistantRole"), scopedPath("clients", "b"))));
   await environment.withSecurityRulesDisabled(async context => {
     await updateDoc(doc(context.firestore(), paths.document("org-a", "members", "assistantRole")), { linkedProfessionalIds: ["a", "professional-b"] });
@@ -361,8 +366,9 @@ try {
   const messagesOf = org => query(collectionGroup(db("a"), "messages"), where("organizationId", "==", org), where("professionalId", "==", "a"));
 
   // Leitura operacional dentro do proprio tenant, do jeito que o repositorio le.
-  for (const [name, field] of [["clients", "assignedProfessionalId"], ["appointments", "professionalId"], ["transactions", "professionalId"], ["conversations", "professionalId"], ["notifications", "professionalId"]]) {
-    await allowed(getDocs(query(collection(db("a"), paths.collection("org-a", name)), where(field, "==", "a"), limit(5))));
+  for (const [name, field] of [["clients", "assignedProfessionalIds"], ["appointments", "professionalId"], ["transactions", "professionalId"], ["conversations", "professionalId"], ["notifications", "professionalId"]]) {
+    const operator = name === "clients" ? "array-contains" : "==";
+    await allowed(getDocs(query(collection(db("a"), paths.collection("org-a", name)), where(field, operator, "a"), limit(5))));
   }
   await allowed(getDocs(query(collection(db("a"), paths.collection("org-a", "aiRules")), where("professionalId", "==", null), limit(5))));
   await allowed(getDocs(query(collection(db("a"), messagesPath("org-a", "conv")), where("professionalId", "==", "a"))));
@@ -750,7 +756,7 @@ try {
   // Consentimento por canal. So se acrescenta ou retira registro, o navegador
   // so registra em nome de quem esta nele, e retirar nao apaga o historico.
   const clientOf = (uid, id) => doc(db(uid), paths.document("org-a", "clients", id));
-  const withConsent = value => ({ organizationId: "org-a", assignedProfessionalId: "a", fullName: "Cadastro Novo", notificationConsent: value });
+  const withConsent = value => ({ organizationId: "org-a", assignedProfessionalIds: ["a"], fullName: "Cadastro Novo", notificationConsent: value });
   const guardian = { fullName: "Rui Ficticio", relationship: "PARENT" };
 
   await allowed(setDoc(clientOf("a", "novo-adulto"), withConsent(recordConsent({ WHATSAPP: [consentRecord("a")] }))));
@@ -818,6 +824,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 506);
+  assert.equal(checks, 510);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

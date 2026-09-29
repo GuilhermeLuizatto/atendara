@@ -72,9 +72,10 @@ export function ClientDrawer({
 
   if (!client) return null;
 
-  const professional = data?.professionals.find(
-    (item) => item.id === client.assignedProfessionalId,
-  );
+  const professionalNames = (data?.professionals ?? [])
+    .filter((item) => client.assignedProfessionalIds.includes(item.id))
+    .map((item) => item.displayName)
+    .join(", ");
 
   return (
     <>
@@ -170,7 +171,7 @@ export function ClientDrawer({
               <Row label="E-mail" value={client.email ?? "—"} />
               <Row
                 label={terminology.professional.singular}
-                value={professional?.displayName ?? "Sem responsável"}
+                value={professionalNames || "Sem responsável"}
               />
               <Row
                 label="Como conheceu"

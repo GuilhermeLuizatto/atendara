@@ -58,9 +58,9 @@ export function buildAppointments(
 
     for (const hour of hours) {
       const client = rng.pick(schedulable);
+      const professionalId = rng.pick(client.assignedProfessionalIds);
       const professional =
-        professionals.find((p) => p.id === client.assignedProfessionalId) ??
-        professionals[0];
+        professionals.find((p) => p.id === professionalId) ?? professionals[0];
 
       const startsAt = atTime(dateKey, hour, rng.bool(0.25) ? 30 : 0);
       const isPast = startsAt < now;

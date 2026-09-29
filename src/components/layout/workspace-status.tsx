@@ -37,6 +37,14 @@ const COLLECTION_LABELS: Record<WorkspaceCollection, string> = {
 
 /** Areas que nao dependem do workspace: abrem mesmo com a carga indisponivel. */
 const INDEPENDENT_AREAS = new Set(["assinatura", "admin"]);
+const PROFESSIONAL_CONTEXT_AREAS = new Set([
+  "dashboard",
+  "agenda",
+  "clientes",
+  "mensagens",
+  "financeiro",
+  "agente",
+]);
 
 /**
  * Portao de carga do painel.
@@ -47,7 +55,8 @@ const INDEPENDENT_AREAS = new Set(["assinatura", "admin"]);
  * nao ha dados.
  */
 export function WorkspaceGate({ children }: { children: ReactNode }) {
-  const { repository, loadState, retry } = useWorkspace();
+  const { repository, loadState, retry, organizationData, activeProfessionalId } =
+    useWorkspace();
   const pathname = usePathname();
   const area = pathname.split("/")[1] ?? "";
 
@@ -55,6 +64,14 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
 
   if (loadState.status === "unavailable") {
     return <UnavailablePanel reason={loadState.reason} onRetry={retry} />;
+  }
+
+  if (
+    organizationData &&
+    !activeProfessionalId &&
+    PROFESSIONAL_CONTEXT_AREAS.has(area)
+  ) {
+    return <NoProfessionalContextPanel />;
   }
 
   return (
@@ -77,6 +94,28 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
       ) : null}
       {children}
     </>
+  );
+}
+
+function NoProfessionalContextPanel() {
+  return (
+    <section
+      role="status"
+      aria-labelledby="professional-context-title"
+      className="mx-auto flex max-w-lg flex-col items-center gap-3 py-16 text-center"
+    >
+      <span className="bg-warning-soft text-warning-soft-foreground flex size-12 items-center justify-center rounded-full">
+        <ShieldAlert className="size-5" aria-hidden />
+      </span>
+      <h1 id="professional-context-title" className="text-foreground text-xl font-semibold">
+        Nenhum vínculo profissional ativo
+      </h1>
+      <p className="text-muted-foreground text-sm leading-relaxed">
+        Esta área só abre dentro de um contexto profissional explícito. Peça à
+        administração da Atendara para revisar seus vínculos; nenhum dado foi
+        combinado ou apagado.
+      </p>
+    </section>
   );
 }
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  hasAllProfessionalScope,
+  hasAnyProfessionalScope,
   hasProfessionalScope,
   professionalScopeFor,
 } from "./professional-scope";
@@ -47,5 +49,20 @@ describe("professionalScopeFor", () => {
         "professional-a",
       ),
     ).toBe(false);
+  });
+
+  it("distingue leitura por interseção de escrita sobre toda a associação", () => {
+    const scope = professionalScopeFor({
+      role: "ASSISTANT",
+      linkedProfessionalIds: ["professional-a"],
+    });
+
+    expect(
+      hasAnyProfessionalScope(scope, ["professional-a", "professional-b"]),
+    ).toBe(true);
+    expect(
+      hasAllProfessionalScope(scope, ["professional-a", "professional-b"]),
+    ).toBe(false);
+    expect(hasAnyProfessionalScope(scope, [])).toBe(false);
   });
 });

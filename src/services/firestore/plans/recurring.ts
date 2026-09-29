@@ -8,7 +8,11 @@ import {
 } from "@/lib/finance/recurring";
 import type { ID, RecurringCharge, RecurringChargeStatus } from "@/types";
 
-import { assertPermission, assertProfessionalScope } from "../../guards";
+import {
+  assertClientProfessionalAssignment,
+  assertPermission,
+  assertProfessionalScope,
+} from "../../guards";
 import { RepositoryError, type RecurringChargeUpdate } from "../../types";
 import {
   auditWrite,
@@ -56,6 +60,13 @@ export function planCreateRecurringCharge(ctx: PlanContext, raw: RecurringCharge
   const input = validation.value;
   assertProfessionalScope(ctx.actor, input.professionalId);
   const client = requireClient(ctx, input.clientId);
+  if (!input.professionalId) {
+    throw new RepositoryError("Escolha o profissional responsável.");
+  }
+  assertClientProfessionalAssignment(
+    client.assignedProfessionalIds,
+    input.professionalId,
+  );
 
   const id = ctx.newId("recurringCharges");
   const launched = launch(ctx, {

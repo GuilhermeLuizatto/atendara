@@ -163,7 +163,7 @@ async function seedMember(uid: string, organizationId: string, role: string): Pr
 function clientDocument(organizationId: string, consent: StoredNotificationConsent | null): Record<string, unknown> {
   return {
     organizationId,
-    assignedProfessionalId: titularA.uid,
+    assignedProfessionalIds: [titularA.uid],
     fullName: "Bia Exemplo Consentimento",
     preferredName: null,
     email: "bia@exemplo.invalid",

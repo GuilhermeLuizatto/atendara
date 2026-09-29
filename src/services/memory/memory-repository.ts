@@ -91,6 +91,9 @@ import {
   type WorkspaceSnapshot,
 } from "../types";
 import {
+  assertAllProfessionalScope,
+  assertAnyProfessionalScope,
+  assertClientProfessionalAssignment,
   assertConsentWrite,
   assertPermission,
   validateAgendaSettings,
@@ -260,6 +263,8 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
 
   async createClient(input: ClientInput): Promise<ID> {
     this.assertPermission("client:create");
+    const assignedProfessionalIds = [...new Set(input.assignedProfessionalIds)];
+    assertAllProfessionalScope(this.actor, assignedProfessionalIds);
     const consent = assertConsentWrite(this.actor, null, input.notificationConsent);
     const now = this.now();
     const id = this.nextId("client");
@@ -269,6 +274,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       organizationId: this.organizationId,
       ...this.stamp(now),
       ...input,
+      assignedProfessionalIds,
       lastAppointmentAt: null,
       nextAppointmentAt: null,
       totalAppointments: 0,
@@ -279,18 +285,18 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
       ...this.snapshot,
       clients: [client, ...this.snapshot.clients],
       notifications: [
-        this.notification(
+        ...assignedProfessionalIds.map((professionalId) => this.notification(
           {
             type: "NEW_CLIENT",
             priority: "NORMAL",
             title: "Novo cadastro",
             body: `${client.fullName} foi cadastrado.`,
-            professionalId: client.assignedProfessionalId,
+            professionalId,
             target: { type: "client", id },
             aiDecisionId: null,
           },
           now,
-        ),
+        )),
         ...this.snapshot.notifications,
       ],
       auditLogs: [
@@ -316,6 +322,21 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     const now = this.now();
     const existing = this.snapshot.clients.find((client) => client.id === id);
     if (!existing) throw new RepositoryError("Cadastro não encontrado.");
+    assertAnyProfessionalScope(this.actor, existing.assignedProfessionalIds);
+    if (input.assignedProfessionalIds !== undefined) {
+      const next = [...new Set(input.assignedProfessionalIds)];
+      if (next.length === 0) {
+        throw new RepositoryError("Escolha ao menos um profissional responsável.");
+      }
+      const before = new Set(existing.assignedProfessionalIds);
+      const after = new Set(next);
+      const changed = [
+        ...existing.assignedProfessionalIds.filter((item) => !after.has(item)),
+        ...next.filter((item) => !before.has(item)),
+      ];
+      if (changed.length > 0) assertAllProfessionalScope(this.actor, changed);
+      input = { ...input, assignedProfessionalIds: next };
+    }
     const consent = assertConsentWrite(this.actor, existing.notificationConsent, input.notificationConsent);
 
     const updated: Client = {
@@ -363,6 +384,7 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     const now = this.now();
     const existing = this.snapshot.clients.find((client) => client.id === id);
     if (!existing) throw new RepositoryError("Cadastro não encontrado.");
+    assertAllProfessionalScope(this.actor, existing.assignedProfessionalIds);
 
     // Excluir alguem com agenda futura apagaria compromissos silenciosamente.
     const future = this.snapshot.appointments.filter(
@@ -623,6 +645,10 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     this.assertPermission("appointment:create");
     const now = this.now();
     const client = this.requireClient(input.clientId);
+    assertClientProfessionalAssignment(
+      client.assignedProfessionalIds,
+      input.professionalId,
+    );
     const professional = this.requireProfessional(input.professionalId);
 
     const endsAt = addMinutes(input.startsAt, input.durationMinutes);
@@ -799,6 +825,9 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     const client = input.clientId
       ? this.requireClient(input.clientId)
       : this.snapshot.clients.find((item) => item.id === existing.clientId);
+    if (client) {
+      assertClientProfessionalAssignment(client.assignedProfessionalIds, professionalId);
+    }
     const professional = this.requireProfessional(professionalId);
 
     const priceInCents = input.priceInCents ?? existing.priceInCents;
@@ -1240,6 +1269,13 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     const input = validation.value;
     const client = this.snapshot.clients.find((item) => item.id === input.clientId);
     if (!client) throw new RepositoryError("Cadastro não encontrado.");
+    if (!input.professionalId) {
+      throw new RepositoryError("Escolha o profissional responsável.");
+    }
+    assertClientProfessionalAssignment(
+      client.assignedProfessionalIds,
+      input.professionalId,
+    );
     const now = this.now();
     const id = this.nextId("recurring");
     const launched = this.launch(

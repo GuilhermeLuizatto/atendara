@@ -11,6 +11,7 @@ import { useWorkspace } from "@/providers/workspace-provider";
 import { TrialNotice } from "@/features/auth/trial-notice";
 
 import { Header } from "./header";
+import { ProfessionalContextTabs } from "./professional-context-tabs";
 import { RequireAuth } from "./require-auth";
 import { Sidebar, SidebarContent } from "./sidebar";
 import { WorkspaceGate } from "./workspace-status";
@@ -89,6 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="contents print:hidden">
             <Header onOpenMenu={() => setMenuOpen(true)} />
+            <ProfessionalContextTabs />
           </div>
           <main
             id="conteudo"

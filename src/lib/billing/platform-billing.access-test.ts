@@ -265,7 +265,7 @@ beforeAll(async () => {
   await adminDb().doc(paths.document(ownerOrg, "clients", "qualquer")).set({
     id: "qualquer",
     organizationId: ownerOrg,
-    assignedProfessionalId: ownerUid,
+    assignedProfessionalIds: [ownerUid],
     fullName: "Cadastro da cobrança",
     status: "ACTIVE",
   });

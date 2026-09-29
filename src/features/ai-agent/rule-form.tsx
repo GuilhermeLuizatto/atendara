@@ -25,7 +25,7 @@ export function RuleForm({
   rule: AIRule | null;
   onClose: () => void;
 }) {
-  const { session, data } = useWorkspace();
+  const { session, activeProfessional } = useWorkspace();
   const actions = useWorkspaceActions();
   const [input, setInput] = useState<RuleInput>(
     rule ?? {
@@ -256,20 +256,12 @@ export function RuleForm({
           </Field>
           <Field label="Profissional">
             {(props) => (
-              <Select
+              <Input
                 {...props}
-                value={input.professionalId ?? ""}
-                onChange={(e) =>
-                  update({ professionalId: e.target.value || null })
-                }
-              >
-                <option value="">Toda a organização</option>
-                {data?.professionals.map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.displayName}
-                  </option>
-                ))}
-              </Select>
+                value={activeProfessional?.displayName ?? ""}
+                readOnly
+                disabled
+              />
             )}
           </Field>
           {input.category === "PRICING" && (

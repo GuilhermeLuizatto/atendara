@@ -880,7 +880,7 @@ os novos listeners, para que a sessão não conserve dados removidos enquanto a
 consulta atualizada está a caminho.
 
 O campo de escopo é desnormalizado em cada documento operacional. Clientes usam
-`assignedProfessionalId`; mensagens, comprovantes, links de pagamento e revisões
+`assignedProfessionalIds`; mensagens, comprovantes, links de pagamento e revisões
 de decisão também carregam `professionalId`, copiado da entidade que os origina.
 Alterar um documento exige escopo tanto no valor anterior quanto no novo, então
 uma atualização não serve para mover dados para fora do vínculo. Regras globais
@@ -889,9 +889,19 @@ null`. As consultas dividem vínculos em blocos de 30 ids, limite do operador
 `in`, e recombinam os resultados sem duplicação.
 
 Isso ainda não libera o piloto: documentos antigos sem o campo ficam fechados
-por padrão e precisam da migração auditável do sprint 5.5; a interface ainda
-precisa do contexto explícito por abas do sprint 5.4. Não existe fallback que
+por padrão e precisam da migração auditável do sprint 5.5. A interface já usa o
+contexto explícito do sprint 5.4: uma aba por profissional ativo, sem visão
+"todos"; agenda, clientes, mensagens, financeiro e Dara derivam a mesma
+fotografia. Perder a aba selecionada escolhe outro vínculo ativo imediatamente,
+ou fecha as áreas operacionais quando não resta nenhum. Não existe fallback que
 transforme dado antigo ou vínculo vazio em acesso geral.
+
+Cliente compartilhado continua sendo um único documento. A leitura exige
+interseção entre `assignedProfessionalIds` e o vínculo do membro. Criar exige
+que toda a lista esteja no alcance; ao editar, um membro pode mudar somente as
+associações que também alcança. Um profissional não apaga cadastro ainda
+compartilhado com alguém fora do vínculo dele. Agenda e lançamentos com cliente
+conferem que o profissional usado está nessa lista.
 
 No modelo aprovado para o piloto, cliente continua sendo registro
 administrativo, sem conta. O profissional e o assistente com vínculo ativo o

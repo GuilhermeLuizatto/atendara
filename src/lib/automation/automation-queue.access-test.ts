@@ -146,7 +146,7 @@ describe("Fase 3, 13.2 — fila de automacao no servidor", () => {
       doc(db, paths.document(organizationId, "clients", CLIENT_ID)),
       toFirestoreData("clients", {
         id: CLIENT_ID, organizationId, fullName: "Duda Ficticia Fila", preferredName: "Duda", email: null, phone: "+5500900000000",
-        status: "ACTIVE", preferredModality: "IN_PERSON", assignedProfessionalId: uid, acquisitionChannel: "OTHER", tags: [],
+        status: "ACTIVE", preferredModality: "IN_PERSON", assignedProfessionalIds: [uid], acquisitionChannel: "OTHER", tags: [],
         administrativeNotes: null, appointmentNotificationsEnabled: true, notificationConsent,
         createdAt: now, updatedAt: now, createdBy: uid, updatedBy: uid,
       }),

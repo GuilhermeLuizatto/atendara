@@ -35,8 +35,7 @@ const SORT_LABELS: Record<ClientSort, string> = {
 export function ClientsView() {
   const { terminology, loading, data } = useWorkspace();
   const { loadMore } = useWorkspaceActions();
-  const { filters, setFilters, clients, total, countsByStatus, professionals } =
-    useClients();
+  const { filters, setFilters, clients, total, countsByStatus } = useClients();
   const page = data?.pagination?.clients;
 
   const [formOpen, setFormOpen] = useState(false);
@@ -77,7 +76,7 @@ export function ClientsView() {
       />
 
       <Card className="p-3">
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <div className="relative sm:col-span-2 lg:col-span-1">
             <Search
               className="text-subtle-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
@@ -111,21 +110,6 @@ export function ClientsView() {
             {Object.entries(CLIENT_STATUS_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
                 {label} ({countsByStatus.get(value as ClientStatus) ?? 0})
-              </option>
-            ))}
-          </Select>
-
-          <Select
-            value={filters.professionalId}
-            onChange={(event) =>
-              setFilters({ ...filters, professionalId: event.target.value })
-            }
-            aria-label={`Filtrar por ${terminology.professional.singularLower}`}
-          >
-            <option value="ALL">Todos os profissionais</option>
-            {professionals.map((professional) => (
-              <option key={professional.id} value={professional.id}>
-                {professional.displayName}
               </option>
             ))}
           </Select>

@@ -42,7 +42,7 @@ function emptyDraft(
     phone: null,
     status: "LEAD",
     preferredModality: modality,
-    assignedProfessionalId: professionalId,
+    assignedProfessionalIds: professionalId ? [professionalId] : [],
     acquisitionChannel: "REFERRAL",
     tags: [],
     administrativeNotes: null,
@@ -57,7 +57,7 @@ function toDraft(client: Client): ClientInput {
     phone: client.phone,
     status: client.status,
     preferredModality: client.preferredModality,
-    assignedProfessionalId: client.assignedProfessionalId,
+    assignedProfessionalIds: client.assignedProfessionalIds,
     acquisitionChannel: client.acquisitionChannel,
     tags: client.tags,
     administrativeNotes: client.administrativeNotes,
@@ -75,6 +75,9 @@ function validate(draft: ClientInput): Errors {
   }
   if (draft.phone && draft.phone.replace(/\D/g, "").length < 10) {
     errors.phone = "Telefone incompleto.";
+  }
+  if (draft.assignedProfessionalIds.length === 0) {
+    errors.assignedProfessionalIds = "Escolha ao menos um profissional.";
   }
 
   return errors;
@@ -95,14 +98,21 @@ export function ClientForm({
   onClose: () => void;
   client?: Client | null;
 }) {
-  const { profession, terminology, data, session } = useWorkspace();
+  const {
+    profession,
+    terminology,
+    data,
+    session,
+    activeProfessionalId,
+    availableProfessionals,
+  } = useWorkspace();
   const { createClient, updateClient } = useWorkspaceActions();
 
   const professionals = data?.professionals ?? [];
   const [draft, setDraft] = useState<ClientInput>(() =>
     client
       ? toDraft(client)
-      : emptyDraft(profession.modalities[0], professionals[0]?.id ?? null),
+      : emptyDraft(profession.modalities[0], activeProfessionalId),
   );
   const [consent, setConsent] = useState<ConsentDraft>(() => initialConsentDraft(client));
   const [errors, setErrors] = useState<Errors>({});
@@ -269,24 +279,69 @@ export function ClientForm({
             )}
           </Field>
 
-          <Field label={terminology.professional.singular}>
-            {(props) => (
-              <Select
-                {...props}
-                value={draft.assignedProfessionalId ?? ""}
-                onChange={(event) =>
-                  patch({ assignedProfessionalId: event.target.value || null })
-                }
-              >
-                <option value="">Sem responsável</option>
-                {professionals.map((professional) => (
-                  <option key={professional.id} value={professional.id}>
-                    {professional.displayName}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
+          <div className="sm:col-span-2">
+            <fieldset
+              aria-describedby={
+                errors.assignedProfessionalIds
+                  ? "client-professionals-error"
+                  : "client-professionals-hint"
+              }
+              aria-invalid={Boolean(errors.assignedProfessionalIds)}
+              className="space-y-1.5"
+            >
+              <legend className="text-foreground text-xs font-medium">
+                {terminology.professional.plural}
+                <span className="text-danger ml-0.5" aria-hidden>*</span>
+              </legend>
+              <div className="border-input grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
+                {professionals
+                  .filter(
+                    (professional) =>
+                      professional.active &&
+                      (availableProfessionals.some(
+                        (available) => available.id === professional.id,
+                      ) ||
+                        draft.assignedProfessionalIds.includes(professional.id)),
+                  )
+                  .map((professional) => {
+                    const checked = draft.assignedProfessionalIds.includes(
+                      professional.id,
+                    );
+                    const editable = availableProfessionals.some(
+                      (available) => available.id === professional.id,
+                    );
+                    return (
+                      <label key={professional.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={!editable}
+                          onChange={(event) =>
+                            patch({
+                              assignedProfessionalIds: event.target.checked
+                                ? [...draft.assignedProfessionalIds, professional.id]
+                                : draft.assignedProfessionalIds.filter(
+                                    (id) => id !== professional.id,
+                                  ),
+                            })
+                          }
+                        />
+                        <span>{professional.displayName}</span>
+                      </label>
+                    );
+                  })}
+              </div>
+              {errors.assignedProfessionalIds ? (
+                <p id="client-professionals-error" role="alert" className="text-danger text-xs">
+                  {errors.assignedProfessionalIds}
+                </p>
+              ) : (
+                <p id="client-professionals-hint" className="text-subtle-foreground text-xs">
+                  O mesmo cadastro pode ser usado em mais de um contexto, sem duplicação.
+                </p>
+              )}
+            </fieldset>
+          </div>
 
           <Field label="Como conheceu">
             {(props) => (

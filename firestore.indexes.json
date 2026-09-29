@@ -218,8 +218,8 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "assignedProfessionalId",
-          "order": "ASCENDING"
+          "fieldPath": "assignedProfessionalIds",
+          "arrayConfig": "CONTAINS"
         },
         {
           "fieldPath": "fullName",

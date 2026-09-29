@@ -219,7 +219,7 @@ describe("Etapa 2 — ciclo administrador, profissional e acesso restrito", () =
     await database.doc(paths.document(organizationId, "clients", "qualquer")).set({
       id: "qualquer",
       organizationId,
-      assignedProfessionalId: professionalUid,
+      assignedProfessionalIds: [professionalUid],
       fullName: "Cadastro de acesso",
       status: "ACTIVE",
     });

@@ -202,7 +202,7 @@ async function seedClient(organizationId: string, by: string, person: { name: st
   await Promise.all([
     set(paths.document(organizationId, "clients", id.client), {
       id: id.client, ...stamp, fullName: person.name, preferredName: null, email: `${person.prefix}@exemplo.invalid`,
-      phone: "+550000000009", status: "ACTIVE", preferredModality: "IN_PERSON", assignedProfessionalId: by,
+      phone: "+550000000009", status: "ACTIVE", preferredModality: "IN_PERSON", assignedProfessionalIds: [by],
       acquisitionChannel: "REFERRAL", tags: [], lastAppointmentAt: null, nextAppointmentAt: null,
       administrativeNotes: `Prefere manha. ${person.name}.`, totalAppointments: 1, outstandingBalanceInCents: 0,
       appointmentNotificationsEnabled: true,

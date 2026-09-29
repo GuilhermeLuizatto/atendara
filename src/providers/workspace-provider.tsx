@@ -39,11 +39,37 @@ import type {
 import { useNow } from "@/lib/utils/use-now";
 
 import { useAuth } from "./auth-provider";
+import {
+  availableProfessionalContexts,
+  resolveActiveProfessionalId,
+  snapshotForProfessional,
+} from "./professional-context";
 
 const professionStore = createPreferenceStore<ProfessionId>(
   "atendo:profession",
   DEFAULT_PROFESSION,
   (raw) => (isProfessionId(raw) ? raw : null),
+);
+
+type ProfessionalContextPreferences = Record<string, string>;
+
+const professionalContextStore = createPreferenceStore<ProfessionalContextPreferences>(
+  "atendo:professional-context",
+  {},
+  (raw) => {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+      return Object.fromEntries(
+        Object.entries(parsed).filter(
+          (entry): entry is [string, string] => typeof entry[1] === "string",
+        ),
+      );
+    } catch {
+      return null;
+    }
+  },
+  JSON.stringify,
 );
 
 interface WorkspaceContextValue {
@@ -57,7 +83,14 @@ interface WorkspaceContextValue {
   setProfession: (id: ProfessionId) => void;
   organization: Organization | null;
   session: ActiveSession | null;
+  /** Fotografia operacional limitada à aba profissional ativa. */
   data: WorkspaceSnapshot | null;
+  /** Fotografia autorizada completa, reservada aos fluxos administrativos. */
+  organizationData: WorkspaceSnapshot | null;
+  availableProfessionals: WorkspaceSnapshot["professionals"];
+  activeProfessional: WorkspaceSnapshot["professionals"][number] | null;
+  activeProfessionalId: string | null;
+  setActiveProfessionalId: (id: string) => void;
   /** Camada de persistencia. Toda escrita passa por aqui. */
   repository: WorkspaceRepository | null;
 }
@@ -94,6 +127,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     professionStore.subscribe,
     professionStore.getSnapshot,
     professionStore.getServerSnapshot,
+  );
+
+  const professionalContextPreferences = useSyncExternalStore(
+    professionalContextStore.subscribe,
+    professionalContextStore.getSnapshot,
+    professionalContextStore.getServerSnapshot,
   );
 
   const platformAdmin = isPlatformAdmin(user?.access);
@@ -153,7 +192,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [repository],
   );
 
-  const data = useSyncExternalStore(subscribe, getSnapshot, NULL_SNAPSHOT);
+  const organizationData = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    NULL_SNAPSHOT,
+  );
 
   const subscribeLoad = useMemo(
     () =>
@@ -182,37 +225,91 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const profession = useMemo(() => getProfession(professionId), [professionId]);
 
-  const session = useMemo<ActiveSession | null>(() => {
-    if (!user || !data) return null;
+  const access = useMemo(() => {
+    if (!user || !organizationData) return null;
     const admin = isPlatformAdmin(user.access);
     // O papel autoritativo e o do vinculo em `members/{uid}`, o mesmo que as
     // rules conferem. A operadora abre so o conjunto demonstrativo, como OWNER.
-    const role: Role = admin ? "OWNER" : (data.membership?.role ?? "PROFESSIONAL");
-    const isOrganizationHolder = !admin && data.organization.ownerId === user.userId;
-    const professionalScope = admin
-      ? { organizationWide: true, professionalIds: data.professionals.map((item) => item.id) }
+    const role: Role = admin
+      ? "OWNER"
+      : (organizationData.membership?.role ?? "PROFESSIONAL");
+    const isOrganizationHolder =
+      !admin && organizationData.organization.ownerId === user.userId;
+    const professionalScope = admin || repository?.mode === "memory"
+      ? {
+          organizationWide: true,
+          professionalIds: organizationData.professionals.map((item) => item.id),
+        }
       : professionalScopeFor(
-          data.membership ?? { role, linkedProfessionalIds: [] },
+          organizationData.membership ?? { role, linkedProfessionalIds: [] },
         );
+    return { role, isOrganizationHolder, professionalScope };
+  }, [user, organizationData, repository]);
+
+  const availableProfessionals = useMemo(
+    () =>
+      organizationData && access
+        ? availableProfessionalContexts(
+            organizationData.professionals,
+            access.professionalScope,
+          )
+        : [],
+    [organizationData, access],
+  );
+
+  const professionalContextKey =
+    user && organizationData
+      ? `${user.userId}:${organizationData.organization.id}`
+      : null;
+  const activeProfessionalId = resolveActiveProfessionalId(
+    professionalContextKey
+      ? professionalContextPreferences[professionalContextKey]
+      : null,
+    availableProfessionals,
+  );
+  const activeProfessional =
+    availableProfessionals.find((item) => item.id === activeProfessionalId) ?? null;
+
+  const setActiveProfessionalId = useCallback(
+    (id: string) => {
+      if (
+        !professionalContextKey ||
+        !availableProfessionals.some((item) => item.id === id)
+      ) {
+        return;
+      }
+      professionalContextStore.set({
+        ...professionalContextStore.read(),
+        [professionalContextKey]: id,
+      });
+    },
+    [professionalContextKey, availableProfessionals],
+  );
+
+  const data = useMemo(
+    () =>
+      organizationData
+        ? snapshotForProfessional(organizationData, activeProfessionalId)
+        : null,
+    [organizationData, activeProfessionalId],
+  );
+
+  const session = useMemo<ActiveSession | null>(() => {
+    if (!user || !organizationData || !access) return null;
     return {
       user,
-      organizationId: data.organization.id,
-      role,
-      isOrganizationHolder,
-      permissions: accountPermissions(user.access, { role, isOrganizationHolder }),
-      // Em uma clinica ha varios perfis na organizacao; o do usuario e o que
-      // carrega o proprio uid. O primeiro da lista so serve de retomada para a
-      // demonstracao, onde o titular e o unico profissional.
-      professionalId:
-        data.professionals.find(
-          (professional) => professional.userId === user.userId,
-        )?.id ??
-        data.professionals[0]?.id ??
-        null,
-      linkedProfessionalIds: professionalScope.professionalIds,
-      organizationWideProfessionalScope: professionalScope.organizationWide,
+      organizationId: organizationData.organization.id,
+      role: access.role,
+      isOrganizationHolder: access.isOrganizationHolder,
+      permissions: accountPermissions(user.access, {
+        role: access.role,
+        isOrganizationHolder: access.isOrganizationHolder,
+      }),
+      professionalId: activeProfessionalId,
+      linkedProfessionalIds: access.professionalScope.professionalIds,
+      organizationWideProfessionalScope: access.professionalScope.organizationWide,
     };
-  }, [user, data]);
+  }, [user, organizationData, access, activeProfessionalId]);
 
   // Sincroniza o autor das escritas com a sessao. E um efeito de sistema
   // externo (nao ha `setState`), que e o uso legitimo de `useEffect`.
@@ -236,12 +333,30 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       profession,
       terminology: profession.terminology,
       setProfession,
-      organization: data?.organization ?? null,
+      organization: organizationData?.organization ?? null,
       session,
       data,
+      organizationData,
+      availableProfessionals,
+      activeProfessional,
+      activeProfessionalId,
+      setActiveProfessionalId,
       repository,
     }),
-    [data, loadState, retry, profession, setProfession, session, repository],
+    [
+      data,
+      organizationData,
+      loadState,
+      retry,
+      profession,
+      setProfession,
+      session,
+      availableProfessionals,
+      activeProfessional,
+      activeProfessionalId,
+      setActiveProfessionalId,
+      repository,
+    ],
   );
 
   return (

@@ -121,9 +121,9 @@ export function buildClients(
       phone: `1198${rng.int(1000000, 9999999)}`,
       status: statuses[index % statuses.length],
       preferredModality: rng.pick(profession.modalities),
-      assignedProfessionalId: rng.bool(0.75)
-        ? professionals[0].id
-        : professionals[1].id,
+      assignedProfessionalIds: rng.bool(0.15)
+        ? professionals.slice(0, 2).map((professional) => professional.id)
+        : [rng.bool(0.75) ? professionals[0].id : professionals[1].id],
       acquisitionChannel: rng.pick(CHANNELS),
       tags: rng.bool(0.35) ? rng.sample(TAG_POOL, 1) : [],
       // Preenchidos depois que a agenda e gerada.

@@ -17,7 +17,6 @@ export function Simulator() {
   const { data, profession, session } = useWorkspace();
   const [text, setText] = useState("");
   const [channel, setChannel] = useState("WEB_CHAT");
-  const [professionalId, setProfessionalId] = useState("");
   const [at, setAt] = useState("");
   const [handoff, setHandoff] = useState(false);
   const [modality, setModality] = useState("");
@@ -51,7 +50,7 @@ export function Simulator() {
             now: at
               ? new Date(fromDateAndTime(at.slice(0, 10), at.slice(11)))
               : new Date(),
-            professionalId: professionalId || session?.professionalId || null,
+            professionalId: session?.professionalId ?? null,
             permissions: session?.permissions ?? [],
             humanHandoff: handoff,
           },
@@ -91,22 +90,6 @@ export function Simulator() {
               ? "Demonstração: avaliação por regras locais."
               : "Ao selecionar, o texto poderá ser processado pelo Google se a integração estiver ativa. Use apenas exemplos fictícios neste teste."}
           </p>
-          <Field label="Profissional">
-            {(props) => (
-              <Select
-                {...props}
-                value={professionalId}
-                onChange={(e) => setProfessionalId(e.target.value)}
-              >
-                <option value="">Responsável atual</option>
-                {data.professionals.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.displayName}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
           <Field label="Canal">
             {(props) => (
               <Select

@@ -11,7 +11,12 @@ import type {
   ServiceModality,
   StoredNotificationConsent,
 } from "@/types";
-import { hasProfessionalScope } from "@/lib/access/professional-scope";
+import {
+  hasAllProfessionalScope,
+  hasAnyProfessionalScope,
+  hasProfessionalScope,
+  type ProfessionalScope,
+} from "@/lib/access/professional-scope";
 
 import { RepositoryError, type RepositoryActor } from "./types";
 
@@ -52,6 +57,49 @@ export function assertProfessionalScope(
   ) {
     throw new RepositoryError(
       "Este registro pertence a um profissional fora dos seus vínculos ativos.",
+    );
+  }
+}
+
+function actorProfessionalScope(actor: RepositoryActor): ProfessionalScope {
+  return {
+    organizationWide:
+      actor.organizationWideProfessionalScope === true ||
+      actor.role === "OWNER" ||
+      actor.role === "ADMIN",
+    professionalIds: actor.linkedProfessionalIds ?? [],
+  };
+}
+
+export function assertAnyProfessionalScope(
+  actor: RepositoryActor,
+  professionalIds: string[],
+): void {
+  if (!hasAnyProfessionalScope(actorProfessionalScope(actor), professionalIds)) {
+    throw new RepositoryError(
+      "Este cadastro não pertence a nenhum dos seus vínculos ativos.",
+    );
+  }
+}
+
+export function assertAllProfessionalScope(
+  actor: RepositoryActor,
+  professionalIds: string[],
+): void {
+  if (!hasAllProfessionalScope(actorProfessionalScope(actor), professionalIds)) {
+    throw new RepositoryError(
+      "A associação inclui um profissional fora dos seus vínculos ativos.",
+    );
+  }
+}
+
+export function assertClientProfessionalAssignment(
+  assignedProfessionalIds: string[],
+  professionalId: string,
+): void {
+  if (!assignedProfessionalIds.includes(professionalId)) {
+    throw new RepositoryError(
+      "Associe o cadastro ao profissional ativo antes de usar este contexto.",
     );
   }
 }

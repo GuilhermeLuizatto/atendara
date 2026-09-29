@@ -103,7 +103,7 @@ describe("revisão das decisões da Dara", () => {
 describe("mensalidades (cobrador, C1)", () => {
   const input = (ctx: PlanContext) => ({
     clientId: ctx.snapshot.clients[0].id,
-    professionalId: null,
+    professionalId: ctx.snapshot.clients[0].assignedProfessionalIds[0],
     description: "Acompanhamento mensal",
     amountInCents: 45000,
     method: "PIX" as const,
@@ -139,7 +139,7 @@ describe("mensalidades (cobrador, C1)", () => {
       recurringCharges: [
         {
           id: "m1", organizationId: s.organization.id, clientId: s.clients[0].id, clientName: s.clients[0].fullName,
-          professionalId: null, description: "Mensal", amountInCents: 45000, method: "PIX", dueDay: 10,
+          professionalId: s.clients[0].assignedProfessionalIds[0], description: "Mensal", amountInCents: 45000, method: "PIX", dueDay: 10,
           startPeriod: "2026-08", lastLaunchedPeriod: "2026-08", status: "PAUSED", endedAt: null,
           createdAt: NOW, updatedAt: NOW, createdBy: "owner", updatedBy: "owner", ...patch,
         },
@@ -288,7 +288,7 @@ const clientInput = {
   phone: null,
   status: "ACTIVE" as Client["status"],
   preferredModality: "ONLINE" as Client["preferredModality"],
-  assignedProfessionalId: null,
+  assignedProfessionalIds: ["prof-owner"],
   acquisitionChannel: "OTHER" as Client["acquisitionChannel"],
   tags: [],
   administrativeNotes: null,

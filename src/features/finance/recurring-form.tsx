@@ -39,7 +39,7 @@ export function RecurringForm({
   currentPeriod: string;
   onClose: () => void;
 }) {
-  const { data, terminology } = useWorkspace();
+  const { data, terminology, activeProfessionalId } = useWorkspace();
   const { run } = useWorkspaceActions();
   const [clientId, setClientId] = useState(charge?.clientId ?? "");
   const [description, setDescription] = useState(charge?.description ?? "");
@@ -54,7 +54,7 @@ export function RecurringForm({
     event.preventDefault();
     const input: RecurringChargeInput = {
       clientId,
-      professionalId: charge?.professionalId ?? null,
+      professionalId: charge?.professionalId ?? activeProfessionalId,
       description,
       amountInCents: toCents(amount),
       method: method || null,

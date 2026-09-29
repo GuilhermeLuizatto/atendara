@@ -352,8 +352,8 @@ resultado.
    vários profissionais já limita consultas, escritas, callables e Security
    Rules; perder um vínculo retira os dados da sessão aberta imediatamente.
    A frente de equipe ainda não está liberada para o piloto multiprofissional:
-   faltam o contexto explícito por abas (5.4) e a migração auditável dos dados
-   antigos (5.5). O catálogo e os preços
+   o contexto explícito por abas e os clientes compartilhados estão concluídos
+   no código (5.4), mas falta a migração auditável dos dados antigos (5.5). O catálogo e os preços
    dos planos continuam deliberadamente em espera, e a Stripe segue travada
    para uso real até a decisão comercial, jurídica, fiscal e o teste
    explicitamente autorizado. O roteiro que depende do titular está no
@@ -371,7 +371,7 @@ mesmo escopo.
 | **5.1 — Contrato de acesso** | Consolidar `PLATFORM_ADMIN` como papel interno da Atendara, `PROFESSIONAL` e `ASSISTANT` como acessos da organização, e `Client` como cadastro administrativo sem login no piloto. Titularidade continua separada do papel. | Novos convites não oferecem OWNER, ADMIN organizacional ou VIEWER; compatibilidade com contas antigas permanece documentada e testada. |
 | **5.2 — Administração de membros** | Fazer convite, suspensão, reativação e remoção por operações específicas da administração da Atendara, com segundo fator, motivo e auditoria. O profissional solicita a inclusão, mas não cria a conta diretamente. | O administrador não ganha leitura geral do tenant; cada ato administrativo é autorizado no backend, revoga sessões quando necessário e gera registro append-only. |
 | **5.3 — Escopo por vínculo (concluído no código)** | Aplicar `linkedProfessionalIds` nas consultas, escritas, callables e Security Rules de agenda, clientes, mensagens, financeiro, regras e alertas. Vínculo vazio nunca significa acesso a todos. | Um assistente ligado aos profissionais A e B não lê nem altera dados do profissional C, inclusive por chamada direta ao Firestore ou às Functions. Testes de emulador cobrem leitura, criação, alteração e remoção de vínculo. |
-| **5.4 — Contexto por abas e clientes** | Criar um contexto global por profissional, com uma aba para cada vínculo ativo e sem opção silenciosa de combinar dados. O profissional ou assistente autorizado cadastra clientes diretamente; a administração da Atendara não participa do fluxo cotidiano. Um cliente da organização pode ser associado explicitamente a mais de um profissional sem duplicar o cadastro. | Agenda, clientes, mensagens, financeiro e Dara seguem a mesma aba ativa. Trocar ou perder vínculo troca ou fecha o contexto imediatamente. O cadastro do cliente não cria conta de acesso. |
+| **5.4 — Contexto por abas e clientes (concluído no código)** | Criar um contexto global por profissional, com uma aba para cada vínculo ativo e sem opção silenciosa de combinar dados. O profissional ou assistente autorizado cadastra clientes diretamente; a administração da Atendara não participa do fluxo cotidiano. Um cliente da organização pode ser associado explicitamente a mais de um profissional sem duplicar o cadastro. | Agenda, clientes, mensagens, financeiro e Dara seguem a mesma aba ativa. Trocar ou perder vínculo troca ou fecha o contexto imediatamente. O cadastro do cliente não cria conta de acesso. |
 | **5.5 — Migração e liberação** | Preservar UID, e-mail, senha, organização, perfis e histórico; mapear papéis antigos, preencher vínculos explícitos e revisar manualmente organizações multiprofissionais ambíguas. | Migração repetível e auditável, sem concessão implícita de acesso. Contagens antes/depois conferidas, testes completos aprovados e piloto bloqueado enquanto houver membro ativo sem escopo resolvido. |
 
 Situação do sprint 5.2: concluído no código. Aprovação/recusa, convite,
@@ -385,6 +385,15 @@ vínculo. Lista ausente ou vazia nega tudo. O mesmo campo desnormalizado limita
 consultas, planos de escrita, callables e Rules, e a suíte do emulador prova
 acesso A/B, negação C e retirada imediata de B. Dados antigos sem o campo de
 escopo permanecem fechados até a migração do sprint 5.5.
+
+Situação do sprint 5.4: concluído no código. O painel oferece uma aba para cada
+profissional ativo alcançado pelo vínculo e não oferece visão combinada. Agenda,
+clientes, mensagens, financeiro e Dara derivam a mesma fotografia da aba ativa;
+se ela deixa de existir, a sessão escolhe outro vínculo ativo ou fecha as áreas
+operacionais. `clients.assignedProfessionalIds` permite que o mesmo cadastro
+apareça explicitamente em mais de um contexto. Consultas, planos, importação e
+Security Rules usam a lista sem criar conta de acesso para o cliente. Os dados
+anteriores ao campo plural continuam fechados até a migração do sprint 5.5.
 
 Fica fora destes sprints: portal do cliente, assistente em várias organizações,
 permissões personalizadas por usuário, transferência de titularidade e visão

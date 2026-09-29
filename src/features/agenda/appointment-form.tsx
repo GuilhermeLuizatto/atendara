@@ -143,11 +143,10 @@ export function AppointmentForm({
   defaultDate?: string;
   defaultTime?: string;
 }) {
-  const { profession, terminology, data } = useWorkspace();
+  const { profession, terminology, data, activeProfessional } = useWorkspace();
   const { createAppointment, updateAppointment } = useWorkspaceActions();
 
   const clients = data?.clients ?? [];
-  const professionals = data?.professionals ?? [];
   // So a profissao com catalogo oferece servico (regra 1: a flag decide).
   // A profissao decide se existe sinal, nunca um `if` por nome (regra 1).
   const deposit = profession.features.depositOnBooking;
@@ -180,7 +179,7 @@ export function AppointmentForm({
         }
       : {
           clientId: defaultClientId ?? clients[0]?.id ?? "",
-          professionalId: professionals[0]?.id ?? "",
+          professionalId: activeProfessional?.id ?? "",
           serviceId: "",
           date: defaultDate ?? toDateKey(new Date()),
           time: defaultTime ?? "09:00",
@@ -400,10 +399,7 @@ export function AppointmentForm({
           <BusyConflictNotice
             className="sm:col-span-2"
             professionalId={draft.professionalId}
-            professionalName={
-              professionals.find((item) => item.id === draft.professionalId)
-                ?.displayName ?? "quem atende"
-            }
+            professionalName={activeProfessional?.displayName ?? "quem atende"}
             date={draft.date}
             time={draft.time}
             durationMinutes={draft.durationMinutes}
@@ -541,21 +537,13 @@ export function AppointmentForm({
               error={errors.professionalId}
             >
               {(props) => (
-                <Select
+                <Input
                   {...props}
-                  value={draft.professionalId}
-                  onChange={(event) =>
-                    patch({ professionalId: event.target.value })
-                  }
+                  value={activeProfessional?.displayName ?? ""}
+                  readOnly
+                  disabled
                   invalid={Boolean(errors.professionalId)}
-                >
-                  <option value="">Selecione</option>
-                  {professionals.map((professional) => (
-                    <option key={professional.id} value={professional.id}>
-                      {professional.displayName}
-                    </option>
-                  ))}
-                </Select>
+                />
               )}
             </Field>
           </div>

@@ -191,7 +191,7 @@ describe("repositorio do Firestore contra o emulador", () => {
       phone: null,
       status: "ACTIVE",
       preferredModality: "ONLINE",
-      assignedProfessionalId: PROFESSIONAL,
+      assignedProfessionalIds: [PROFESSIONAL],
       acquisitionChannel: "OTHER",
       tags: [],
       administrativeNotes: null,
@@ -342,7 +342,7 @@ describe("repositorio do Firestore contra o emulador", () => {
         phone: null,
         status: "ACTIVE",
         preferredModality: "ONLINE",
-        assignedProfessionalId: PROFESSIONAL,
+        assignedProfessionalIds: [PROFESSIONAL],
         acquisitionChannel: "OTHER",
         tags: [],
         administrativeNotes: null,
@@ -399,7 +399,7 @@ describe("repositorio do Firestore contra o emulador", () => {
     await setDoc(externalReference, {
       id: "fora-do-vinculo",
       organizationId: ORG,
-      assignedProfessionalId: "prof-fora",
+      assignedProfessionalIds: ["prof-fora"],
       fullName: "Z Cliente fora do vínculo",
       status: "ACTIVE",
       createdAt: Timestamp.now(),
@@ -422,10 +422,10 @@ describe("repositorio do Firestore contra o emulador", () => {
       );
       expect(restricted.clients.some((client) => client.id === "fora-do-vinculo")).toBe(false);
       const reloaded = await nextSnapshot(
-        (snapshot) => snapshot.clients.some((client) => client.assignedProfessionalId === PROFESSIONAL)
+        (snapshot) => snapshot.clients.some((client) => client.assignedProfessionalIds.includes(PROFESSIONAL))
           && !snapshot.clients.some((client) => client.id === "fora-do-vinculo"),
       );
-      expect(reloaded.clients.every((client) => client.assignedProfessionalId === PROFESSIONAL)).toBe(true);
+      expect(reloaded.clients.every((client) => client.assignedProfessionalIds.includes(PROFESSIONAL))).toBe(true);
     } finally {
       await deleteDoc(externalReference);
       await setDoc(memberReference, membership("ADMIN", []));
@@ -584,7 +584,7 @@ describe("repositorio do Firestore contra o emulador", () => {
         phone: null,
         status: "ACTIVE",
         preferredModality: "IN_PERSON",
-        assignedProfessionalId: "prof-2",
+        assignedProfessionalIds: ["prof-2"],
         acquisitionChannel: "OTHER",
         tags: [],
         administrativeNotes: null,
@@ -695,7 +695,7 @@ describe("repositorio do Firestore contra o emulador", () => {
       phone: null,
       status: "ACTIVE",
       preferredModality: "ONLINE",
-      assignedProfessionalId: PROFESSIONAL,
+      assignedProfessionalIds: [PROFESSIONAL],
       acquisitionChannel: "OTHER",
       tags: [],
       administrativeNotes: null,

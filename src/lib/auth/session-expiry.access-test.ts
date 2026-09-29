@@ -62,7 +62,7 @@ beforeAll(async () => {
   });
   await adminDb().doc(paths.organization(ORG)).set({ id: ORG, ownerId: UID, primaryProfession: "PSYCHOLOGIST", professions: ["PSYCHOLOGIST"] });
   await adminDb().doc(paths.document(ORG, "members", UID)).set({ id: UID, userId: UID, organizationId: ORG, role: "PROFESSIONAL", status: "ACTIVE", linkedProfessionalIds: [UID] });
-  await clientRef().set({ id: CLIENT, organizationId: ORG, assignedProfessionalId: UID, fullName: "Cliente Fictício", status: "ACTIVE" });
+  await clientRef().set({ id: CLIENT, organizationId: ORG, assignedProfessionalIds: [UID], fullName: "Cliente Fictício", status: "ACTIVE" });
 
   aberta = tokenSession(UID, null);
 }, 60_000);

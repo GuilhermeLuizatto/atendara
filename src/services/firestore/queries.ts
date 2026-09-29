@@ -126,6 +126,26 @@ function scopedTenantQueries(
   );
 }
 
+function scopedClientQueries(
+  db: Firestore,
+  organizationId: ID,
+  scope: ProfessionalScope,
+  count: number,
+): Query[] {
+  const source = tenantQuery(db, organizationId, "clients");
+  if (scope.organizationWide) {
+    return [query(source, orderBy("fullName"), limit(count))];
+  }
+  return chunks(scope.professionalIds).map((professionalIds) =>
+    query(
+      source,
+      where("assignedProfessionalIds", "array-contains-any", professionalIds),
+      orderBy("fullName"),
+      limit(count),
+    ),
+  );
+}
+
 function unscopedTenantQuery(
   db: Firestore,
   organizationId: ID,
@@ -143,9 +163,7 @@ export const snapshotQueries: Record<PagedPart, SnapshotQueryFactory> = {
     ]),
 
   clients: (db, organizationId, count, scope) =>
-    scopedTenantQueries(db, organizationId, "clients", "assignedProfessionalId", scope, count, [
-      orderBy("fullName"),
-    ]),
+    scopedClientQueries(db, organizationId, scope, count),
 
   // A ordem da lista e a que ela escolheu (`position`).
   services: (db, organizationId, count) =>

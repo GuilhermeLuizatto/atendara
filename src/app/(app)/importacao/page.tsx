@@ -22,7 +22,7 @@ interface FieldDefinition { key: string; label: string; required: boolean; }
 const ENTITY_LABEL: Record<ImportEntityType, string> = { PROFESSIONALS: "Profissionais", CLIENTS: "Clientes", APPOINTMENTS: "Atendimentos", TRANSACTIONS: "Financeiro" };
 const FIELD_TUPLES: Record<ImportEntityType, [string, string, boolean][]> = {
   PROFESSIONALS: [["id", "ID do registro", false], ["displayName", "Nome", true], ["email", "E-mail", true], ["phone", "Telefone", false], ["profession", "Profissão", true], ["licenseNumber", "Registro profissional", false], ["specialties", "Especialidades", true], ["active", "Ativo", true]],
-  CLIENTS: [["id", "ID do registro", false], ["fullName", "Nome completo", true], ["preferredName", "Nome preferido", false], ["email", "E-mail", false], ["phone", "Telefone", false], ["status", "Situação", true], ["preferredModality", "Modalidade", true], ["assignedProfessionalId", "ID do profissional", false], ["acquisitionChannel", "Canal de aquisição", true], ["tags", "Tags", true], ["administrativeNotes", "Observação administrativa", false]],
+  CLIENTS: [["id", "ID do registro", false], ["fullName", "Nome completo", true], ["preferredName", "Nome preferido", false], ["email", "E-mail", false], ["phone", "Telefone", false], ["status", "Situação", true], ["preferredModality", "Modalidade", true], ["assignedProfessionalIds", "IDs dos profissionais", true], ["acquisitionChannel", "Canal de aquisição", true], ["tags", "Tags", true], ["administrativeNotes", "Observação administrativa", false]],
   APPOINTMENTS: [["id", "ID do registro", false], ["clientId", "ID do cliente", true], ["professionalId", "ID do profissional", true], ["startsAt", "Início", true], ["durationMinutes", "Duração em minutos", true], ["modality", "Modalidade", true], ["status", "Situação", true], ["priceInCents", "Valor em centavos", true], ["administrativeNotes", "Observação administrativa", false]],
   TRANSACTIONS: [["id", "ID do registro", false], ["type", "Tipo", true], ["clientId", "ID do cliente", false], ["professionalId", "ID do profissional", false], ["appointmentId", "ID do atendimento", false], ["description", "Descrição", true], ["amountInCents", "Valor em centavos", true], ["status", "Situação", true], ["method", "Forma de pagamento", false], ["dueDate", "Vencimento", true]],
 };
@@ -34,8 +34,8 @@ const FIELDS = Object.fromEntries(
 ) as Record<ImportEntityType, FieldDefinition[]>;
 
 const CLINICAL_TERMS = ["diagnostico", "sintoma", "prontuario", "anamnese", "laudo", "prescricao", "medicamento", "cid", "evolucao clinica", "observacao clinica"];
-const nullable = new Set(["id", "phone", "licenseNumber", "preferredName", "email", "assignedProfessionalId", "administrativeNotes", "clientId", "professionalId", "appointmentId", "method"]);
-const listFields = new Set(["specialties", "tags"]);
+const nullable = new Set(["id", "phone", "licenseNumber", "preferredName", "email", "administrativeNotes", "clientId", "professionalId", "appointmentId", "method"]);
+const listFields = new Set(["specialties", "tags", "assignedProfessionalIds"]);
 const numericFields = new Set(["durationMinutes", "priceInCents", "amountInCents"]);
 const dateFields = new Set(["startsAt", "dueDate"]);
 
@@ -123,7 +123,12 @@ export default function ImportPage() {
     return records.map((record, index) => {
       const missing = FIELDS[entity].filter((field) => field.required && (record[field.key] === "" || record[field.key] === null || Number.isNaN(record[field.key]))).map((field) => field.label);
       const referenceMissing: string[] = [];
-      if (entity === "CLIENTS" && record.assignedProfessionalId && !existingIds.PROFESSIONALS.has(String(record.assignedProfessionalId))) referenceMissing.push("profissional vinculado");
+      if (
+        entity === "CLIENTS" &&
+        (record.assignedProfessionalIds as unknown[]).some(
+          (id) => !existingIds.PROFESSIONALS.has(String(id)),
+        )
+      ) referenceMissing.push("profissional vinculado");
       if (entity === "APPOINTMENTS") {
         if (!existingIds.CLIENTS.has(String(record.clientId))) referenceMissing.push("cliente");
         if (!existingIds.PROFESSIONALS.has(String(record.professionalId))) referenceMissing.push("profissional");

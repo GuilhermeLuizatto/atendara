@@ -41,11 +41,11 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function blankDraft(): Draft {
+function blankDraft(professionalId: string | null): Draft {
   return {
     type: "INCOME",
     clientId: null,
-    professionalId: null,
+    professionalId,
     appointmentId: null,
     description: "",
     amountInCents: 0,
@@ -193,9 +193,11 @@ function SummaryCard({ label, value, tone }: { label: string; value: string; ton
 }
 
 function TransactionForm({ transaction, onClose }: { transaction: Transaction | null; onClose: () => void }) {
-  const { data } = useWorkspace();
+  const { data, activeProfessionalId } = useWorkspace();
   const { createTransaction, updateTransaction } = useWorkspaceActions();
-  const [draft, setDraft] = useState<Draft>(() => transaction ? toDraft(transaction) : blankDraft());
+  const [draft, setDraft] = useState<Draft>(() =>
+    transaction ? toDraft(transaction) : blankDraft(activeProfessionalId),
+  );
   const [amount, setAmount] = useState(() => transaction ? String(transaction.amountInCents / 100).replace(".", ",") : "");
   const [saving, setSaving] = useState(false);
   const patch = (changes: Partial<Draft>) => setDraft((current) => ({ ...current, ...changes }));

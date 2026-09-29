@@ -32,3 +32,29 @@ export function hasProfessionalScope(
     (professionalId != null && scope.professionalIds.includes(professionalId))
   );
 }
+
+export function hasAnyProfessionalScope(
+  scope: ProfessionalScope,
+  professionalIds: ID[],
+): boolean {
+  return (
+    professionalIds.length > 0 &&
+    (scope.organizationWide ||
+      professionalIds.some((professionalId) =>
+        scope.professionalIds.includes(professionalId),
+      ))
+  );
+}
+
+export function hasAllProfessionalScope(
+  scope: ProfessionalScope,
+  professionalIds: ID[],
+): boolean {
+  return (
+    professionalIds.length > 0 &&
+    (scope.organizationWide ||
+      professionalIds.every((professionalId) =>
+        scope.professionalIds.includes(professionalId),
+      ))
+  );
+}

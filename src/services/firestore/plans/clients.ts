@@ -2,9 +2,10 @@ import type { Client, ID } from "@/types";
 import { openRecurringChargeError } from "@/lib/finance/recurring";
 
 import {
+  assertAllProfessionalScope,
+  assertAnyProfessionalScope,
   assertConsentWrite,
   assertPermission,
-  assertProfessionalScope,
 } from "../../guards";
 import { RepositoryError, type ClientInput } from "../../types";
 import {
@@ -25,7 +26,8 @@ export function planCreateClient(
   input: ClientInput,
 ): Plan<ID> {
   assertPermission(ctx.actor, "client:create");
-  assertProfessionalScope(ctx.actor, input.assignedProfessionalId);
+  const assignedProfessionalIds = [...new Set(input.assignedProfessionalIds)];
+  assertAllProfessionalScope(ctx.actor, assignedProfessionalIds);
   const consent = assertConsentWrite(ctx.actor, null, input.notificationConsent);
   const id = ctx.newId("clients");
 
@@ -34,6 +36,7 @@ export function planCreateClient(
     organizationId: ctx.organizationId,
     ...stamp(ctx),
     ...input,
+    assignedProfessionalIds,
     // Campos derivados nascem zerados e sao recalculados na leitura do
     // snapshot; ver `snapshot.ts`.
     lastAppointmentAt: null,
@@ -51,15 +54,18 @@ export function planCreateClient(
         path: docPath(ctx, "clients", id),
         data: client as unknown as Record<string, unknown>,
       },
-      notificationWrite(ctx, {
-        type: "NEW_CLIENT",
-        priority: "NORMAL",
-        title: "Novo cadastro",
-        body: `${client.fullName} foi cadastrado.`,
-        professionalId: client.assignedProfessionalId,
-        target: { type: "client", id },
-        aiDecisionId: null,
-      }).write,
+      ...assignedProfessionalIds.map(
+        (professionalId) =>
+          notificationWrite(ctx, {
+            type: "NEW_CLIENT",
+            priority: "NORMAL",
+            title: "Novo cadastro",
+            body: `${client.fullName} foi cadastrado.`,
+            professionalId,
+            target: { type: "client", id },
+            aiDecisionId: null,
+          }).write,
+      ),
       auditWrite(ctx, {
         action: "CREATE",
         actorType: "USER",
@@ -78,9 +84,20 @@ export function planUpdateClient(
 ): Plan {
   assertPermission(ctx.actor, "client:update");
   const existing = requireClient(ctx, id);
-  assertProfessionalScope(ctx.actor, existing.assignedProfessionalId);
-  if (input.assignedProfessionalId !== undefined) {
-    assertProfessionalScope(ctx.actor, input.assignedProfessionalId);
+  assertAnyProfessionalScope(ctx.actor, existing.assignedProfessionalIds);
+  if (input.assignedProfessionalIds !== undefined) {
+    const next = [...new Set(input.assignedProfessionalIds)];
+    if (next.length === 0) {
+      throw new RepositoryError("Escolha ao menos um profissional responsável.");
+    }
+    const before = new Set(existing.assignedProfessionalIds);
+    const after = new Set(next);
+    const changed = [
+      ...existing.assignedProfessionalIds.filter((item) => !after.has(item)),
+      ...next.filter((item) => !before.has(item)),
+    ];
+    if (changed.length > 0) assertAllProfessionalScope(ctx.actor, changed);
+    input = { ...input, assignedProfessionalIds: next };
   }
   const consent = assertConsentWrite(ctx.actor, existing.notificationConsent, input.notificationConsent);
   const fullName = input.fullName ?? existing.fullName;
@@ -133,7 +150,9 @@ export function planUpdateClient(
 export function planDeleteClient(ctx: PlanContext, id: ID): Plan {
   assertPermission(ctx.actor, "client:delete");
   const existing = requireClient(ctx, id);
-  assertProfessionalScope(ctx.actor, existing.assignedProfessionalId);
+  // Um profissional não apaga um cadastro ainda compartilhado com alguém fora
+  // dos vínculos dele. OWNER/ADMIN continuam com escopo organizacional.
+  assertAllProfessionalScope(ctx.actor, existing.assignedProfessionalIds);
 
   // Excluir alguem com agenda futura apagaria compromissos silenciosamente.
   const future = ctx.snapshot.appointments.filter(

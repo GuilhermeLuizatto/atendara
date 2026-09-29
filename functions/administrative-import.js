@@ -11,6 +11,8 @@ import { fromStored, toStored } from "./firestore-dates.js";
 import { runAs } from "./service-accounts.js";
 import { consumeRateLimit } from "./rate-limit.js";
 import {
+  assertAllProfessionalScopes,
+  assertAnyProfessionalScope,
   assertProfessionalScope,
   tenantActor,
   tenantAudit,
@@ -29,7 +31,7 @@ const professional = z.object({
 const client = z.object({
   fullName: z.string().trim().min(2).max(120), preferredName: nullableText(80), email: z.email().trim().toLowerCase().nullable(),
   phone: nullableText(30), status: z.enum(["LEAD", "ACTIVE", "INACTIVE", "ON_HOLD", "DISCHARGED"]),
-  preferredModality: z.enum(["IN_PERSON", "ONLINE", "HOME_VISIT"]), assignedProfessionalId: id.nullable(),
+  preferredModality: z.enum(["IN_PERSON", "ONLINE", "HOME_VISIT"]), assignedProfessionalIds: z.array(id).min(1).max(50),
   acquisitionChannel: z.enum(["REFERRAL", "INSTAGRAM", "GOOGLE", "WHATSAPP", "WEBSITE", "OTHER"]),
   tags: z.array(z.string().trim().min(1).max(40)).max(30), administrativeNotes: nullableText(500),
 }).strict();
@@ -146,23 +148,28 @@ export const commitAdministrativeImport = onCall(OPTIONS, async (request) => {
     if (item.action === "CREATE" && snapshots[index].exists) throw new HttpsError("already-exists", `A linha ${index + 1} passou a duplicar um registro. Revise a prévia.`);
     if (item.action === "UPDATE" && !snapshots[index].exists) throw new HttpsError("failed-precondition", `O registro da linha ${index + 1} não existe mais. Revise a prévia.`);
   });
-  const professionalIdOf = (item, data) => {
+  const professionalIdsOf = (item, data) => {
     if (item.entityType === "PROFESSIONALS") return item.targetId;
-    if (item.entityType === "CLIENTS") return data.assignedProfessionalId ?? null;
+    if (item.entityType === "CLIENTS") return data.assignedProfessionalIds;
     return data.professionalId ?? null;
   };
   rows.forEach((item, index) => {
-    if (item.action === "UPDATE") {
-      assertProfessionalScope(
-        actor,
-        professionalIdOf(item, fromStored(
+    const previous = item.action === "UPDATE"
+      ? fromStored(
           { PROFESSIONALS: "professionals", CLIENTS: "clients", APPOINTMENTS: "appointments", TRANSACTIONS: "transactions" }[item.entityType],
           snapshots[index].id,
           snapshots[index].data(),
-        )),
-      );
+        )
+      : null;
+    if (item.entityType === "CLIENTS") {
+      if (previous) assertAnyProfessionalScope(actor, previous.assignedProfessionalIds);
+      assertAllProfessionalScopes(actor, item.data.assignedProfessionalIds);
+      return;
     }
-    assertProfessionalScope(actor, professionalIdOf(item, item.data));
+    if (item.action === "UPDATE") {
+      assertProfessionalScope(actor, professionalIdsOf(item, previous));
+    }
+    assertProfessionalScope(actor, professionalIdsOf(item, item.data));
   });
   const matches = await mapWithConcurrency(rows, 20, (item) => existingDuplicates(actor.organizationId, item));
   rows.forEach((item, index) => {
@@ -179,7 +186,11 @@ export const commitAdministrativeImport = onCall(OPTIONS, async (request) => {
   const existing = new Map(snapshots.filter((snapshot) => snapshot.exists).map((snapshot) => [snapshot.ref.path, snapshot.data()]));
   const referenced = [];
   for (const item of rows) {
-    if (item.entityType === "CLIENTS" && item.data.assignedProfessionalId) referenced.push(["PROFESSIONALS", item.data.assignedProfessionalId]);
+    if (item.entityType === "CLIENTS") {
+      for (const professionalId of item.data.assignedProfessionalIds) {
+        referenced.push(["PROFESSIONALS", professionalId]);
+      }
+    }
     if (item.entityType === "APPOINTMENTS") referenced.push(["CLIENTS", item.data.clientId], ["PROFESSIONALS", item.data.professionalId]);
     if (item.entityType === "TRANSACTIONS") {
       if (item.data.clientId) referenced.push(["CLIENTS", item.data.clientId]);

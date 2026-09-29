@@ -132,7 +132,7 @@ beforeAll(async () => {
   await adminDb().doc(paths.document(organizationId, "clients", "qualquer")).set({
     id: "qualquer",
     organizationId,
-    assignedProfessionalId: titularUid,
+    assignedProfessionalIds: [titularUid],
     fullName: "Cadastro da concessão",
     status: "ACTIVE",
   });

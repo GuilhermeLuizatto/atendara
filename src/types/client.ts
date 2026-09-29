@@ -34,8 +34,11 @@ export interface Client extends TenantScopedEntity {
   phone: string | null;
   status: ClientStatus;
   preferredModality: ServiceModality;
-  /** Profissional responsavel dentro da organizacao. */
-  assignedProfessionalId: ID | null;
+  /**
+   * Profissionais responsáveis dentro da organização. A lista explícita
+   * permite compartilhar o mesmo cadastro sem duplicar a pessoa.
+   */
+  assignedProfessionalIds: ID[];
   acquisitionChannel: AcquisitionChannel;
   tags: string[];
   lastAppointmentAt: ISODateString | null;

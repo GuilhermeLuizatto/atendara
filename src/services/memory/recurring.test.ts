@@ -12,14 +12,22 @@ import { MemoryWorkspaceRepository } from "./memory-repository";
 
 function repositoryAs(role: "OWNER" | "ASSISTANT" | "VIEWER") {
   const repo = new MemoryWorkspaceRepository("PSYCHOLOGIST");
-  repo.setActor({ userId: "u", name: "Teste", role });
+  repo.setActor({
+    userId: "u",
+    name: "Teste",
+    role,
+    linkedProfessionalIds: repo
+      .getSnapshot()
+      .professionals.map((professional) => professional.id),
+    organizationWideProfessionalScope: role === "OWNER",
+  });
   return repo;
 }
 
 function input(repo: MemoryWorkspaceRepository) {
   return {
     clientId: repo.getSnapshot().clients[0].id,
-    professionalId: null,
+    professionalId: repo.getSnapshot().clients[0].assignedProfessionalIds[0],
     description: "Acompanhamento mensal",
     amountInCents: 45000,
     method: "PIX" as const,

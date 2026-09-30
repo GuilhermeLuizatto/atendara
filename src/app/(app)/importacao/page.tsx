@@ -1,6 +1,6 @@
 "use client";
 
-import readXlsxFile from "read-excel-file";
+import { readSheet } from "read-excel-file/browser";
 import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,10 @@ const numericFields = new Set(["durationMinutes", "priceInCents", "amountInCents
 const dateFields = new Set(["startsAt", "dueDate"]);
 
 function normalize(value: string) { return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim(); }
+function rawCell(value: unknown): RawCell {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean" || value instanceof Date) return value;
+  throw new Error("A planilha contém um valor incompatível.");
+}
 function csvLine(line: string): string[] {
   const values: string[] = []; let current = ""; let quoted = false;
   for (let index = 0; index < line.length; index += 1) { const char = line[index]; if (char === '"') { if (quoted && line[index + 1] === '"') { current += '"'; index += 1; } else quoted = !quoted; } else if (char === "," && !quoted) { values.push(current); current = ""; } else current += char; }
@@ -104,7 +108,7 @@ export default function ImportPage() {
     if (file.size > 10 * 1024 * 1024) { setNotice("O arquivo deve ter até 10 MB."); return; }
     try {
       const extension = file.name.split(".").pop()?.toLowerCase();
-      const matrix = extension === "xlsx" ? (await readXlsxFile(file) as RawCell[][]) : extension === "csv" ? (await file.text()).split(/\r?\n/).filter(Boolean).map((line) => csvLine(line)) : null;
+      const matrix = extension === "xlsx" ? (await readSheet(file)).map((row) => row.map(rawCell)) : extension === "csv" ? (await file.text()).split(/\r?\n/).filter(Boolean).map((line) => csvLine(line)) : null;
       if (!matrix) throw new Error("Use um arquivo CSV ou XLSX.");
       const parsed = rowsFromMatrix(matrix);
       if (parsed.rows.length > 350) throw new Error("Cada confirmação aceita até 350 linhas.");

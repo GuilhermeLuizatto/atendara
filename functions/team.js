@@ -14,6 +14,7 @@ import { runAs } from "./service-accounts.js";
 import { consumeRateLimit, networkSubject } from "./rate-limit.js";
 import { escapeHtml, emailShell, sendEmail } from "./ses.js";
 import { tenantActor, tenantAudit } from "./tenant-auth.js";
+import { unresolvedScopeMembers } from "./scope-migration.js";
 
 const db = () => getFirestore();
 const SECRETS = ["SES_ACCESS_KEY_ID", "SES_SECRET_ACCESS_KEY"];
@@ -203,6 +204,31 @@ export const listPlatformTeamAdministration = onCall(OPTIONS, async (request) =>
   };
 });
 
+/**
+ * Piloto multiprofissional (sprint 5.5): enquanto houver membro ativo sem
+ * escopo resolvido, a organizacao nao recebe novos membros. Um vinculo vazio nao
+ * abre nada, mas conviver com ele esconde o problema; a migracao
+ * (`functions/migrate-scope.js`) resolve ou manda para revisao manual.
+ */
+async function assertScopeResolved(organizationId) {
+  const [members, professionals] = await Promise.all([
+    db().collection(paths.collection(organizationId, "members")).get(),
+    db().collection(paths.collection(organizationId, "professionals")).get(),
+  ]);
+  const pending = unresolvedScopeMembers(
+    members.docs.map((document) => ({ id: document.id, ...document.data() })),
+    professionals.docs
+      .filter((document) => document.data().active !== false)
+      .map((document) => document.id),
+  );
+  if (pending.length > 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "O piloto multiprofissional está bloqueado: há membro ativo sem escopo resolvido. Conclua a migração do sprint 5.5 antes de aprovar novos membros.",
+    );
+  }
+}
+
 export const decidePlatformTeamRequest = onCall(OPTIONS, async (request) => {
   const actor = await adminOf(request);
   await consumeRateLimit(actor.userId, "platformTeamWrite");
@@ -233,6 +259,7 @@ export const decidePlatformTeamRequest = onCall(OPTIONS, async (request) => {
   }
 
   await ensureEmailAvailable(record.email);
+  await assertScopeResolved(input.organizationId);
   const linkedProfessionalIds = await validateLinkedProfessionals(input.organizationId, record.linkedProfessionalIds ?? []);
   const token = randomBytes(32).toString("base64url");
   const invitation = invitationDraft(

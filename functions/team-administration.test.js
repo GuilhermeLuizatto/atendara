@@ -5,13 +5,14 @@ const mock = vi.hoisted(() => ({
   writes: [],
   transactions: 0,
   updateUser: vi.fn(),
+  getUserByEmail: vi.fn(),
   revokeRefreshTokens: vi.fn(),
   deleteUser: vi.fn(),
 }));
 
 vi.mock("firebase-admin/auth", () => ({
   getAuth: () => ({
-    getUserByEmail: vi.fn(),
+    getUserByEmail: mock.getUserByEmail,
     updateUser: mock.updateUser,
     revokeRefreshTokens: mock.revokeRefreshTokens,
     deleteUser: mock.deleteUser,
@@ -20,6 +21,14 @@ vi.mock("firebase-admin/auth", () => ({
 vi.mock("firebase-admin/firestore", () => ({
   Timestamp: { fromDate: (value) => value },
   getFirestore: () => ({
+    collection: (path) => ({
+      where: () => ({ get: async () => ({ docs: [] }) }),
+      get: async () => ({
+        docs: [...mock.documents.entries()]
+          .filter(([key]) => key.startsWith(`${path}/`) && !key.slice(path.length + 1).includes("/"))
+          .map(([key, value]) => ({ id: key.slice(path.length + 1), data: () => value })),
+      }),
+    }),
     doc: (path) => ({ path, get: async () => ({ exists: mock.documents.has(path), data: () => mock.documents.get(path) }) }),
     batch: () => ({
       create: (ref, data) => mock.writes.push({ origin: "batch", op: "create", path: ref.path, data }),
@@ -47,7 +56,7 @@ vi.mock("firebase-functions/v2/https", () => ({
 vi.mock("./rate-limit.js", () => ({ consumeRateLimit: vi.fn(), networkSubject: vi.fn() }));
 vi.mock("./ses.js", () => ({ escapeHtml: (value) => value, emailShell: ({ body }) => body, sendEmail: vi.fn() }));
 
-import { removePlatformTeamMember, setPlatformTeamMemberStatus } from "./team.js";
+import { decidePlatformTeamRequest, removePlatformTeamMember, setPlatformTeamMemberStatus } from "./team.js";
 import { paths } from "./generated/paths.js";
 
 const TOTP = { firebase: { sign_in_second_factor: "totp" } };
@@ -157,5 +166,58 @@ describe("administração de membros pela operadora", () => {
     await expect(removePlatformTeamMember(call({ organizationId: "org", memberId: "titular", reason }))).rejects.toMatchObject({ code: "failed-precondition" });
     expect(mock.deleteUser).not.toHaveBeenCalled();
     expect(mock.writes).toHaveLength(0);
+  });
+});
+
+describe("trava do piloto multiprofissional (sprint 5.5)", () => {
+  const requestPath = paths.document("org", "memberRequests", "pedido");
+  const approve = () => decidePlatformTeamRequest(call({ organizationId: "org", requestId: "pedido", decision: "APPROVED", reason }));
+
+  beforeEach(() => {
+    mock.getUserByEmail.mockRejectedValue({ code: "auth/user-not-found" });
+    mock.documents.set(paths.document("org", "professionals", "titular"), { id: "titular", userId: "titular", active: true });
+    mock.documents.set(requestPath, {
+      id: "pedido", organizationId: "org", status: "PENDING", role: "ASSISTANT", displayName: "Nova Pessoa",
+      email: "nova@example.com", requestedBy: "titular", linkedProfessionalIds: ["titular"],
+    });
+  });
+
+  it("recusa aprovar enquanto houver membro ativo sem escopo resolvido, sem gravar nada", async () => {
+    // `assistente` (beforeEach de cima) é ASSISTANT ativo sem linkedProfessionalIds.
+    await expect(approve()).rejects.toMatchObject({ code: "failed-precondition" });
+    expect(mock.writes).toHaveLength(0);
+  });
+
+  it("recusa também quando o vínculo aponta para um perfil que não existe", async () => {
+    mock.documents.set(paths.document("org", "members", "assistente"), {
+      id: "assistente", organizationId: "org", role: "ASSISTANT", status: "ACTIVE", linkedProfessionalIds: ["removido"],
+    });
+    await expect(approve()).rejects.toMatchObject({ code: "failed-precondition" });
+    expect(mock.writes).toHaveLength(0);
+  });
+
+  it("recusa quando o vínculo aponta somente para um perfil inativo", async () => {
+    mock.documents.set(paths.document("org", "professionals", "titular"), { id: "titular", userId: "titular", active: false });
+    mock.documents.set(paths.document("org", "members", "assistente"), {
+      id: "assistente", organizationId: "org", role: "ASSISTANT", status: "ACTIVE", linkedProfessionalIds: ["titular"],
+    });
+    await expect(approve()).rejects.toMatchObject({ code: "failed-precondition" });
+    expect(mock.writes).toHaveLength(0);
+  });
+
+  it("não trava a recusa de solicitação", async () => {
+    await decidePlatformTeamRequest(call({ organizationId: "org", requestId: "pedido", decision: "REJECTED", reason }));
+    expect(writesTo(requestPath)).toHaveLength(1);
+  });
+
+  it("libera a aprovação quando todos os membros ativos têm escopo válido", async () => {
+    mock.documents.set(paths.document("org", "members", "assistente"), {
+      id: "assistente", organizationId: "org", role: "ASSISTANT", status: "ACTIVE", linkedProfessionalIds: ["titular"],
+    });
+    await approve().catch((error) => {
+      // O envio do convite depende do SES (simulado); o que importa aqui é que a trava não barrou.
+      expect(error.code).not.toBe("failed-precondition");
+    });
+    expect(writesTo(requestPath).length).toBeGreaterThan(0);
   });
 });

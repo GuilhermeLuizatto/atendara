@@ -142,6 +142,9 @@ export const PLATFORM_AUDIT_ACTION_LABELS: Record<PlatformAuditAction, string> =
   TEAM_MEMBER_SUSPENDED: "Suspensão de membro",
   TEAM_MEMBER_REACTIVATED: "Reativação de membro",
   TEAM_MEMBER_REMOVED: "Remoção de membro",
+  SCOPE_MIGRATION_STARTED: "Migração de escopo por vínculo iniciada",
+  SCOPE_MIGRATION_COMPLETED: "Migração de escopo por vínculo concluída",
+  SCOPE_MIGRATION_FAILED: "Migração de escopo por vínculo falhou",
   ORGANIZATION_DELETED: "Exclusão de organização pelo titular",
 };
 

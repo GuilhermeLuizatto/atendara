@@ -896,6 +896,21 @@ fotografia. Perder a aba selecionada escolhe outro vínculo ativo imediatamente,
 ou fecha as áreas operacionais quando não resta nenhum. Não existe fallback que
 transforme dado antigo ou vínculo vazio em acesso geral.
 
+**Migração 5.5.** `functions/scope-migration.js` é o planejador puro (sem
+Firestore) e `functions/migrate-scope.js` o executor administrativo. Simulação é
+o padrão; `--apply` grava por organização, com `SCOPE_MIGRATION_STARTED` antes,
+releitura de conferência e `SCOPE_MIGRATION_COMPLETED` depois em
+`platformAuditLogs`. Nenhum campo de marcação é gravado nos documentos (as Rules
+conferem `hasOnly` na atualização); `aiDecisions` e `auditLogs` não são
+escritos (regra 6); papéis não mudam. Organização com mais de um profissional
+ativo só recebe o que tem evidência no dado ou decisão registrada, e permanece
+fechada enquanto houver pendência. A aprovação de novos membros
+(`decidePlatformTeamRequest`) recusa enquanto houver membro ativo sem escopo
+resolvido. Perfil inativo continua reconhecido como autoria histórica, mas não
+é vínculo elegível para membro, cliente ou decisão nova. Aplicar exige o UID de
+uma conta administrativa ativa, conferida contra a conta autenticada no
+Firebase CLI; esse UID é o `actorId` dos registros da migração.
+
 Cliente compartilhado continua sendo um único documento. A leitura exige
 interseção entre `assignedProfessionalIds` e o vínculo do membro. Criar exige
 que toda a lista esteja no alcance; ao editar, um membro pode mudar somente as

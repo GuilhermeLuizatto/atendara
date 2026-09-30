@@ -68,6 +68,11 @@ export const PLATFORM_AUDIT_ACTIONS = [
     "TEAM_MEMBER_SUSPENDED",
     "TEAM_MEMBER_REACTIVATED",
     "TEAM_MEMBER_REMOVED",
+    // Migracao 5.5 do escopo por vinculo: um registro ao iniciar e outro ao concluir
+    // (ou falhar), por organizacao, com contagens e nenhum dado pessoal.
+    "SCOPE_MIGRATION_STARTED",
+    "SCOPE_MIGRATION_COMPLETED",
+    "SCOPE_MIGRATION_FAILED",
     // Unico ato desta trilha que nao e da operadora: o titular encerra a propria
     // organizacao. Fica aqui porque o tenant deixa de existir para guardar o
     // registro, e porque encerrar organizacao e assunto do contrato com a

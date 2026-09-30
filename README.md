@@ -395,6 +395,38 @@ apareça explicitamente em mais de um contexto. Consultas, planos, importação 
 Security Rules usam a lista sem criar conta de acesso para o cliente. Os dados
 anteriores ao campo plural continuam fechados até a migração do sprint 5.5.
 
+Situação do sprint 5.5: ferramenta concluída no código e migração aplicada em
+produção em 30/09/2026; a conferência posterior terminou com todas as
+organizações limpas, sem escritas ou pendências restantes.
+`functions/migrate-scope.js` faz simulação por padrão e só grava com `--apply`.
+Ele preserva UID, e-mail, senha, organização,
+perfis e histórico (não toca em Authentication nem muda papéis) e só escreve
+`linkedProfessionalIds` (membros), `assignedProfessionalIds` (clientes) e
+`professionalId` (agenda, conversas, mensagens, financeiro, cobrador, recibos,
+revisões, avisos, entregas, tarefas e ocupado do calendário). Regras:
+
+- organização com **um** profissional ativo: tudo que não tem escopo passa a ser
+  dele; profissional sem vínculo é ligado ao próprio perfil ativo. Vínculo ou
+  decisão que aponte para perfil inativo continua fechado para revisão;
+- organização com **dois ou mais**: só se grava o que tem evidência no próprio
+  dado (agendamento, cliente já associado, conversa, lançamento). O restante vai
+  para o relatório como pendência manual e a organização **não é gravada**
+  enquanto houver pendência; as decisões entram em um arquivo (fora do Git):
+  `{ "<organizationId>": { "defaultProfessionalId": "...", "members": { "<uid>": ["<professionalId>"] }, "clients": { "<clientId>": ["<professionalId>"] } } }`;
+- `aiDecisions` e `auditLogs` (append-only) nunca são alterados: decisões antigas
+  sem escopo ficam visíveis só a OWNER/ADMIN;
+- cada organização gravada registra `SCOPE_MIGRATION_STARTED` com o UID real da
+  conta administrativa que executou o ato e, depois de reler e
+  conferir que o plano voltou vazio, `SCOPE_MIGRATION_COMPLETED` (ou `..._FAILED`)
+  em `platformAuditLogs`, com contagens e sem dado pessoal;
+- a aprovação de novos membros fica bloqueada (`failed-precondition`) enquanto
+  houver membro ativo sem escopo resolvido.
+
+Roteiro: `node functions/migrate-scope.js atendo-a3481` (relatório em `.local/`),
+revisar, preencher as decisões, repetir com `--decisions <arquivo>` e, só então,
+`--actor <uid-da-operadora> --apply` (`--org <id>` limita a uma organização). Em
+produção, o e-mail dessa conta precisa ser o mesmo usado pelo `firebase login`.
+
 Fica fora destes sprints: portal do cliente, assistente em várias organizações,
 permissões personalizadas por usuário, transferência de titularidade e visão
 consolidada de vários profissionais. Essas expansões só entram depois de o

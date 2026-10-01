@@ -277,13 +277,11 @@ testes de ponta a ponta.
 | **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco | ⏸️ Em espera; validação externa pendente |
 | **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | 🟨 Código integrado à `main` e Functions publicadas; validações reais pendentes |
 | **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | ✅ Gemini por allowlist em 6 organizações; acerto revisado e entrega nos indicadores |
-| **5** | Produto: equipes, importação administrativa, suporte, marca e preparação da cobrança | 🟨 Base concluída; escopo multiprofissional, administração de membros e migração pendentes |
-| **6** | Expansão: portfólio da Estética, marketplace e cobrador dos clientes | ⬜ |
+| **5** | Produto: equipes, importação administrativa, suporte, marca e preparação da cobrança | 🟨 Base, escopo multiprofissional, administração de membros e migração concluídos; validações reais pendentes |
+| **6** | Cobrador dos clientes: mensalidades, comprovantes e recibos, sem processar pagamento | 🟨 Código integrado à `main`; validações reais pendentes |
 
-As validações externas ou manuais que dependem do titular ficam no
-[checklist vivo em PDF](docs/VALIDACOES-REAIS-PENDENTES.pdf), acompanhado da
-[fonte editável](docs/VALIDACOES-REAIS-PENDENTES.md). A lista inclui a Fase 3B
-e deve ser atualizada a cada conclusão ou mudança de roteiro.
+As validações externas ou manuais que dependem do titular, inclusive as da
+Fase 3B, são acompanhadas fora do repositório.
 
 ### Próximas entregas
 
@@ -436,7 +434,7 @@ isolamento individual do piloto estar validado.
 
 Planos e billing da plataforma continuam em modo de testes. A IA externa
 (Gemini) está ativa em produção só para as organizações da allowlist
-explícita; equipes, marketplace e cobrança de clientes ainda não estão
+explícita; equipes e cobrança de clientes ainda não estão
 liberados. O sistema continua sem dados
 reais e sem afirmar conformidade com a LGPD.
 

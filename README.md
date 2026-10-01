@@ -277,13 +277,11 @@ testes de ponta a ponta.
 | **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco | ⏸️ Em espera; validação externa pendente |
 | **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | 🟨 Código integrado à `main` e Functions publicadas; validações reais pendentes |
 | **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | ✅ Gemini por allowlist em 6 organizações; acerto revisado e entrega nos indicadores |
-| **5** | Produto: equipes, importação administrativa, suporte, marca e preparação da cobrança | 🟨 Base concluída; escopo multiprofissional, administração de membros e migração pendentes |
-| **6** | Expansão: portfólio da Estética, marketplace e cobrador dos clientes | ⬜ |
+| **5** | Produto: equipes, importação administrativa, suporte, marca e preparação da cobrança | 🟨 Base, escopo multiprofissional, administração de membros e migração concluídos; validações reais pendentes |
+| **6** | Cobrador dos clientes: mensalidades, comprovantes e recibos, sem processar pagamento | 🟨 Código integrado à `main`; validações reais pendentes |
 
-As validações externas ou manuais que dependem do titular ficam no
-[checklist vivo em PDF](docs/VALIDACOES-REAIS-PENDENTES.pdf), acompanhado da
-[fonte editável](docs/VALIDACOES-REAIS-PENDENTES.md). A lista inclui a Fase 3B
-e deve ser atualizada a cada conclusão ou mudança de roteiro.
+As validações externas ou manuais que dependem do titular, inclusive as da
+Fase 3B, são acompanhadas fora do repositório.
 
 ### Próximas entregas
 
@@ -351,15 +349,17 @@ resultado.
    convites e avisos; a conversa de suporte permanece no painel. O vínculo com
    vários profissionais já limita consultas, escritas, callables e Security
    Rules; perder um vínculo retira os dados da sessão aberta imediatamente.
-   A frente de equipe ainda não está liberada para o piloto multiprofissional:
-   o contexto explícito por abas e os clientes compartilhados estão concluídos
-   no código (5.4), mas falta a migração auditável dos dados antigos (5.5). O catálogo e os preços
+   O contexto explícito por abas e os clientes compartilhados estão concluídos
+   no código (5.4), e a migração auditável dos dados antigos (5.5) foi
+   aplicada em produção em 30/09/2026, sem pendências. A frente de equipe só
+   fica liberada para o piloto multiprofissional depois da validação real com
+   contas de teste: administração de membros, abas por profissional e
+   isolamento entre vínculos. O catálogo e os preços
    dos planos continuam deliberadamente em espera, e a Stripe segue travada
    para uso real até a decisão comercial, jurídica, fiscal e o teste
-   explicitamente autorizado. O roteiro que depende do titular está no
-   [checklist vivo](docs/VALIDACOES-REAIS-PENDENTES.pdf).
+   explicitamente autorizado.
 
-### Sprints seguintes — acesso multiprofissional do piloto
+### Sprints do acesso multiprofissional do piloto
 
 Estes sprints fecham a diferença entre registrar um vínculo e usá-lo como
 fronteira real de autorização. A ordem é deliberada: nenhuma aba pode ser
@@ -372,7 +372,7 @@ mesmo escopo.
 | **5.2 — Administração de membros** | Fazer convite, suspensão, reativação e remoção por operações específicas da administração da Atendara, com segundo fator, motivo e auditoria. O profissional solicita a inclusão, mas não cria a conta diretamente. | O administrador não ganha leitura geral do tenant; cada ato administrativo é autorizado no backend, revoga sessões quando necessário e gera registro append-only. |
 | **5.3 — Escopo por vínculo (concluído no código)** | Aplicar `linkedProfessionalIds` nas consultas, escritas, callables e Security Rules de agenda, clientes, mensagens, financeiro, regras e alertas. Vínculo vazio nunca significa acesso a todos. | Um assistente ligado aos profissionais A e B não lê nem altera dados do profissional C, inclusive por chamada direta ao Firestore ou às Functions. Testes de emulador cobrem leitura, criação, alteração e remoção de vínculo. |
 | **5.4 — Contexto por abas e clientes (concluído no código)** | Criar um contexto global por profissional, com uma aba para cada vínculo ativo e sem opção silenciosa de combinar dados. O profissional ou assistente autorizado cadastra clientes diretamente; a administração da Atendara não participa do fluxo cotidiano. Um cliente da organização pode ser associado explicitamente a mais de um profissional sem duplicar o cadastro. | Agenda, clientes, mensagens, financeiro e Dara seguem a mesma aba ativa. Trocar ou perder vínculo troca ou fecha o contexto imediatamente. O cadastro do cliente não cria conta de acesso. |
-| **5.5 — Migração e liberação** | Preservar UID, e-mail, senha, organização, perfis e histórico; mapear papéis antigos, preencher vínculos explícitos e revisar manualmente organizações multiprofissionais ambíguas. | Migração repetível e auditável, sem concessão implícita de acesso. Contagens antes/depois conferidas, testes completos aprovados e piloto bloqueado enquanto houver membro ativo sem escopo resolvido. |
+| **5.5 — Migração e liberação (aplicada em produção)** | Preservar UID, e-mail, senha, organização, perfis e histórico; mapear papéis antigos, preencher vínculos explícitos e revisar manualmente organizações multiprofissionais ambíguas. | Migração repetível e auditável, sem concessão implícita de acesso. Contagens antes/depois conferidas, testes completos aprovados e piloto bloqueado enquanto houver membro ativo sem escopo resolvido. |
 
 Situação do sprint 5.2: concluído no código. Aprovação/recusa, convite,
 suspensão, reativação e remoção são exclusivos da administração da Atendara,
@@ -383,8 +383,8 @@ Situação do sprint 5.3: concluído no código. OWNER e ADMIN mantêm escopo da
 organização; PROFESSIONAL, ASSISTANT e VIEWER veem somente os ids explícitos no
 vínculo. Lista ausente ou vazia nega tudo. O mesmo campo desnormalizado limita
 consultas, planos de escrita, callables e Rules, e a suíte do emulador prova
-acesso A/B, negação C e retirada imediata de B. Dados antigos sem o campo de
-escopo permanecem fechados até a migração do sprint 5.5.
+acesso A/B, negação C e retirada imediata de B. Dado sem o campo de escopo
+continua fechado; a migração do sprint 5.5 preencheu os dados antigos.
 
 Situação do sprint 5.4: concluído no código. O painel oferece uma aba para cada
 profissional ativo alcançado pelo vínculo e não oferece visão combinada. Agenda,
@@ -393,7 +393,7 @@ se ela deixa de existir, a sessão escolhe outro vínculo ativo ou fecha as áre
 operacionais. `clients.assignedProfessionalIds` permite que o mesmo cadastro
 apareça explicitamente em mais de um contexto. Consultas, planos, importação e
 Security Rules usam a lista sem criar conta de acesso para o cliente. Os dados
-anteriores ao campo plural continuam fechados até a migração do sprint 5.5.
+anteriores ao campo plural foram preenchidos pela migração do sprint 5.5.
 
 Situação do sprint 5.5: ferramenta concluída no código e migração aplicada em
 produção em 30/09/2026; a conferência posterior terminou com todas as
@@ -434,7 +434,7 @@ isolamento individual do piloto estar validado.
 
 Planos e billing da plataforma continuam em modo de testes. A IA externa
 (Gemini) está ativa em produção só para as organizações da allowlist
-explícita; equipes, marketplace e cobrança de clientes ainda não estão
+explícita; equipes e cobrança de clientes ainda não estão
 liberados. O sistema continua sem dados
 reais e sem afirmar conformidade com a LGPD.
 

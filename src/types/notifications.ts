@@ -50,6 +50,7 @@ export type AgendaNoticeEvent = (typeof AGENDA_NOTICE_EVENTS)[number];
  * pessoa abriu.
  */
 export const CONVERSATION_REPLY_EVENTS = [
+  "ADMINISTRATIVE_REPLY",
   "RESCHEDULE_OFFERED",
   "RESCHEDULE_CONFIRMED",
   "RESCHEDULE_HANDED_OFF",
@@ -307,7 +308,8 @@ export interface NotificationDelivery extends TenantScopedEntity {
   event: AppointmentNotificationEvent;
   channel: OutboundChannel;
   ruleId: ID;
-  appointmentId: ID;
+  /** `null` na resposta administrativa, que nasce da conversa e não da agenda. */
+  appointmentId: ID | null;
   clientId: ID;
   professionalId: ID | null;
   /** Instante em que o envio deve ocorrer (evento menos antecedencia). */
@@ -375,6 +377,9 @@ export const NOTIFICATION_SKIP_REASONS = [
   "REPLY_WINDOW_CLOSED",
   // A resposta perdeu o sentido: oferta de horario cuja reserva ja venceu.
   "REPLY_EXPIRED",
+  "ASSISTANT_DISABLED",
+  "AUTONOMOUS_REPLIES_DISABLED",
+  "ASSISTANT_QUIET_HOURS",
 ] as const;
 
 export type NotificationSkipReason =
@@ -402,6 +407,9 @@ export const NOTIFICATION_DISPATCH_ONLY_STOP_REASONS = [
   // ou encerrada antes de a mensagem sair. Mostra-la agora seria oferecer o que
   // nao esta mais segurado.
   "OFFER_CLOSED",
+  "SOURCE_DECISION_NOT_FOUND",
+  "SOURCE_DECISION_NOT_ELIGIBLE",
+  "SOURCE_MESSAGE_CHANGED",
 ] as const;
 
 export type NotificationDispatchOnlyStopReason =

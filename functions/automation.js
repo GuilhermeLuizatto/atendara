@@ -47,7 +47,7 @@ import { whatsappConversationId } from "./generated/automation-inbound.js";
 import { bridgeProviderFrom } from "./n8n-bridge.js";
 import { runAs, SERVICE_ACCOUNTS } from "./service-accounts.js";
 import { withOrganizationDefaults } from "./generated/organization-config.js";
-import { paths } from "./generated/paths.js";
+import { messagePath, paths } from "./generated/paths.js";
 import { getProfession, isProfessionId } from "./generated/professions.js";
 
 /**
@@ -739,6 +739,8 @@ export async function runAutomationTask(data, deps = {}) {
       sender: null,
       conversation: null,
       offer: null,
+      sourceDecision: null,
+      sourceMessage: null,
     };
     // As duas chaves, lidas na MESMA transacao que adquire a tarefa: desligar
     // no meio do caminho para o envio que ja estava a caminho.
@@ -850,6 +852,28 @@ export async function runAutomationTask(data, deps = {}) {
             scope.doc("rescheduleRequests", conversationId),
           ),
         );
+        if (task.sourceMessageId) {
+          context.sourceMessage = stored(
+            "messages",
+            await transaction.get(
+              firestore.doc(
+                messagePath(
+                  payload.organizationId,
+                  conversationId,
+                  task.sourceMessageId,
+                ),
+              ),
+            ),
+          );
+        }
+        if (task.sourceDecisionId) {
+          context.sourceDecision = stored(
+            "aiDecisions",
+            await transaction.get(
+              scope.doc("aiDecisions", task.sourceDecisionId),
+            ),
+          );
+        }
       }
     }
 
@@ -877,6 +901,8 @@ export async function runAutomationTask(data, deps = {}) {
             ...common,
             conversation: context.conversation,
             offer: context.offer,
+            sourceDecision: context.sourceDecision,
+            sourceMessage: context.sourceMessage,
           })
         : decideDispatch(common);
 

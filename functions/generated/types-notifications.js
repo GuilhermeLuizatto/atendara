@@ -21,6 +21,7 @@ export const AGENDA_NOTICE_EVENTS = [
  * pessoa abriu.
  */
 export const CONVERSATION_REPLY_EVENTS = [
+    "ADMINISTRATIVE_REPLY",
     "RESCHEDULE_OFFERED",
     "RESCHEDULE_CONFIRMED",
     "RESCHEDULE_HANDED_OFF",
@@ -114,6 +115,9 @@ export const NOTIFICATION_SKIP_REASONS = [
     "REPLY_WINDOW_CLOSED",
     // A resposta perdeu o sentido: oferta de horario cuja reserva ja venceu.
     "REPLY_EXPIRED",
+    "ASSISTANT_DISABLED",
+    "AUTONOMOUS_REPLIES_DISABLED",
+    "ASSISTANT_QUIET_HOURS",
 ];
 /**
  * Por que um aviso ja planejado nao foi enviado. Alem das travas do
@@ -132,6 +136,9 @@ export const NOTIFICATION_DISPATCH_ONLY_STOP_REASONS = [
     // ou encerrada antes de a mensagem sair. Mostra-la agora seria oferecer o que
     // nao esta mais segurado.
     "OFFER_CLOSED",
+    "SOURCE_DECISION_NOT_FOUND",
+    "SOURCE_DECISION_NOT_ELIGIBLE",
+    "SOURCE_MESSAGE_CHANGED",
 ];
 // ------------------------------------------------ avisos da plataforma
 export const PLATFORM_NOTICE_EVENTS = [

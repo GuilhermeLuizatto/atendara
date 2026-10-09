@@ -32,6 +32,7 @@ import { contactFor, hasRawContact } from "./contacts";
 import { deliveryKey } from "./delivery";
 import { scheduledTimeFor } from "./schedule";
 import { renderReply, type ReplyContext } from "./replies";
+import { isWithinAssistantQuietHours } from "@/lib/automation/assistant-availability";
 import { whatsappMessageFor, type WhatsappMessage } from "./whatsapp";
 import { hashBody, renderTemplate, type TemplateContext } from "./templates";
 
@@ -256,6 +257,8 @@ export interface ConversationReplyInput {
   validUntil?: ISODateString | null;
   /** Horarios da oferta ou horario novo da confirmacao. */
   details?: Pick<ReplyContext, "slots" | "startsAt">;
+  /** Resposta produzida pelo motor para `ADMINISTRATIVE_REPLY`. */
+  responseText?: string | null;
 }
 
 export type ConversationReplyEligibility =
@@ -282,6 +285,18 @@ export function evaluateConversationReply(
   );
   if (!rule) return { eligible: false, reason: "NO_RULE_FOR_EVENT" };
   if (!input.client) return { eligible: false, reason: "CLIENT_NOT_IDENTIFIED" };
+
+  if (input.event === "ADMINISTRATIVE_REPLY") {
+    if (!input.organization.settings.ai.enabled) {
+      return { eligible: false, reason: "ASSISTANT_DISABLED" };
+    }
+    if (!input.organization.settings.ai.allowAutonomousReplies) {
+      return { eligible: false, reason: "AUTONOMOUS_REPLIES_DISABLED" };
+    }
+    if (isWithinAssistantQuietHours(input.organization, input.now)) {
+      return { eligible: false, reason: "ASSISTANT_QUIET_HOURS" };
+    }
+  }
 
   const problem = gateProblem(rule, input.event, {
     organization: input.organization,
@@ -321,6 +336,7 @@ export function evaluateConversationReply(
     clientName: input.client.preferredName ?? firstName(input.client.fullName),
     organizationName: input.organization.name,
     ...input.details,
+    responseText: input.responseText,
   });
   if (!rendered.ok) return { eligible: false, reason: "TEMPLATE_REJECTED" };
 

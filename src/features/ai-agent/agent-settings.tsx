@@ -106,6 +106,25 @@ export function AgentSettings({ initial }: { initial: AIAgentSettings }) {
               />
             )}
           </Field>
+          <Field
+            label="Esperar resposta humana por (minutos)"
+            hint="Dentro do expediente. Fora dele ou durante um atendimento, a Dara pode responder imediatamente."
+          >
+            {(props) => (
+              <Input
+                {...props}
+                type="number"
+                min={1}
+                max={120}
+                step={1}
+                required
+                value={settings.unansweredDelayMinutes}
+                onChange={(e) =>
+                  update({ unansweredDelayMinutes: Number(e.target.value) })
+                }
+              />
+            )}
+          </Field>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field
               label="Silêncio a partir de"

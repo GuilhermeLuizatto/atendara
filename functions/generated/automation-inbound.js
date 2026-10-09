@@ -46,6 +46,7 @@ export function parseInboundPayload(data) {
         if (!Array.isArray(changes))
             continue;
         for (const change of changes) {
+            const field = change?.field;
             const value = change?.value;
             const providerSenderId = value?.metadata?.phone_number_id;
             if (typeof providerSenderId !== "string" ||
@@ -61,15 +62,40 @@ export function parseInboundPayload(data) {
                     ? Number(raw.timestamp)
                     : NaN;
                 const instant = new Date(seconds * 1000);
-                if (!from ||
-                    !normalizeInboundPhone(from) ||
-                    !id ||
+                if (!id ||
                     !/^[\x21-\x7e]{1,256}$/.test(id) ||
                     !Number.isSafeInteger(seconds) ||
                     seconds <= 0 ||
                     !Number.isFinite(instant.getTime()))
                     continue;
                 const sentAt = instant.toISOString();
+                if (field === "smb_message_echoes") {
+                    const to = typeof raw.to === "string"
+                        ? raw.to
+                        : typeof raw.recipient_id === "string"
+                            ? raw.recipient_id
+                            : null;
+                    const text = raw.text?.body;
+                    if (!to ||
+                        !normalizeInboundPhone(to) ||
+                        typeof text !== "string" ||
+                        !text.trim())
+                        continue;
+                    events.push({
+                        kind: "HUMAN_ECHO",
+                        providerSenderId,
+                        to,
+                        providerMessageId: id,
+                        text: text.trim(),
+                        sentAt,
+                    });
+                    continue;
+                }
+                if (!from || !normalizeInboundPhone(from))
+                    continue;
+                // Eventos de sincronização da coexistência não são mensagens da pessoa.
+                if (field && field !== "messages")
+                    continue;
                 if (raw.type === "text") {
                     const text = raw.text?.body;
                     if (typeof text !== "string" || !text.trim())

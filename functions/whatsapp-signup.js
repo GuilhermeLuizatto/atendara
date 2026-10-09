@@ -29,9 +29,23 @@ const CONNECTION_ID = "WHATSAPP";
 const schema = z
   .object({
     code: z.string().trim().min(1).max(4096),
-    businessId: z.string().trim().min(1).max(128).nullable().optional().default(null),
+    businessId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(128)
+      .nullable()
+      .optional()
+      .default(null),
     wabaId: z.string().trim().min(1).max(128),
-    phoneNumberId: z.string().trim().min(1).max(128),
+    phoneNumberId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(128)
+      .nullable()
+      .optional()
+      .default(null),
   })
   .strict();
 
@@ -45,8 +59,13 @@ function auditEntry({ organizationId, actorId, now }) {
     actorName: "Usuário autenticado",
     action: "UPDATE",
     resource: { type: "whatsappConnection", id: CONNECTION_ID },
-    summary: "Conexão do WhatsApp Business validada pela Meta; o envio ainda aguarda ativação do remetente.",
-    metadata: { channel: "WHATSAPP", provider: "META_CLOUD_API", status: "VALIDATED" },
+    summary:
+      "Conexão do WhatsApp Business validada pela Meta; o envio ainda aguarda ativação do remetente.",
+    metadata: {
+      channel: "WHATSAPP",
+      provider: "META_CLOUD_API",
+      status: "VALIDATED",
+    },
     occurredAt: now,
     createdAt: now,
     createdBy: actorId,
@@ -58,21 +77,31 @@ function auditEntry({ organizationId, actorId, now }) {
 /** O telefone precisa ser o mesmo que veio no evento do Embedded Signup. */
 export function selectWhatsappPhone(phones, phoneNumberId) {
   if (!Array.isArray(phones)) return null;
-  return (
-    phones.find(
-      (phone) =>
-        phone &&
-        String(phone.id) === phoneNumberId &&
-        typeof phone.display_phone_number === "string" &&
-        phone.display_phone_number.trim() &&
-        typeof phone.verified_name === "string" &&
-        phone.verified_name.trim(),
-    ) ?? null
+  const eligible = phones.filter(
+    (phone) =>
+      phone &&
+      typeof phone.display_phone_number === "string" &&
+      phone.display_phone_number.trim() &&
+      typeof phone.verified_name === "string" &&
+      phone.verified_name.trim(),
   );
+  if (phoneNumberId) {
+    return eligible.find((phone) => String(phone.id) === phoneNumberId) ?? null;
+  }
+  // O evento de conclusão da coexistência pode trazer só a WABA. Nesse caso
+  // só aceitamos a inferência quando ela é inequívoca.
+  return eligible.length === 1 ? eligible[0] : null;
 }
 
 /** Documento persistido: nenhum token ou payload bruto da Meta entra aqui. */
-export function connectionDocument({ organizationId, input, phone, actorId, now, createdAt }) {
+export function connectionDocument({
+  organizationId,
+  input,
+  phone,
+  actorId,
+  now,
+  createdAt,
+}) {
   return {
     id: CONNECTION_ID,
     organizationId,
@@ -80,7 +109,8 @@ export function connectionDocument({ organizationId, input, phone, actorId, now,
     provider: "META_CLOUD_API",
     businessId: input.businessId,
     wabaId: input.wabaId,
-    phoneNumberId: input.phoneNumberId,
+    phoneNumberId: String(phone.id),
+    connectionMode: "COEXISTENCE",
     displayNumber: phone.display_phone_number.trim(),
     displayName: phone.verified_name.trim(),
     status: "VALIDATED",
@@ -97,12 +127,15 @@ export function connectionDocument({ organizationId, input, phone, actorId, now,
 async function membershipOf(request) {
   const account = await accountOf(request);
   const organizationId = account.organizationId;
-  if (!organizationId) throw new HttpsError("failed-precondition", "Cadastro sem organização.");
+  if (!organizationId)
+    throw new HttpsError("failed-precondition", "Cadastro sem organização.");
 
   const firestore = db();
   const [organizationSnapshot, memberSnapshot] = await Promise.all([
     firestore.doc(paths.organization(organizationId)).get(),
-    firestore.doc(paths.document(organizationId, "members", request.auth.uid)).get(),
+    firestore
+      .doc(paths.document(organizationId, "members", request.auth.uid))
+      .get(),
   ]);
   const organization = organizationSnapshot.data();
   const member = memberSnapshot.data();
@@ -110,82 +143,115 @@ async function membershipOf(request) {
     throw new HttpsError("permission-denied", "Vínculo não está ativo.");
   }
 
-  const permissions = permissionsForMembership(member.role, organization.ownerId === request.auth.uid);
+  const permissions = permissionsForMembership(
+    member.role,
+    organization.ownerId === request.auth.uid,
+  );
   if (!permissions?.includes("notificationSettings:update")) {
-    throw new HttpsError("permission-denied", "Seu papel não permite conectar o WhatsApp.");
+    throw new HttpsError(
+      "permission-denied",
+      "Seu papel não permite conectar o WhatsApp.",
+    );
   }
   return { organizationId };
 }
 
-export const completeWhatsappEmbeddedSignup = onCall(CALL_OPTIONS, async (request) => {
-  const { organizationId } = await membershipOf(request);
-  await consumeRateLimit(request.auth.uid, "whatsappSignup");
-  const input = parse(schema, request.data);
+export const completeWhatsappEmbeddedSignup = onCall(
+  CALL_OPTIONS,
+  async (request) => {
+    const { organizationId } = await membershipOf(request);
+    await consumeRateLimit(request.auth.uid, "whatsappSignup");
+    const input = parse(schema, request.data);
 
-  const appId = process.env.META_APP_ID ?? process.env.NEXT_PUBLIC_META_APP_ID;
-  const appSecret = process.env.META_APP_SECRET;
-  if (!appId || !appSecret) {
-    throw new HttpsError("failed-precondition", "A conexão com a Meta ainda não está configurada no servidor.");
-  }
+    const appId =
+      process.env.META_APP_ID ?? process.env.NEXT_PUBLIC_META_APP_ID;
+    const appSecret = process.env.META_APP_SECRET;
+    if (!appId || !appSecret) {
+      throw new HttpsError(
+        "failed-precondition",
+        "A conexão com a Meta ainda não está configurada no servidor.",
+      );
+    }
 
-  const graphVersion = process.env.META_GRAPH_VERSION ?? "v25.0";
-  let phone;
-  try {
-    const exchanged = await exchangeEmbeddedSignupCode({
-      code: input.code,
-      appId,
-      appSecret,
-      graphVersion,
+    const graphVersion = process.env.META_GRAPH_VERSION ?? "v25.0";
+    let phone;
+    try {
+      const exchanged = await exchangeEmbeddedSignupCode({
+        code: input.code,
+        appId,
+        appSecret,
+        graphVersion,
+      });
+      const businessAccount = await fetchWhatsappBusinessAccount({
+        wabaId: input.wabaId,
+        accessToken: exchanged.accessToken,
+        graphVersion,
+      });
+      if (String(businessAccount?.id) !== input.wabaId)
+        throw new Error("WABA divergente");
+
+      const phones = await fetchWhatsappPhoneNumbers({
+        wabaId: input.wabaId,
+        accessToken: exchanged.accessToken,
+        graphVersion,
+      });
+      phone = selectWhatsappPhone(phones, input.phoneNumberId);
+      if (!phone) throw new Error("Número não encontrado");
+
+      await subscribeWhatsappBusinessAccount({
+        wabaId: input.wabaId,
+        accessToken: exchanged.accessToken,
+        graphVersion,
+      });
+    } catch (error) {
+      logger.warn("whatsapp.signup.validation_failed", {
+        organizationId,
+        stage: error?.message === "WABA divergente" ? "waba" : "graph",
+      });
+      throw new HttpsError(
+        "failed-precondition",
+        "A Meta não confirmou a conta ou o número informado.",
+      );
+    }
+
+    const now = new Date().toISOString();
+    const firestore = db();
+    await firestore.runTransaction(async (transaction) => {
+      const connectionRef = firestore.doc(
+        paths.document(organizationId, "whatsappConnections", CONNECTION_ID),
+      );
+      const existing = (await transaction.get(connectionRef)).data() ?? null;
+      const audit = auditEntry({
+        organizationId,
+        actorId: request.auth.uid,
+        now,
+      });
+      transaction.set(
+        connectionRef,
+        toStored(
+          "whatsappConnections",
+          connectionDocument({
+            organizationId,
+            input,
+            phone,
+            actorId: request.auth.uid,
+            now,
+            createdAt: existing?.createdAt,
+          }),
+        ),
+      );
+      transaction.create(
+        firestore.doc(paths.document(organizationId, "auditLogs", audit.id)),
+        toStored("auditLogs", audit),
+      );
     });
-    const businessAccount = await fetchWhatsappBusinessAccount({
+
+    return {
+      status: "VALIDATED",
+      displayNumber: phone.display_phone_number.trim(),
+      displayName: phone.verified_name.trim(),
       wabaId: input.wabaId,
-      accessToken: exchanged.accessToken,
-      graphVersion,
-    });
-    if (String(businessAccount?.id) !== input.wabaId) throw new Error("WABA divergente");
-
-    const phones = await fetchWhatsappPhoneNumbers({
-      wabaId: input.wabaId,
-      accessToken: exchanged.accessToken,
-      graphVersion,
-    });
-    phone = selectWhatsappPhone(phones, input.phoneNumberId);
-    if (!phone) throw new Error("Número não encontrado");
-
-    await subscribeWhatsappBusinessAccount({
-      wabaId: input.wabaId,
-      accessToken: exchanged.accessToken,
-      graphVersion,
-    });
-  } catch (error) {
-    logger.warn("whatsapp.signup.validation_failed", {
-      organizationId,
-      stage: error?.message === "WABA divergente" ? "waba" : "graph",
-    });
-    throw new HttpsError("failed-precondition", "A Meta não confirmou a conta ou o número informado.");
-  }
-
-  const now = new Date().toISOString();
-  const firestore = db();
-  await firestore.runTransaction(async (transaction) => {
-    const connectionRef = firestore.doc(paths.document(organizationId, "whatsappConnections", CONNECTION_ID));
-    const existing = (await transaction.get(connectionRef)).data() ?? null;
-    const audit = auditEntry({ organizationId, actorId: request.auth.uid, now });
-    transaction.set(
-      connectionRef,
-      toStored(
-        "whatsappConnections",
-        connectionDocument({ organizationId, input, phone, actorId: request.auth.uid, now, createdAt: existing?.createdAt }),
-      ),
-    );
-    transaction.create(firestore.doc(paths.document(organizationId, "auditLogs", audit.id)), toStored("auditLogs", audit));
-  });
-
-  return {
-    status: "VALIDATED",
-    displayNumber: phone.display_phone_number.trim(),
-    displayName: phone.verified_name.trim(),
-    wabaId: input.wabaId,
-    phoneNumberId: input.phoneNumberId,
-  };
-});
+      phoneNumberId: String(phone.id),
+    };
+  },
+);

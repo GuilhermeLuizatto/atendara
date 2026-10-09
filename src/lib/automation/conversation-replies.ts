@@ -41,10 +41,16 @@ export function planConversationReply(
   input: ConversationReplyInput & {
     inboundMessageId: ID;
     appointment: Pick<Appointment, "id" | "startsAt" | "professionalId"> | null;
+    professionalId?: ID | null;
+    scheduledFor?: ISODateString;
+    sourceDecisionId?: ID | null;
   },
 ): ConversationReplyPlan {
-  if (!input.appointment || !input.client) {
-    return { kind: "SKIPPED", reason: input.client ? "NO_APPOINTMENT" : "CLIENT_NOT_IDENTIFIED" };
+  if (!input.client) {
+    return { kind: "SKIPPED", reason: "CLIENT_NOT_IDENTIFIED" };
+  }
+  if (input.event !== "ADMINISTRATIVE_REPLY" && !input.appointment) {
+    return { kind: "SKIPPED", reason: "NO_APPOINTMENT" };
   }
 
   const decision = evaluateConversationReply(input);
@@ -58,8 +64,10 @@ export function planConversationReply(
 
   const id = conversationReplyId(input.inboundMessageId);
   const at = input.now;
-  const expiresAt = replyExpiresAt(input);
+  const scheduledFor = input.scheduledFor ?? at;
+  const expiresAt = replyExpiresAt(input, scheduledFor);
   const { appointment, client } = input;
+  const professionalId = appointment?.professionalId ?? input.professionalId ?? null;
 
   const delivery: NotificationDelivery = {
     id,
@@ -72,10 +80,10 @@ export function planConversationReply(
     event: input.event,
     channel: input.channel,
     ruleId: rule.id,
-    appointmentId: appointment.id,
+    appointmentId: appointment?.id ?? null,
     clientId: client.id,
-    professionalId: appointment.professionalId,
-    scheduledFor: at,
+    professionalId,
+    scheduledFor,
     status: "PLANNED",
     attempts: 0,
     lastAttemptAt: null,
@@ -104,15 +112,17 @@ export function planConversationReply(
     status: "PLANNED",
     attempt: 1,
     maxAttempts: RETRY_POLICY.maxAttempts,
-    scheduledFor: at,
+    scheduledFor,
     expiresAt,
     idempotencyKey: id,
-    appointmentId: appointment.id,
-    appointmentStartsAt: appointment.startsAt,
+    appointmentId: appointment?.id ?? null,
+    appointmentStartsAt: appointment?.startsAt ?? null,
     clientId: client.id,
-    professionalId: appointment.professionalId,
+    professionalId,
     deliveryId: id,
     sourceTaskId: null,
+    sourceMessageId: input.inboundMessageId,
+    sourceDecisionId: input.sourceDecisionId ?? null,
     event: input.event,
     channel: input.channel,
     failureCode: null,
@@ -131,8 +141,13 @@ export function planConversationReply(
  * A resposta vale pelo menor dos prazos: o dela (reserva da oferta, ou a
  * validade curta das demais) e a janela de 24 horas que a pessoa abriu.
  */
-function replyExpiresAt(input: ConversationReplyInput): ISODateString {
-  const own = input.validUntil ?? addMinutes(input.now, CONVERSATION_REPLY_VALIDITY_MINUTES);
+function replyExpiresAt(
+  input: ConversationReplyInput,
+  scheduledFor: ISODateString,
+): ISODateString {
+  const own =
+    input.validUntil ??
+    addMinutes(scheduledFor, CONVERSATION_REPLY_VALIDITY_MINUTES);
   const window = input.conversation.inboundWindowEndsAt;
   const limits = [Date.parse(own), ...(window ? [Date.parse(window)] : [])];
   return new Date(Math.min(...limits)).toISOString();

@@ -62,6 +62,12 @@ export interface AIAgentSettings {
   autoResponseConfidenceThreshold: number;
   /** Se falso, o agente sempre sugere e nunca envia sozinho. */
   allowAutonomousReplies: boolean;
+  /**
+   * Dentro do expediente, quanto a Dara espera por uma resposta humana antes
+   * de assumir uma pergunta administrativa. Fora do expediente ou durante um
+   * atendimento em andamento, a resposta pode ser imediata.
+   */
+  unansweredDelayMinutes: number;
   /** Janela de silencio: fora dela o agente apenas registra e nao responde. */
   quietHoursStart: string | null;
   quietHoursEnd: string | null;

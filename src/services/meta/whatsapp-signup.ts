@@ -8,7 +8,7 @@ export interface CompleteWhatsappEmbeddedSignupInput {
   code: string;
   businessId: string | null;
   wabaId: string;
-  phoneNumberId: string;
+  phoneNumberId: string | null;
 }
 
 export interface CompleteWhatsappEmbeddedSignupOutput {
@@ -24,12 +24,14 @@ export async function completeWhatsappEmbeddedSignup(
   input: CompleteWhatsappEmbeddedSignupInput,
 ): Promise<CompleteWhatsappEmbeddedSignupOutput> {
   if (isDemoMode) {
-    throw new AuthError("A demonstração local não conecta uma conta real da Meta.");
+    throw new AuthError(
+      "A demonstração local não conecta uma conta real da Meta.",
+    );
   }
 
-  const callable = httpsCallable<CompleteWhatsappEmbeddedSignupInput, CompleteWhatsappEmbeddedSignupOutput>(
-    getFirebaseFunctions(),
-    "completeWhatsappEmbeddedSignup",
-  );
+  const callable = httpsCallable<
+    CompleteWhatsappEmbeddedSignupInput,
+    CompleteWhatsappEmbeddedSignupOutput
+  >(getFirebaseFunctions(), "completeWhatsappEmbeddedSignup");
   return (await callable(input)).data;
 }

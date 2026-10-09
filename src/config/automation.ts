@@ -51,6 +51,7 @@ export const NOTICE_TASK_TYPES: Record<AppointmentNotificationEvent, AutomationT
   APPOINTMENT_REMINDER: "SEND_REMINDER",
   APPOINTMENT_CONFIRMED: "CONFIRM_APPOINTMENT",
   APPOINTMENT_CANCELLED: null,
+  ADMINISTRATIVE_REPLY: "SEND_CONVERSATION_REPLY",
   // Respostas da assistente na conversa (docs/planos/DARA-RESPOSTA-REMARCACAO-2026-09-24.md).
   // Planejadas pelo webhook, nunca por mudanca da agenda; o despachante as
   // confere e envia por `decideReplyDispatch`.
@@ -181,6 +182,9 @@ export const CALENDAR_SYNC_VALIDITY_MINUTES = 1_440;
  * de 24 horas que a pessoa abriu.
  */
 export const CONVERSATION_REPLY_VALIDITY_MINUTES = 30;
+
+/** Limites do tempo configurável de espera pela resposta humana. */
+export const ASSISTANT_REPLY_DELAY_MINUTES = { min: 1, max: 120 } as const;
 
 export const AUTOMATION_STATUS_LABELS: Record<AutomationTaskStatus, string> = {
   PLANNED: "Planejada",

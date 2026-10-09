@@ -7,8 +7,16 @@ describe("Embedded Signup do WhatsApp", () => {
     expect(
       selectWhatsappPhone(
         [
-          { id: "outro", display_phone_number: "+1 555", verified_name: "Outro" },
-          { id: "phone-1", display_phone_number: "+55 13 99999-0000", verified_name: "Atendara" },
+          {
+            id: "outro",
+            display_phone_number: "+1 555",
+            verified_name: "Outro",
+          },
+          {
+            id: "phone-1",
+            display_phone_number: "+55 13 99999-0000",
+            verified_name: "Atendara",
+          },
         ],
         "phone-1",
       ),
@@ -18,20 +26,48 @@ describe("Embedded Signup do WhatsApp", () => {
   it("recusa número sem telefone exibível ou nome verificado", () => {
     expect(selectWhatsappPhone([{ id: "phone-1" }], "phone-1")).toBeNull();
     expect(
-      selectWhatsappPhone([{ id: "phone-1", display_phone_number: "+55 13 99999-0000" }], "phone-1"),
+      selectWhatsappPhone(
+        [{ id: "phone-1", display_phone_number: "+55 13 99999-0000" }],
+        "phone-1",
+      ),
+    ).toBeNull();
+  });
+
+  it("aceita a WABA da coexistência sem phone id somente quando há um único número", () => {
+    const unico = {
+      id: "phone-1",
+      display_phone_number: "+55 13 99999-0000",
+      verified_name: "Atendara",
+    };
+    expect(selectWhatsappPhone([unico], null)).toEqual(unico);
+    expect(
+      selectWhatsappPhone([unico, { ...unico, id: "phone-2" }], null),
     ).toBeNull();
   });
 
   it("não persiste token nem o payload bruto da Meta", () => {
     const document = connectionDocument({
       organizationId: "org-1",
-      input: { businessId: "business-1", wabaId: "waba-1", phoneNumberId: "phone-1" },
-      phone: { display_phone_number: "+55 13 99999-0000", verified_name: "Atendara" },
+      input: {
+        businessId: "business-1",
+        wabaId: "waba-1",
+        phoneNumberId: "phone-1",
+      },
+      phone: {
+        id: "phone-1",
+        display_phone_number: "+55 13 99999-0000",
+        verified_name: "Atendara",
+      },
       actorId: "user-1",
       now: "2026-09-22T12:00:00.000Z",
     });
 
-    expect(document).toMatchObject({ status: "VALIDATED", wabaId: "waba-1", phoneNumberId: "phone-1" });
+    expect(document).toMatchObject({
+      status: "VALIDATED",
+      connectionMode: "COEXISTENCE",
+      wabaId: "waba-1",
+      phoneNumberId: "phone-1",
+    });
     expect(document).not.toHaveProperty("accessToken");
     expect(document).not.toHaveProperty("payload");
   });

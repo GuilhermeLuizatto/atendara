@@ -24,6 +24,7 @@ import { DecisionDetails } from "./decision-details";
 import { DecisionReview } from "./decision-review";
 import { AgentSettings } from "./agent-settings";
 import { AnalyticsPanel } from "./analytics-panel";
+import { BusinessChat } from "./business-chat";
 
 export function AgentView() {
   const { data } = useWorkspace();
@@ -47,7 +48,9 @@ function AgentSkeleton() {
 function AgentWorkspace() {
   const { data, session, repository } = useWorkspace();
   const actions = useWorkspaceActions();
-  const [tab, setTab] = useState<"rules" | "simulator" | "audit" | "settings" | "analytics">("rules");
+  const [tab, setTab] = useState<
+    "chat" | "rules" | "simulator" | "audit" | "settings" | "analytics"
+  >("chat");
   const [editing, setEditing] = useState<AIRule | "new" | null>(null);
   const [deleting, setDeleting] = useState<AIRule | null>(null);
   if (!data) return <AgentSkeleton />;
@@ -83,6 +86,7 @@ function AgentWorkspace() {
           value={tab}
           onChange={setTab}
           options={[
+            { value: "chat", label: "Chat" },
             { value: "settings", label: "Autorizações" },
             { value: "analytics", label: "Indicadores" },
             { value: "rules", label: "Regras", count: data.rules.length },
@@ -102,134 +106,141 @@ function AgentWorkspace() {
         )}
       </div>
       <TabPanel idBase="agente" value={tab} className="space-y-5">
-      {tab === "settings" && <AgentSettings key={JSON.stringify(data.organization.settings.ai)} initial={data.organization.settings.ai} />}
-      {tab === "analytics" && <AnalyticsPanel />}
-      {tab === "rules" &&
-        groups.map((group) => (
-          <section key={group.title} className="space-y-3">
-            <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-              {group.title}
-            </h2>
-            {sortByPrecedence(group.rules).map((rule) => (
-              <Card
-                key={rule.id}
-                className="flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-center"
-              >
-                <div className="min-w-0 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-semibold">{rule.name}</h3>
-                    <Badge tone={rule.enabled ? "success" : "neutral"}>
-                      {rule.enabled ? "Ativa" : "Desativada"}
-                    </Badge>
+        {tab === "chat" && <BusinessChat />}
+        {tab === "settings" && (
+          <AgentSettings
+            key={JSON.stringify(data.organization.settings.ai)}
+            initial={data.organization.settings.ai}
+          />
+        )}
+        {tab === "analytics" && <AnalyticsPanel />}
+        {tab === "rules" &&
+          groups.map((group) => (
+            <section key={group.title} className="space-y-3">
+              <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+                {group.title}
+              </h2>
+              {sortByPrecedence(group.rules).map((rule) => (
+                <Card
+                  key={rule.id}
+                  className="flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-center"
+                >
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-semibold">{rule.name}</h3>
+                      <Badge tone={rule.enabled ? "success" : "neutral"}>
+                        {rule.enabled ? "Ativa" : "Desativada"}
+                      </Badge>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      {rule.description}
+                    </p>
+                    <p className="text-subtle-foreground text-xs">
+                      {RULE_LEVEL_LABELS[rule.level]} · v{rule.version} ·
+                      prioridade {rule.priority}
+                    </p>
                   </div>
-                  <p className="text-muted-foreground text-sm">
-                    {rule.description}
-                  </p>
-                  <p className="text-subtle-foreground text-xs">
-                    {RULE_LEVEL_LABELS[rule.level]} · v{rule.version} ·
-                    prioridade {rule.priority}
-                  </p>
-                </div>
-                {rule.immutable ? (
-                  <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs">
-                    <LockKeyhole className="size-3" aria-hidden />
-                    Protegida
-                  </span>
-                ) : (
-                  <div className="flex shrink-0 flex-wrap gap-1">
-                    {session?.permissions.includes("rule:update") && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            actions.setRuleEnabled(rule.id, !rule.enabled)
-                          }
-                        >
-                          {rule.enabled ? "Desativar" : "Ativar"}
-                        </Button>
+                  {rule.immutable ? (
+                    <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs">
+                      <LockKeyhole className="size-3" aria-hidden />
+                      Protegida
+                    </span>
+                  ) : (
+                    <div className="flex shrink-0 flex-wrap gap-1">
+                      {session?.permissions.includes("rule:update") && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              actions.setRuleEnabled(rule.id, !rule.enabled)
+                            }
+                          >
+                            {rule.enabled ? "Desativar" : "Ativar"}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditing(rule)}
+                          >
+                            Editar
+                          </Button>
+                        </>
+                      )}
+                      {session?.permissions.includes("rule:delete") && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setEditing(rule)}
+                          onClick={() => setDeleting(rule)}
                         >
-                          Editar
+                          Excluir
                         </Button>
-                      </>
-                    )}
-                    {session?.permissions.includes("rule:delete") && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeleting(rule)}
-                      >
-                        Excluir
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </Card>
-            ))}
-            {!group.rules.length && (
-              <p className="text-muted-foreground text-sm">
-                Nenhuma regra neste nível.
-              </p>
-            )}
-          </section>
-        ))}
-      {tab === "simulator" && <Simulator />}
-      {tab === "audit" && data.decisions.length === 0 && (
-        <Card>
-          <EmptyState
-            icon={<ScrollText className="size-5" aria-hidden />}
-            title="Nenhuma decisão registrada"
-            description={
-              repository?.mode === "memory"
-                ? "As decisões das conversas de demonstração aparecem aqui. A prévia em Testar não grava registros."
-                : "Cada mensagem avaliada pelo agente deixa uma decisão aqui. Sem canal de mensagens integrado, a lista fica vazia até lá."
-            }
-          />
-        </Card>
-      )}
-      {tab === "audit" && data.decisions.length > 0 && (
-        <div className="space-y-3">
-          {data.decisions.map((decision) => (
-            <Card key={decision.id} className="p-4">
-              <details>
-                <summary className="cursor-pointer text-sm">
-                  <span className="font-medium">
-                    {decision.inputPreview || "Trecho da mensagem não guardado nesta profissão"}
-                  </span>
-                  <span className="text-muted-foreground mt-1 block text-xs">
-                    {formatDateTime(decision.decidedAt)} ·{" "}
-                    {data.clients.find(
-                      (client) => client.id === decision.clientId,
-                    )?.fullName ?? "Contato"}
-                  </span>
-                </summary>
-                <div className="mt-4">
-                  <DecisionDetails decision={decision} />
-                  <div className="mt-4">
-                    <DecisionReview decision={decision} />
-                  </div>
-                  <p className="text-muted-foreground mt-2 text-xs">
-                    Organização: {decision.organizationId} · Decisão:{" "}
-                    {decision.id}
-                  </p>
-                </div>
-              </details>
-            </Card>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              ))}
+              {!group.rules.length && (
+                <p className="text-muted-foreground text-sm">
+                  Nenhuma regra neste nível.
+                </p>
+              )}
+            </section>
           ))}
+        {tab === "simulator" && <Simulator />}
+        {tab === "audit" && data.decisions.length === 0 && (
           <Card>
-            <LoadMore
-              page={data.pagination?.decisions}
-              summary={`Mostrando as ${data.decisions.length} decisões mais recentes.`}
-              label="Carregar decisões anteriores"
-              onLoadMore={() => void actions.loadMore("decisions")}
+            <EmptyState
+              icon={<ScrollText className="size-5" aria-hidden />}
+              title="Nenhuma decisão registrada"
+              description={
+                repository?.mode === "memory"
+                  ? "As decisões das conversas de demonstração aparecem aqui. A prévia em Testar não grava registros."
+                  : "Cada mensagem avaliada pelo agente deixa uma decisão aqui. Sem canal de mensagens integrado, a lista fica vazia até lá."
+              }
             />
           </Card>
-        </div>
-      )}
+        )}
+        {tab === "audit" && data.decisions.length > 0 && (
+          <div className="space-y-3">
+            {data.decisions.map((decision) => (
+              <Card key={decision.id} className="p-4">
+                <details>
+                  <summary className="cursor-pointer text-sm">
+                    <span className="font-medium">
+                      {decision.inputPreview ||
+                        "Trecho da mensagem não guardado nesta profissão"}
+                    </span>
+                    <span className="text-muted-foreground mt-1 block text-xs">
+                      {formatDateTime(decision.decidedAt)} ·{" "}
+                      {data.clients.find(
+                        (client) => client.id === decision.clientId,
+                      )?.fullName ?? "Contato"}
+                    </span>
+                  </summary>
+                  <div className="mt-4">
+                    <DecisionDetails decision={decision} />
+                    <div className="mt-4">
+                      <DecisionReview decision={decision} />
+                    </div>
+                    <p className="text-muted-foreground mt-2 text-xs">
+                      Organização: {decision.organizationId} · Decisão:{" "}
+                      {decision.id}
+                    </p>
+                  </div>
+                </details>
+              </Card>
+            ))}
+            <Card>
+              <LoadMore
+                page={data.pagination?.decisions}
+                summary={`Mostrando as ${data.decisions.length} decisões mais recentes.`}
+                label="Carregar decisões anteriores"
+                onLoadMore={() => void actions.loadMore("decisions")}
+              />
+            </Card>
+          </div>
+        )}
       </TabPanel>
       {editing && (
         <RuleForm

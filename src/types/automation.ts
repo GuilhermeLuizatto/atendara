@@ -103,6 +103,9 @@ export interface AutomationTask extends TenantScopedEntity {
   deliveryId: ID | null;
   /** Alerta e trilha: a tarefa cuja mudanca de estado os originou. */
   sourceTaskId: ID | null;
+  /** Mensagem e decisão que autorizaram uma resposta administrativa. */
+  sourceMessageId?: ID | null;
+  sourceDecisionId?: ID | null;
   event: AppointmentNotificationEvent | null;
   channel: OutboundChannel | null;
   failureCode: DeliveryFailureCode | null;

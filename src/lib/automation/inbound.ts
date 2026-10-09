@@ -24,7 +24,7 @@ import type { ID, ISODateString } from "@/types";
  */
 
 /** O que o n8n repassa, já separado por tipo. */
-export type InboundEvent =
+export type InboundPatientEvent =
   | {
       kind: "TEXT";
       providerSenderId: string;
@@ -44,6 +44,18 @@ export type InboundEvent =
       repliedTo: string | null;
       sentAt: ISODateString;
     };
+
+/** Resposta feita pelo profissional no app WhatsApp Business em coexistência. */
+export interface InboundHumanEcho {
+  kind: "HUMAN_ECHO";
+  providerSenderId: string;
+  to: string;
+  providerMessageId: string;
+  text: string;
+  sentAt: ISODateString;
+}
+
+export type InboundEvent = InboundPatientEvent | InboundHumanEcho;
 
 const BUTTONS: Record<string, WhatsappTemplateButton> = {
   CONFIRMAR: "CONFIRM",
@@ -91,6 +103,7 @@ export function parseInboundPayload(data: unknown): InboundEvent[] {
     if (!Array.isArray(changes)) continue;
 
     for (const change of changes) {
+      const field = (change as { field?: unknown })?.field;
       const value = (change as { value?: unknown })?.value as
         | { metadata?: { phone_number_id?: unknown }; messages?: unknown }
         | undefined;
@@ -112,8 +125,6 @@ export function parseInboundPayload(data: unknown): InboundEvent[] {
             : NaN;
         const instant = new Date(seconds * 1000);
         if (
-          !from ||
-          !normalizeInboundPhone(from) ||
           !id ||
           !/^[\x21-\x7e]{1,256}$/.test(id) ||
           !Number.isSafeInteger(seconds) ||
@@ -122,6 +133,37 @@ export function parseInboundPayload(data: unknown): InboundEvent[] {
         )
           continue;
         const sentAt = instant.toISOString();
+
+        if (field === "smb_message_echoes") {
+          const to =
+            typeof raw.to === "string"
+              ? raw.to
+              : typeof raw.recipient_id === "string"
+                ? raw.recipient_id
+                : null;
+          const text = (raw.text as { body?: unknown })?.body;
+          if (
+            !to ||
+            !normalizeInboundPhone(to) ||
+            typeof text !== "string" ||
+            !text.trim()
+          )
+            continue;
+          events.push({
+            kind: "HUMAN_ECHO",
+            providerSenderId,
+            to,
+            providerMessageId: id,
+            text: text.trim(),
+            sentAt,
+          });
+          continue;
+        }
+
+        if (!from || !normalizeInboundPhone(from)) continue;
+
+        // Eventos de sincronização da coexistência não são mensagens da pessoa.
+        if (field && field !== "messages") continue;
 
         if (raw.type === "text") {
           const text = (raw.text as { body?: unknown })?.body;
@@ -197,7 +239,7 @@ export type InboundDecision =
   | { kind: "CLASSIFY" };
 
 export function decideInbound(input: {
-  event: InboundEvent;
+  event: InboundPatientEvent;
   /** Ids de mensagens do provedor já gravadas nesta conversa. */
   knownProviderMessageIds: readonly string[];
   /** Instante da última mensagem recebida nesta conversa. */

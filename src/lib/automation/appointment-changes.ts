@@ -62,7 +62,10 @@ export interface AppointmentChangeInput {
 
 export interface AppointmentChangePlan {
   created: Array<{ task: AutomationTask; delivery: NotificationDelivery }>;
-  stopped: Array<{ task: AutomationTask; delivery: NotificationDelivery | null }>;
+  stopped: Array<{
+    task: AutomationTask;
+    delivery: NotificationDelivery | null;
+  }>;
   effects: InternalEffect[];
   skipped: SkippedDelivery[];
 }
@@ -83,7 +86,10 @@ export function appointmentNoticeEvents(
   }
   // O lembrete deriva do horario e de quem e atendido: mudar um dos dois pede
   // um lembrete novo, e o antigo e cancelado na primeira parte.
-  if (after.startsAt !== before.startsAt || after.clientId !== before.clientId) {
+  if (
+    after.startsAt !== before.startsAt ||
+    after.clientId !== before.clientId
+  ) {
     events.push("APPOINTMENT_REMINDER");
   }
   if (after.status === "CANCELLED" && before.status !== "CANCELLED") {
@@ -97,13 +103,20 @@ function stopReasonFor(
   current: Appointment | null,
 ): AutomationStopReason | null {
   if (!current) return "APPOINTMENT_NOT_FOUND";
+  // Esta resposta existe justamente porque o atendimento acabou de ser
+  // cancelado pela pessoa. O gatilho da agenda nao pode cancelar a confirmacao.
+  if (task.event === "CANCELLATION_CONFIRMED") return null;
   if (INACTIVE.includes(current.status)) return "APPOINTMENT_CANCELLED";
-  if (task.appointmentStartsAt !== current.startsAt) return "APPOINTMENT_RESCHEDULED";
+  if (task.appointmentStartsAt !== current.startsAt)
+    return "APPOINTMENT_RESCHEDULED";
   if (task.clientId !== current.clientId) return "APPOINTMENT_CLIENT_CHANGED";
   return null;
 }
 
-function cancelledDelivery(delivery: NotificationDelivery, at: ISODateString): NotificationDelivery {
+function cancelledDelivery(
+  delivery: NotificationDelivery,
+  at: ISODateString,
+): NotificationDelivery {
   return {
     ...delivery,
     status: "CANCELLED",
@@ -114,15 +127,24 @@ function cancelledDelivery(delivery: NotificationDelivery, at: ISODateString): N
   };
 }
 
-export function planAppointmentChange(input: AppointmentChangeInput): AppointmentChangePlan {
-  const plan: AppointmentChangePlan = { created: [], stopped: [], effects: [], skipped: [] };
+export function planAppointmentChange(
+  input: AppointmentChangeInput,
+): AppointmentChangePlan {
+  const plan: AppointmentChangePlan = {
+    created: [],
+    stopped: [],
+    effects: [],
+    skipped: [],
+  };
 
   // Organizacao ausente ou em exclusao: nada a gravar. Escrever agora
   // ressuscitaria documentos que a exclusao esta apagando.
   if (!input.organization || !input.profession) return plan;
 
   const at = input.changedAt;
-  const deliveries = new Map(input.deliveries.map((delivery) => [delivery.id, delivery]));
+  const deliveries = new Map(
+    input.deliveries.map((delivery) => [delivery.id, delivery]),
+  );
   const known = new Map(input.tasks.map((task) => [task.id, task]));
 
   // 1. O que deixou de valer.
@@ -137,18 +159,23 @@ export function planAppointmentChange(input: AppointmentChangeInput): Appointmen
       patch: { stopReason: reason },
     });
     const delivery = deliveries.get(task.deliveryId);
-    plan.stopped.push({ task: stopped, delivery: delivery ? cancelledDelivery(delivery, at) : null });
+    plan.stopped.push({
+      task: stopped,
+      delivery: delivery ? cancelledDelivery(delivery, at) : null,
+    });
     plan.effects.push(auditEffect(stopped, at));
     known.set(stopped.id, stopped);
   }
 
   // 2. O que o evento acrescenta.
   const current = input.current;
-  if (!current || !input.client || INACTIVE.includes(current.status)) return plan;
+  if (!current || !input.client || INACTIVE.includes(current.status))
+    return plan;
 
   for (const event of appointmentNoticeEvents(input.before, input.after)) {
     // Confirmacao desfeita por uma escrita posterior nao vira aviso atrasado.
-    if (event === "APPOINTMENT_CONFIRMED" && current.status !== "CONFIRMED") continue;
+    if (event === "APPOINTMENT_CONFIRMED" && current.status !== "CONFIRMED")
+      continue;
 
     const type = NOTICE_TASK_TYPES[event];
     const result = planAppointmentNotifications({
@@ -177,7 +204,11 @@ export function planAppointmentChange(input: AppointmentChangeInput): Appointmen
       });
       // Nasceria vencido: confirmacao registrada com o atendimento ja comecado.
       if (Date.parse(task.expiresAt) <= Date.parse(task.scheduledFor)) {
-        plan.skipped.push({ ruleId: planned.ruleId, channel: planned.channel, reason: "SCHEDULE_IN_THE_PAST" });
+        plan.skipped.push({
+          ruleId: planned.ruleId,
+          channel: planned.channel,
+          reason: "SCHEDULE_IN_THE_PAST",
+        });
         continue;
       }
       const delivery: NotificationDelivery = {

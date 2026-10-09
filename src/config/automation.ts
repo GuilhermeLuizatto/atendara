@@ -26,16 +26,47 @@ export interface AutomationTaskMeta {
   alertTitle: string;
 }
 
-export const AUTOMATION_TASK_META: Record<AutomationTaskType, AutomationTaskMeta> = {
-  CONFIRM_APPOINTMENT: { label: "Aviso de confirmação", executor: "EXTERNAL", alertTitle: "Aviso não enviado" },
-  SEND_REMINDER: { label: "Lembrete", executor: "EXTERNAL", alertTitle: "Aviso não enviado" },
-  PROCESS_INBOUND_MESSAGE: { label: "Mensagem recebida", executor: "INTERNAL", alertTitle: "Mensagem não processada" },
-  RAISE_ALERT: { label: "Alerta para a equipe", executor: "INTERNAL", alertTitle: "Alerta não registrado" },
-  WRITE_AUDIT: { label: "Registro na trilha", executor: "INTERNAL", alertTitle: "Registro não gravado" },
+export const AUTOMATION_TASK_META: Record<
+  AutomationTaskType,
+  AutomationTaskMeta
+> = {
+  CONFIRM_APPOINTMENT: {
+    label: "Aviso de confirmação",
+    executor: "EXTERNAL",
+    alertTitle: "Aviso não enviado",
+  },
+  SEND_REMINDER: {
+    label: "Lembrete",
+    executor: "EXTERNAL",
+    alertTitle: "Aviso não enviado",
+  },
+  PROCESS_INBOUND_MESSAGE: {
+    label: "Mensagem recebida",
+    executor: "INTERNAL",
+    alertTitle: "Mensagem não processada",
+  },
+  RAISE_ALERT: {
+    label: "Alerta para a equipe",
+    executor: "INTERNAL",
+    alertTitle: "Alerta não registrado",
+  },
+  WRITE_AUDIT: {
+    label: "Registro na trilha",
+    executor: "INTERNAL",
+    alertTitle: "Registro não gravado",
+  },
   // Executor de fora do Atendara — o Google —, chamado pelo backend enquanto
   // nao ha n8n em producao. Passa pela mesma fila, trilha e chave de emergencia.
-  SYNC_CALENDAR_EVENT: { label: "Agenda Google", executor: "EXTERNAL", alertTitle: "Agenda Google não atualizada" },
-  SEND_CONVERSATION_REPLY: { label: "Resposta na conversa", executor: "EXTERNAL", alertTitle: "Resposta não enviada" },
+  SYNC_CALENDAR_EVENT: {
+    label: "Agenda Google",
+    executor: "EXTERNAL",
+    alertTitle: "Agenda Google não atualizada",
+  },
+  SEND_CONVERSATION_REPLY: {
+    label: "Resposta na conversa",
+    executor: "EXTERNAL",
+    alertTitle: "Resposta não enviada",
+  },
 };
 
 /**
@@ -46,18 +77,26 @@ export const AUTOMATION_TASK_META: Record<AutomationTaskType, AutomationTaskMeta
  * cancelamento ganham tipo proprio numa etapa seguinte; ate la, uma regra ligada
  * para eles fica gravada e nao manda nada.
  */
-export const NOTICE_TASK_TYPES: Record<AppointmentNotificationEvent, AutomationTaskType | null> = {
+export const NOTICE_TASK_TYPES: Record<
+  AppointmentNotificationEvent,
+  AutomationTaskType | null
+> = {
   APPOINTMENT_SCHEDULED: null,
   APPOINTMENT_REMINDER: "SEND_REMINDER",
   APPOINTMENT_CONFIRMED: "CONFIRM_APPOINTMENT",
   APPOINTMENT_CANCELLED: null,
   ADMINISTRATIVE_REPLY: "SEND_CONVERSATION_REPLY",
+  SCHEDULE_OFFERED: "SEND_CONVERSATION_REPLY",
+  SCHEDULE_CONFIRMED: "SEND_CONVERSATION_REPLY",
+  SCHEDULE_HANDED_OFF: "SEND_CONVERSATION_REPLY",
   // Respostas da assistente na conversa (docs/planos/DARA-RESPOSTA-REMARCACAO-2026-09-24.md).
   // Planejadas pelo webhook, nunca por mudanca da agenda; o despachante as
   // confere e envia por `decideReplyDispatch`.
   RESCHEDULE_OFFERED: "SEND_CONVERSATION_REPLY",
   RESCHEDULE_CONFIRMED: "SEND_CONVERSATION_REPLY",
   RESCHEDULE_HANDED_OFF: "SEND_CONVERSATION_REPLY",
+  CANCELLATION_CONFIRMED: "SEND_CONVERSATION_REPLY",
+  CANCELLATION_HANDED_OFF: "SEND_CONVERSATION_REPLY",
 };
 
 export interface AutomationTransitionRule {
@@ -103,7 +142,10 @@ export const TERMINAL_AUTOMATION_STATUSES: readonly AutomationTaskStatus[] = [
 ];
 
 /** Nada saiu ainda: a agenda pode cancelar. Depois de adquirida, so o despachante decide. */
-export const WAITING_AUTOMATION_STATUSES: readonly AutomationTaskStatus[] = ["PLANNED", "SCHEDULED"];
+export const WAITING_AUTOMATION_STATUSES: readonly AutomationTaskStatus[] = [
+  "PLANNED",
+  "SCHEDULED",
+];
 
 /**
  * Versao do contrato que o Atendara EMITE: o ponteiro da Cloud Tasks e a tarefa
@@ -162,7 +204,10 @@ export const INTERNAL_TASK_VALIDITY_MINUTES = 60;
 /** Autor das entradas que a automacao grava na trilha e nos alertas. */
 export const AUTOMATION_ACTOR_NAME = "Automação do Atendara";
 
-export const AUTOMATION_QUEUE_STOP_LABELS: Record<AutomationQueueStopReason, string> = {
+export const AUTOMATION_QUEUE_STOP_LABELS: Record<
+  AutomationQueueStopReason,
+  string
+> = {
   TASK_EXPIRED: "A tarefa venceu antes de ser executada.",
   NO_EXECUTOR: "Não há executor para este tipo de tarefa.",
   DELIVERY_NOT_FOUND: "O registro do aviso não foi encontrado.",
@@ -198,4 +243,8 @@ export const AUTOMATION_STATUS_LABELS: Record<AutomationTaskStatus, string> = {
 };
 
 /** Lotes limitados evitam uma execução longa bloquear as próximas verificações. */
-export const AUTOMATION_EXPIRY_SCAN = { schedule: "every 5 minutes", batchSize: 100, maxBatches: 10 } as const;
+export const AUTOMATION_EXPIRY_SCAN = {
+  schedule: "every 5 minutes",
+  batchSize: 100,
+  maxBatches: 10,
+} as const;

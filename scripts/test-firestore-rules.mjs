@@ -111,6 +111,7 @@ try {
       await setDoc(doc(db, paths.document(org, "calendarConnections", "a")), { organizationId: org, professionalId: "a", provider: "GOOGLE", status: "CONNECTED", refreshTokenCiphertext: "cifrado" });
       await setDoc(doc(db, paths.document(org, "calendarBusyBlocks", "a")), { organizationId: org, professionalId: "a", blocks: [] });
       await setDoc(doc(db, paths.document(org, "rescheduleRequests", "conversa")), { organizationId: org, clientId: "example", appointmentId: "example", status: "OFFERED" });
+      await setDoc(doc(db, paths.document(org, "bookingRequests", "conversa")), { organizationId: org, clientId: "example", appointmentId: null, status: "OFFERED" });
       await setDoc(doc(db, paths.document(org, "messagingSenders", "WHATSAPP")), { organizationId: org, channel: "WHATSAPP", providerId: "N8N_BRIDGE", providerSenderId: "123", displayNumber: "+5513999990000", displayName: "Clinica", status: "APPROVED", mode: "TEST", testRecipients: ["+5513999990000"] });
       await setDoc(doc(db, paths.document(org, "memberRequests", "example")), { organizationId: org });
       await setDoc(doc(db, paths.document(org, "memberInvitations", "example")), { organizationId: org });
@@ -385,7 +386,7 @@ try {
   await denied(getDocs(query(collectionGroup(db("restricted"), "messages"), where("organizationId", "==", "org-a"))));
 
   // Listagem cruzada de cada colecao operacional.
-  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "whatsappConnections", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "services", "auditLogs"]) {
+  for (const name of ["clients", "appointments", "transactions", "conversations", "aiRules", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "whatsappConnections", "rescheduleRequests", "bookingRequests", "calendarConnections", "calendarBusyBlocks", "services", "auditLogs"]) {
     await denied(getDocs(query(collection(db("a"), paths.collection("org-b", name)), limit(5))));
   }
 
@@ -519,6 +520,15 @@ try {
     await deniedBecause(`${uid} apagando pedido`, deleteDoc(pedidoOf(uid)));
   }
 
+  // Pedido de agendamento: a oferta e a escolha tambem existem so no backend.
+  const agendamentoOf = (uid) => doc(db(uid), paths.document("org-a", "bookingRequests", "conversa"));
+  for (const uid of ["a", "ownerRole", "adminRole"]) {
+    await deniedBecause(`${uid} lendo pedido de agendamento`, getDoc(agendamentoOf(uid)));
+    await deniedBecause(`${uid} segurando vaga de agendamento`, setDoc(agendamentoOf(uid), { organizationId: "org-a", status: "OFFERED" }));
+    await deniedBecause(`${uid} confirmando agendamento`, updateDoc(agendamentoOf(uid), { status: "CONFIRMED" }));
+    await deniedBecause(`${uid} apagando pedido de agendamento`, deleteDoc(agendamentoOf(uid)));
+  }
+
   // Remetente de canal real (13.4): quem administra a organizacao LE — precisa
   // saber qual numero aparece para quem e atendido —, e NINGUEM escreve pelo
   // cliente. Se a organizacao escrevesse aqui, ela se declararia habilitada a
@@ -573,7 +583,7 @@ try {
   await denied(getDoc(doc(operator, paths.document("org-a", "members", "a"))));
   await denied(updateDoc(doc(operator, paths.document("org-a", "members", "a")), { role: "OWNER" }));
   await denied(deleteDoc(doc(operator, paths.document("org-a", "members", "restricted"))));
-  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "whatsappConnections", "rescheduleRequests", "calendarConnections", "calendarBusyBlocks", "automationSwitches", "services", "aiDecisionReviews", "recurringCharges", "paymentLinks", "paymentProofs", "receipts", "receiptSettings", "receiptCounters", "auditLogs"]) {
+  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "whatsappConnections", "rescheduleRequests", "bookingRequests", "calendarConnections", "calendarBusyBlocks", "automationSwitches", "services", "aiDecisionReviews", "recurringCharges", "paymentLinks", "paymentProofs", "receipts", "receiptSettings", "receiptCounters", "auditLogs"]) {
     await denied(getDoc(doc(operator, own(name))));
     await denied(setDoc(doc(operator, paths.document("org-a", name, "da-operadora")), { organizationId: "org-a" }));
   }
@@ -742,7 +752,7 @@ try {
   // O caminho administrativo nao mudou: ADMIN continua alterando a agenda.
   await allowed(updateDoc(doc(db("adminRole"), orgA()), { "settings.agenda": { workdayStart: "07:00" } }));
 
-  const aiSettings = { enabled: true, displayName: "Dara", autoResponseConfidenceThreshold: 0.8, allowAutonomousReplies: false, quietHoursStart: null, quietHoursEnd: null };
+  const aiSettings = { enabled: true, displayName: "Dara", autoResponseConfidenceThreshold: 0.8, allowAutonomousReplies: false, unansweredDelayMinutes: 15, quietHoursStart: null, quietHoursEnd: null };
   await allowed(updateDoc(doc(db("adminRole"), orgA()), { "settings.ai": aiSettings }));
   await allowed(updateDoc(doc(db("ownerRole"), orgA()), { "settings.ai": { ...aiSettings, quietHoursStart: "22:00", quietHoursEnd: "07:00" } }));
   await denied(updateDoc(doc(db("a"), orgA()), { "settings.ai": aiSettings }));
@@ -824,6 +834,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 510);
+  assert.equal(checks, 525);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

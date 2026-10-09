@@ -1,14 +1,42 @@
 // Gerado por scripts/build-functions.mjs.
 export const AUTOMATION_TASK_META = {
-    CONFIRM_APPOINTMENT: { label: "Aviso de confirmação", executor: "EXTERNAL", alertTitle: "Aviso não enviado" },
-    SEND_REMINDER: { label: "Lembrete", executor: "EXTERNAL", alertTitle: "Aviso não enviado" },
-    PROCESS_INBOUND_MESSAGE: { label: "Mensagem recebida", executor: "INTERNAL", alertTitle: "Mensagem não processada" },
-    RAISE_ALERT: { label: "Alerta para a equipe", executor: "INTERNAL", alertTitle: "Alerta não registrado" },
-    WRITE_AUDIT: { label: "Registro na trilha", executor: "INTERNAL", alertTitle: "Registro não gravado" },
+    CONFIRM_APPOINTMENT: {
+        label: "Aviso de confirmação",
+        executor: "EXTERNAL",
+        alertTitle: "Aviso não enviado",
+    },
+    SEND_REMINDER: {
+        label: "Lembrete",
+        executor: "EXTERNAL",
+        alertTitle: "Aviso não enviado",
+    },
+    PROCESS_INBOUND_MESSAGE: {
+        label: "Mensagem recebida",
+        executor: "INTERNAL",
+        alertTitle: "Mensagem não processada",
+    },
+    RAISE_ALERT: {
+        label: "Alerta para a equipe",
+        executor: "INTERNAL",
+        alertTitle: "Alerta não registrado",
+    },
+    WRITE_AUDIT: {
+        label: "Registro na trilha",
+        executor: "INTERNAL",
+        alertTitle: "Registro não gravado",
+    },
     // Executor de fora do Atendara — o Google —, chamado pelo backend enquanto
     // nao ha n8n em producao. Passa pela mesma fila, trilha e chave de emergencia.
-    SYNC_CALENDAR_EVENT: { label: "Agenda Google", executor: "EXTERNAL", alertTitle: "Agenda Google não atualizada" },
-    SEND_CONVERSATION_REPLY: { label: "Resposta na conversa", executor: "EXTERNAL", alertTitle: "Resposta não enviada" },
+    SYNC_CALENDAR_EVENT: {
+        label: "Agenda Google",
+        executor: "EXTERNAL",
+        alertTitle: "Agenda Google não atualizada",
+    },
+    SEND_CONVERSATION_REPLY: {
+        label: "Resposta na conversa",
+        executor: "EXTERNAL",
+        alertTitle: "Resposta não enviada",
+    },
 };
 /**
  * Evento da agenda -> tarefa que o executa.
@@ -24,12 +52,17 @@ export const NOTICE_TASK_TYPES = {
     APPOINTMENT_CONFIRMED: "CONFIRM_APPOINTMENT",
     APPOINTMENT_CANCELLED: null,
     ADMINISTRATIVE_REPLY: "SEND_CONVERSATION_REPLY",
+    SCHEDULE_OFFERED: "SEND_CONVERSATION_REPLY",
+    SCHEDULE_CONFIRMED: "SEND_CONVERSATION_REPLY",
+    SCHEDULE_HANDED_OFF: "SEND_CONVERSATION_REPLY",
     // Respostas da assistente na conversa (docs/planos/DARA-RESPOSTA-REMARCACAO-2026-09-24.md).
     // Planejadas pelo webhook, nunca por mudanca da agenda; o despachante as
     // confere e envia por `decideReplyDispatch`.
     RESCHEDULE_OFFERED: "SEND_CONVERSATION_REPLY",
     RESCHEDULE_CONFIRMED: "SEND_CONVERSATION_REPLY",
     RESCHEDULE_HANDED_OFF: "SEND_CONVERSATION_REPLY",
+    CANCELLATION_CONFIRMED: "SEND_CONVERSATION_REPLY",
+    CANCELLATION_HANDED_OFF: "SEND_CONVERSATION_REPLY",
 };
 const ANY = ["INTERNAL", "EXTERNAL"];
 const EXTERNAL = ["EXTERNAL"];
@@ -65,7 +98,10 @@ export const TERMINAL_AUTOMATION_STATUSES = [
     "EXPIRED",
 ];
 /** Nada saiu ainda: a agenda pode cancelar. Depois de adquirida, so o despachante decide. */
-export const WAITING_AUTOMATION_STATUSES = ["PLANNED", "SCHEDULED"];
+export const WAITING_AUTOMATION_STATUSES = [
+    "PLANNED",
+    "SCHEDULED",
+];
 /**
  * Versao do contrato que o Atendara EMITE: o ponteiro da Cloud Tasks e a tarefa
  * que vai ao n8n. Mudanca incompativel aumenta o numero.
@@ -144,4 +180,8 @@ export const AUTOMATION_STATUS_LABELS = {
     EXPIRED: "Vencida",
 };
 /** Lotes limitados evitam uma execução longa bloquear as próximas verificações. */
-export const AUTOMATION_EXPIRY_SCAN = { schedule: "every 5 minutes", batchSize: 100, maxBatches: 10 };
+export const AUTOMATION_EXPIRY_SCAN = {
+    schedule: "every 5 minutes",
+    batchSize: 100,
+    maxBatches: 10,
+};

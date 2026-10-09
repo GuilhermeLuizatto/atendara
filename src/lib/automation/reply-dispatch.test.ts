@@ -1,11 +1,23 @@
 import { describe, expect, it } from "vitest";
 
 import { getProfession } from "@/config/professions";
-import { ANCHOR, FICTITIOUS, appointment, client, consent, consentRecord, organization } from "@/lib/notifications/fixtures";
+import {
+  ANCHOR,
+  FICTITIOUS,
+  appointment,
+  client,
+  consent,
+  consentRecord,
+  organization,
+} from "@/lib/notifications/fixtures";
 import type { Conversation, MessagingSender, NotificationRule } from "@/types";
 
 import { planConversationReply } from "./conversation-replies";
-import { decideReplyDispatch, type ReplyDispatchInput, type ReplyOffer } from "./dispatch";
+import {
+  decideReplyDispatch,
+  type ReplyDispatchInput,
+  type ReplyOffer,
+} from "./dispatch";
 
 /**
  * O envio da resposta da assistente (etapa 4). Tarefa e entrega nascem do
@@ -21,14 +33,26 @@ const HORARIOS = [
   { startsAt: "2026-09-14T11:30:00.000Z", endsAt: "2026-09-14T12:20:00.000Z" },
 ];
 
-const REGRAS: NotificationRule[] = ([
-  "ADMINISTRATIVE_REPLY",
-  "RESCHEDULE_OFFERED",
-  "RESCHEDULE_CONFIRMED",
-  "RESCHEDULE_HANDED_OFF",
-] as const).map(
-  (event) => ({ id: `${event}:WHATSAPP`, event, channel: "WHATSAPP", enabled: true, leadMinutes: 0, customTemplate: null }),
-);
+const REGRAS: NotificationRule[] = (
+  [
+    "ADMINISTRATIVE_REPLY",
+    "SCHEDULE_OFFERED",
+    "SCHEDULE_CONFIRMED",
+    "SCHEDULE_HANDED_OFF",
+    "RESCHEDULE_OFFERED",
+    "RESCHEDULE_CONFIRMED",
+    "RESCHEDULE_HANDED_OFF",
+    "CANCELLATION_CONFIRMED",
+    "CANCELLATION_HANDED_OFF",
+  ] as const
+).map((event) => ({
+  id: `${event}:WHATSAPP`,
+  event,
+  channel: "WHATSAPP",
+  enabled: true,
+  leadMinutes: 0,
+  customTemplate: null,
+}));
 
 const REMETENTE: MessagingSender = {
   id: "WHATSAPP",
@@ -48,7 +72,10 @@ const REMETENTE: MessagingSender = {
   updatedBy: "operadora",
 };
 
-const ORGANIZACAO = organization({ verifiedSenderChannels: ["WHATSAPP"], rules: REGRAS });
+const ORGANIZACAO = organization({
+  verifiedSenderChannels: ["WHATSAPP"],
+  rules: REGRAS,
+});
 const CONVERSA: Pick<
   Conversation,
   "escalated" | "attention" | "inboundWindowEndsAt" | "lastInboundAt"
@@ -58,11 +85,19 @@ const CONVERSA: Pick<
   inboundWindowEndsAt: JANELA,
   lastInboundAt: ANCHOR,
 };
-const OFERTA: ReplyOffer = { status: "OFFERED", appointmentId: "atendimento-1", slots: HORARIOS, holdEndsAt: RESERVA };
+const OFERTA: ReplyOffer = {
+  status: "OFFERED",
+  appointmentId: "atendimento-1",
+  slots: HORARIOS,
+  holdEndsAt: RESERVA,
+};
 
 /** Tarefa e entrega como o webhook gravaria. */
 function planejado(
-  event: "RESCHEDULE_OFFERED" | "RESCHEDULE_CONFIRMED" | "RESCHEDULE_HANDED_OFF" = "RESCHEDULE_OFFERED",
+  event:
+    | "RESCHEDULE_OFFERED"
+    | "RESCHEDULE_CONFIRMED"
+    | "RESCHEDULE_HANDED_OFF" = "RESCHEDULE_OFFERED",
 ) {
   const atendimento = appointment();
   const plano = planConversationReply({
@@ -76,7 +111,10 @@ function planejado(
     conversation: CONVERSA,
     now: ANCHOR,
     validUntil: event === "RESCHEDULE_OFFERED" ? RESERVA : null,
-    details: event === "RESCHEDULE_OFFERED" ? { slots: HORARIOS } : { startsAt: atendimento.startsAt },
+    details:
+      event === "RESCHEDULE_OFFERED"
+        ? { slots: HORARIOS }
+        : { startsAt: atendimento.startsAt },
     inboundMessageId: "wa-wamid.pedido",
     appointment: atendimento,
   });
@@ -89,7 +127,12 @@ function entrada(
   overrides: Partial<ReplyDispatchInput> = {},
 ): ReplyDispatchInput {
   return {
-    payload: { version: 2, organizationId: "org-teste", taskId: plano.task.id, attempt: 1 },
+    payload: {
+      version: 2,
+      organizationId: "org-teste",
+      taskId: plano.task.id,
+      attempt: 1,
+    },
     task: { ...plano.task, status: "SCHEDULED" },
     delivery: plano.delivery,
     organization: ORGANIZACAO,
@@ -127,6 +170,51 @@ function administrativo() {
   return plano;
 }
 
+function agendamento(event: "SCHEDULE_OFFERED" | "SCHEDULE_CONFIRMED") {
+  const atendimento = event === "SCHEDULE_CONFIRMED" ? appointment() : null;
+  const plano = planConversationReply({
+    organization: ORGANIZACAO,
+    profession: getProfession(ORGANIZACAO.primaryProfession),
+    client: client(),
+    sender: REMETENTE,
+    event,
+    stage: event === "SCHEDULE_OFFERED" ? "REQUEST" : "CHOICE",
+    channel: "WHATSAPP",
+    conversation: CONVERSA,
+    now: ANCHOR,
+    validUntil: event === "SCHEDULE_OFFERED" ? RESERVA : null,
+    details:
+      event === "SCHEDULE_OFFERED"
+        ? { slots: HORARIOS }
+        : { startsAt: atendimento?.startsAt },
+    inboundMessageId: `wa-wamid.${event.toLowerCase()}`,
+    appointment: atendimento,
+    professionalId: "profissional-1",
+  });
+  if (plano.kind !== "PLANNED") throw new Error(plano.reason);
+  return plano;
+}
+
+function cancelamento() {
+  const atendimento = appointment({ status: "CANCELLED" });
+  const plano = planConversationReply({
+    organization: ORGANIZACAO,
+    profession: getProfession(ORGANIZACAO.primaryProfession),
+    client: client(),
+    sender: REMETENTE,
+    event: "CANCELLATION_CONFIRMED",
+    stage: "REQUEST",
+    channel: "WHATSAPP",
+    conversation: CONVERSA,
+    now: ANCHOR,
+    details: { startsAt: atendimento.startsAt },
+    inboundMessageId: "wa-wamid.cancelar",
+    appointment: atendimento,
+  });
+  if (plano.kind !== "PLANNED") throw new Error(plano.reason);
+  return { plano, atendimento };
+}
+
 function parouPor(passo: ReturnType<typeof decideReplyDispatch>) {
   if (passo.kind !== "STOP") return passo.kind;
   return passo.task.stopReason ?? passo.task.status;
@@ -148,12 +236,45 @@ describe("a resposta sai", () => {
       taskId: plano.task.id,
     });
     expect(passo.request.template).toBeUndefined();
-    expect(passo.request.body).toContain("1. segunda-feira, 14 de setembro, às 08:00");
+    expect(passo.request.body).toContain(
+      "1. segunda-feira, 14 de setembro, às 08:00",
+    );
   });
 
   it("a confirmação e o encaminhamento também saem", () => {
-    expect(decideReplyDispatch(entrada(planejado("RESCHEDULE_CONFIRMED"))).kind).toBe("SEND");
-    expect(decideReplyDispatch(entrada(planejado("RESCHEDULE_HANDED_OFF"))).kind).toBe("SEND");
+    expect(
+      decideReplyDispatch(entrada(planejado("RESCHEDULE_CONFIRMED"))).kind,
+    ).toBe("SEND");
+    expect(
+      decideReplyDispatch(entrada(planejado("RESCHEDULE_HANDED_OFF"))).kind,
+    ).toBe("SEND");
+  });
+
+  it("oferta e confirmação de agendamento são recompostas do estado atual", () => {
+    const oferta = agendamento("SCHEDULE_OFFERED");
+    const offered = decideReplyDispatch(
+      entrada(oferta, {
+        appointment: null,
+        offer: { ...OFERTA, appointmentId: null },
+      }),
+    );
+    expect(offered.kind).toBe("SEND");
+
+    const confirmado = agendamento("SCHEDULE_CONFIRMED");
+    expect(
+      decideReplyDispatch(
+        entrada(confirmado, { appointment: appointment(), offer: null }),
+      ).kind,
+    ).toBe("SEND");
+  });
+
+  it("a confirmação de cancelamento continua válida com o atendimento cancelado", () => {
+    const { plano, atendimento } = cancelamento();
+    expect(
+      decideReplyDispatch(
+        entrada(plano, { appointment: atendimento, offer: null }),
+      ).kind,
+    ).toBe("SEND");
   });
 
   it("a resposta administrativa sem atendimento só sai com a decisão original intacta", () => {
@@ -187,24 +308,47 @@ describe("a resposta sai", () => {
 describe("o que mudou entre planejar e enviar para a resposta", () => {
   it("oferta já respondida, substituída ou de outro atendimento", () => {
     const plano = planejado();
-    expect(parouPor(decideReplyDispatch(entrada(plano, { offer: { ...OFERTA, status: "CONFIRMED" } })))).toBe(
+    expect(
+      parouPor(
+        decideReplyDispatch(
+          entrada(plano, { offer: { ...OFERTA, status: "CONFIRMED" } }),
+        ),
+      ),
+    ).toBe("OFFER_CLOSED");
+    expect(parouPor(decideReplyDispatch(entrada(plano, { offer: null })))).toBe(
       "OFFER_CLOSED",
     );
-    expect(parouPor(decideReplyDispatch(entrada(plano, { offer: null })))).toBe("OFFER_CLOSED");
     expect(
-      parouPor(decideReplyDispatch(entrada(plano, { offer: { ...OFERTA, appointmentId: "outro-atendimento" } }))),
+      parouPor(
+        decideReplyDispatch(
+          entrada(plano, {
+            offer: { ...OFERTA, appointmentId: "outro-atendimento" },
+          }),
+        ),
+      ),
     ).toBe("OFFER_CLOSED");
   });
 
   it("oferta com horários diferentes dos planejados não sai com o texto novo", () => {
-    const outros = [{ startsAt: "2026-09-15T11:00:00.000Z", endsAt: "2026-09-15T11:50:00.000Z" }];
-    expect(parouPor(decideReplyDispatch(entrada(planejado(), { offer: { ...OFERTA, slots: outros } })))).toBe(
-      "BODY_CHANGED",
-    );
+    const outros = [
+      {
+        startsAt: "2026-09-15T11:00:00.000Z",
+        endsAt: "2026-09-15T11:50:00.000Z",
+      },
+    ];
+    expect(
+      parouPor(
+        decideReplyDispatch(
+          entrada(planejado(), { offer: { ...OFERTA, slots: outros } }),
+        ),
+      ),
+    ).toBe("BODY_CHANGED");
   });
 
   it("reserva vencida: a tarefa vence junto", () => {
-    const passo = decideReplyDispatch(entrada(planejado(), { now: "2026-09-10T12:10:01.000Z" }));
+    const passo = decideReplyDispatch(
+      entrada(planejado(), { now: "2026-09-10T12:10:01.000Z" }),
+    );
     expect(passo.kind === "STOP" && passo.task.status).toBe("EXPIRED");
   });
 
@@ -212,31 +356,56 @@ describe("o que mudou entre planejar e enviar para a resposta", () => {
     const retirado = client({
       notificationConsent: consent({
         WHATSAPP: [
-          consentRecord({ withdrawn: { at: ANCHOR, recordedBy: { kind: "SUBJECT", userId: null }, medium: "MESSAGE" } }),
+          consentRecord({
+            withdrawn: {
+              at: ANCHOR,
+              recordedBy: { kind: "SUBJECT", userId: null },
+              medium: "MESSAGE",
+            },
+          }),
         ],
       }),
     });
-    expect(parouPor(decideReplyDispatch(entrada(planejado(), { client: retirado })))).toBe("CONSENT_REVOKED");
+    expect(
+      parouPor(decideReplyDispatch(entrada(planejado(), { client: retirado }))),
+    ).toBe("CONSENT_REVOKED");
   });
 
   it("conversa assumida pela equipe, ou marcada como crítica, depois do pedido", () => {
     const plano = planejado();
-    expect(parouPor(decideReplyDispatch(entrada(plano, { conversation: { ...CONVERSA, escalated: true } })))).toBe(
-      "CONVERSATION_WITH_HUMAN",
-    );
     expect(
-      parouPor(decideReplyDispatch(entrada(plano, { conversation: { ...CONVERSA, attention: "CRITICAL" } }))),
+      parouPor(
+        decideReplyDispatch(
+          entrada(plano, { conversation: { ...CONVERSA, escalated: true } }),
+        ),
+      ),
+    ).toBe("CONVERSATION_WITH_HUMAN");
+    expect(
+      parouPor(
+        decideReplyDispatch(
+          entrada(plano, {
+            conversation: { ...CONVERSA, attention: "CRITICAL" },
+          }),
+        ),
+      ),
     ).toBe("CONVERSATION_WITH_HUMAN");
   });
 
   it("sem conversa não há janela conhecida", () => {
-    expect(parouPor(decideReplyDispatch(entrada(planejado(), { conversation: null })))).toBe("REPLY_WINDOW_CLOSED");
+    expect(
+      parouPor(
+        decideReplyDispatch(entrada(planejado(), { conversation: null })),
+      ),
+    ).toBe("REPLY_WINDOW_CLOSED");
   });
 
   it("confirmação de um horário que a equipe mudou depois da escolha", () => {
     const passo = decideReplyDispatch(
       entrada(planejado("RESCHEDULE_CONFIRMED"), {
-        appointment: appointment({ startsAt: "2026-09-16T13:00:00.000Z", endsAt: "2026-09-16T13:50:00.000Z" }),
+        appointment: appointment({
+          startsAt: "2026-09-16T13:00:00.000Z",
+          endsAt: "2026-09-16T13:50:00.000Z",
+        }),
       }),
     );
     expect(parouPor(passo)).toBe("BODY_CHANGED");
@@ -244,10 +413,16 @@ describe("o que mudou entre planejar e enviar para a resposta", () => {
 
   it("cadastro trocado ou atendimento sumido", () => {
     const plano = planejado();
-    expect(parouPor(decideReplyDispatch(entrada(plano, { client: client({ id: "outra-pessoa" }) })))).toBe(
-      "CLIENT_NOT_FOUND",
-    );
-    expect(parouPor(decideReplyDispatch(entrada(plano, { appointment: null })))).toBe("APPOINTMENT_NOT_FOUND");
+    expect(
+      parouPor(
+        decideReplyDispatch(
+          entrada(plano, { client: client({ id: "outra-pessoa" }) }),
+        ),
+      ),
+    ).toBe("CLIENT_NOT_FOUND");
+    expect(
+      parouPor(decideReplyDispatch(entrada(plano, { appointment: null }))),
+    ).toBe("APPOINTMENT_NOT_FOUND");
   });
 
   it("regra desligada ou remetente revogado depois do pedido", () => {
@@ -256,16 +431,30 @@ describe("o que mudou entre planejar e enviar para a resposta", () => {
       verifiedSenderChannels: ["WHATSAPP"],
       rules: REGRAS.map((regra) => ({ ...regra, enabled: false })),
     });
-    expect(parouPor(decideReplyDispatch(entrada(plano, { organization: semRegra })))).toBe("RULE_DISABLED");
-    expect(parouPor(decideReplyDispatch(entrada(plano, { sender: { ...REMETENTE, status: "REJECTED" } })))).toBe(
-      "SENDER_NOT_APPROVED",
-    );
+    expect(
+      parouPor(decideReplyDispatch(entrada(plano, { organization: semRegra }))),
+    ).toBe("RULE_DISABLED");
+    expect(
+      parouPor(
+        decideReplyDispatch(
+          entrada(plano, { sender: { ...REMETENTE, status: "REJECTED" } }),
+        ),
+      ),
+    ).toBe("SENDER_NOT_APPROVED");
   });
 
   it("chave de emergência desligada: a resposta espera, não é cancelada", () => {
     const passo = decideReplyDispatch(
       entrada(planejado(), {
-        switches: { organization: { enabled: false, reason: "teste", changedAt: ANCHOR, changedBy: "dono" }, global: null },
+        switches: {
+          organization: {
+            enabled: false,
+            reason: "teste",
+            changedAt: ANCHOR,
+            changedBy: "dono",
+          },
+          global: null,
+        },
       }),
     );
     expect(passo.kind).toBe("REQUEUE");

@@ -1,6 +1,9 @@
 import { CONVERSATION_REPLY_VALIDITY_MINUTES } from "@/config/automation";
 import { CHANNEL_META, RETRY_POLICY } from "@/config/notifications";
-import { evaluateConversationReply, type ConversationReplyInput } from "@/lib/notifications/eligibility";
+import {
+  evaluateConversationReply,
+  type ConversationReplyInput,
+} from "@/lib/notifications/eligibility";
 import { addMinutes } from "@/lib/notifications/schedule";
 import { hashBody } from "@/lib/notifications/templates";
 import type {
@@ -49,7 +52,13 @@ export function planConversationReply(
   if (!input.client) {
     return { kind: "SKIPPED", reason: "CLIENT_NOT_IDENTIFIED" };
   }
-  if (input.event !== "ADMINISTRATIVE_REPLY" && !input.appointment) {
+  const mayNotHaveAppointment = [
+    "ADMINISTRATIVE_REPLY",
+    "SCHEDULE_OFFERED",
+    "SCHEDULE_HANDED_OFF",
+    "CANCELLATION_HANDED_OFF",
+  ].includes(input.event);
+  if (!mayNotHaveAppointment && !input.appointment) {
     return { kind: "SKIPPED", reason: "NO_APPOINTMENT" };
   }
 
@@ -67,7 +76,8 @@ export function planConversationReply(
   const scheduledFor = input.scheduledFor ?? at;
   const expiresAt = replyExpiresAt(input, scheduledFor);
   const { appointment, client } = input;
-  const professionalId = appointment?.professionalId ?? input.professionalId ?? null;
+  const professionalId =
+    appointment?.professionalId ?? input.professionalId ?? null;
 
   const delivery: NotificationDelivery = {
     id,

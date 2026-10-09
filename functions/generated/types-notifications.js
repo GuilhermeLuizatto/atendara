@@ -22,9 +22,14 @@ export const AGENDA_NOTICE_EVENTS = [
  */
 export const CONVERSATION_REPLY_EVENTS = [
     "ADMINISTRATIVE_REPLY",
+    "SCHEDULE_OFFERED",
+    "SCHEDULE_CONFIRMED",
+    "SCHEDULE_HANDED_OFF",
     "RESCHEDULE_OFFERED",
     "RESCHEDULE_CONFIRMED",
     "RESCHEDULE_HANDED_OFF",
+    "CANCELLATION_CONFIRMED",
+    "CANCELLATION_HANDED_OFF",
 ];
 /** Tudo o que uma regra de aviso pode autorizar. */
 export const APPOINTMENT_NOTIFICATION_EVENTS = [
@@ -44,7 +49,11 @@ export function isConversationReplyEvent(event) {
  * mensagem sair: `PENDING` e verificacao em andamento na Meta e `REJECTED` e
  * recusa, que exige agir no painel do provedor antes de tentar de novo.
  */
-export const MESSAGING_SENDER_STATUSES = ["PENDING", "APPROVED", "REJECTED"];
+export const MESSAGING_SENDER_STATUSES = [
+    "PENDING",
+    "APPROVED",
+    "REJECTED",
+];
 /**
  * Em `TEST`, o provedor so entrega a numeros cadastrados como testadores, e o
  * Atendara recusa antes de tentar: o erro do provedor viria tarde demais, e
@@ -61,7 +70,10 @@ export const CONSENT_RECORDER_KINDS = ["STAFF", "SUBJECT"];
 /** Por onde a pessoa se manifestou, ao autorizar ou ao retirar. */
 export const CONSENT_MEDIA = ["FORM", "WRITTEN_DOCUMENT", "MESSAGE"];
 /** LGPD, art. 14: um dos pais ou o responsavel legal. */
-export const LEGAL_GUARDIAN_RELATIONSHIPS = ["PARENT", "LEGAL_GUARDIAN"];
+export const LEGAL_GUARDIAN_RELATIONSHIPS = [
+    "PARENT",
+    "LEGAL_GUARDIAN",
+];
 export const DELIVERY_FAILURE_CODES = [
     "PROVIDER_UNAVAILABLE",
     "INVALID_DESTINATION",

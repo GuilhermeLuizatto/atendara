@@ -34,7 +34,9 @@ export const LEGAL_REVIEW_STATUS = "PENDING_LEGAL_REVIEW" as const;
  * decisao continua explicada por classificacao, confianca, regras e motivo, e
  * a mensagem inteira fica na conversa, que eliminacao e retencao ja alcancam.
  */
-export const DECISION_INPUT_PREVIEW_CHARS: Readonly<Record<SensitiveDataProfile, number>> = {
+export const DECISION_INPUT_PREVIEW_CHARS: Readonly<
+  Record<SensitiveDataProfile, number>
+> = {
   STANDARD: 200,
   ELEVATED: 0,
   HIGH: 0,
@@ -98,7 +100,8 @@ export interface PersonalDataPolicy {
 
 /** Prefixo do pseudonimo. O resto e aleatorio e nao deriva do `clientId`. */
 export const PSEUDONYM_PREFIX = "titular-removido-";
-export const REDACTED_TEXT = "[conteúdo removido a pedido do titular dos dados]";
+export const REDACTED_TEXT =
+  "[conteúdo removido a pedido do titular dos dados]";
 export const REDACTED_NAME = "Pessoa removida";
 export const MASKED_CONTACT = "***";
 
@@ -115,7 +118,10 @@ export const RECENT_LOGIN_SECONDS = 300;
 /** Paginas de uma exportacao so valem dentro desta janela a partir do inicio. */
 export const ORGANIZATION_EXPORT_WINDOW_MINUTES = 60;
 
-export const ORGANIZATION_EXPORT_PAGE_SIZE = { default: 200, max: 300 } as const;
+export const ORGANIZATION_EXPORT_PAGE_SIZE = {
+  default: 200,
+  max: 300,
+} as const;
 
 /**
  * Prazos PROVISORIOS, gravados como `expiresAt` e sem TTL ligado — o mesmo
@@ -176,11 +182,16 @@ const DECISION_CONTENT = {
 
 const REQUEST_SUBJECT = { subjectId: "CLIENT_ID" } as const;
 
-const WHILE_ORGANIZATION: RetentionPolicy = { kind: "WHILE_ORGANIZATION_EXISTS" };
+const WHILE_ORGANIZATION: RetentionPolicy = {
+  kind: "WHILE_ORGANIZATION_EXISTS",
+};
 const NOT_APPLICABLE: Treatment = { action: "NOT_APPLICABLE" };
 const DELETE: Treatment = { action: "DELETE" };
 
-export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolicy> = {
+export const PERSONAL_DATA_MAP: Record<
+  PersonalDataCollection,
+  PersonalDataPolicy
+> = {
   // -------------------------------------------------------------- raiz
   organizations: {
     // O cadastro usa o nome do profissional como nome da organizacao.
@@ -216,7 +227,13 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     onOrganizationDeletion: DELETE,
   },
   memberRequests: {
-    personalFields: ["requestedBy", "displayName", "email", "decidedBy", "decisionReason"],
+    personalFields: [
+      "requestedBy",
+      "displayName",
+      "email",
+      "decidedBy",
+      "decisionReason",
+    ],
     retention: WHILE_ORGANIZATION,
     onClientErasure: NOT_APPLICABLE,
     onOrganizationDeletion: DELETE,
@@ -234,7 +251,14 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     onOrganizationDeletion: DELETE,
   },
   professionals: {
-    personalFields: ["displayName", "email", "phone", "licenseNumber", "specialties", "avatarUrl"],
+    personalFields: [
+      "displayName",
+      "email",
+      "phone",
+      "licenseNumber",
+      "specialties",
+      "avatarUrl",
+    ],
     retention: WHILE_ORGANIZATION,
     onClientErasure: NOT_APPLICABLE,
     onOrganizationDeletion: DELETE,
@@ -291,14 +315,25 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     onOrganizationDeletion: DELETE,
   },
   conversations: {
-    personalFields: ["clientId", "clientName", "lastMessagePreview", "escalationReason"],
-    retention: { kind: "CONFIGURED_NOT_ENFORCED", setting: "messageRetentionDays" },
+    personalFields: [
+      "clientId",
+      "clientName",
+      "lastMessagePreview",
+      "escalationReason",
+    ],
+    retention: {
+      kind: "CONFIGURED_NOT_ENFORCED",
+      setting: "messageRetentionDays",
+    },
     onClientErasure: DELETE,
     onOrganizationDeletion: DELETE,
   },
   messages: {
     personalFields: ["clientId", "authorName", "body"],
-    retention: { kind: "CONFIGURED_NOT_ENFORCED", setting: "messageRetentionDays" },
+    retention: {
+      kind: "CONFIGURED_NOT_ENFORCED",
+      setting: "messageRetentionDays",
+    },
     onClientErasure: DELETE,
     onOrganizationDeletion: DELETE,
   },
@@ -309,7 +344,11 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     // levar o nome.
     onClientErasure: {
       action: "PSEUDONYMIZE",
-      fields: { clientId: "CLIENT_ID", clientName: "NULL", description: "REDACTED_TEXT" },
+      fields: {
+        clientId: "CLIENT_ID",
+        clientName: "NULL",
+        description: "REDACTED_TEXT",
+      },
     },
     onOrganizationDeletion: DELETE,
   },
@@ -321,7 +360,11 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     retention: WHILE_ORGANIZATION,
     onClientErasure: {
       action: "PSEUDONYMIZE",
-      fields: { clientId: "CLIENT_ID", clientName: "NULL", description: "REDACTED_TEXT" },
+      fields: {
+        clientId: "CLIENT_ID",
+        clientName: "NULL",
+        description: "REDACTED_TEXT",
+      },
     },
     onOrganizationDeletion: DELETE,
   },
@@ -346,7 +389,14 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
   // (decisao de 25/09), ate o juridico responder o prazo de guarda (pergunta
   // 16 do ADR 0004). Entra na exportacao.
   receipts: {
-    personalFields: ["clientId", "payerName", "payerDocument", "beneficiaryName", "beneficiaryDocument", "description"],
+    personalFields: [
+      "clientId",
+      "payerName",
+      "payerDocument",
+      "beneficiaryName",
+      "beneficiaryDocument",
+      "description",
+    ],
     retention: WHILE_ORGANIZATION,
     onClientErasure: {
       action: "KEEP",
@@ -378,16 +428,25 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
   },
   aiDecisions: {
     personalFields: ["clientId", "inputPreview", "responseText"],
-    retention: { kind: "CONFIGURED_NOT_ENFORCED", setting: "auditRetentionDays" },
+    retention: {
+      kind: "CONFIGURED_NOT_ENFORCED",
+      setting: "auditRetentionDays",
+    },
     // Append-only: a decisao continua existindo, sem o que a pessoa escreveu.
     onClientErasure: { action: "PSEUDONYMIZE", fields: DECISION_CONTENT },
-    onOrganizationDeletion: { action: "PSEUDONYMIZE", fields: DECISION_CONTENT },
+    onOrganizationDeletion: {
+      action: "PSEUDONYMIZE",
+      fields: DECISION_CONTENT,
+    },
   },
   // Revisao da classificacao (Fase 4). So ids e enums: o que a pessoa escreveu
   // fica na decisao, que e quem responde ao pedido do titular.
   aiDecisionReviews: {
     personalFields: ["createdBy", "updatedBy"],
-    retention: { kind: "CONFIGURED_NOT_ENFORCED", setting: "auditRetentionDays" },
+    retention: {
+      kind: "CONFIGURED_NOT_ENFORCED",
+      setting: "auditRetentionDays",
+    },
     onClientErasure: {
       action: "KEEP",
       why: "Guarda só o veredito e a classificação esperada, sem texto da pessoa atendida. Os ids são de quem revisou, da equipe.",
@@ -452,7 +511,21 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
   rescheduleRequests: {
     personalFields: ["clientId"],
     retention: { kind: "UNDEFINED" },
-    onClientErasure: { action: "PSEUDONYMIZE", fields: { clientId: "CLIENT_ID" } },
+    onClientErasure: {
+      action: "PSEUDONYMIZE",
+      fields: { clientId: "CLIENT_ID" },
+    },
+    onOrganizationDeletion: DELETE,
+  },
+  // Oferta de agendamento: mesmos dados mínimos e o mesmo ciclo curto da
+  // oferta de remarcação; o texto continua somente em `messages`.
+  bookingRequests: {
+    personalFields: ["clientId"],
+    retention: { kind: "UNDEFINED" },
+    onClientErasure: {
+      action: "PSEUDONYMIZE",
+      fields: { clientId: "CLIENT_ID" },
+    },
     onOrganizationDeletion: DELETE,
   },
   // Catalogo de servicos (E2.1). Nome, preco e duracao do TRABALHO da
@@ -494,7 +567,10 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
   },
   auditLogs: {
     personalFields: ["actorName", "summary", "resource.id"],
-    retention: { kind: "CONFIGURED_NOT_ENFORCED", setting: "auditRetentionDays" },
+    retention: {
+      kind: "CONFIGURED_NOT_ENFORCED",
+      setting: "auditRetentionDays",
+    },
     // O resumo e montado com o nome do cliente ("Cadastro de ... criado").
     // O nome de quem agiu e da equipe e fica enquanto a organizacao existe.
     onClientErasure: {
@@ -569,7 +645,13 @@ export const PERSONAL_DATA_MAP: Record<PersonalDataCollection, PersonalDataPolic
     },
   },
   platformAccessGrants: {
-    personalFields: ["subscriberUserId", "reason", "grantedBy", "revokedBy", "revokeReason"],
+    personalFields: [
+      "subscriberUserId",
+      "reason",
+      "grantedBy",
+      "revokedBy",
+      "revokeReason",
+    ],
     retention: { kind: "UNDEFINED" },
     onClientErasure: NOT_APPLICABLE,
     onOrganizationDeletion: {

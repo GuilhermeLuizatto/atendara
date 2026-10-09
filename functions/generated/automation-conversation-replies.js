@@ -1,7 +1,7 @@
 // Gerado por scripts/build-functions.mjs.
 import { CONVERSATION_REPLY_VALIDITY_MINUTES } from "./automation-config.js";
 import { CHANNEL_META, RETRY_POLICY } from "./notifications-config.js";
-import { evaluateConversationReply } from "./notifications-eligibility.js";
+import { evaluateConversationReply, } from "./notifications-eligibility.js";
 import { addMinutes } from "./notifications-schedule.js";
 import { hashBody } from "./notifications-templates.js";
 /** Uma resposta por mensagem recebida: a reentrega da Meta cai no mesmo id. */
@@ -12,7 +12,13 @@ export function planConversationReply(input) {
     if (!input.client) {
         return { kind: "SKIPPED", reason: "CLIENT_NOT_IDENTIFIED" };
     }
-    if (input.event !== "ADMINISTRATIVE_REPLY" && !input.appointment) {
+    const mayNotHaveAppointment = [
+        "ADMINISTRATIVE_REPLY",
+        "SCHEDULE_OFFERED",
+        "SCHEDULE_HANDED_OFF",
+        "CANCELLATION_HANDED_OFF",
+    ].includes(input.event);
+    if (!mayNotHaveAppointment && !input.appointment) {
         return { kind: "SKIPPED", reason: "NO_APPOINTMENT" };
     }
     const decision = evaluateConversationReply(input);

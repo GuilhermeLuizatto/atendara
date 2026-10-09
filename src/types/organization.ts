@@ -34,6 +34,20 @@ export interface ReschedulePolicy {
   searchWindowDays: number;
 }
 
+/** Acoes de agenda que a propria pessoa pode concluir pela conversa. */
+export interface AgendaSelfServicePolicy {
+  /** Oferece horarios e cria um atendimento depois da escolha. */
+  bookingEnabled: boolean;
+  /** Permite cancelar o proximo atendimento sem intervencao humana. */
+  cancellationEnabled: boolean;
+  /** Antecedencia minima para o cancelamento automatico. */
+  minimumCancellationNoticeHours: number;
+  /** Quantos horarios aparecem em cada oferta de agendamento. */
+  offeredSlots: number;
+  /** Ate quantos dias a frente a Dara procura uma vaga. */
+  searchWindowDays: number;
+}
+
 export interface AgendaSettings {
   /**
    * Remarcacao pela propria pessoa atendida (13.6). Ausente = desligada, como
@@ -42,6 +56,8 @@ export interface AgendaSettings {
    * `agendaSettings:update` e a regra de `settings.agenda` ja dizem isso.
    */
   reschedule?: ReschedulePolicy;
+  /** Ausente em documentos antigos = tudo desligado. */
+  selfService?: AgendaSelfServicePolicy;
   /** 0 = domingo ... 6 = sabado. */
   workingDays: number[];
   workdayStart: string; // "08:00"

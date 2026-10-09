@@ -19,8 +19,7 @@ import type { PrivacyRedactionMark } from "./privacy";
  * bases legais diferentes.
  */
 export type NotificationAudience =
-  | "PLATFORM_TO_SUBSCRIBER"
-  | "ORGANIZATION_TO_CLIENT";
+  "PLATFORM_TO_SUBSCRIBER" | "ORGANIZATION_TO_CLIENT";
 
 /**
  * Canais de saida da organizacao. `IN_APP` nao entra: aviso dentro do painel e
@@ -51,9 +50,14 @@ export type AgendaNoticeEvent = (typeof AGENDA_NOTICE_EVENTS)[number];
  */
 export const CONVERSATION_REPLY_EVENTS = [
   "ADMINISTRATIVE_REPLY",
+  "SCHEDULE_OFFERED",
+  "SCHEDULE_CONFIRMED",
+  "SCHEDULE_HANDED_OFF",
   "RESCHEDULE_OFFERED",
   "RESCHEDULE_CONFIRMED",
   "RESCHEDULE_HANDED_OFF",
+  "CANCELLATION_CONFIRMED",
+  "CANCELLATION_HANDED_OFF",
 ] as const;
 
 export type ConversationReplyEvent = (typeof CONVERSATION_REPLY_EVENTS)[number];
@@ -103,7 +107,11 @@ export interface NotificationRule {
  * mensagem sair: `PENDING` e verificacao em andamento na Meta e `REJECTED` e
  * recusa, que exige agir no painel do provedor antes de tentar de novo.
  */
-export const MESSAGING_SENDER_STATUSES = ["PENDING", "APPROVED", "REJECTED"] as const;
+export const MESSAGING_SENDER_STATUSES = [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+] as const;
 
 export type MessagingSenderStatus = (typeof MESSAGING_SENDER_STATUSES)[number];
 
@@ -182,9 +190,13 @@ export const CONSENT_MEDIA = ["FORM", "WRITTEN_DOCUMENT", "MESSAGE"] as const;
 export type ConsentMedium = (typeof CONSENT_MEDIA)[number];
 
 /** LGPD, art. 14: um dos pais ou o responsavel legal. */
-export const LEGAL_GUARDIAN_RELATIONSHIPS = ["PARENT", "LEGAL_GUARDIAN"] as const;
+export const LEGAL_GUARDIAN_RELATIONSHIPS = [
+  "PARENT",
+  "LEGAL_GUARDIAN",
+] as const;
 
-export type LegalGuardianRelationship = (typeof LEGAL_GUARDIAN_RELATIONSHIPS)[number];
+export type LegalGuardianRelationship =
+  (typeof LEGAL_GUARDIAN_RELATIONSHIPS)[number];
 
 export interface ConsentRecorder {
   kind: ConsentRecorderKind;
@@ -252,7 +264,8 @@ export interface LegacyNotificationConsent {
 }
 
 /** O que um documento de cadastro pode trazer no campo de consentimento. */
-export type StoredNotificationConsent = NotificationConsent | LegacyNotificationConsent;
+export type StoredNotificationConsent =
+  NotificationConsent | LegacyNotificationConsent;
 
 /**
  * Estados de entrega.
@@ -264,11 +277,7 @@ export type StoredNotificationConsent = NotificationConsent | LegacyNotification
  * backend adquiriu a tarefa e ainda nao gravou o resultado.
  */
 export type DeliveryStatus =
-  | "PLANNED"
-  | "SENDING"
-  | "SENT"
-  | "FAILED"
-  | "CANCELLED";
+  "PLANNED" | "SENDING" | "SENT" | "FAILED" | "CANCELLED";
 
 /** O que o provedor respondeu. Nao inclui conteudo da mensagem. */
 export type DeliveryOutcome = "ACCEPTED" | "TEMPORARY_FAILURE" | "REJECTED";
@@ -382,8 +391,7 @@ export const NOTIFICATION_SKIP_REASONS = [
   "ASSISTANT_QUIET_HOURS",
 ] as const;
 
-export type NotificationSkipReason =
-  (typeof NOTIFICATION_SKIP_REASONS)[number];
+export type NotificationSkipReason = (typeof NOTIFICATION_SKIP_REASONS)[number];
 
 /** Resultado da avaliacao de uma regra contra um evento concreto. */
 export type NotificationEligibility =
@@ -416,8 +424,7 @@ export type NotificationDispatchOnlyStopReason =
   (typeof NOTIFICATION_DISPATCH_ONLY_STOP_REASONS)[number];
 
 export type NotificationDispatchStopReason =
-  | NotificationSkipReason
-  | NotificationDispatchOnlyStopReason;
+  NotificationSkipReason | NotificationDispatchOnlyStopReason;
 
 // ------------------------------------------------ avisos da plataforma
 

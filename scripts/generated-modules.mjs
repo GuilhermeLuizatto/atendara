@@ -53,6 +53,7 @@ export const SOURCES = [
   ["src/config/automation.ts", "automation-config"],
   ["src/config/notifications.ts", "notifications-config"],
   ["src/config/organization.ts", "organization-config"],
+  ["src/config/agenda-self-service.ts", "agenda-self-service-config"],
   ["src/config/professions/index.ts", "professions"],
   ["src/config/professions/definitions.ts", "profession-definitions"],
   ["src/lib/utils/format.ts", "format"],

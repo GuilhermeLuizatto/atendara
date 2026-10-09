@@ -46,7 +46,10 @@ export const PRIVACY_RESPONSIBLE_ROLES = ["OWNER", "ADMIN"];
 export const RECENT_LOGIN_SECONDS = 300;
 /** Paginas de uma exportacao so valem dentro desta janela a partir do inicio. */
 export const ORGANIZATION_EXPORT_WINDOW_MINUTES = 60;
-export const ORGANIZATION_EXPORT_PAGE_SIZE = { default: 200, max: 300 };
+export const ORGANIZATION_EXPORT_PAGE_SIZE = {
+    default: 200,
+    max: 300,
+};
 /**
  * Prazos PROVISORIOS, gravados como `expiresAt` e sem TTL ligado — o mesmo
  * tratamento que a Etapa 5B deu a `platformGatewayEvents`. 730 dias acompanha
@@ -101,7 +104,9 @@ const DECISION_CONTENT = {
     responseText: "REDACTED_TEXT",
 };
 const REQUEST_SUBJECT = { subjectId: "CLIENT_ID" };
-const WHILE_ORGANIZATION = { kind: "WHILE_ORGANIZATION_EXISTS" };
+const WHILE_ORGANIZATION = {
+    kind: "WHILE_ORGANIZATION_EXISTS",
+};
 const NOT_APPLICABLE = { action: "NOT_APPLICABLE" };
 const DELETE = { action: "DELETE" };
 export const PERSONAL_DATA_MAP = {
@@ -139,7 +144,13 @@ export const PERSONAL_DATA_MAP = {
         onOrganizationDeletion: DELETE,
     },
     memberRequests: {
-        personalFields: ["requestedBy", "displayName", "email", "decidedBy", "decisionReason"],
+        personalFields: [
+            "requestedBy",
+            "displayName",
+            "email",
+            "decidedBy",
+            "decisionReason",
+        ],
         retention: WHILE_ORGANIZATION,
         onClientErasure: NOT_APPLICABLE,
         onOrganizationDeletion: DELETE,
@@ -157,7 +168,14 @@ export const PERSONAL_DATA_MAP = {
         onOrganizationDeletion: DELETE,
     },
     professionals: {
-        personalFields: ["displayName", "email", "phone", "licenseNumber", "specialties", "avatarUrl"],
+        personalFields: [
+            "displayName",
+            "email",
+            "phone",
+            "licenseNumber",
+            "specialties",
+            "avatarUrl",
+        ],
         retention: WHILE_ORGANIZATION,
         onClientErasure: NOT_APPLICABLE,
         onOrganizationDeletion: DELETE,
@@ -214,14 +232,25 @@ export const PERSONAL_DATA_MAP = {
         onOrganizationDeletion: DELETE,
     },
     conversations: {
-        personalFields: ["clientId", "clientName", "lastMessagePreview", "escalationReason"],
-        retention: { kind: "CONFIGURED_NOT_ENFORCED", setting: "messageRetentionDays" },
+        personalFields: [
+            "clientId",
+            "clientName",
+            "lastMessagePreview",
+            "escalationReason",
+        ],
+        retention: {
+            kind: "CONFIGURED_NOT_ENFORCED",
+            setting: "messageRetentionDays",
+        },
         onClientErasure: DELETE,
         onOrganizationDeletion: DELETE,
     },
     messages: {
         personalFields: ["clientId", "authorName", "body"],
-        retention: { kind: "CONFIGURED_NOT_ENFORCED", setting: "messageRetentionDays" },
+        retention: {
+            kind: "CONFIGURED_NOT_ENFORCED",
+            setting: "messageRetentionDays",
+        },
         onClientErasure: DELETE,
         onOrganizationDeletion: DELETE,
     },
@@ -232,7 +261,11 @@ export const PERSONAL_DATA_MAP = {
         // levar o nome.
         onClientErasure: {
             action: "PSEUDONYMIZE",
-            fields: { clientId: "CLIENT_ID", clientName: "NULL", description: "REDACTED_TEXT" },
+            fields: {
+                clientId: "CLIENT_ID",
+                clientName: "NULL",
+                description: "REDACTED_TEXT",
+            },
         },
         onOrganizationDeletion: DELETE,
     },
@@ -244,7 +277,11 @@ export const PERSONAL_DATA_MAP = {
         retention: WHILE_ORGANIZATION,
         onClientErasure: {
             action: "PSEUDONYMIZE",
-            fields: { clientId: "CLIENT_ID", clientName: "NULL", description: "REDACTED_TEXT" },
+            fields: {
+                clientId: "CLIENT_ID",
+                clientName: "NULL",
+                description: "REDACTED_TEXT",
+            },
         },
         onOrganizationDeletion: DELETE,
     },
@@ -269,7 +306,14 @@ export const PERSONAL_DATA_MAP = {
     // (decisao de 25/09), ate o juridico responder o prazo de guarda (pergunta
     // 16 do ADR 0004). Entra na exportacao.
     receipts: {
-        personalFields: ["clientId", "payerName", "payerDocument", "beneficiaryName", "beneficiaryDocument", "description"],
+        personalFields: [
+            "clientId",
+            "payerName",
+            "payerDocument",
+            "beneficiaryName",
+            "beneficiaryDocument",
+            "description",
+        ],
         retention: WHILE_ORGANIZATION,
         onClientErasure: {
             action: "KEEP",
@@ -301,16 +345,25 @@ export const PERSONAL_DATA_MAP = {
     },
     aiDecisions: {
         personalFields: ["clientId", "inputPreview", "responseText"],
-        retention: { kind: "CONFIGURED_NOT_ENFORCED", setting: "auditRetentionDays" },
+        retention: {
+            kind: "CONFIGURED_NOT_ENFORCED",
+            setting: "auditRetentionDays",
+        },
         // Append-only: a decisao continua existindo, sem o que a pessoa escreveu.
         onClientErasure: { action: "PSEUDONYMIZE", fields: DECISION_CONTENT },
-        onOrganizationDeletion: { action: "PSEUDONYMIZE", fields: DECISION_CONTENT },
+        onOrganizationDeletion: {
+            action: "PSEUDONYMIZE",
+            fields: DECISION_CONTENT,
+        },
     },
     // Revisao da classificacao (Fase 4). So ids e enums: o que a pessoa escreveu
     // fica na decisao, que e quem responde ao pedido do titular.
     aiDecisionReviews: {
         personalFields: ["createdBy", "updatedBy"],
-        retention: { kind: "CONFIGURED_NOT_ENFORCED", setting: "auditRetentionDays" },
+        retention: {
+            kind: "CONFIGURED_NOT_ENFORCED",
+            setting: "auditRetentionDays",
+        },
         onClientErasure: {
             action: "KEEP",
             why: "Guarda só o veredito e a classificação esperada, sem texto da pessoa atendida. Os ids são de quem revisou, da equipe.",
@@ -375,7 +428,21 @@ export const PERSONAL_DATA_MAP = {
     rescheduleRequests: {
         personalFields: ["clientId"],
         retention: { kind: "UNDEFINED" },
-        onClientErasure: { action: "PSEUDONYMIZE", fields: { clientId: "CLIENT_ID" } },
+        onClientErasure: {
+            action: "PSEUDONYMIZE",
+            fields: { clientId: "CLIENT_ID" },
+        },
+        onOrganizationDeletion: DELETE,
+    },
+    // Oferta de agendamento: mesmos dados mínimos e o mesmo ciclo curto da
+    // oferta de remarcação; o texto continua somente em `messages`.
+    bookingRequests: {
+        personalFields: ["clientId"],
+        retention: { kind: "UNDEFINED" },
+        onClientErasure: {
+            action: "PSEUDONYMIZE",
+            fields: { clientId: "CLIENT_ID" },
+        },
         onOrganizationDeletion: DELETE,
     },
     // Catalogo de servicos (E2.1). Nome, preco e duracao do TRABALHO da
@@ -417,7 +484,10 @@ export const PERSONAL_DATA_MAP = {
     },
     auditLogs: {
         personalFields: ["actorName", "summary", "resource.id"],
-        retention: { kind: "CONFIGURED_NOT_ENFORCED", setting: "auditRetentionDays" },
+        retention: {
+            kind: "CONFIGURED_NOT_ENFORCED",
+            setting: "auditRetentionDays",
+        },
         // O resumo e montado com o nome do cliente ("Cadastro de ... criado").
         // O nome de quem agiu e da equipe e fica enquanto a organizacao existe.
         onClientErasure: {
@@ -491,7 +561,13 @@ export const PERSONAL_DATA_MAP = {
         },
     },
     platformAccessGrants: {
-        personalFields: ["subscriberUserId", "reason", "grantedBy", "revokedBy", "revokeReason"],
+        personalFields: [
+            "subscriberUserId",
+            "reason",
+            "grantedBy",
+            "revokedBy",
+            "revokeReason",
+        ],
         retention: { kind: "UNDEFINED" },
         onClientErasure: NOT_APPLICABLE,
         onOrganizationDeletion: {

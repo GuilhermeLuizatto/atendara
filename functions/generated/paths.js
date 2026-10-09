@@ -92,6 +92,8 @@ export const TENANT_COLLECTIONS = {
     // quando a escolha esta segurada. Um por conversa, com o id da conversa.
     // So o backend le e escreve — o navegador nem oferece nem confirma.
     rescheduleRequests: "rescheduleRequests",
+    // Oferta de um novo atendimento pela conversa. Backend somente.
+    bookingRequests: "bookingRequests",
     // Remetente comprovado de cada canal real (13.4): o numero aprovado na Meta,
     // o nome de exibicao e a situacao da verificacao. Um documento por canal, com
     // o proprio canal como id. Escrito SO pela operadora, pelo backend, com

@@ -1,5 +1,7 @@
 // Gerado por scripts/build-functions.mjs.
 import { DEFAULT_NOTIFICATION_SETTINGS } from "./notifications-config.js";
+import { DEFAULT_AGENDA_SELF_SERVICE_POLICY } from "./agenda-self-service-config.js";
+import { DEFAULT_RESCHEDULE_POLICY } from "./reschedule-config.js";
 import { AI_ASSISTANT_NAME, DEFAULT_CONFIDENCE_THRESHOLD, DEFAULT_LOCALE, DEFAULT_TIMEZONE, } from "./app-config.js";
 import { getProfession } from "./professions.js";
 /**
@@ -35,6 +37,8 @@ export const AGENDA_SLOT_INTERVALS = [10, 15, 20, 30, 45, 60];
 export function defaultOrganizationSettings(profession) {
     return {
         agenda: {
+            reschedule: { ...DEFAULT_RESCHEDULE_POLICY },
+            selfService: { ...DEFAULT_AGENDA_SELF_SERVICE_POLICY },
             workingDays: [1, 2, 3, 4, 5],
             workdayStart: "08:00",
             workdayEnd: "19:00",
@@ -103,7 +107,18 @@ export function withOrganizationDefaults(raw, organizationId, professionId, now)
         plan: raw.plan ?? "TRIAL",
         ownerId: raw.ownerId ?? "",
         settings: {
-            agenda: { ...defaults.agenda, ...raw.settings?.agenda },
+            agenda: {
+                ...defaults.agenda,
+                ...raw.settings?.agenda,
+                reschedule: {
+                    ...DEFAULT_RESCHEDULE_POLICY,
+                    ...(raw.settings?.agenda?.reschedule ?? {}),
+                },
+                selfService: {
+                    ...DEFAULT_AGENDA_SELF_SERVICE_POLICY,
+                    ...(raw.settings?.agenda?.selfService ?? {}),
+                },
+            },
             ai: { ...defaults.ai, ...raw.settings?.ai },
             privacy: { ...defaults.privacy, ...raw.settings?.privacy },
             notifications: {

@@ -67,6 +67,33 @@ export const APPOINTMENT_EVENT_META = {
         consentLabel: "respostas administrativas da assistente virtual",
         channels: ["WHATSAPP"],
     },
+    SCHEDULE_OFFERED: {
+        label: "Horários para agendar",
+        description: "Oferece horários livres quando a pessoa pede um novo atendimento.",
+        defaultEnabled: false,
+        allowedLeadMinutes: [0],
+        anchor: "CHANGE",
+        consentLabel: "horários livres quando você pedir para agendar",
+        channels: ["WHATSAPP"],
+    },
+    SCHEDULE_CONFIRMED: {
+        label: "Agendamento feito",
+        description: "Confirma o horário novo escolhido pela pessoa.",
+        defaultEnabled: false,
+        allowedLeadMinutes: [0],
+        anchor: "CHANGE",
+        consentLabel: "confirmação do horário agendado",
+        channels: ["WHATSAPP"],
+    },
+    SCHEDULE_HANDED_OFF: {
+        label: "Agendamento com a equipe",
+        description: "Avisa que o pedido de agendamento foi encaminhado à equipe.",
+        defaultEnabled: false,
+        allowedLeadMinutes: [0],
+        anchor: "CHANGE",
+        consentLabel: "aviso de que o pedido de agendamento foi para a equipe",
+        channels: ["WHATSAPP"],
+    },
     RESCHEDULE_OFFERED: {
         label: "Horários para remarcar",
         description: "Responde a quem pediu para remarcar com os horários livres dentro da política de remarcação. Sai só dentro das 24 horas que a pessoa abriu e só enquanto os horários estão segurados.",
@@ -94,6 +121,24 @@ export const APPOINTMENT_EVENT_META = {
         consentLabel: "aviso de que o pedido de remarcação foi para a equipe",
         channels: ["WHATSAPP"],
     },
+    CANCELLATION_CONFIRMED: {
+        label: "Cancelamento feito",
+        description: "Confirma o cancelamento pedido pela própria pessoa.",
+        defaultEnabled: false,
+        allowedLeadMinutes: [0],
+        anchor: "CHANGE",
+        consentLabel: "confirmação do cancelamento pedido por você",
+        channels: ["WHATSAPP"],
+    },
+    CANCELLATION_HANDED_OFF: {
+        label: "Cancelamento com a equipe",
+        description: "Avisa que o pedido de cancelamento foi encaminhado à equipe.",
+        defaultEnabled: false,
+        allowedLeadMinutes: [0],
+        anchor: "CHANGE",
+        consentLabel: "aviso de que o pedido de cancelamento foi para a equipe",
+        channels: ["WHATSAPP"],
+    },
 };
 /** Canais em que um evento pode sair, dentro do que a profissao permite. */
 export function channelsForEvent(event, professionChannels) {
@@ -109,8 +154,8 @@ export function channelsForEvent(event, professionChannels) {
  * RASCUNHO: redacao, base legal e necessidade do consentimento para cada
  * evento dependem de revisao por profissional qualificado.
  */
-// 09/10: entra a resposta administrativa da assistente na conversa.
-export const NOTIFICATION_CONSENT_TEXT_VERSION = "2026-10-09-rascunho";
+// 09/10: entram as jornadas de agenda feitas pela assistente na conversa.
+export const NOTIFICATION_CONSENT_TEXT_VERSION = "2026-10-09-dara-agenda-rascunho";
 export const NOTIFICATION_CONSENT_REVIEW_STATUS = "DRAFT_PENDING_LEGAL_REVIEW";
 /**
  * O que o aviso mostra, dito a pessoa. Precisa acompanhar

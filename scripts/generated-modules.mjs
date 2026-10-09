@@ -94,6 +94,10 @@ export const SOURCES = [
     "src/lib/automation/conversation-replies.ts",
     "automation-conversation-replies",
   ],
+  [
+    "src/lib/automation/assistant-availability.ts",
+    "automation-assistant-availability",
+  ],
   ["src/lib/automation/emergency.ts", "automation-emergency"],
   ["src/lib/automation/inbound.ts", "automation-inbound"],
   ["src/lib/ai/decision-engine.ts", "decision-engine"],

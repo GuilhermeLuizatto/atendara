@@ -456,11 +456,13 @@ service cloud.firestore {
       let before = resource.data.get('settings', {}).get('ai', null);
       let after = request.resource.data.get('settings', {}).get('ai', null);
       return before == after || (after is map
-        && after.keys().hasOnly(['enabled', 'displayName', 'autoResponseConfidenceThreshold', 'allowAutonomousReplies', 'quietHoursStart', 'quietHoursEnd'])
+        && after.keys().hasOnly(['enabled', 'displayName', 'autoResponseConfidenceThreshold', 'allowAutonomousReplies', 'unansweredDelayMinutes', 'quietHoursStart', 'quietHoursEnd'])
         && after.enabled is bool && after.allowAutonomousReplies is bool
         && after.displayName is string && after.displayName.size() > 0 && after.displayName.size() <= 60
         && after.autoResponseConfidenceThreshold is number
         && after.autoResponseConfidenceThreshold >= 0.8 && after.autoResponseConfidenceThreshold <= 1
+        && after.unansweredDelayMinutes is int
+        && after.unansweredDelayMinutes >= 1 && after.unansweredDelayMinutes <= 120
         && ((after.quietHoursStart == null && after.quietHoursEnd == null)
           || (after.quietHoursStart is string && after.quietHoursEnd is string
             && after.quietHoursStart.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')

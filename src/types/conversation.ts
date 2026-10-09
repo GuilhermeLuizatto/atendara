@@ -31,6 +31,8 @@ export interface Conversation extends TenantScopedEntity {
   /** True quando o agente parou de atuar e aguarda o profissional. */
   escalated: boolean;
   escalationReason: string | null;
+  /** Resposta administrativa ainda cancelável por uma resposta humana. */
+  pendingAssistantTaskId?: ID | null;
 }
 
 export interface Message extends TenantScopedEntity {

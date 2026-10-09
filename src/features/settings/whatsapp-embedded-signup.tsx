@@ -3,8 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
 
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
-import { isMetaEmbeddedSignupConfigured, META_EMBEDDED_SIGNUP } from "@/config/meta";
+import {
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui";
+import {
+  isMetaEmbeddedSignupConfigured,
+  META_EMBEDDED_SIGNUP,
+} from "@/config/meta";
 import {
   embeddedSignupResult,
   embeddedSignupSession,
@@ -21,7 +31,9 @@ export function WhatsappEmbeddedSignup() {
   const [sdkReady, setSdkReady] = useState(false);
   const [state, setState] = useState<ConnectionState>("idle");
   const [message, setMessage] = useState("");
-  const [authorizationCode, setAuthorizationCode] = useState<string | null>(null);
+  const [authorizationCode, setAuthorizationCode] = useState<string | null>(
+    null,
+  );
   const [session, setSession] = useState<EmbeddedSignupSession | null>(null);
   const submittedRef = useRef<string | null>(null);
   const configured = isMetaEmbeddedSignupConfigured();
@@ -48,12 +60,16 @@ export function WhatsappEmbeddedSignup() {
       if (eventName.includes("CANCEL") || eventName.includes("ERROR")) {
         setSession(null);
         setState("error");
-        setMessage("A conexão foi interrompida antes de concluir o cadastro na Meta.");
+        setMessage(
+          "A conexão foi interrompida antes de concluir o cadastro na Meta.",
+        );
         return;
       }
 
       if (eventName.includes("FINISH")) setSession(session);
-      setMessage("A Meta recebeu os dados da conta. Finalizando a autorização...");
+      setMessage(
+        "A Meta recebeu os dados da conta. Finalizando a autorização...",
+      );
     }
 
     window.addEventListener("message", receiveMetaSession);
@@ -62,10 +78,10 @@ export function WhatsappEmbeddedSignup() {
 
   useEffect(() => {
     const wabaId = session?.data.wabaId;
-    const phoneNumberId = session?.data.phoneNumberId;
-    if (!authorizationCode || !wabaId || !phoneNumberId) return;
+    const phoneNumberId = session?.data.phoneNumberId ?? null;
+    if (!authorizationCode || !wabaId) return;
 
-    const key = `${authorizationCode}:${wabaId}:${phoneNumberId}`;
+    const key = `${authorizationCode}:${wabaId}:${phoneNumberId ?? "coexistence"}`;
     if (submittedRef.current === key) return;
     submittedRef.current = key;
     let cancelled = false;
@@ -89,7 +105,9 @@ export function WhatsappEmbeddedSignup() {
       .catch(() => {
         if (cancelled) return;
         setState("error");
-        setMessage("A Meta não confirmou essa conta ou esse número. Confira os dados e tente novamente.");
+        setMessage(
+          "A Meta não confirmou essa conta ou esse número. Confira os dados e tente novamente.",
+        );
         setAuthorizationCode(null);
       });
 
@@ -117,7 +135,11 @@ export function WhatsappEmbeddedSignup() {
         config_id: META_EMBEDDED_SIGNUP.configId,
         response_type: "code",
         override_default_response_type: true,
-        extras: { setup: {} },
+        extras: {
+          setup: {},
+          featureType: "whatsapp_business_app_onboarding",
+          sessionInfoVersion: "3",
+        },
       },
     );
   }
@@ -149,12 +171,13 @@ export function WhatsappEmbeddedSignup() {
       <CardBody className="space-y-4">
         <div className="space-y-2 text-sm">
           <p className="text-foreground">
-            O Embedded Signup prepara a conexão oficial da conta e do número do WhatsApp Business
-            do profissional.
+            O Embedded Signup conecta o número que o profissional já usa no app
+            WhatsApp Business pelo modo de coexistência oficial da Meta.
           </p>
           <p className="text-muted-foreground">
-            Nenhuma mensagem é enviada por este botão. O código de autorização é usado uma única
-            vez pelo backend e não é salvo no navegador nem no Firestore.
+            O app continua disponível para conversas individuais. Quando o
+            profissional responde por ele, a Dara sai da conversa. Nenhuma
+            mensagem é enviada por este botão.
           </p>
         </div>
 
@@ -164,8 +187,8 @@ export function WhatsappEmbeddedSignup() {
             <p>
               Preencha <code>NEXT_PUBLIC_META_APP_ID</code> e
               <code> NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID</code> no
-              <code> .env.local</code>. Esses identificadores são públicos; tokens e segredos não
-              devem ser colocados no frontend.
+              <code> .env.local</code>. Esses identificadores são públicos;
+              tokens e segredos não devem ser colocados no frontend.
             </p>
           </div>
         ) : (

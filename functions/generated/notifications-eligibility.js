@@ -8,6 +8,7 @@ import { contactFor, hasRawContact } from "./notifications-contacts.js";
 import { deliveryKey } from "./notifications-delivery.js";
 import { scheduledTimeFor } from "./notifications-schedule.js";
 import { renderReply } from "./notifications-replies.js";
+import { isWithinAssistantQuietHours } from "./automation-assistant-availability.js";
 import { whatsappMessageFor } from "./notifications-whatsapp.js";
 import { hashBody, renderTemplate } from "./notifications-templates.js";
 /**
@@ -162,6 +163,17 @@ export function evaluateConversationReply(input) {
         return { eligible: false, reason: "NO_RULE_FOR_EVENT" };
     if (!input.client)
         return { eligible: false, reason: "CLIENT_NOT_IDENTIFIED" };
+    if (input.event === "ADMINISTRATIVE_REPLY") {
+        if (!input.organization.settings.ai.enabled) {
+            return { eligible: false, reason: "ASSISTANT_DISABLED" };
+        }
+        if (!input.organization.settings.ai.allowAutonomousReplies) {
+            return { eligible: false, reason: "AUTONOMOUS_REPLIES_DISABLED" };
+        }
+        if (isWithinAssistantQuietHours(input.organization, input.now)) {
+            return { eligible: false, reason: "ASSISTANT_QUIET_HOURS" };
+        }
+    }
     const problem = gateProblem(rule, input.event, {
         organization: input.organization,
         profession: input.profession,
@@ -200,6 +212,7 @@ export function evaluateConversationReply(input) {
         clientName: input.client.preferredName ?? firstName(input.client.fullName),
         organizationName: input.organization.name,
         ...input.details,
+        responseText: input.responseText,
     });
     if (!rendered.ok)
         return { eligible: false, reason: "TEMPLATE_REJECTED" };

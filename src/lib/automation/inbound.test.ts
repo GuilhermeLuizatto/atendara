@@ -9,7 +9,7 @@ import {
   isWithinInboundWindow,
   normalizeInboundPhone,
   parseInboundPayload,
-  type InboundEvent,
+  type InboundPatientEvent,
 } from "./inbound";
 
 const SENDER = "1236644296208358";
@@ -170,6 +170,29 @@ describe("ler o corpo do webhook", () => {
     };
     expect(parseInboundPayload(status)).toEqual([]);
   });
+
+  it("separa a resposta feita no app WhatsApp Business como eco humano", () => {
+    const data = webhook({
+      from: SENDER,
+      to: FROM,
+      id: "wamid.echo-1",
+      timestamp: "1789881830",
+      type: "text",
+      text: { body: "Eu assumo daqui." },
+    });
+    data.entry[0].changes[0].field = "smb_message_echoes";
+
+    expect(parseInboundPayload(data)).toEqual([
+      {
+        kind: "HUMAN_ECHO",
+        providerSenderId: SENDER,
+        to: FROM,
+        providerMessageId: "wamid.echo-1",
+        text: "Eu assumo daqui.",
+        sentAt: "2026-09-20T05:23:50.000Z",
+      },
+    ]);
+  });
 });
 
 describe("o telefone", () => {
@@ -212,7 +235,7 @@ describe("pedido de saida", () => {
 });
 
 describe("o que fazer com o que chegou", () => {
-  const base: InboundEvent = {
+  const base: InboundPatientEvent = {
     kind: "TEXT",
     providerSenderId: SENDER,
     from: FROM,
@@ -254,7 +277,7 @@ describe("o que fazer com o que chegou", () => {
   });
 
   it("botao vira confirmacao ou remarcacao, sem passar pelo classificador", () => {
-    const botao = (button: "CONFIRM" | "RESCHEDULE"): InboundEvent => ({
+    const botao = (button: "CONFIRM" | "RESCHEDULE"): InboundPatientEvent => ({
       kind: "BUTTON",
       providerSenderId: SENDER,
       from: FROM,

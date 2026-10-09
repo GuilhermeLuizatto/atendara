@@ -21,6 +21,7 @@ function valuesFor(context) {
             ? slots.map((slot, index) => `${index + 1}. ${when(slot.startsAt)}`).join("\n")
             : null,
         holdMinutes: String(RESCHEDULE_HOLD_MINUTES),
+        responseText: context.responseText?.trim() || null,
     };
 }
 export function renderReply(event, stage, context) {

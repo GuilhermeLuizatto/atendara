@@ -21,7 +21,12 @@ const HORARIOS = [
   { startsAt: "2026-09-14T11:30:00.000Z", endsAt: "2026-09-14T12:20:00.000Z" },
 ];
 
-const REGRAS: NotificationRule[] = (["RESCHEDULE_OFFERED", "RESCHEDULE_CONFIRMED", "RESCHEDULE_HANDED_OFF"] as const).map(
+const REGRAS: NotificationRule[] = ([
+  "ADMINISTRATIVE_REPLY",
+  "RESCHEDULE_OFFERED",
+  "RESCHEDULE_CONFIRMED",
+  "RESCHEDULE_HANDED_OFF",
+] as const).map(
   (event) => ({ id: `${event}:WHATSAPP`, event, channel: "WHATSAPP", enabled: true, leadMinutes: 0, customTemplate: null }),
 );
 
@@ -44,10 +49,14 @@ const REMETENTE: MessagingSender = {
 };
 
 const ORGANIZACAO = organization({ verifiedSenderChannels: ["WHATSAPP"], rules: REGRAS });
-const CONVERSA: Pick<Conversation, "escalated" | "attention" | "inboundWindowEndsAt"> = {
+const CONVERSA: Pick<
+  Conversation,
+  "escalated" | "attention" | "inboundWindowEndsAt" | "lastInboundAt"
+> = {
   escalated: false,
   attention: "NORMAL",
   inboundWindowEndsAt: JANELA,
+  lastInboundAt: ANCHOR,
 };
 const OFERTA: ReplyOffer = { status: "OFFERED", appointmentId: "atendimento-1", slots: HORARIOS, holdEndsAt: RESERVA };
 
@@ -97,6 +106,27 @@ function entrada(
   };
 }
 
+function administrativo() {
+  const plano = planConversationReply({
+    organization: ORGANIZACAO,
+    profession: getProfession(ORGANIZACAO.primaryProfession),
+    client: client(),
+    sender: REMETENTE,
+    event: "ADMINISTRATIVE_REPLY",
+    stage: "REQUEST",
+    channel: "WHATSAPP",
+    conversation: CONVERSA,
+    now: ANCHOR,
+    responseText: "O valor do atendimento é R$ 180,00.",
+    inboundMessageId: "wa-wamid.administrativa",
+    appointment: null,
+    professionalId: "profissional-1",
+    sourceDecisionId: "wa-wamid.administrativa-decision",
+  });
+  if (plano.kind !== "PLANNED") throw new Error(plano.reason);
+  return plano;
+}
+
 function parouPor(passo: ReturnType<typeof decideReplyDispatch>) {
   if (passo.kind !== "STOP") return passo.kind;
   return passo.task.stopReason ?? passo.task.status;
@@ -124,6 +154,33 @@ describe("a resposta sai", () => {
   it("a confirmação e o encaminhamento também saem", () => {
     expect(decideReplyDispatch(entrada(planejado("RESCHEDULE_CONFIRMED"))).kind).toBe("SEND");
     expect(decideReplyDispatch(entrada(planejado("RESCHEDULE_HANDED_OFF"))).kind).toBe("SEND");
+  });
+
+  it("a resposta administrativa sem atendimento só sai com a decisão original intacta", () => {
+    const plano = administrativo();
+    const passo = decideReplyDispatch(
+      entrada(plano, {
+        appointment: null,
+        offer: null,
+        sourceMessage: {
+          id: "wa-wamid.administrativa",
+          sentAt: ANCHOR,
+          aiDecisionId: "wa-wamid.administrativa-decision",
+        },
+        sourceDecision: {
+          id: "wa-wamid.administrativa-decision",
+          messageId: "wa-wamid.administrativa",
+          classification: "ADMINISTRATIVE",
+          confidence: 0.96,
+          action: "AUTO_RESPONSE",
+          responseText: "O valor do atendimento é R$ 180,00.",
+        },
+      }),
+    );
+
+    if (passo.kind !== "SEND") throw new Error(passo.kind);
+    expect(passo.request.body).toContain("R$ 180,00");
+    expect(passo.request.freeText).toBe(true);
   });
 });
 
@@ -220,5 +277,33 @@ describe("o que mudou entre planejar e enviar para a resposta", () => {
     expect(passo.task.status).toBe("CANCELLED");
     expect(passo.delivery?.status).toBe("CANCELLED");
     expect(passo.effects.map((efeito) => efeito.kind)).toContain("WRITE_AUDIT");
+  });
+
+  it("uma mensagem mais recente cancela a resposta administrativa antiga", () => {
+    const plano = administrativo();
+    const passo = decideReplyDispatch(
+      entrada(plano, {
+        appointment: null,
+        offer: null,
+        conversation: {
+          ...CONVERSA,
+          lastInboundAt: "2026-09-10T12:00:02.000Z",
+        },
+        sourceMessage: {
+          id: "wa-wamid.administrativa",
+          sentAt: ANCHOR,
+          aiDecisionId: "wa-wamid.administrativa-decision",
+        },
+        sourceDecision: {
+          id: "wa-wamid.administrativa-decision",
+          messageId: "wa-wamid.administrativa",
+          classification: "ADMINISTRATIVE",
+          confidence: 0.96,
+          action: "AUTO_RESPONSE",
+          responseText: "O valor do atendimento é R$ 180,00.",
+        },
+      }),
+    );
+    expect(parouPor(passo)).toBe("SOURCE_MESSAGE_CHANGED");
   });
 });

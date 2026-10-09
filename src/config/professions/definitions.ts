@@ -73,6 +73,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       // combinado por conversa, e um aviso automatico nessa hora cria registro
       // do vinculo antes de a pessoa ter escolhido o canal.
       allowedEvents: [
+        "ADMINISTRATIVE_REPLY",
         "APPOINTMENT_REMINDER",
         "APPOINTMENT_CONFIRMED",
         "APPOINTMENT_CANCELLED",
@@ -159,6 +160,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       // combinado por conversa, e um aviso automatico nessa hora cria registro
       // do vinculo antes de a pessoa ter escolhido o canal.
       allowedEvents: [
+        "ADMINISTRATIVE_REPLY",
         "APPOINTMENT_REMINDER",
         "APPOINTMENT_CONFIRMED",
         "APPOINTMENT_CANCELLED",
@@ -244,6 +246,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       // combinado por conversa, e um aviso automatico nessa hora cria registro
       // do vinculo antes de a pessoa ter escolhido o canal.
       allowedEvents: [
+        "ADMINISTRATIVE_REPLY",
         "APPOINTMENT_REMINDER",
         "APPOINTMENT_CONFIRMED",
         "APPOINTMENT_CANCELLED",
@@ -327,6 +330,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     ],
     notifications: {
       allowedEvents: [
+        "ADMINISTRATIVE_REPLY",
         "APPOINTMENT_SCHEDULED",
         "APPOINTMENT_REMINDER",
         "APPOINTMENT_CONFIRMED",
@@ -409,6 +413,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     ],
     notifications: {
       allowedEvents: [
+        "ADMINISTRATIVE_REPLY",
         "APPOINTMENT_SCHEDULED",
         "APPOINTMENT_REMINDER",
         "APPOINTMENT_CONFIRMED",
@@ -490,6 +495,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     ],
     notifications: {
       allowedEvents: [
+        "ADMINISTRATIVE_REPLY",
         "APPOINTMENT_SCHEDULED",
         "APPOINTMENT_REMINDER",
         "APPOINTMENT_CONFIRMED",
@@ -577,6 +583,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
       // combinado por conversa, e um aviso automatico nessa hora cria registro
       // do vinculo antes de a pessoa ter escolhido o canal.
       allowedEvents: [
+        "ADMINISTRATIVE_REPLY",
         "APPOINTMENT_REMINDER",
         "APPOINTMENT_CONFIRMED",
         "APPOINTMENT_CANCELLED",
@@ -659,6 +666,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     ],
     notifications: {
       allowedEvents: [
+        "ADMINISTRATIVE_REPLY",
         "APPOINTMENT_SCHEDULED",
         "APPOINTMENT_REMINDER",
         "APPOINTMENT_CONFIRMED",
@@ -747,6 +755,7 @@ export const PROFESSION_DEFINITIONS: Record<ProfessionId, ProfessionConfig> = {
     ],
     notifications: {
       allowedEvents: [
+        "ADMINISTRATIVE_REPLY",
         "APPOINTMENT_SCHEDULED",
         "APPOINTMENT_REMINDER",
         "APPOINTMENT_CONFIRMED",

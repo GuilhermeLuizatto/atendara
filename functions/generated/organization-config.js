@@ -49,8 +49,11 @@ export function defaultOrganizationSettings(profession) {
             // O agente comeca podendo responder sozinho apenas o que a taxonomia
             // marca como administrativo; a trava real esta em CLASSIFICATION_META.
             allowAutonomousReplies: true,
-            quietHoursStart: "21:00",
-            quietHoursEnd: "07:00",
+            unansweredDelayMinutes: 15,
+            // Fora do expediente a Dara pode atender. A janela de silencio continua
+            // disponível como uma interrupcao explicita, mas nao nasce ligada.
+            quietHoursStart: null,
+            quietHoursEnd: null,
         },
         privacy: {
             messageRetentionDays: 365,

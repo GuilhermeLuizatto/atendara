@@ -106,7 +106,7 @@ vi.mock("firebase-admin/firestore", () => {
   };
 });
 
-const { applyInboundEvent, inboundWebhook, verifyMetaSignature } =
+const { applyHumanEcho, applyInboundEvent, inboundWebhook, verifyMetaSignature } =
   await import("./inbound.js");
 const { BRIDGE_SIGNATURE_HEADER, BRIDGE_TIMESTAMP_HEADER } =
   await import("./generated/automation-bridge.js");
@@ -428,6 +428,36 @@ describe("o que chega", () => {
     expect(store.has(paths.document(ORG, "messages", "wa-wamid.um"))).toBe(
       false,
     );
+  });
+
+  it("eco do app WhatsApp Business assume a conversa e é idempotente", async () => {
+    const inbound = await applyInboundEvent(evento());
+    const echo = {
+      kind: "HUMAN_ECHO",
+      providerSenderId: SENDER_ID,
+      to: FROM,
+      providerMessageId: "wamid.echo",
+      text: "Olá, eu assumo daqui.",
+      sentAt: "2026-09-20T12:02:00.000Z",
+    };
+
+    expect(await applyHumanEcho(echo)).toMatchObject({ outcome: "HUMAN_ECHO" });
+    expect(await applyHumanEcho(echo)).toMatchObject({ outcome: "DUPLICATE" });
+    expect(
+      store.get(paths.document(ORG, "conversations", inbound.conversationId)),
+    ).toMatchObject({
+      status: "WAITING_CLIENT",
+      unreadCount: 0,
+      escalated: true,
+      escalationReason: "Conversa assumida pelo profissional no WhatsApp Business.",
+    });
+    expect(
+      store.get(messagePath(ORG, inbound.conversationId, "wa-wamid.echo")),
+    ).toMatchObject({
+      direction: "OUTBOUND",
+      authorType: "PROFESSIONAL",
+      body: "Olá, eu assumo daqui.",
+    });
   });
 
   it("deduplica o formato antigo apenas quando o id original também coincide", async () => {
@@ -1363,7 +1393,12 @@ describe("agenda externa na oferta (13.7)", () => {
 
 describe("resposta da assistente planejada no webhook", () => {
   const CONVERSA = "wa-cliente-1";
-  const REGRAS = ["RESCHEDULE_OFFERED", "RESCHEDULE_CONFIRMED", "RESCHEDULE_HANDED_OFF"].map((event) => ({
+  const REGRAS = [
+    "ADMINISTRATIVE_REPLY",
+    "RESCHEDULE_OFFERED",
+    "RESCHEDULE_CONFIRMED",
+    "RESCHEDULE_HANDED_OFF",
+  ].map((event) => ({
     id: `${event}:WHATSAPP`,
     event,
     channel: "WHATSAPP",
@@ -1373,7 +1408,7 @@ describe("resposta da assistente planejada no webhook", () => {
   }));
   const REGISTRO = {
     granted: { at: "2026-09-01T12:00:00.000Z", recordedBy: { kind: "STAFF", userId: "membro" }, medium: "FORM" },
-    textVersion: "2026-09-24-rascunho",
+    textVersion: "2026-10-09-rascunho",
     subjectIsMinor: false,
     legalGuardian: null,
     withdrawn: null,
@@ -1450,6 +1485,7 @@ describe("resposta da assistente planejada no webhook", () => {
       phone: `+${FROM}`,
       email: null,
       appointmentNotificationsEnabled: true,
+      assignedProfessionalIds: ["profissional-1"],
       notificationConsent: { formatVersion: 2, channels: { WHATSAPP: [REGISTRO] }, legacy: null },
       ...patch,
     };
@@ -1477,6 +1513,94 @@ describe("resposta da assistente planejada no webhook", () => {
     consultas.clients = [cliente()];
     consultas.appointments = [atendimento()];
     store.set(paths.organization(ORG), organizacao());
+  });
+
+  it("espera o prazo configurado e o eco humano cancela a resposta administrativa", async () => {
+    const quando = "2026-09-21T14:00:00.000Z"; // segunda, 11h em São Paulo
+    consultas.rules = [
+      {
+        id: "regra-preco",
+        organizationId: ORG,
+        professionalId: "profissional-1",
+        name: "Informar preços",
+        description: "Autoriza a informação administrativa de preço.",
+        level: "PROFESSIONAL",
+        category: "PRICING",
+        enabled: true,
+        priority: 100,
+        conditions: {
+          combinator: "AND",
+          conditions: [
+            {
+              field: "message.classification",
+              operator: "EQUALS",
+              value: "ADMINISTRATIVE",
+            },
+          ],
+        },
+        actions: [{ type: "ALLOW_TOPIC", payload: { topic: "PRICING" } }],
+        source: "MANUAL",
+        immutable: false,
+        version: 1,
+        naturalLanguageInput: null,
+        lastAppliedAt: null,
+      },
+    ];
+    const resultado = await applyInboundEvent(
+      evento({
+        providerMessageId: "wamid.valor",
+        text: "Qual o valor da consulta?",
+        sentAt: quando,
+      }),
+      { clock: () => quando, enqueue },
+    );
+
+    expect(resultado).toMatchObject({
+      outcome: "CLASSIFIED",
+      action: "AUTO_RESPONSE",
+      reply: "PLANNED",
+      replyTrigger: "HUMAN_RESPONSE_TIMEOUT",
+    });
+    const taskId = "wa-wamid.valor-resposta";
+    const task = store.get(caminho("automationTasks", taskId));
+    expect(task).toMatchObject({
+      event: "ADMINISTRATIVE_REPLY",
+      sourceMessageId: "wa-wamid.valor",
+      sourceDecisionId: "wa-wamid.valor-decision",
+      appointmentId: null,
+      professionalId: "profissional-1",
+      status: "SCHEDULED",
+    });
+    expect(comoIso(task.scheduledFor)).toBe("2026-09-21T14:15:00.000Z");
+    expect(store.get(caminho("conversations", CONVERSA))).toMatchObject({
+      status: "OPEN",
+      escalated: false,
+      pendingAssistantTaskId: taskId,
+    });
+
+    await applyHumanEcho(
+      {
+        kind: "HUMAN_ECHO",
+        providerSenderId: SENDER_ID,
+        to: FROM,
+        providerMessageId: "wamid.echo-cancela",
+        text: "Olá, eu respondo daqui.",
+        sentAt: "2026-09-21T14:02:00.000Z",
+      },
+      { clock: () => "2026-09-21T14:02:00.000Z" },
+    );
+
+    expect(store.get(caminho("automationTasks", taskId))).toMatchObject({
+      status: "CANCELLED",
+      stopReason: "CONVERSATION_WITH_HUMAN",
+    });
+    expect(store.get(caminho("notificationDeliveries", taskId))).toMatchObject({
+      status: "CANCELLED",
+    });
+    expect(store.get(caminho("conversations", CONVERSA))).toMatchObject({
+      escalated: true,
+      pendingAssistantTaskId: null,
+    });
   });
 
   it("a oferta planeja a resposta na mesma transação e a põe na fila", async () => {

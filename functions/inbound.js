@@ -43,7 +43,12 @@ import { getProfession, isProfessionId } from "./generated/professions.js";
 import { ROLE_PERMISSIONS } from "./generated/permissions.js";
 import { messagePath, paths } from "./generated/paths.js";
 import { planConversationReply } from "./generated/automation-conversation-replies.js";
+import {
+  assistantReplySchedule,
+  hasActiveAppointment,
+} from "./generated/automation-assistant-availability.js";
 import { scheduleTask } from "./automation-queue.js";
+import { transitionTask } from "./generated/automation.js";
 import { verifyBridgeSignature } from "./n8n-bridge.js";
 import { runAs } from "./service-accounts.js";
 import { classifyWithGemini, geminiEnabledFor } from "./gemini.js";
@@ -256,6 +261,11 @@ export async function applyInboundEvent(event, deps = {}) {
         "conversations",
         await transaction.get(scope.doc("conversations", conversationId)),
       );
+      const professionalId =
+        conversation?.professionalId ??
+        (client?.assignedProfessionalIds?.length === 1
+          ? client.assignedProfessionalIds[0]
+          : null);
       const existing = await transaction.get(messageRef);
       // Compatibilidade com a versão que gravava na raiz e retirava pontuação.
       // Conferir o id original impede que colisões antigas descartem mensagens.
@@ -334,7 +344,7 @@ export async function applyInboundEvent(event, deps = {}) {
           organizationId,
           conversationId,
           clientId: client?.id ?? null,
-          professionalId: conversation?.professionalId ?? null,
+          professionalId,
           direction: "INBOUND",
           authorType: "CLIENT",
           authorName: client?.fullName ?? "Contato não identificado",
@@ -363,7 +373,7 @@ export async function applyInboundEvent(event, deps = {}) {
             organizationId,
             clientId: client?.id ?? null,
             clientName: client?.fullName ?? "Contato não identificado",
-            professionalId: conversation?.professionalId ?? null,
+            professionalId,
             channel: "WHATSAPP",
             status: conversation?.escalated ? "WAITING_PROFESSIONAL" : "OPEN",
             attention: conversation?.attention ?? "NORMAL",
@@ -581,21 +591,59 @@ export async function applyInboundEvent(event, deps = {}) {
               : null,
             semanticClassification: semanticResult?.classification,
             now: new Date(now),
-            professionalId: conversation?.professionalId ?? null,
+            professionalId,
             humanHandoff: conversation?.escalated ?? false,
             // A automacao age com as permissoes da propria organizacao, nunca com
             // as de uma pessoa: decisao de robo nao herda papel de ninguem.
             permissions: ROLE_PERMISSIONS.OWNER,
           });
 
-          // Só a fila autorizada envia. O webhook não pode afirmar que respondeu
-          // quando apenas preparou um texto para revisão da equipe.
-          if (decided.action === "AUTO_RESPONSE") {
-            decided.action = "SUGGEST_RESPONSE";
-            decided.reason =
-              "Resposta administrativa preparada para revisão da equipe. O webhook não executa envio.";
-          }
           const decisionId = `${messageId}-decision`;
+          let administrativeReply = null;
+          let replyTrigger = null;
+          if (decided.action === "AUTO_RESPONSE" && decided.responseText) {
+            const recentAppointments = professionalId
+              ? (
+                  await transaction.get(
+                    firestore
+                      .collection(
+                        paths.collection(organizationId, "appointments"),
+                      )
+                      .where("professionalId", "==", professionalId)
+                      .where(
+                        "startsAt",
+                        "<=",
+                        Timestamp.fromDate(new Date(now)),
+                      )
+                      .orderBy("startsAt", "desc")
+                      .limit(20),
+                  )
+                ).docs.map((document) => stored("appointments", document))
+              : [];
+            const timing = assistantReplySchedule({
+              organization,
+              now,
+              activeAppointment: hasActiveAppointment(
+                recentAppointments,
+                professionalId,
+                now,
+              ),
+            });
+            replyTrigger = timing.trigger;
+            administrativeReply = replyTo({
+              event: "ADMINISTRATIVE_REPLY",
+              stage: "REQUEST",
+              appointment: null,
+              professionalId,
+              scheduledFor: timing.scheduledFor,
+              sourceDecisionId: decisionId,
+              responseText: decided.responseText,
+            });
+            if (administrativeReply.kind !== "PLANNED") {
+              decided.action = "SUGGEST_RESPONSE";
+              decided.reason = `Resposta administrativa preparada, mas o envio automático foi bloqueado: ${administrativeReply.reason}.`;
+            }
+          }
           transaction.set(
             messageRef,
             {
@@ -613,7 +661,7 @@ export async function applyInboundEvent(event, deps = {}) {
               conversationId,
               messageId,
               clientId: client?.id ?? null,
-              professionalId: conversation?.professionalId ?? null,
+              professionalId,
               inputPreview: decisionInputPreview(
                 event.text,
                 profession.sensitiveDataProfile,
@@ -631,7 +679,9 @@ export async function applyInboundEvent(event, deps = {}) {
               engineVersion: decided.engineVersion ?? "13.5",
               decidedAt: now,
               latencyMs: semanticResult?.metadata.latencyMs ?? 0,
-              ...(semanticResult ? { classifier: semanticResult.metadata } : {}),
+              ...(semanticResult
+                ? { classifier: semanticResult.metadata }
+                : {}),
               createdAt: now,
               createdBy: null,
               updatedAt: now,
@@ -651,9 +701,9 @@ export async function applyInboundEvent(event, deps = {}) {
                 organizationId,
                 clientId: client?.id ?? null,
                 clientName: client?.fullName ?? "Contato não identificado",
-                professionalId: conversation?.professionalId ?? null,
+                professionalId,
                 channel: "WHATSAPP",
-                status: "WAITING_PROFESSIONAL",
+                status: mustEscalate ? "WAITING_PROFESSIONAL" : "OPEN",
                 attention: retainsCritical ? "CRITICAL" : decided.attention,
                 lastClassification: decided.trace.classification.classification,
                 lastMessagePreview: preview(body),
@@ -663,7 +713,13 @@ export async function applyInboundEvent(event, deps = {}) {
                 escalated: mustEscalate,
                 escalationReason: retainsCritical
                   ? conversation.escalationReason
-                  : decided.reason,
+                  : mustEscalate
+                    ? decided.reason
+                    : null,
+                pendingAssistantTaskId:
+                  administrativeReply?.kind === "PLANNED"
+                    ? administrativeReply.task.id
+                    : null,
                 inboundWindowEndsAt: inboundWindowEndsAt(event.sentAt),
                 createdAt: conversation?.createdAt ?? now,
                 createdBy: null,
@@ -704,7 +760,7 @@ export async function applyInboundEvent(event, deps = {}) {
                     ? "Uma mensagem recebida foi classificada como possível risco. Nenhuma resposta automática foi enviada."
                     : "Uma mensagem recebida aguarda análise da equipe. Nenhuma resposta automática foi enviada.",
                 target: { type: "conversation", id: conversationId },
-                professionalId: conversation?.professionalId ?? null,
+                professionalId,
                 channels: ["DASHBOARD"],
                 aiDecisionId: decisionId,
                 acknowledgedAt: null,
@@ -726,6 +782,8 @@ export async function applyInboundEvent(event, deps = {}) {
             classification: decided.trace.classification.classification,
             action: decided.action,
             attention: decided.attention,
+            replyTrigger,
+            ...replyOutcome(administrativeReply),
           };
         }
       }
@@ -756,15 +814,184 @@ export async function applyInboundEvent(event, deps = {}) {
   return outcome;
 }
 
+/**
+ * O eco de coexistência prova que alguém respondeu pelo app WhatsApp Business.
+ * A identidade individual não vem no evento; por isso o registro diz apenas
+ * "Profissional" e a conversa fica sob responsabilidade humana até liberação.
+ */
+export async function applyHumanEcho(event, deps = {}) {
+  const { clock = () => new Date().toISOString() } = deps;
+  const now = clock();
+  const sender = await organizationOfSender(event.providerSenderId);
+  if (!sender) return { outcome: "UNKNOWN_SENDER" };
+  const organizationId = sender.organizationId;
+  const phone = normalizeInboundPhone(event.to);
+  if (!phone) return { outcome: "INVALID_PHONE" };
+  if (sender.mode === "TEST" && !sender.testRecipients?.includes(phone)) {
+    return { outcome: "TEST_CONTACT_NOT_ALLOWED" };
+  }
+
+  const firestore = db();
+  const scope = {
+    doc: (collection, id) =>
+      firestore.doc(paths.document(organizationId, collection, id)),
+  };
+  const messageId = inboundMessageId(event.providerMessageId);
+
+  return firestore.runTransaction(async (transaction) => {
+    const client = await clientOfPhone(transaction, organizationId, phone);
+    const conversationId = whatsappConversationId(client?.id ?? null, phone);
+    const conversation = stored(
+      "conversations",
+      await transaction.get(scope.doc("conversations", conversationId)),
+    );
+    if (!conversation)
+      return { outcome: "ECHO_WITHOUT_CONVERSATION", organizationId };
+    const messageRef = firestore.doc(
+      messagePath(organizationId, conversationId, messageId),
+    );
+    if ((await transaction.get(messageRef)).exists) {
+      return { outcome: "DUPLICATE", organizationId, conversationId };
+    }
+    const pendingTask = conversation.pendingAssistantTaskId
+      ? stored(
+          "automationTasks",
+          await transaction.get(
+            scope.doc("automationTasks", conversation.pendingAssistantTaskId),
+          ),
+        )
+      : null;
+    const pendingDelivery =
+      pendingTask?.deliveryId &&
+      (pendingTask.status === "PLANNED" || pendingTask.status === "SCHEDULED")
+        ? stored(
+            "notificationDeliveries",
+            await transaction.get(
+              scope.doc("notificationDeliveries", pendingTask.deliveryId),
+            ),
+          )
+        : null;
+
+    transaction.create(
+      messageRef,
+      toStored("messages", {
+        id: messageId,
+        organizationId,
+        conversationId,
+        clientId: conversation.clientId,
+        professionalId: conversation.professionalId,
+        providerMessageId: event.providerMessageId,
+        direction: "OUTBOUND",
+        authorType: "PROFESSIONAL",
+        authorName: "Profissional pelo WhatsApp Business",
+        channel: "WHATSAPP",
+        body: event.text,
+        sentAt: event.sentAt,
+        readAt: event.sentAt,
+        classification: null,
+        classificationConfidence: null,
+        aiDecisionId: null,
+        createdAt: now,
+        createdBy: null,
+        updatedAt: now,
+        updatedBy: null,
+      }),
+    );
+    transaction.set(
+      scope.doc("conversations", conversationId),
+      toStored("conversations", {
+        status: "WAITING_CLIENT",
+        lastMessagePreview: preview(event.text),
+        lastMessageAt: event.sentAt,
+        unreadCount: 0,
+        escalated: true,
+        escalationReason:
+          "Conversa assumida pelo profissional no WhatsApp Business.",
+        pendingAssistantTaskId: null,
+        updatedAt: now,
+        updatedBy: null,
+      }),
+      { merge: true },
+    );
+    if (
+      pendingTask &&
+      (pendingTask.status === "PLANNED" || pendingTask.status === "SCHEDULED")
+    ) {
+      transaction.set(
+        scope.doc("automationTasks", pendingTask.id),
+        toStored(
+          "automationTasks",
+          transitionTask(pendingTask, "CANCELLED", {
+            at: now,
+            code: "CONVERSATION_WITH_HUMAN",
+            patch: {
+              stopReason: "CONVERSATION_WITH_HUMAN",
+              completedAt: now,
+            },
+          }),
+        ),
+      );
+      if (pendingDelivery) {
+        transaction.set(
+          scope.doc("notificationDeliveries", pendingDelivery.id),
+          toStored("notificationDeliveries", {
+            ...pendingDelivery,
+            status: "CANCELLED",
+            cancelledAt: now,
+            nextAttemptAt: null,
+            updatedAt: now,
+            updatedBy: null,
+          }),
+        );
+      }
+    }
+    transaction.create(
+      scope.doc("auditLogs", `${messageId}-handoff`),
+      toStored("auditLogs", {
+        id: `${messageId}-handoff`,
+        organizationId,
+        actorType: "SYSTEM",
+        actorId: null,
+        actorName: "WhatsApp Business",
+        action: "UPDATE",
+        resource: { type: "conversation", id: conversationId },
+        summary:
+          "Resposta humana detectada no app WhatsApp Business; automação pausada.",
+        metadata: { channel: "WHATSAPP", messageId },
+        occurredAt: now,
+        createdAt: now,
+        createdBy: null,
+        updatedAt: now,
+        updatedBy: null,
+      }),
+    );
+    return { outcome: "HUMAN_ECHO", organizationId, conversationId };
+  });
+}
+
 /** Grava a resposta da assistente, se ela puder sair, na transacao de quem pediu. */
 function planReply(ctx) {
-  const { transaction, scope, organizationId, organizationSnapshot, client, sender, conversation, sentAt } = ctx;
+  const {
+    transaction,
+    scope,
+    organizationId,
+    organizationSnapshot,
+    client,
+    sender,
+    conversation,
+    sentAt,
+  } = ctx;
   const raw = stored("organizations", organizationSnapshot);
   if (!raw || raw.deletion || !isProfessionId(raw.primaryProfession)) {
     return { kind: "SKIPPED", reason: "ORGANIZATION_DISABLED" };
   }
   const plan = planConversationReply({
-    organization: withOrganizationDefaults(raw, organizationId, raw.primaryProfession, ctx.now),
+    organization: withOrganizationDefaults(
+      raw,
+      organizationId,
+      raw.primaryProfession,
+      ctx.now,
+    ),
     profession: getProfession(raw.primaryProfession),
     client,
     sender,
@@ -780,12 +1007,22 @@ function planReply(ctx) {
     now: ctx.now,
     validUntil: ctx.validUntil ?? null,
     details: ctx.details,
+    responseText: ctx.responseText ?? null,
     inboundMessageId: ctx.messageId,
     appointment: ctx.appointment,
+    professionalId: ctx.professionalId ?? null,
+    scheduledFor: ctx.scheduledFor ?? ctx.now,
+    sourceDecisionId: ctx.sourceDecisionId ?? null,
   });
   if (plan.kind === "PLANNED") {
-    transaction.create(scope.doc("automationTasks", plan.task.id), toStored("automationTasks", plan.task));
-    transaction.set(scope.doc("notificationDeliveries", plan.delivery.id), toStored("notificationDeliveries", plan.delivery));
+    transaction.create(
+      scope.doc("automationTasks", plan.task.id),
+      toStored("automationTasks", plan.task),
+    );
+    transaction.set(
+      scope.doc("notificationDeliveries", plan.delivery.id),
+      toStored("notificationDeliveries", plan.delivery),
+    );
   }
   return plan;
 }
@@ -863,11 +1100,18 @@ export const inboundWebhook = onRequest(
       // Por que a resposta da assistente saiu ou nao: motivo nomeado, sem texto.
       const replies = [];
       for (const event of events) {
-        const result = await applyInboundEvent(event);
+        const result =
+          event.kind === "HUMAN_ECHO"
+            ? await applyHumanEcho(event)
+            : await applyInboundEvent(event);
         outcomes.push(result.outcome);
         if (result.reply) replies.push(result.reply);
       }
-      logger.info("automation.inbound", { received: events.length, outcomes, replies });
+      logger.info("automation.inbound", {
+        received: events.length,
+        outcomes,
+        replies,
+      });
       // 200 sempre que o corpo foi aceito: a Meta reentrega o que nao recebe
       // 200, e reentrega e inofensiva pela trava de duplicidade.
       response.status(200).json({ received: events.length });
@@ -913,7 +1157,12 @@ async function handleRescheduleRequest(ctx) {
   // o webhook, que a Meta reentregava para derrubar de novo.
   const agenda =
     organization && isProfessionId(organization.primaryProfession)
-      ? withOrganizationDefaults(organization, organizationId, organization.primaryProfession, now).settings.agenda
+      ? withOrganizationDefaults(
+          organization,
+          organizationId,
+          organization.primaryProfession,
+          now,
+        ).settings.agenda
       : null;
   const policy = policyOf(agenda?.reschedule ?? null);
 
@@ -982,7 +1231,11 @@ async function handleRescheduleRequest(ctx) {
       now,
     });
     // A pessoa ouve que o pedido foi para a equipe; o motivo fica no alerta.
-    const reply = replyTo({ event: "RESCHEDULE_HANDED_OFF", stage: "REQUEST", appointment });
+    const reply = replyTo({
+      event: "RESCHEDULE_HANDED_OFF",
+      stage: "REQUEST",
+      appointment,
+    });
     return { outcome: "RESCHEDULE_ESCALATED", reason: decided.reason, reply };
   }
 
@@ -1053,7 +1306,11 @@ async function confirmChosenSlot(ctx) {
       messageId,
       now,
     });
-    const reply = replyTo({ event: "RESCHEDULE_HANDED_OFF", stage: "CHOICE", appointment });
+    const reply = replyTo({
+      event: "RESCHEDULE_HANDED_OFF",
+      stage: "CHOICE",
+      appointment,
+    });
     return { outcome, reason, reply };
   };
 
@@ -1086,11 +1343,7 @@ async function confirmChosenSlot(ctx) {
   });
 
   if (confirmacao.kind === "ESCALATE")
-    return encaminhar(
-      confirmacao.reason,
-      "ESCALATED",
-      "RESCHEDULE_ESCALATED",
-    );
+    return encaminhar(confirmacao.reason, "ESCALATED", "RESCHEDULE_ESCALATED");
   if (confirmacao.kind === "RETRY")
     return encaminhar(confirmacao.reason, "EXPIRED", "RESCHEDULE_RETRY");
 

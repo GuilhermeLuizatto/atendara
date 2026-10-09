@@ -58,6 +58,15 @@ export const APPOINTMENT_EVENT_META = {
         anchor: "CHANGE",
         consentLabel: "cancelamento do horário",
     },
+    ADMINISTRATIVE_REPLY: {
+        label: "Resposta administrativa da Dara",
+        description: "Responde somente perguntas classificadas como administrativas, quando a conversa não foi assumida pela equipe. Fora do expediente ou durante um atendimento pode responder imediatamente; nos demais casos espera o prazo configurado.",
+        defaultEnabled: false,
+        allowedLeadMinutes: [0],
+        anchor: "CHANGE",
+        consentLabel: "respostas administrativas da assistente virtual",
+        channels: ["WHATSAPP"],
+    },
     RESCHEDULE_OFFERED: {
         label: "Horários para remarcar",
         description: "Responde a quem pediu para remarcar com os horários livres dentro da política de remarcação. Sai só dentro das 24 horas que a pessoa abriu e só enquanto os horários estão segurados.",
@@ -100,8 +109,8 @@ export function channelsForEvent(event, professionChannels) {
  * RASCUNHO: redacao, base legal e necessidade do consentimento para cada
  * evento dependem de revisao por profissional qualificado.
  */
-// 24/09: entram as respostas da assistente a pedidos de remarcacao.
-export const NOTIFICATION_CONSENT_TEXT_VERSION = "2026-09-24-rascunho";
+// 09/10: entra a resposta administrativa da assistente na conversa.
+export const NOTIFICATION_CONSENT_TEXT_VERSION = "2026-10-09-rascunho";
 export const NOTIFICATION_CONSENT_REVIEW_STATUS = "DRAFT_PENDING_LEGAL_REVIEW";
 /**
  * O que o aviso mostra, dito a pessoa. Precisa acompanhar
@@ -237,6 +246,9 @@ export const SKIP_REASON_LABELS = {
     CONVERSATION_WITH_HUMAN: "A conversa está com a equipe; a assistente não responde sozinha.",
     REPLY_WINDOW_CLOSED: "Passaram as 24 horas desde a última mensagem da pessoa.",
     REPLY_EXPIRED: "A resposta perdeu a validade: os horários oferecidos não estão mais segurados.",
+    ASSISTANT_DISABLED: "A Dara está desativada para esta organização.",
+    AUTONOMOUS_REPLIES_DISABLED: "A Dara está configurada apenas para sugerir respostas.",
+    ASSISTANT_QUIET_HOURS: "A Dara está dentro da janela de silêncio configurada.",
 };
 export const DELIVERY_FAILURE_LABELS = {
     PROVIDER_UNAVAILABLE: "Provedor indisponível",
@@ -258,6 +270,9 @@ export const NOTIFICATION_DISPATCH_STOP_LABELS = {
     CLIENT_NOT_FOUND: "O cadastro de quem recebe o aviso não foi encontrado.",
     BODY_CHANGED: "O texto mudou entre o planejamento e o envio.",
     OFFER_CLOSED: "A oferta de horários já foi respondida ou encerrada antes de a mensagem sair.",
+    SOURCE_DECISION_NOT_FOUND: "A decisão que autorizou a resposta não foi encontrada.",
+    SOURCE_DECISION_NOT_ELIGIBLE: "A decisão original não autoriza mais uma resposta automática.",
+    SOURCE_MESSAGE_CHANGED: "Uma mensagem mais recente tornou esta resposta obsoleta.",
 };
 export const PLATFORM_NOTICE_LABELS = {
     TRIAL_ENDING: "Período de teste terminando",

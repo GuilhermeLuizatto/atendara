@@ -3,11 +3,20 @@ export {};
 declare global {
   type FacebookEmbeddedSignupExtras =
     | { setup: Record<string, unknown> }
-    | { feature: "whatsapp_embedded_signup"; sessionInfoVersion: "3" };
+    | {
+        setup: Record<string, unknown>;
+        featureType: "whatsapp_business_app_onboarding";
+        sessionInfoVersion: "3";
+      };
 
   interface Window {
     FB?: {
-      init(options: { appId: string; cookie: boolean; xfbml: boolean; version: string }): void;
+      init(options: {
+        appId: string;
+        cookie: boolean;
+        xfbml: boolean;
+        version: string;
+      }): void;
       login(
         callback: (response: FacebookLoginResponse) => void,
         options: {

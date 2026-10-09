@@ -22,6 +22,13 @@ export function validateAISettings(settings: AIAgentSettings): string[] {
   ) {
     errors.push("A confiança mínima deve estar entre 80% e 100%.");
   }
+  if (
+    !Number.isInteger(settings.unansweredDelayMinutes) ||
+    settings.unansweredDelayMinutes < 1 ||
+    settings.unansweredDelayMinutes > 120
+  ) {
+    errors.push("A espera por resposta humana deve ficar entre 1 e 120 minutos.");
+  }
   const { quietHoursStart: start, quietHoursEnd: end } = settings;
   const time = (value: unknown) =>
     typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);

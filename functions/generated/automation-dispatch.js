@@ -170,15 +170,39 @@ export function decideReplyDispatch(input) {
     }
     if (!client || client.id !== delivery.clientId)
         return cancel(task, delivery, "CLIENT_NOT_FOUND", now);
-    if (!appointment || appointment.id !== delivery.appointmentId) {
-        return cancel(task, delivery, "APPOINTMENT_NOT_FOUND", now);
-    }
     // Sem conversa nao ha janela conhecida — e sem janela a Meta nao aceita texto.
     if (!input.conversation)
         return cancel(task, delivery, "REPLY_WINDOW_CLOSED", now);
     let details = {};
     let validUntil = null;
-    if (event === "RESCHEDULE_OFFERED") {
+    if (event === "ADMINISTRATIVE_REPLY") {
+        const { sourceDecision, sourceMessage } = input;
+        if (!task.sourceDecisionId ||
+            !task.sourceMessageId ||
+            !sourceDecision ||
+            !sourceMessage ||
+            sourceDecision.id !== task.sourceDecisionId ||
+            sourceDecision.messageId !== task.sourceMessageId ||
+            sourceMessage.id !== task.sourceMessageId ||
+            sourceMessage.aiDecisionId !== task.sourceDecisionId) {
+            return cancel(task, delivery, "SOURCE_DECISION_NOT_FOUND", now);
+        }
+        if (sourceDecision.classification !== "ADMINISTRATIVE" ||
+            sourceDecision.action !== "AUTO_RESPONSE" ||
+            !sourceDecision.responseText ||
+            sourceDecision.confidence <
+                input.organization.settings.ai.autoResponseConfidenceThreshold) {
+            return cancel(task, delivery, "SOURCE_DECISION_NOT_ELIGIBLE", now);
+        }
+        if (input.conversation.lastInboundAt !== sourceMessage.sentAt) {
+            return cancel(task, delivery, "SOURCE_MESSAGE_CHANGED", now);
+        }
+        details = { responseText: sourceDecision.responseText };
+    }
+    else if (event === "RESCHEDULE_OFFERED") {
+        if (!appointment || appointment.id !== delivery.appointmentId) {
+            return cancel(task, delivery, "APPOINTMENT_NOT_FOUND", now);
+        }
         const { offer } = input;
         if (!offer || offer.status !== "OFFERED" || offer.appointmentId !== appointment.id) {
             return cancel(task, delivery, "OFFER_CLOSED", now);
@@ -187,7 +211,13 @@ export function decideReplyDispatch(input) {
         validUntil = offer.holdEndsAt;
     }
     else if (event === "RESCHEDULE_CONFIRMED") {
+        if (!appointment || appointment.id !== delivery.appointmentId) {
+            return cancel(task, delivery, "APPOINTMENT_NOT_FOUND", now);
+        }
         details = { startsAt: appointment.startsAt };
+    }
+    else if (!appointment || appointment.id !== delivery.appointmentId) {
+        return cancel(task, delivery, "APPOINTMENT_NOT_FOUND", now);
     }
     const decision = evaluateConversationReply({
         organization: input.organization,
@@ -201,6 +231,7 @@ export function decideReplyDispatch(input) {
         now,
         validUntil,
         details,
+        responseText: details.responseText,
     });
     if (!decision.eligible)
         return cancel(task, delivery, decision.reason, now);

@@ -36,6 +36,7 @@ export const REPLY_VARIABLES = [
   "time",
   "slotOptions",
   "holdMinutes",
+  "responseText",
 ] as const;
 
 export type ReplyVariable = (typeof REPLY_VARIABLES)[number];
@@ -59,6 +60,10 @@ export const CONVERSATION_REPLY_TEXTS: Record<
   ConversationReplyEvent,
   Record<ReplyStage, readonly string[]>
 > = {
+  ADMINISTRATIVE_REPLY: {
+    REQUEST: [INTRODUCTION, "{{responseText}}"],
+    CHOICE: [],
+  },
   RESCHEDULE_OFFERED: {
     REQUEST: [
       `${INTRODUCTION} Estes horários estão livres para o seu atendimento:`,

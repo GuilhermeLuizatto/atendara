@@ -28,6 +28,8 @@ export interface ReplyContext {
   startsAt?: ISODateString | null;
   /** Horários oferecidos, na ordem em que a pessoa vai escolher. */
   slots?: readonly { startsAt: ISODateString }[];
+  /** Texto administrativo já produzido pelo motor e coberto por uma regra. */
+  responseText?: string | null;
 }
 
 const PLACEHOLDER = /\{\{\s*([a-zA-Z]+)\s*\}\}/g;
@@ -49,6 +51,7 @@ function valuesFor(context: ReplyContext): Record<ReplyVariable, string | null> 
       ? slots.map((slot, index) => `${index + 1}. ${when(slot.startsAt)}`).join("\n")
       : null,
     holdMinutes: String(RESCHEDULE_HOLD_MINUTES),
+    responseText: context.responseText?.trim() || null,
   };
 }
 

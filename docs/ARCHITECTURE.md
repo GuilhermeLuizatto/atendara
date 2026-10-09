@@ -732,8 +732,21 @@ nunca saiu, ou zeraria tentativas. O caminho (`functions/automation.js`):
    planejado) e adquire a tarefa. Envia fora da transacao e grava o resultado
    numa segunda, que confere se a tarefa ainda e desta execucao.
 
+**Resposta administrativa da Dara.** Uma mensagem recebida só cria resposta
+automática quando a decisão append-only continua classificada como
+`ADMINISTRATIVE`, com ação `AUTO_RESPONSE`, e todas as travas de aviso ao
+cliente estão satisfeitas. A resposta é imediata fora do horário de trabalho ou
+durante um atendimento ativo do profissional; nos demais casos, espera o prazo
+configurado para dar oportunidade à resposta humana. O eco de uma mensagem
+humana enviada pelo mesmo número cancela a tarefa e a entrega pendentes. Antes
+do envio, o despachante relê mensagem, decisão, conversa, consentimento,
+remetente, configuração e horário de silêncio; uma entrada mais nova ou qualquer
+mudança de elegibilidade cancela a resposta. Horário de silêncio explícito é uma
+trava de envio, não um sinal de indisponibilidade.
+
 **Tarefa.** Tipos `CONFIRM_APPOINTMENT` e `SEND_REMINDER` (externos) e
-`PROCESS_INBOUND_MESSAGE`, `RAISE_ALERT` e `WRITE_AUDIT` (internos). Estados
+`SEND_CONVERSATION_REPLY` (externo), além de `PROCESS_INBOUND_MESSAGE`,
+`RAISE_ALERT` e `WRITE_AUDIT` (internos). Estados
 `PLANNED -> SCHEDULED -> DISPATCHING -> DISPATCHED -> SUCCEEDED | FAILED`, mais
 `CANCELLED` e `EXPIRED`, com as transicoes validas numa tabela
 (`src/config/automation.ts`) e cada passo no historico da propria tarefa.

@@ -32,6 +32,7 @@ export const REPLY_VARIABLES = [
     "time",
     "slotOptions",
     "holdMinutes",
+    "responseText",
 ];
 /*
  * O encaminhamento muda de texto conforme o ponto do pedido (`ReplyStage`):
@@ -46,6 +47,10 @@ const INTRODUCTION = "Olá, {{clientName}}! Aqui é a {{assistantName}}, assiste
  * inteiro: é a lista numerada, uma opção por linha.
  */
 export const CONVERSATION_REPLY_TEXTS = {
+    ADMINISTRATIVE_REPLY: {
+        REQUEST: [INTRODUCTION, "{{responseText}}"],
+        CHOICE: [],
+    },
     RESCHEDULE_OFFERED: {
         REQUEST: [
             `${INTRODUCTION} Estes horários estão livres para o seu atendimento:`,

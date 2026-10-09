@@ -12,6 +12,11 @@ import type {
   StoredNotificationConsent,
 } from "@/types";
 import {
+  AGENDA_SELF_SERVICE_LIMITS,
+  agendaSelfServicePolicyOf,
+} from "@/config/agenda-self-service";
+import { policyOf } from "@/lib/agenda/reschedule";
+import {
   hasAllProfessionalScope,
   hasAnyProfessionalScope,
   hasProfessionalScope,
@@ -75,7 +80,9 @@ export function assertAnyProfessionalScope(
   actor: RepositoryActor,
   professionalIds: string[],
 ): void {
-  if (!hasAnyProfessionalScope(actorProfessionalScope(actor), professionalIds)) {
+  if (
+    !hasAnyProfessionalScope(actorProfessionalScope(actor), professionalIds)
+  ) {
     throw new RepositoryError(
       "Este cadastro não pertence a nenhum dos seus vínculos ativos.",
     );
@@ -86,7 +93,9 @@ export function assertAllProfessionalScope(
   actor: RepositoryActor,
   professionalIds: string[],
 ): void {
-  if (!hasAllProfessionalScope(actorProfessionalScope(actor), professionalIds)) {
+  if (
+    !hasAllProfessionalScope(actorProfessionalScope(actor), professionalIds)
+  ) {
     throw new RepositoryError(
       "A associação inclui um profissional fora dos seus vínculos ativos.",
     );
@@ -146,16 +155,46 @@ export function validateAgendaSettings(
     !CLOCK_TIME.test(settings.workdayEnd) ||
     settings.workdayStart >= settings.workdayEnd
   ) {
-    throw new RepositoryError("O início do expediente precisa ser antes do fim.");
+    throw new RepositoryError(
+      "O início do expediente precisa ser antes do fim.",
+    );
   }
-  if (!(AGENDA_SLOT_INTERVALS as readonly number[]).includes(settings.slotIntervalMinutes)) {
+  if (
+    !(AGENDA_SLOT_INTERVALS as readonly number[]).includes(
+      settings.slotIntervalMinutes,
+    )
+  ) {
     throw new RepositoryError("Escolha um intervalo de agenda da lista.");
   }
   if (!modalities.includes(settings.defaultModality)) {
     throw new RepositoryError("Modalidade não atendida por esta profissão.");
   }
 
+  const selfService = agendaSelfServicePolicyOf(settings.selfService);
+  const within = (value: number, limits: { min: number; max: number }) =>
+    Number.isInteger(value) && value >= limits.min && value <= limits.max;
+  if (
+    !within(
+      selfService.minimumCancellationNoticeHours,
+      AGENDA_SELF_SERVICE_LIMITS.minimumCancellationNoticeHours,
+    ) ||
+    !within(
+      selfService.offeredSlots,
+      AGENDA_SELF_SERVICE_LIMITS.offeredSlots,
+    ) ||
+    !within(
+      selfService.searchWindowDays,
+      AGENDA_SELF_SERVICE_LIMITS.searchWindowDays,
+    )
+  ) {
+    throw new RepositoryError(
+      "Revise os limites do autoatendimento da agenda.",
+    );
+  }
+
   return {
+    reschedule: policyOf(settings.reschedule),
+    selfService,
     workingDays,
     workdayStart: settings.workdayStart,
     workdayEnd: settings.workdayEnd,

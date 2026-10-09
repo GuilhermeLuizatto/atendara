@@ -16,17 +16,24 @@ import {
 
 describe("politica da fila de automacao", () => {
   it("alerta, trilha e mensagem recebida sao internos: nunca saem do Atendara", () => {
-    for (const type of ["RAISE_ALERT", "WRITE_AUDIT", "PROCESS_INBOUND_MESSAGE"] as const) {
+    for (const type of [
+      "RAISE_ALERT",
+      "WRITE_AUDIT",
+      "PROCESS_INBOUND_MESSAGE",
+    ] as const) {
       expect(AUTOMATION_TASK_META[type].executor, type).toBe("INTERNAL");
     }
-    expect(Object.keys(AUTOMATION_TASK_META).sort()).toEqual([...AUTOMATION_TASK_TYPES].sort());
+    expect(Object.keys(AUTOMATION_TASK_META).sort()).toEqual(
+      [...AUTOMATION_TASK_TYPES].sort(),
+    );
   });
 
   it("todo evento com tarefa aponta para um tipo externo; da agenda, so confirmacao e lembrete tem tarefa", () => {
     // As respostas da assistente sao planejadas pelo webhook, nao pela agenda.
     for (const event of APPOINTMENT_NOTIFICATION_EVENTS) {
       const type = NOTICE_TASK_TYPES[event];
-      if (type) expect(AUTOMATION_TASK_META[type].executor, event).toBe("EXTERNAL");
+      if (type)
+        expect(AUTOMATION_TASK_META[type].executor, event).toBe("EXTERNAL");
     }
     expect(NOTICE_TASK_TYPES).toEqual({
       APPOINTMENT_SCHEDULED: null,
@@ -34,9 +41,14 @@ describe("politica da fila de automacao", () => {
       APPOINTMENT_CONFIRMED: "CONFIRM_APPOINTMENT",
       APPOINTMENT_CANCELLED: null,
       ADMINISTRATIVE_REPLY: "SEND_CONVERSATION_REPLY",
+      SCHEDULE_OFFERED: "SEND_CONVERSATION_REPLY",
+      SCHEDULE_CONFIRMED: "SEND_CONVERSATION_REPLY",
+      SCHEDULE_HANDED_OFF: "SEND_CONVERSATION_REPLY",
       RESCHEDULE_OFFERED: "SEND_CONVERSATION_REPLY",
       RESCHEDULE_CONFIRMED: "SEND_CONVERSATION_REPLY",
       RESCHEDULE_HANDED_OFF: "SEND_CONVERSATION_REPLY",
+      CANCELLATION_CONFIRMED: "SEND_CONVERSATION_REPLY",
+      CANCELLATION_HANDED_OFF: "SEND_CONVERSATION_REPLY",
     });
   });
 

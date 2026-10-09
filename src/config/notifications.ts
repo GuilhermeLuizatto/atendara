@@ -160,6 +160,34 @@ export const APPOINTMENT_EVENT_META: Record<
     consentLabel: "respostas administrativas da assistente virtual",
     channels: ["WHATSAPP"],
   },
+  SCHEDULE_OFFERED: {
+    label: "Horários para agendar",
+    description:
+      "Oferece horários livres quando a pessoa pede um novo atendimento.",
+    defaultEnabled: false,
+    allowedLeadMinutes: [0],
+    anchor: "CHANGE",
+    consentLabel: "horários livres quando você pedir para agendar",
+    channels: ["WHATSAPP"],
+  },
+  SCHEDULE_CONFIRMED: {
+    label: "Agendamento feito",
+    description: "Confirma o horário novo escolhido pela pessoa.",
+    defaultEnabled: false,
+    allowedLeadMinutes: [0],
+    anchor: "CHANGE",
+    consentLabel: "confirmação do horário agendado",
+    channels: ["WHATSAPP"],
+  },
+  SCHEDULE_HANDED_OFF: {
+    label: "Agendamento com a equipe",
+    description: "Avisa que o pedido de agendamento foi encaminhado à equipe.",
+    defaultEnabled: false,
+    allowedLeadMinutes: [0],
+    anchor: "CHANGE",
+    consentLabel: "aviso de que o pedido de agendamento foi para a equipe",
+    channels: ["WHATSAPP"],
+  },
   RESCHEDULE_OFFERED: {
     label: "Horários para remarcar",
     description:
@@ -189,6 +217,24 @@ export const APPOINTMENT_EVENT_META: Record<
     consentLabel: "aviso de que o pedido de remarcação foi para a equipe",
     channels: ["WHATSAPP"],
   },
+  CANCELLATION_CONFIRMED: {
+    label: "Cancelamento feito",
+    description: "Confirma o cancelamento pedido pela própria pessoa.",
+    defaultEnabled: false,
+    allowedLeadMinutes: [0],
+    anchor: "CHANGE",
+    consentLabel: "confirmação do cancelamento pedido por você",
+    channels: ["WHATSAPP"],
+  },
+  CANCELLATION_HANDED_OFF: {
+    label: "Cancelamento com a equipe",
+    description: "Avisa que o pedido de cancelamento foi encaminhado à equipe.",
+    defaultEnabled: false,
+    allowedLeadMinutes: [0],
+    anchor: "CHANGE",
+    consentLabel: "aviso de que o pedido de cancelamento foi para a equipe",
+    channels: ["WHATSAPP"],
+  },
 };
 
 /** Canais em que um evento pode sair, dentro do que a profissao permite. */
@@ -197,7 +243,9 @@ export function channelsForEvent(
   professionChannels: readonly OutboundChannel[],
 ): OutboundChannel[] {
   const only = APPOINTMENT_EVENT_META[event].channels;
-  return professionChannels.filter((channel) => !only || only.includes(channel));
+  return professionChannels.filter(
+    (channel) => !only || only.includes(channel),
+  );
 }
 
 // ------------------------------------------------------- consentimento
@@ -210,18 +258,24 @@ export function channelsForEvent(
  * RASCUNHO: redacao, base legal e necessidade do consentimento para cada
  * evento dependem de revisao por profissional qualificado.
  */
-// 09/10: entra a resposta administrativa da assistente na conversa.
-export const NOTIFICATION_CONSENT_TEXT_VERSION = "2026-10-09-rascunho";
+// 09/10: entram as jornadas de agenda feitas pela assistente na conversa.
+export const NOTIFICATION_CONSENT_TEXT_VERSION =
+  "2026-10-09-dara-agenda-rascunho";
 
-export const NOTIFICATION_CONSENT_REVIEW_STATUS = "DRAFT_PENDING_LEGAL_REVIEW" as const;
+export const NOTIFICATION_CONSENT_REVIEW_STATUS =
+  "DRAFT_PENDING_LEGAL_REVIEW" as const;
 
 /**
  * O que o aviso mostra, dito a pessoa. Precisa acompanhar
  * `ALLOWED_BY_DISCLOSURE` em `lib/notifications/templates.ts`: prometer menos
  * do que o renderizador interpola seria consentimento para outra coisa.
  */
-export const CONSENT_DISCLOSURE_PHRASES: Record<AppointmentDisclosureLevel, string> = {
-  TIME_ONLY: "trazem apenas o seu nome, o nome da organização, a data e o horário",
+export const CONSENT_DISCLOSURE_PHRASES: Record<
+  AppointmentDisclosureLevel,
+  string
+> = {
+  TIME_ONLY:
+    "trazem apenas o seu nome, o nome da organização, a data e o horário",
   TIME_AND_PROFESSIONAL:
     "trazem o seu nome, o nome da organização, o nome de quem atende, a data e o horário",
   TIME_PROFESSIONAL_AND_SERVICE:
@@ -250,7 +304,10 @@ export const CONSENT_RECORDER_LABELS: Record<ConsentRecorderKind, string> = {
   SUBJECT: "registrado pela própria pessoa",
 };
 
-export const LEGAL_GUARDIAN_RELATIONSHIP_LABELS: Record<LegalGuardianRelationship, string> = {
+export const LEGAL_GUARDIAN_RELATIONSHIP_LABELS: Record<
+  LegalGuardianRelationship,
+  string
+> = {
   PARENT: "Mãe ou pai",
   LEGAL_GUARDIAN: "Tutor ou outro responsável legal",
 };
@@ -352,7 +409,8 @@ export const SKIP_REASON_LABELS: Record<NotificationSkipReason, string> = {
   SENDER_NOT_VERIFIED: "O canal não tem remetente comprovado.",
   SENDER_NOT_REGISTERED:
     "O canal usa um provedor real e ainda não tem remetente cadastrado pela operadora.",
-  SENDER_NOT_APPROVED: "O remetente cadastrado ainda não foi aprovado pelo provedor.",
+  SENDER_NOT_APPROVED:
+    "O remetente cadastrado ainda não foi aprovado pelo provedor.",
   DESTINATION_NOT_IN_TEST_LIST:
     "O remetente está em modo de teste e este destino não está na lista de testadores.",
   NO_RULE_FOR_EVENT: "Nenhuma regra cobre este evento.",
@@ -373,13 +431,19 @@ export const SKIP_REASON_LABELS: Record<NotificationSkipReason, string> = {
   SCHEDULE_IN_THE_PAST: "O horário de envio já passou.",
   ALREADY_PLANNED: "Já existe um envio planejado igual a este.",
   TEMPLATE_REJECTED: "O modelo foi recusado pela política de conteúdo.",
-  CLIENT_NOT_IDENTIFIED: "O número não corresponde a um único cadastro nesta organização.",
-  CONVERSATION_WITH_HUMAN: "A conversa está com a equipe; a assistente não responde sozinha.",
-  REPLY_WINDOW_CLOSED: "Passaram as 24 horas desde a última mensagem da pessoa.",
-  REPLY_EXPIRED: "A resposta perdeu a validade: os horários oferecidos não estão mais segurados.",
+  CLIENT_NOT_IDENTIFIED:
+    "O número não corresponde a um único cadastro nesta organização.",
+  CONVERSATION_WITH_HUMAN:
+    "A conversa está com a equipe; a assistente não responde sozinha.",
+  REPLY_WINDOW_CLOSED:
+    "Passaram as 24 horas desde a última mensagem da pessoa.",
+  REPLY_EXPIRED:
+    "A resposta perdeu a validade: os horários oferecidos não estão mais segurados.",
   ASSISTANT_DISABLED: "A Dara está desativada para esta organização.",
-  AUTONOMOUS_REPLIES_DISABLED: "A Dara está configurada apenas para sugerir respostas.",
-  ASSISTANT_QUIET_HOURS: "A Dara está dentro da janela de silêncio configurada.",
+  AUTONOMOUS_REPLIES_DISABLED:
+    "A Dara está configurada apenas para sugerir respostas.",
+  ASSISTANT_QUIET_HOURS:
+    "A Dara está dentro da janela de silêncio configurada.",
 };
 
 export const DELIVERY_FAILURE_LABELS: Record<DeliveryFailureCode, string> = {
@@ -389,12 +453,17 @@ export const DELIVERY_FAILURE_LABELS: Record<DeliveryFailureCode, string> = {
   SENDER_NOT_ALLOWED: "Remetente não autorizado",
   ATTEMPTS_EXHAUSTED: "Tentativas esgotadas",
   DISPATCH_INTERRUPTED: "Envio interrompido sem confirmação",
-  CALENDAR_RECONNECT_REQUIRED: "A autorização do Google expirou ou foi revogada",
+  CALENDAR_RECONNECT_REQUIRED:
+    "A autorização do Google expirou ou foi revogada",
   CALENDAR_NOT_PROVISIONED: "A agenda Atendara não existe no Google",
-  OUTSIDE_REPLY_WINDOW: "Passaram as 24 horas desde a última mensagem da pessoa",
+  OUTSIDE_REPLY_WINDOW:
+    "Passaram as 24 horas desde a última mensagem da pessoa",
 };
 
-export const NOTIFICATION_DISPATCH_STOP_LABELS: Record<NotificationDispatchOnlyStopReason, string> = {
+export const NOTIFICATION_DISPATCH_STOP_LABELS: Record<
+  NotificationDispatchOnlyStopReason,
+  string
+> = {
   RULE_NOT_FOUND: "A regra que planejou o aviso não existe mais.",
   APPOINTMENT_NOT_FOUND: "O atendimento não foi encontrado.",
   APPOINTMENT_CANCELLED: "O atendimento foi cancelado ou marcado como falta.",
@@ -402,10 +471,14 @@ export const NOTIFICATION_DISPATCH_STOP_LABELS: Record<NotificationDispatchOnlyS
   APPOINTMENT_CLIENT_CHANGED: "O atendimento passou para outro cadastro.",
   CLIENT_NOT_FOUND: "O cadastro de quem recebe o aviso não foi encontrado.",
   BODY_CHANGED: "O texto mudou entre o planejamento e o envio.",
-  OFFER_CLOSED: "A oferta de horários já foi respondida ou encerrada antes de a mensagem sair.",
-  SOURCE_DECISION_NOT_FOUND: "A decisão que autorizou a resposta não foi encontrada.",
-  SOURCE_DECISION_NOT_ELIGIBLE: "A decisão original não autoriza mais uma resposta automática.",
-  SOURCE_MESSAGE_CHANGED: "Uma mensagem mais recente tornou esta resposta obsoleta.",
+  OFFER_CLOSED:
+    "A oferta de horários já foi respondida ou encerrada antes de a mensagem sair.",
+  SOURCE_DECISION_NOT_FOUND:
+    "A decisão que autorizou a resposta não foi encontrada.",
+  SOURCE_DECISION_NOT_ELIGIBLE:
+    "A decisão original não autoriza mais uma resposta automática.",
+  SOURCE_MESSAGE_CHANGED:
+    "Uma mensagem mais recente tornou esta resposta obsoleta.",
 };
 
 export const PLATFORM_NOTICE_LABELS: Record<PlatformNoticeEvent, string> = {

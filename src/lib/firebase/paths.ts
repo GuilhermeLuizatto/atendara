@@ -96,6 +96,8 @@ export const TENANT_COLLECTIONS = {
   // quando a escolha esta segurada. Um por conversa, com o id da conversa.
   // So o backend le e escreve — o navegador nem oferece nem confirma.
   rescheduleRequests: "rescheduleRequests",
+  // Oferta de um novo atendimento pela conversa. Backend somente.
+  bookingRequests: "bookingRequests",
   // Remetente comprovado de cada canal real (13.4): o numero aprovado na Meta,
   // o nome de exibicao e a situacao da verificacao. Um documento por canal, com
   // o proprio canal como id. Escrito SO pela operadora, pelo backend, com
@@ -114,7 +116,8 @@ export type TenantCollection = keyof typeof TENANT_COLLECTIONS;
 export const paths = {
   accounts: () => ROOT_COLLECTIONS.accounts,
   account: (userId: ID) => `${ROOT_COLLECTIONS.accounts}/${userId}`,
-  initialPassword: (userId: ID) => `${ROOT_COLLECTIONS.initialPasswords}/${userId}`,
+  initialPassword: (userId: ID) =>
+    `${ROOT_COLLECTIONS.initialPasswords}/${userId}`,
   organizations: () => ROOT_COLLECTIONS.organizations,
   organization: (organizationId: ID) =>
     `${ROOT_COLLECTIONS.organizations}/${organizationId}`,
@@ -173,7 +176,8 @@ export const paths = {
   platformAccessGrant: (organizationId: ID) =>
     `${PLATFORM_COLLECTIONS.platformAccessGrants}/${organizationId}`,
 
-  platformProfessionRequests: () => PLATFORM_COLLECTIONS.platformProfessionRequests,
+  platformProfessionRequests: () =>
+    PLATFORM_COLLECTIONS.platformProfessionRequests,
   /**
    * Pedido de troca de profissao, chaveado pelo `organizationId`. Um por vez,
    * pela mesma razao da concessao: dois pedidos abertos deixariam a operadora
@@ -196,7 +200,8 @@ export const paths = {
     `${PLATFORM_COLLECTIONS.platformSupportTickets}/${ticketId}/messages`,
   platformSupportMessage: (ticketId: ID, messageId: ID) =>
     `${PLATFORM_COLLECTIONS.platformSupportTickets}/${ticketId}/messages/${messageId}`,
-  platformAutomationSwitch: () => `${PLATFORM_COLLECTIONS.platformAutomationSwitch}/global`,
+  platformAutomationSwitch: () =>
+    `${PLATFORM_COLLECTIONS.platformAutomationSwitch}/global`,
 } as const;
 
 /**

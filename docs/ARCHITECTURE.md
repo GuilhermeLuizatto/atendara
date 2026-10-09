@@ -131,6 +131,7 @@ Colecoes sob `organizations/{organizationId}`:
 | `notifications` | Alertas DENTRO do painel                 |
 | `notificationDeliveries` | Fila de saida dos avisos ao cliente (escrita so pelo backend) |
 | `automationTasks` | Fila de automacao: cada execucao, com estado, tentativa e validade (so backend) |
+| `bookingRequests` | Oferta temporária de horários para agendamento pela conversa (só backend) |
 | `auditLogs`     | Trilha append-only                       |
 | `privacyRequests` | Registro dos pedidos de titulares atendidos |
 
@@ -830,6 +831,14 @@ e pelo retorno.
   impede dois atendimentos no mesmo horario — so neste caminho; a agenda manual
   continua como esta. Fora da politica, com leitura de ocupado velha, fora do
   `ADMINISTRATIVE` ou com risco, o pedido escala para a equipe.
+- **Agendamento e cancelamento pela conversa têm políticas próprias**, também
+  desligadas por padrão. O agendamento só prossegue quando profissão e
+  profissional permitem inferir duração, preço e modalidade sem perguntar por
+  serviço; a escolha relê a agenda e cria atendimento, receita pendente e
+  auditoria na mesma transação. O cancelamento só age sobre um único atendimento
+  futuro, respeita a antecedência configurada e escala qualquer caso com sinal
+  ou pagamento para decisão humana. Nenhum desses caminhos autoriza resposta
+  fora de `ADMINISTRATIVE` nem contorna consentimento, remetente ou canal.
 
 **Sem resposta nao e sucesso.** Tarefa entregue ao n8n sem resultado no prazo
 vira falha, gera alerta e **nao repete sozinha**: repetir sem saber se a

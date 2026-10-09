@@ -32,6 +32,12 @@ import {
   selfServiceReschedulesOf,
 } from "./generated/agenda-reschedule.js";
 import { RESCHEDULE_REFUSAL_LABELS } from "./generated/reschedule-config.js";
+import { rescheduleHoldEndsAt } from "./generated/reschedule-config.js";
+import {
+  firstAvailableSlots,
+  isSlotFree,
+} from "./generated/agenda-availability.js";
+import { agendaSelfServicePolicyOf } from "./generated/agenda-self-service-config.js";
 import { isBusySnapshotFresh } from "./generated/agenda-calendar.js";
 import {
   activeConsentChannels,
@@ -295,6 +301,16 @@ export async function applyInboundEvent(event, deps = {}) {
         Date.parse(now) <= Date.parse(pendingRaw.holdEndsAt)
           ? pendingRaw
           : null;
+      const bookingRaw = stored(
+        "bookingRequests",
+        await transaction.get(scope.doc("bookingRequests", conversationId)),
+      );
+      const pendingBooking =
+        bookingRaw &&
+        bookingRaw.status === "OFFERED" &&
+        Date.parse(now) <= Date.parse(bookingRaw.holdEndsAt)
+          ? bookingRaw
+          : null;
 
       // Resposta da assistente, planejada nesta transacao. Tudo o que ela
       // confere ja foi lido acima: organizacao, cadastro, conversa e remetente.
@@ -508,7 +524,55 @@ export async function applyInboundEvent(event, deps = {}) {
       // Escolha de um dos horarios oferecidos: "1", "2", "3". A conferencia de
       // que o horario CONTINUA livre acontece aqui dentro, na mesma transacao —
       // entre oferecer e escolher passa gente marcando.
-      if (decision.kind === "CLASSIFY" && pending && event.kind === "TEXT") {
+      const bookingChoiceActive = Boolean(
+        pendingBooking &&
+        (!pending ||
+          Date.parse(pendingBooking.offeredAt) >=
+            Date.parse(pending.offeredAt)),
+      );
+      if (
+        decision.kind === "CLASSIFY" &&
+        pendingBooking &&
+        bookingChoiceActive &&
+        event.kind === "TEXT"
+      ) {
+        const escolha = Number(event.text.trim());
+        if (
+          Number.isInteger(escolha) &&
+          escolha >= 1 &&
+          escolha <= pendingBooking.slots.length
+        ) {
+          const resultado = await confirmBookingSlot({
+            transaction,
+            scope,
+            firestore,
+            organizationId,
+            conversationId,
+            pending: pendingBooking,
+            chosen: pendingBooking.slots[escolha - 1],
+            client,
+            organizationSnapshot,
+            messageId,
+            now,
+            replyTo,
+          });
+          return {
+            outcome: resultado.outcome,
+            organizationId,
+            conversationId,
+            clientId: client?.id ?? null,
+            reason: resultado.reason ?? null,
+            ...replyOutcome(resultado.reply),
+          };
+        }
+      }
+
+      if (
+        decision.kind === "CLASSIFY" &&
+        pending &&
+        !bookingChoiceActive &&
+        event.kind === "TEXT"
+      ) {
         const escolha = Number(event.text.trim());
         if (
           Number.isInteger(escolha) &&
@@ -599,9 +663,67 @@ export async function applyInboundEvent(event, deps = {}) {
           });
 
           const decisionId = `${messageId}-decision`;
+          const naturalLanguageReschedule =
+            decided.action === "AUTO_RESPONSE" &&
+            decided.trace.classification.classification === "ADMINISTRATIVE" &&
+            decided.trace.classification.intent === "RESCHEDULING";
+          const naturalLanguageBooking =
+            decided.action === "AUTO_RESPONSE" &&
+            decided.trace.classification.classification === "ADMINISTRATIVE" &&
+            decided.trace.classification.intent === "SCHEDULING";
+          const naturalLanguageCancellation =
+            decided.action === "AUTO_RESPONSE" &&
+            decided.trace.classification.classification === "ADMINISTRATIVE" &&
+            decided.trace.classification.intent === "CANCELLATION";
+          let routineResult = null;
           let administrativeReply = null;
           let replyTrigger = null;
-          if (decided.action === "AUTO_RESPONSE" && decided.responseText) {
+          if (naturalLanguageReschedule) {
+            // O texto entra no mesmo fluxo transacional do botão: política,
+            // agenda e concorrência continuam com uma única fonte de verdade.
+            routineResult = await handleRescheduleRequest({
+              transaction,
+              scope,
+              firestore,
+              organizationId,
+              organizationSnapshot,
+              conversationId,
+              client,
+              messageId,
+              now,
+              replyTo,
+            });
+          } else if (naturalLanguageBooking) {
+            routineResult = await handleBookingRequest({
+              transaction,
+              scope,
+              firestore,
+              organizationId,
+              organizationSnapshot,
+              conversationId,
+              client,
+              professionalId,
+              messageId,
+              now,
+              replyTo,
+            });
+          } else if (naturalLanguageCancellation) {
+            routineResult = await handleCancellationRequest({
+              transaction,
+              scope,
+              firestore,
+              organizationId,
+              organizationSnapshot,
+              conversationId,
+              client,
+              messageId,
+              now,
+              replyTo,
+            });
+          } else if (
+            decided.action === "AUTO_RESPONSE" &&
+            decided.responseText
+          ) {
             const recentAppointments = professionalId
               ? (
                   await transaction.get(
@@ -691,8 +813,14 @@ export async function applyInboundEvent(event, deps = {}) {
 
           const retainsCritical =
             conversation?.escalated && conversation.attention === "CRITICAL";
+          const routineEscalated =
+            routineResult?.outcome?.endsWith("_ESCALATED") ?? false;
           const mustEscalate =
-            decided.escalated || conversation?.escalated || false;
+            routineEscalated ||
+            decided.escalated ||
+            conversation?.escalated ||
+            false;
+          const plannedReply = routineResult?.reply ?? administrativeReply;
           if (!olderThanPreview)
             transaction.set(
               scope.doc("conversations", conversationId),
@@ -704,7 +832,11 @@ export async function applyInboundEvent(event, deps = {}) {
                 professionalId,
                 channel: "WHATSAPP",
                 status: mustEscalate ? "WAITING_PROFESSIONAL" : "OPEN",
-                attention: retainsCritical ? "CRITICAL" : decided.attention,
+                attention: retainsCritical
+                  ? "CRITICAL"
+                  : routineEscalated
+                    ? "HIGH"
+                    : decided.attention,
                 lastClassification: decided.trace.classification.classification,
                 lastMessagePreview: preview(body),
                 lastMessageAt: event.sentAt,
@@ -714,11 +846,11 @@ export async function applyInboundEvent(event, deps = {}) {
                 escalationReason: retainsCritical
                   ? conversation.escalationReason
                   : mustEscalate
-                    ? decided.reason
+                    ? (routineResult?.reason ?? decided.reason)
                     : null,
                 pendingAssistantTaskId:
-                  administrativeReply?.kind === "PLANNED"
-                    ? administrativeReply.task.id
+                  plannedReply?.kind === "PLANNED"
+                    ? plannedReply.task.id
                     : null,
                 inboundWindowEndsAt: inboundWindowEndsAt(event.sentAt),
                 createdAt: conversation?.createdAt ?? now,
@@ -771,6 +903,20 @@ export async function applyInboundEvent(event, deps = {}) {
                 updatedBy: null,
               }),
             );
+          }
+
+          if (routineResult) {
+            return {
+              outcome: routineResult.outcome,
+              organizationId,
+              conversationId,
+              clientId: client?.id ?? null,
+              classification: decided.trace.classification.classification,
+              action: decided.action,
+              attention: routineEscalated ? "HIGH" : decided.attention,
+              reason: routineResult.reason ?? null,
+              ...replyOutcome(routineResult.reply),
+            };
           }
 
           return {
@@ -1128,6 +1274,500 @@ export const inboundWebhook = onRequest(
     }
   },
 );
+
+/** Oferece um novo horario sem inventar servico, preco ou profissional. */
+async function handleBookingRequest(ctx) {
+  const {
+    transaction,
+    scope,
+    firestore,
+    organizationId,
+    organizationSnapshot,
+    conversationId,
+    client,
+    professionalId,
+    messageId,
+    now,
+    replyTo,
+  } = ctx;
+  const raw = stored("organizations", organizationSnapshot);
+  const organization =
+    raw && isProfessionId(raw.primaryProfession)
+      ? withOrganizationDefaults(
+          raw,
+          organizationId,
+          raw.primaryProfession,
+          now,
+        )
+      : null;
+  const profession = organization
+    ? getProfession(organization.primaryProfession)
+    : null;
+  const policy = agendaSelfServicePolicyOf(
+    organization?.settings.agenda.selfService,
+  );
+
+  const handoff = (reason) => {
+    alertTeamAboutRoutine({
+      transaction,
+      scope,
+      organizationId,
+      conversationId,
+      professionalId,
+      messageId,
+      now,
+      kind: "agendamento",
+      reason,
+    });
+    return {
+      outcome: "SCHEDULE_ESCALATED",
+      reason,
+      reply: replyTo({
+        event: "SCHEDULE_HANDED_OFF",
+        stage: "REQUEST",
+        appointment: null,
+        professionalId,
+      }),
+    };
+  };
+
+  if (!policy.bookingEnabled) return handoff("POLICY_DISABLED");
+  if (!organization || !profession || !client || !professionalId) {
+    return handoff("CONTEXT_NOT_UNIQUE");
+  }
+  const durationMinutes = profession.defaultAppointmentDurationMinutes;
+  const priceInCents = profession.defaultPriceInCents;
+  if (durationMinutes === null || priceInCents === null) {
+    return handoff("SERVICE_REQUIRED");
+  }
+  const professional = stored(
+    "professionals",
+    await transaction.get(scope.doc("professionals", professionalId)),
+  );
+  if (!professional) return handoff("PROFESSIONAL_NOT_FOUND");
+
+  const busy = await busyOfAgenda({
+    transaction,
+    firestore,
+    scope,
+    organizationId,
+    professionalId,
+    now,
+  });
+  const slots = firstAvailableSlots(
+    {
+      agenda: organization.settings.agenda,
+      durationMinutes,
+      bufferMinutes: 0,
+      from: now,
+      to: new Date(
+        Date.parse(now) + policy.searchWindowDays * 86_400_000,
+      ).toISOString(),
+      busy,
+      timezoneOffsetMinutes: offsetOfTimezone(organization.timezone),
+    },
+    policy.offeredSlots,
+  );
+  if (slots.length === 0) return handoff("NO_SLOTS");
+
+  const holdEndsAt = rescheduleHoldEndsAt(now);
+  transaction.set(
+    scope.doc("bookingRequests", conversationId),
+    toStored("bookingRequests", {
+      id: conversationId,
+      organizationId,
+      clientId: client.id,
+      professionalId,
+      professionalName: professional.displayName,
+      appointmentId: null,
+      status: "OFFERED",
+      slots,
+      holdEndsAt,
+      offeredAt: now,
+      durationMinutes,
+      priceInCents,
+      modality:
+        client.preferredModality ??
+        organization.settings.agenda.defaultModality,
+      createdAt: now,
+      createdBy: null,
+      updatedAt: now,
+      updatedBy: null,
+    }),
+  );
+  const reply = replyTo({
+    event: "SCHEDULE_OFFERED",
+    stage: "REQUEST",
+    appointment: null,
+    professionalId,
+    validUntil: holdEndsAt,
+    details: { slots },
+  });
+  return { outcome: "SCHEDULE_OFFERED", reply };
+}
+
+/** Confirma a vaga dentro da mesma transacao que relê toda a agenda. */
+async function confirmBookingSlot(ctx) {
+  const {
+    transaction,
+    scope,
+    firestore,
+    organizationId,
+    conversationId,
+    pending,
+    chosen,
+    client,
+    organizationSnapshot,
+    messageId,
+    now,
+    replyTo,
+  } = ctx;
+  const raw = stored("organizations", organizationSnapshot);
+  const organization =
+    raw && isProfessionId(raw.primaryProfession)
+      ? withOrganizationDefaults(
+          raw,
+          organizationId,
+          raw.primaryProfession,
+          now,
+        )
+      : null;
+  const policy = agendaSelfServicePolicyOf(
+    organization?.settings.agenda.selfService,
+  );
+  const handoff = (reason, status = "ESCALATED") => {
+    transaction.set(
+      scope.doc("bookingRequests", pending.id),
+      toStored("bookingRequests", {
+        ...pending,
+        status,
+        updatedAt: now,
+        updatedBy: null,
+      }),
+    );
+    alertTeamAboutRoutine({
+      transaction,
+      scope,
+      organizationId,
+      conversationId,
+      professionalId: pending.professionalId,
+      messageId,
+      now,
+      kind: "agendamento",
+      reason,
+    });
+    return {
+      outcome: status === "EXPIRED" ? "SCHEDULE_RETRY" : "SCHEDULE_ESCALATED",
+      reason,
+      reply: replyTo({
+        event: "SCHEDULE_HANDED_OFF",
+        stage: "CHOICE",
+        appointment: null,
+        professionalId: pending.professionalId,
+      }),
+    };
+  };
+
+  if (!policy.bookingEnabled) return handoff("POLICY_DISABLED");
+  if (!client || client.id !== pending.clientId)
+    return handoff("CLIENT_CHANGED");
+  if (Date.parse(now) > Date.parse(pending.holdEndsAt)) {
+    return handoff("HOLD_EXPIRED", "EXPIRED");
+  }
+  const professional = stored(
+    "professionals",
+    await transaction.get(scope.doc("professionals", pending.professionalId)),
+  );
+  if (!professional) return handoff("PROFESSIONAL_NOT_FOUND");
+  const busy = await busyOfAgenda({
+    transaction,
+    firestore,
+    scope,
+    organizationId,
+    professionalId: pending.professionalId,
+    now,
+  });
+  if (!isSlotFree(chosen, busy, 0)) return handoff("SLOT_TAKEN", "EXPIRED");
+
+  const appointmentId = `${messageId}-appointment`;
+  const appointment = {
+    id: appointmentId,
+    organizationId,
+    clientId: client.id,
+    clientName: client.fullName,
+    professionalId: pending.professionalId,
+    professionalName: professional.displayName,
+    startsAt: chosen.startsAt,
+    endsAt: chosen.endsAt,
+    durationMinutes: pending.durationMinutes,
+    serviceId: null,
+    serviceName: null,
+    modality: pending.modality,
+    status: "SCHEDULED",
+    priceInCents: pending.priceInCents,
+    depositInCents: null,
+    depositOutcome: null,
+    visitAddress: null,
+    travelFeeInCents: null,
+    administrativeNotes: null,
+    origin: "CLIENT_SELF_SERVICE",
+    confirmedAt: null,
+    cancelledAt: null,
+    cancellationReason: null,
+    rescheduledFromId: null,
+    externalCalendar: null,
+    createdAt: now,
+    createdBy: null,
+    updatedAt: now,
+    updatedBy: null,
+  };
+  transaction.create(
+    scope.doc("appointments", appointmentId),
+    toStored("appointments", appointment),
+  );
+  transaction.create(
+    scope.doc("transactions", `${messageId}-income`),
+    toStored("transactions", {
+      id: `${messageId}-income`,
+      organizationId,
+      type: "INCOME",
+      clientId: client.id,
+      clientName: client.fullName,
+      professionalId: pending.professionalId,
+      appointmentId,
+      appointmentPart: "SERVICE",
+      description: `Atendimento de ${client.fullName}`,
+      amountInCents: pending.priceInCents,
+      status: "PENDING",
+      method: null,
+      dueDate: chosen.startsAt,
+      paidAt: null,
+      gateway: null,
+      createdAt: now,
+      createdBy: null,
+      updatedAt: now,
+      updatedBy: null,
+    }),
+  );
+  transaction.set(
+    scope.doc("bookingRequests", pending.id),
+    toStored("bookingRequests", {
+      ...pending,
+      appointmentId,
+      status: "CONFIRMED",
+      updatedAt: now,
+      updatedBy: null,
+    }),
+  );
+  transaction.create(
+    scope.doc("auditLogs", `${messageId}-agendado`),
+    toStored("auditLogs", {
+      id: `${messageId}-agendado`,
+      organizationId,
+      actorType: "SYSTEM",
+      actorId: null,
+      actorName: "Automação do Atendara",
+      action: "CREATE",
+      resource: { type: "appointment", id: appointmentId },
+      summary:
+        "Agendado pela própria pessoa, pelo WhatsApp, dentro da política da organização.",
+      metadata: { startsAt: chosen.startsAt, channel: "WHATSAPP" },
+      occurredAt: now,
+      createdAt: now,
+      createdBy: null,
+      updatedAt: now,
+      updatedBy: null,
+    }),
+  );
+  const reply = replyTo({
+    event: "SCHEDULE_CONFIRMED",
+    stage: "CHOICE",
+    appointment,
+    details: { startsAt: appointment.startsAt },
+  });
+  return { outcome: "SCHEDULE_CONFIRMED", reply };
+}
+
+/** Cancela somente o caso inequivoco e sem decisao financeira pendente. */
+async function handleCancellationRequest(ctx) {
+  const {
+    transaction,
+    scope,
+    firestore,
+    organizationId,
+    organizationSnapshot,
+    conversationId,
+    client,
+    messageId,
+    now,
+    replyTo,
+  } = ctx;
+  const raw = stored("organizations", organizationSnapshot);
+  const organization =
+    raw && isProfessionId(raw.primaryProfession)
+      ? withOrganizationDefaults(
+          raw,
+          organizationId,
+          raw.primaryProfession,
+          now,
+        )
+      : null;
+  const policy = agendaSelfServicePolicyOf(
+    organization?.settings.agenda.selfService,
+  );
+  const futuros = client
+    ? (
+        await transaction.get(
+          firestore
+            .collection(paths.collection(organizationId, "appointments"))
+            .where("clientId", "==", client.id)
+            .where("startsAt", ">=", Timestamp.fromDate(new Date(now)))
+            .orderBy("startsAt")
+            .limit(5),
+        )
+      ).docs
+        .map((document) => stored("appointments", document))
+        .filter(
+          (item) => item.status === "SCHEDULED" || item.status === "CONFIRMED",
+        )
+    : [];
+  const appointment = futuros.length === 1 ? futuros[0] : null;
+  const handoff = (reason) => {
+    alertTeamAboutRoutine({
+      transaction,
+      scope,
+      organizationId,
+      conversationId,
+      professionalId: appointment?.professionalId ?? null,
+      messageId,
+      now,
+      kind: "cancelamento",
+      reason,
+    });
+    return {
+      outcome: "CANCELLATION_ESCALATED",
+      reason,
+      reply: replyTo({
+        event: "CANCELLATION_HANDED_OFF",
+        stage: "REQUEST",
+        appointment,
+        professionalId: appointment?.professionalId ?? null,
+      }),
+    };
+  };
+
+  if (!policy.cancellationEnabled) return handoff("POLICY_DISABLED");
+  if (futuros.length === 0) return handoff("APPOINTMENT_NOT_FOUND");
+  if (futuros.length > 1) return handoff("MULTIPLE_APPOINTMENTS");
+  const noticeMs = Date.parse(appointment.startsAt) - Date.parse(now);
+  if (noticeMs < policy.minimumCancellationNoticeHours * 3_600_000) {
+    return handoff("TOO_LATE");
+  }
+  const transactions = (
+    await transaction.get(
+      firestore
+        .collection(paths.collection(organizationId, "transactions"))
+        .where("appointmentId", "==", appointment.id)
+        .limit(20),
+    )
+  ).docs.map((document) => stored("transactions", document));
+  if (
+    appointment.depositInCents != null ||
+    transactions.some((item) => item.status === "PAID")
+  ) {
+    return handoff("FINANCIAL_REVIEW_REQUIRED");
+  }
+
+  const cancelled = {
+    ...appointment,
+    status: "CANCELLED",
+    cancelledAt: now,
+    cancellationReason: "Cancelado pela própria pessoa, pelo WhatsApp.",
+    origin: "CLIENT_SELF_SERVICE",
+    updatedAt: now,
+    updatedBy: null,
+  };
+  transaction.set(
+    scope.doc("appointments", appointment.id),
+    toStored("appointments", cancelled),
+  );
+  for (const item of transactions) {
+    if (item.status === "CANCELLED" || item.status === "REFUNDED") continue;
+    transaction.set(
+      scope.doc("transactions", item.id),
+      toStored("transactions", {
+        ...item,
+        status: "CANCELLED",
+        updatedAt: now,
+        updatedBy: null,
+      }),
+    );
+  }
+  transaction.create(
+    scope.doc("auditLogs", `${messageId}-cancelado`),
+    toStored("auditLogs", {
+      id: `${messageId}-cancelado`,
+      organizationId,
+      actorType: "SYSTEM",
+      actorId: null,
+      actorName: "Automação do Atendara",
+      action: "UPDATE",
+      resource: { type: "appointment", id: appointment.id },
+      summary:
+        "Cancelado pela própria pessoa, pelo WhatsApp, dentro da política da organização.",
+      metadata: { startsAt: appointment.startsAt, channel: "WHATSAPP" },
+      occurredAt: now,
+      createdAt: now,
+      createdBy: null,
+      updatedAt: now,
+      updatedBy: null,
+    }),
+  );
+  const reply = replyTo({
+    event: "CANCELLATION_CONFIRMED",
+    stage: "REQUEST",
+    appointment: cancelled,
+    details: { startsAt: cancelled.startsAt },
+  });
+  return { outcome: "CANCELLATION_CONFIRMED", reply };
+}
+
+function alertTeamAboutRoutine(ctx) {
+  const {
+    transaction,
+    scope,
+    organizationId,
+    conversationId,
+    professionalId,
+    messageId,
+    now,
+    kind,
+    reason,
+  } = ctx;
+  const id = `${messageId}-${kind}`;
+  transaction.create(
+    scope.doc("notifications", id),
+    toStored("notifications", {
+      id,
+      organizationId,
+      type: "CLIENT_WAITING",
+      status: "UNREAD",
+      priority: "HIGH",
+      title: `Pedido de ${kind} precisa da equipe`,
+      body: `A Dara encaminhou o pedido. Motivo: ${reason}.`,
+      target: { type: "conversation", id: conversationId },
+      professionalId,
+      channels: ["DASHBOARD"],
+      aiDecisionId: `${messageId}-decision`,
+      acknowledgedAt: null,
+      acknowledgedBy: null,
+      createdAt: now,
+      createdBy: null,
+      updatedAt: now,
+      updatedBy: null,
+    }),
+  );
+}
 
 /**
  * O pedido de remarcacao: le a politica, procura o atendimento futuro e os

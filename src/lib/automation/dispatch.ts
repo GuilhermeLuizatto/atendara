@@ -1,6 +1,12 @@
-import { AUTOMATION_TASK_META, DISPATCH_CLOCK_SKEW_SECONDS } from "@/config/automation";
+import {
+  AUTOMATION_TASK_META,
+  DISPATCH_CLOCK_SKEW_SECONDS,
+} from "@/config/automation";
 import { applyAttempt, type AttemptResult } from "@/lib/notifications/delivery";
-import { evaluateConversationReply, recheckBeforeSend } from "@/lib/notifications/eligibility";
+import {
+  evaluateConversationReply,
+  recheckBeforeSend,
+} from "@/lib/notifications/eligibility";
 import type { ReplyContext } from "@/lib/notifications/replies";
 import { hashBody } from "@/lib/notifications/templates";
 import type { SendRequest } from "@/lib/notifications/providers/types";
@@ -23,7 +29,11 @@ import { isConversationReplyEvent } from "@/types";
 
 import { alertEffect, auditEffect, type InternalEffect } from "./effects";
 import { expireWaitingTask } from "./expiry";
-import { outboundBlock, switchRetryAt, type AutomationSwitch } from "./emergency";
+import {
+  outboundBlock,
+  switchRetryAt,
+  type AutomationSwitch,
+} from "./emergency";
 import {
   isLeaseStale,
   isTerminalStatus,
@@ -57,26 +67,49 @@ export interface DispatchInput {
   /** Remetente do canal, cadastrado pela operadora (13.4). */
   sender: MessagingSender | null;
   /** Chave de emergência da organização e a geral (13.9). */
-  switches?: { organization: AutomationSwitch | null; global: AutomationSwitch | null };
+  switches?: {
+    organization: AutomationSwitch | null;
+    global: AutomationSwitch | null;
+  };
   now: ISODateString;
 }
 
 export type DispatchStep =
   /** Nada a fazer: tarefa inexistente, concluida, ou ponteiro de outra tentativa. */
-  | { kind: "IGNORE"; why: "NOT_FOUND" | "TERMINAL" | "STALE_ATTEMPT" | "AWAITING_RESULT" }
+  | {
+      kind: "IGNORE";
+      why: "NOT_FOUND" | "TERMINAL" | "STALE_ATTEMPT" | "AWAITING_RESULT";
+    }
   /** Outra execucao esta com a tarefa. A Cloud Tasks deve tentar mais tarde. */
   | { kind: "BUSY" }
   /** Ainda nao e hora, ou a tentativa corrente ficou sem fila: pedir de novo. */
   | { kind: "REQUEUE"; task: AutomationTask; at: ISODateString }
-  | { kind: "STOP"; task: AutomationTask; delivery: NotificationDelivery | null; effects: InternalEffect[] }
-  | { kind: "SEND"; task: AutomationTask; delivery: NotificationDelivery; request: SendRequest };
+  | {
+      kind: "STOP";
+      task: AutomationTask;
+      delivery: NotificationDelivery | null;
+      effects: InternalEffect[];
+    }
+  | {
+      kind: "SEND";
+      task: AutomationTask;
+      delivery: NotificationDelivery;
+      request: SendRequest;
+    };
 
 function cancelledDelivery(
   delivery: NotificationDelivery | null,
   at: ISODateString,
 ): NotificationDelivery | null {
   return delivery
-    ? { ...delivery, status: "CANCELLED", cancelledAt: at, nextAttemptAt: null, updatedAt: at, updatedBy: null }
+    ? {
+        ...delivery,
+        status: "CANCELLED",
+        cancelledAt: at,
+        nextAttemptAt: null,
+        updatedAt: at,
+        updatedBy: null,
+      }
     : null;
 }
 
@@ -86,7 +119,11 @@ export function cancel(
   reason: AutomationStopReason,
   at: ISODateString,
 ): Extract<DispatchStep, { kind: "STOP" }> {
-  const cancelled = transitionTask(task, "CANCELLED", { at, code: reason, patch: { stopReason: reason } });
+  const cancelled = transitionTask(task, "CANCELLED", {
+    at,
+    code: reason,
+    patch: { stopReason: reason },
+  });
   return {
     kind: "STOP",
     task: cancelled,
@@ -106,10 +143,16 @@ export function guardDispatch(input: {
   delivery: NotificationDelivery | null;
   switches?: DispatchInput["switches"];
   now: ISODateString;
-}): Exclude<DispatchStep, { kind: "SEND" }> | { kind: "CONTINUE"; task: AutomationTask } {
+}):
+  | Exclude<DispatchStep, { kind: "SEND" }>
+  | { kind: "CONTINUE"; task: AutomationTask } {
   const { payload, task, now } = input;
 
-  if (!task || task.id !== payload.taskId || task.organizationId !== payload.organizationId) {
+  if (
+    !task ||
+    task.id !== payload.taskId ||
+    task.organizationId !== payload.organizationId
+  ) {
     return { kind: "IGNORE", why: "NOT_FOUND" };
   }
   if (isTerminalStatus(task.status)) return { kind: "IGNORE", why: "TERMINAL" };
@@ -141,10 +184,16 @@ export function guardDispatch(input: {
           updatedBy: null,
         }
       : null;
-    return { kind: "STOP", task: failed, delivery, effects: [auditEffect(failed, now), alertEffect(failed, now)] };
+    return {
+      kind: "STOP",
+      task: failed,
+      delivery,
+      effects: [auditEffect(failed, now), alertEffect(failed, now)],
+    };
   }
 
-  if (task.status === "DISPATCHED") return { kind: "IGNORE", why: "AWAITING_RESULT" };
+  if (task.status === "DISPATCHED")
+    return { kind: "IGNORE", why: "AWAITING_RESULT" };
 
   // Tarefa interna nao passa pela fila: nasce e termina no ato que a origina.
   // Um ponteiro que chegue ate aqui nao executa nada.
@@ -155,7 +204,10 @@ export function guardDispatch(input: {
   const expired = expireWaitingTask(task, input.delivery, now);
   if (expired) return { kind: "STOP", ...expired };
 
-  if (Date.parse(task.scheduledFor) - DISPATCH_CLOCK_SKEW_SECONDS * 1000 > Date.parse(now)) {
+  if (
+    Date.parse(task.scheduledFor) - DISPATCH_CLOCK_SKEW_SECONDS * 1000 >
+    Date.parse(now)
+  ) {
     return { kind: "REQUEUE", task, at: queueEnqueueAt(task, now) };
   }
 
@@ -212,13 +264,21 @@ function sendStep(
   now: ISODateString,
   message: Pick<SendRequest, "destination" | "body" | "template" | "freeText">,
 ): Extract<DispatchStep, { kind: "SEND" }> {
-  const scheduled = task.status === "PLANNED" ? transitionTask(task, "SCHEDULED", { at: now }) : task;
+  const scheduled =
+    task.status === "PLANNED"
+      ? transitionTask(task, "SCHEDULED", { at: now })
+      : task;
   const dispatching = transitionTask(scheduled, "DISPATCHING", { at: now });
 
   return {
     kind: "SEND",
     task: dispatching,
-    delivery: { ...delivery, status: "SENDING", updatedAt: now, updatedBy: null },
+    delivery: {
+      ...delivery,
+      status: "SENDING",
+      updatedAt: now,
+      updatedBy: null,
+    },
     // Destino e texto existem so aqui, na memoria do despachante. Nenhum dos
     // dois e gravado.
     request: {
@@ -242,7 +302,7 @@ function sendStep(
 /** O pedido de remarcacao como o despachante precisa dele. */
 export interface ReplyOffer {
   status: string;
-  appointmentId: string;
+  appointmentId: string | null;
   slots: readonly { startsAt: ISODateString; endsAt: ISODateString }[];
   holdEndsAt: ISODateString;
 }
@@ -258,7 +318,12 @@ export interface ReplyDispatchInput extends DispatchInput {
   /** Origem append-only da resposta administrativa. */
   sourceDecision?: Pick<
     AIDecision,
-    "id" | "messageId" | "classification" | "confidence" | "action" | "responseText"
+    | "id"
+    | "messageId"
+    | "classification"
+    | "confidence"
+    | "action"
+    | "responseText"
   > | null;
   sourceMessage?: Pick<Message, "id" | "sentAt" | "aiDecisionId"> | null;
 }
@@ -280,14 +345,17 @@ export function decideReplyDispatch(input: ReplyDispatchInput): DispatchStep {
   const { now, delivery, appointment, client } = input;
 
   if (!delivery) return cancel(task, null, "DELIVERY_NOT_FOUND", now);
-  if (!input.organization || !input.profession) return cancel(task, delivery, "ORGANIZATION_DISABLED", now);
+  if (!input.organization || !input.profession)
+    return cancel(task, delivery, "ORGANIZATION_DISABLED", now);
   const event = task.event;
   if (!event || !isConversationReplyEvent(event) || !task.replyStage) {
     return cancel(task, delivery, "EVENT_WITHOUT_AUTOMATION", now);
   }
-  if (!client || client.id !== delivery.clientId) return cancel(task, delivery, "CLIENT_NOT_FOUND", now);
+  if (!client || client.id !== delivery.clientId)
+    return cancel(task, delivery, "CLIENT_NOT_FOUND", now);
   // Sem conversa nao ha janela conhecida — e sem janela a Meta nao aceita texto.
-  if (!input.conversation) return cancel(task, delivery, "REPLY_WINDOW_CLOSED", now);
+  if (!input.conversation)
+    return cancel(task, delivery, "REPLY_WINDOW_CLOSED", now);
 
   let details: Pick<ReplyContext, "slots" | "startsAt" | "responseText"> = {};
   let validUntil: ISODateString | null = null;
@@ -323,17 +391,35 @@ export function decideReplyDispatch(input: ReplyDispatchInput): DispatchStep {
       return cancel(task, delivery, "APPOINTMENT_NOT_FOUND", now);
     }
     const { offer } = input;
-    if (!offer || offer.status !== "OFFERED" || offer.appointmentId !== appointment.id) {
+    if (
+      !offer ||
+      offer.status !== "OFFERED" ||
+      offer.appointmentId !== appointment.id
+    ) {
       return cancel(task, delivery, "OFFER_CLOSED", now);
     }
     details = { slots: offer.slots };
     validUntil = offer.holdEndsAt;
-  } else if (event === "RESCHEDULE_CONFIRMED") {
+  } else if (event === "SCHEDULE_OFFERED") {
+    const { offer } = input;
+    if (!offer || offer.status !== "OFFERED" || offer.appointmentId !== null) {
+      return cancel(task, delivery, "OFFER_CLOSED", now);
+    }
+    details = { slots: offer.slots };
+    validUntil = offer.holdEndsAt;
+  } else if (
+    event === "RESCHEDULE_CONFIRMED" ||
+    event === "SCHEDULE_CONFIRMED" ||
+    event === "CANCELLATION_CONFIRMED"
+  ) {
     if (!appointment || appointment.id !== delivery.appointmentId) {
       return cancel(task, delivery, "APPOINTMENT_NOT_FOUND", now);
     }
     details = { startsAt: appointment.startsAt };
-  } else if (!appointment || appointment.id !== delivery.appointmentId) {
+  } else if (
+    !["SCHEDULE_HANDED_OFF", "CANCELLATION_HANDED_OFF"].includes(event) &&
+    (!appointment || appointment.id !== delivery.appointmentId)
+  ) {
     return cancel(task, delivery, "APPOINTMENT_NOT_FOUND", now);
   }
 
@@ -352,7 +438,8 @@ export function decideReplyDispatch(input: ReplyDispatchInput): DispatchStep {
     responseText: details.responseText,
   });
   if (!decision.eligible) return cancel(task, delivery, decision.reason, now);
-  if (hashBody(decision.body) !== delivery.bodyHash) return cancel(task, delivery, "BODY_CHANGED", now);
+  if (hashBody(decision.body) !== delivery.bodyHash)
+    return cancel(task, delivery, "BODY_CHANGED", now);
 
   return sendStep(task, delivery, input.sender, now, {
     destination: decision.destination,
@@ -378,7 +465,10 @@ export interface DispatchCompletion {
  * ate o retorno assinado chegar. **Marcar `SENT` aqui seria dizer que o
  * WhatsApp entregou porque o n8n atendeu o telefone.**
  */
-export function handoffDispatch(task: AutomationTask, now: ISODateString): AutomationTask {
+export function handoffDispatch(
+  task: AutomationTask,
+  now: ISODateString,
+): AutomationTask {
   return transitionTask(task, "DISPATCHED", { at: now });
 }
 
@@ -397,21 +487,35 @@ export function applyDispatchResult(input: {
 }): DispatchCompletion {
   const { task: dispatched, delivery, result, now } = input;
   const outcome = applyAttempt(delivery, result, now);
-  const nextDelivery: NotificationDelivery = { ...delivery, ...outcome, updatedAt: now, updatedBy: null };
+  const nextDelivery: NotificationDelivery = {
+    ...delivery,
+    ...outcome,
+    updatedAt: now,
+    updatedBy: null,
+  };
 
   if (outcome.status === "SENT") {
     const done = transitionTask(dispatched, "SUCCEEDED", {
       at: now,
       patch: { providerMessageId: result.providerMessageId, failureCode: null },
     });
-    return { task: done, delivery: nextDelivery, effects: [auditEffect(done, now)], requeueAt: null };
+    return {
+      task: done,
+      delivery: nextDelivery,
+      effects: [auditEffect(done, now)],
+      requeueAt: null,
+    };
   }
 
   if (outcome.status === "PLANNED" && outcome.nextAttemptAt) {
     const retry = transitionTask(dispatched, "SCHEDULED", {
       at: now,
       code: outcome.failureCode,
-      patch: { attempt: dispatched.attempt + 1, scheduledFor: outcome.nextAttemptAt, failureCode: outcome.failureCode },
+      patch: {
+        attempt: dispatched.attempt + 1,
+        scheduledFor: outcome.nextAttemptAt,
+        failureCode: outcome.failureCode,
+      },
     });
     return {
       task: retry,
@@ -444,5 +548,8 @@ export function completeDispatch(input: {
   result: AttemptResult;
   now: ISODateString;
 }): DispatchCompletion {
-  return applyDispatchResult({ ...input, task: handoffDispatch(input.task, input.now) });
+  return applyDispatchResult({
+    ...input,
+    task: handoffDispatch(input.task, input.now),
+  });
 }

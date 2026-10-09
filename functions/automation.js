@@ -839,6 +839,20 @@ export async function runAutomationTask(data, deps = {}) {
         );
       }
       if (task.type === "SEND_CONVERSATION_REPLY" && task.clientId) {
+        if (!context.client) {
+          context.client = stored(
+            "clients",
+            await transaction.get(scope.doc("clients", task.clientId)),
+          );
+        }
+        if (!context.professional && task.professionalId) {
+          context.professional = stored(
+            "professionals",
+            await transaction.get(
+              scope.doc("professionals", task.professionalId),
+            ),
+          );
+        }
         // A conversa e o pedido se deduzem do cadastro, pela regra do webhook:
         // a tarefa nao guarda o id da conversa, que carrega o do cadastro.
         const conversationId = whatsappConversationId(task.clientId, "");
@@ -846,11 +860,13 @@ export async function runAutomationTask(data, deps = {}) {
           "conversations",
           await transaction.get(scope.doc("conversations", conversationId)),
         );
+        const offerCollection =
+          task.event === "SCHEDULE_OFFERED"
+            ? "bookingRequests"
+            : "rescheduleRequests";
         context.offer = stored(
-          "rescheduleRequests",
-          await transaction.get(
-            scope.doc("rescheduleRequests", conversationId),
-          ),
+          offerCollection,
+          await transaction.get(scope.doc(offerCollection, conversationId)),
         );
         if (task.sourceMessageId) {
           context.sourceMessage = stored(

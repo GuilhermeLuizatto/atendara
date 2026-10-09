@@ -17,6 +17,7 @@ const consultas = vi.hoisted(() => ({
   clients: [],
   rules: [],
   appointments: [],
+  transactions: [],
 }));
 const gemini = vi.hoisted(() => ({ generate: vi.fn(), reserve: vi.fn() }));
 vi.mock("./rate-limit.js", () => ({ consumeRateLimit: gemini.reserve }));
@@ -59,7 +60,9 @@ vi.mock("firebase-admin/firestore", () => {
           ? consulta(consultas.rules)
           : path.endsWith("/appointments")
             ? consulta(consultas.appointments)
-            : consulta(consultas.clients),
+            : path.endsWith("/transactions")
+              ? consulta(consultas.transactions)
+              : consulta(consultas.clients),
       collectionGroup: () => consulta(consultas.senders),
       runTransaction: async (callback) => {
         let writing = false;
@@ -106,8 +109,12 @@ vi.mock("firebase-admin/firestore", () => {
   };
 });
 
-const { applyHumanEcho, applyInboundEvent, inboundWebhook, verifyMetaSignature } =
-  await import("./inbound.js");
+const {
+  applyHumanEcho,
+  applyInboundEvent,
+  inboundWebhook,
+  verifyMetaSignature,
+} = await import("./inbound.js");
 const { BRIDGE_SIGNATURE_HEADER, BRIDGE_TIMESTAMP_HEADER } =
   await import("./generated/automation-bridge.js");
 const { signBridgeMessage } = await import("./n8n-bridge.js");
@@ -225,6 +232,7 @@ beforeEach(() => {
   consultas.clients = [];
   consultas.rules = [];
   consultas.appointments = [];
+  consultas.transactions = [];
   process.env.N8N_CALLBACK_SECRET = PONTE;
   process.env.META_APP_SECRET = META;
   store.set(paths.organization(ORG), {
@@ -234,7 +242,10 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 describe("interpretação semântica na entrada", () => {
   function enableGemini() {
@@ -248,17 +259,45 @@ describe("interpretação semântica na entrada", () => {
   }
   it("grava parecer e metadados uma vez e não consulta novamente na reentrega", async () => {
     enableGemini();
-    gemini.generate.mockResolvedValue({ ok: true, text: async () => JSON.stringify({
-      candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify({
-        classification: "POSSIBLE_RISK", confidence: 0.96, intent: "NONE", ambiguous: false,
-      }) }] } }], usageMetadata: { promptTokenCount: 250, candidatesTokenCount: 40 },
-    }) });
-    const event = evento({ text: "Já deixei as cartas de despedida e hoje vou acabar com tudo." });
+    gemini.generate.mockResolvedValue({
+      ok: true,
+      text: async () =>
+        JSON.stringify({
+          candidates: [
+            {
+              finishReason: "STOP",
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      classification: "POSSIBLE_RISK",
+                      confidence: 0.96,
+                      intent: "NONE",
+                      ambiguous: false,
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+          usageMetadata: { promptTokenCount: 250, candidatesTokenCount: 40 },
+        }),
+    });
+    const event = evento({
+      text: "Já deixei as cartas de despedida e hoje vou acabar com tudo.",
+    });
     await applyInboundEvent(event);
-    const decisions = [...store.entries()].filter(([key]) => key.includes("/aiDecisions/"));
+    const decisions = [...store.entries()].filter(([key]) =>
+      key.includes("/aiDecisions/"),
+    );
     expect(decisions).toHaveLength(1);
-    expect(decisions[0][1]).toMatchObject({ classification: "POSSIBLE_RISK", attention: "CRITICAL",
-      action: "ESCALATE_TO_PROFESSIONAL", inputPreview: "", classifier: { status: "SUCCEEDED", model: "gemini-3.1-flash-lite" } });
+    expect(decisions[0][1]).toMatchObject({
+      classification: "POSSIBLE_RISK",
+      attention: "CRITICAL",
+      action: "ESCALATE_TO_PROFESSIONAL",
+      inputPreview: "",
+      classifier: { status: "SUCCEEDED", model: "gemini-3.1-flash-lite" },
+    });
     await applyInboundEvent(event);
     expect(gemini.generate).toHaveBeenCalledTimes(1);
   });
@@ -266,14 +305,22 @@ describe("interpretação semântica na entrada", () => {
     enableGemini();
     gemini.generate.mockRejectedValue(new Error("rede indisponível"));
     await applyInboundEvent(evento({ text: "Qual o valor da consulta?" }));
-    const decision = [...store.entries()].find(([key]) => key.includes("/aiDecisions/"))[1];
-    expect(decision).toMatchObject({ classification: "UNKNOWN", action: "ESCALATE_TO_PROFESSIONAL", classifier: { status: "UNAVAILABLE" } });
+    const decision = [...store.entries()].find(([key]) =>
+      key.includes("/aiDecisions/"),
+    )[1];
+    expect(decision).toMatchObject({
+      classification: "UNKNOWN",
+      action: "ESCALATE_TO_PROFESSIONAL",
+      classifier: { status: "UNAVAILABLE" },
+    });
   });
   it("risco lexical não sai para o provedor", async () => {
     enableGemini();
     await applyInboundEvent(evento({ text: "Quero morrer." }));
     expect(gemini.generate).not.toHaveBeenCalled();
-    const decision = [...store.entries()].find(([key]) => key.includes("/aiDecisions/"))[1];
+    const decision = [...store.entries()].find(([key]) =>
+      key.includes("/aiDecisions/"),
+    )[1];
     expect(decision.classifier.status).toBe("LOCAL_GUARD");
     expect(decision.attention).toBe("CRITICAL");
   });
@@ -449,7 +496,8 @@ describe("o que chega", () => {
       status: "WAITING_CLIENT",
       unreadCount: 0,
       escalated: true,
-      escalationReason: "Conversa assumida pelo profissional no WhatsApp Business.",
+      escalationReason:
+        "Conversa assumida pelo profissional no WhatsApp Business.",
     });
     expect(
       store.get(messagePath(ORG, inbound.conversationId, "wa-wamid.echo")),
@@ -1233,7 +1281,9 @@ describe("confirmacao, cancelamento e resposta da Dara (piloto simulado)", () =>
     expect(resultado.action).not.toBe("AUTO_RESPONSE");
     expect(store.get(caminho)).toEqual(atendimento);
     expect(
-      store.get(paths.document(ORG, "notifications", "wa-wamid.cancelar-alerta")),
+      store.get(
+        paths.document(ORG, "notifications", "wa-wamid.cancelar-alerta"),
+      ),
     ).toMatchObject({ type: "CLIENT_WAITING", status: "UNREAD" });
     expect(semTarefaDeEnvio()).toBe(true);
   });
@@ -1395,9 +1445,14 @@ describe("resposta da assistente planejada no webhook", () => {
   const CONVERSA = "wa-cliente-1";
   const REGRAS = [
     "ADMINISTRATIVE_REPLY",
+    "SCHEDULE_OFFERED",
+    "SCHEDULE_CONFIRMED",
+    "SCHEDULE_HANDED_OFF",
     "RESCHEDULE_OFFERED",
     "RESCHEDULE_CONFIRMED",
     "RESCHEDULE_HANDED_OFF",
+    "CANCELLATION_CONFIRMED",
+    "CANCELLATION_HANDED_OFF",
   ].map((event) => ({
     id: `${event}:WHATSAPP`,
     event,
@@ -1407,7 +1462,11 @@ describe("resposta da assistente planejada no webhook", () => {
     customTemplate: null,
   }));
   const REGISTRO = {
-    granted: { at: "2026-09-01T12:00:00.000Z", recordedBy: { kind: "STAFF", userId: "membro" }, medium: "FORM" },
+    granted: {
+      at: "2026-09-01T12:00:00.000Z",
+      recordedBy: { kind: "STAFF", userId: "membro" },
+      medium: "FORM",
+    },
     textVersion: "2026-10-09-rascunho",
     subjectIsMinor: false,
     legalGuardian: null,
@@ -1422,7 +1481,8 @@ describe("resposta da assistente planejada no webhook", () => {
     repliedTo: "wamid.lembrete",
     sentAt: "2026-09-21T11:00:00.000Z",
   };
-  const comoIso = (valor) => (typeof valor === "string" ? valor : valor.toDate().toISOString());
+  const comoIso = (valor) =>
+    typeof valor === "string" ? valor : valor.toDate().toISOString();
   const caminho = (colecao, id) => paths.document(ORG, colecao, id);
   let fila;
 
@@ -1470,8 +1530,19 @@ describe("resposta da assistente planejada no webhook", () => {
             allowProfessionalChange: false,
             searchWindowDays: 14,
           },
+          selfService: {
+            bookingEnabled: true,
+            cancellationEnabled: true,
+            minimumCancellationNoticeHours: 24,
+            offeredSlots: 3,
+            searchWindowDays: 14,
+          },
         },
-        notifications: { enabled: true, verifiedSenderChannels: ["WHATSAPP"], rules: REGRAS },
+        notifications: {
+          enabled: true,
+          verifiedSenderChannels: ["WHATSAPP"],
+          rules: REGRAS,
+        },
       },
     };
   }
@@ -1482,11 +1553,16 @@ describe("resposta da assistente planejada no webhook", () => {
       organizationId: ORG,
       fullName: "Alex Fictício",
       preferredName: null,
+      preferredModality: "IN_PERSON",
       phone: `+${FROM}`,
       email: null,
       appointmentNotificationsEnabled: true,
       assignedProfessionalIds: ["profissional-1"],
-      notificationConsent: { formatVersion: 2, channels: { WHATSAPP: [REGISTRO] }, legacy: null },
+      notificationConsent: {
+        formatVersion: 2,
+        channels: { WHATSAPP: [REGISTRO] },
+        legacy: null,
+      },
       ...patch,
     };
   }
@@ -1496,24 +1572,71 @@ describe("resposta da assistente planejada no webhook", () => {
   };
 
   function remarcar(patch = {}, quando = "2026-09-21T11:00:00.000Z") {
-    return applyInboundEvent({ ...PEDIDO, sentAt: quando, ...patch }, { clock: () => quando, enqueue });
-  }
-
-  function escolher(texto, id, quando = "2026-09-21T11:02:00.000Z") {
     return applyInboundEvent(
-      { ...PEDIDO, kind: "TEXT", providerMessageId: id, text: texto, button: undefined, sentAt: quando },
+      { ...PEDIDO, sentAt: quando, ...patch },
       { clock: () => quando, enqueue },
     );
   }
 
-  const tarefas = () => [...store.keys()].filter((chave) => chave.includes("/automationTasks/"));
+  function escolher(texto, id, quando = "2026-09-21T11:02:00.000Z") {
+    return applyInboundEvent(
+      {
+        ...PEDIDO,
+        kind: "TEXT",
+        providerMessageId: id,
+        text: texto,
+        button: undefined,
+        sentAt: quando,
+      },
+      { clock: () => quando, enqueue },
+    );
+  }
+
+  const tarefas = () =>
+    [...store.keys()].filter((chave) => chave.includes("/automationTasks/"));
 
   beforeEach(() => {
     fila = [];
     consultas.clients = [cliente()];
     consultas.appointments = [atendimento()];
+    consultas.transactions = [];
     store.set(paths.organization(ORG), organizacao());
+    store.set(caminho("professionals", "profissional-1"), {
+      id: "profissional-1",
+      organizationId: ORG,
+      displayName: "Sam Fictício",
+    });
   });
+
+  function regra(category) {
+    return {
+      id: `regra-${category.toLowerCase()}`,
+      organizationId: ORG,
+      professionalId: "profissional-1",
+      name: `Permitir ${category.toLowerCase()}`,
+      description: "Autoriza a jornada pela conversa.",
+      level: "PROFESSIONAL",
+      category,
+      enabled: true,
+      priority: 100,
+      conditions: {
+        combinator: "AND",
+        conditions: [
+          {
+            field: "message.classification",
+            operator: "EQUALS",
+            value: "ADMINISTRATIVE",
+          },
+        ],
+      },
+      actions: [{ type: "ALLOW_TOPIC", payload: { topic: category } }],
+      source: "MANUAL",
+      immutable: false,
+      version: 1,
+      naturalLanguageInput: null,
+      lastAppliedAt: null,
+    };
+  }
 
   it("espera o prazo configurado e o eco humano cancela a resposta administrativa", async () => {
     const quando = "2026-09-21T14:00:00.000Z"; // segunda, 11h em São Paulo
@@ -1606,9 +1729,14 @@ describe("resposta da assistente planejada no webhook", () => {
   it("a oferta planeja a resposta na mesma transação e a põe na fila", async () => {
     const resultado = await remarcar();
 
-    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_OFFERED", reply: "PLANNED" });
+    expect(resultado).toMatchObject({
+      outcome: "RESCHEDULE_OFFERED",
+      reply: "PLANNED",
+    });
     expect(resultado.replyTask).toBeUndefined();
-    const tarefa = store.get(caminho("automationTasks", "wa-wamid.remarcar-resposta"));
+    const tarefa = store.get(
+      caminho("automationTasks", "wa-wamid.remarcar-resposta"),
+    );
     expect(tarefa).toMatchObject({
       type: "SEND_CONVERSATION_REPLY",
       event: "RESCHEDULE_OFFERED",
@@ -1621,13 +1749,274 @@ describe("resposta da assistente planejada no webhook", () => {
     // Vence com a reserva da oferta.
     const pedido = store.get(caminho("rescheduleRequests", CONVERSA));
     expect(comoIso(tarefa.expiresAt)).toBe(comoIso(pedido.holdEndsAt));
-    expect(store.get(caminho("notificationDeliveries", "wa-wamid.remarcar-resposta"))).toMatchObject({
+    expect(
+      store.get(
+        caminho("notificationDeliveries", "wa-wamid.remarcar-resposta"),
+      ),
+    ).toMatchObject({
       event: "RESCHEDULE_OFFERED",
       channel: "WHATSAPP",
       templateId: "assistant:RESCHEDULE_OFFERED:REQUEST",
     });
     expect(fila).toHaveLength(1);
-    expect(fila[0].payload).toMatchObject({ version: 2, organizationId: ORG, taskId: "wa-wamid.remarcar-resposta" });
+    expect(fila[0].payload).toMatchObject({
+      version: 2,
+      organizationId: ORG,
+      taskId: "wa-wamid.remarcar-resposta",
+    });
+  });
+
+  it("pedido escrito de remarcação entra no mesmo fluxo seguro do botão", async () => {
+    const quando = "2026-09-21T11:00:00.000Z";
+    consultas.rules = [
+      {
+        id: "regra-remarcacao",
+        organizationId: ORG,
+        professionalId: "profissional-1",
+        name: "Permitir remarcação",
+        description: "Autoriza a jornada de remarcação pela conversa.",
+        level: "PROFESSIONAL",
+        category: "RESCHEDULING",
+        enabled: true,
+        priority: 100,
+        conditions: {
+          combinator: "AND",
+          conditions: [
+            {
+              field: "message.classification",
+              operator: "EQUALS",
+              value: "ADMINISTRATIVE",
+            },
+          ],
+        },
+        actions: [{ type: "ALLOW_TOPIC", payload: { topic: "RESCHEDULING" } }],
+        source: "MANUAL",
+        immutable: false,
+        version: 1,
+        naturalLanguageInput: null,
+        lastAppliedAt: null,
+      },
+    ];
+    const resultado = await applyInboundEvent(
+      {
+        ...PEDIDO,
+        kind: "TEXT",
+        providerMessageId: "wamid.remarcar-texto",
+        text: "Quero remarcar meu horário",
+        button: undefined,
+        sentAt: quando,
+      },
+      { clock: () => quando, enqueue },
+    );
+
+    expect(resultado).toMatchObject({
+      outcome: "RESCHEDULE_OFFERED",
+      classification: "ADMINISTRATIVE",
+      action: "AUTO_RESPONSE",
+      reply: "PLANNED",
+    });
+    expect(store.get(caminho("rescheduleRequests", CONVERSA))).toMatchObject({
+      status: "OFFERED",
+      appointmentId: "atendimento-1",
+    });
+    expect(
+      store.get(caminho("automationTasks", "wa-wamid.remarcar-texto-resposta")),
+    ).toMatchObject({
+      event: "RESCHEDULE_OFFERED",
+      sourceMessageId: "wa-wamid.remarcar-texto",
+      status: "SCHEDULED",
+    });
+  });
+
+  it("pedido escrito de agendamento oferece vaga e a escolha cria agenda e financeiro atomicamente", async () => {
+    consultas.rules = [regra("SCHEDULING")];
+    const quando = "2026-09-21T11:00:00.000Z";
+    const oferta = await applyInboundEvent(
+      {
+        ...PEDIDO,
+        kind: "TEXT",
+        providerMessageId: "wamid.agendar-texto",
+        text: "Quero agendar um horário",
+        button: undefined,
+        sentAt: quando,
+      },
+      { clock: () => quando, enqueue },
+    );
+
+    expect(oferta).toMatchObject({
+      outcome: "SCHEDULE_OFFERED",
+      classification: "ADMINISTRATIVE",
+      action: "AUTO_RESPONSE",
+      reply: "PLANNED",
+    });
+    const pedido = store.get(caminho("bookingRequests", CONVERSA));
+    expect(pedido).toMatchObject({
+      status: "OFFERED",
+      appointmentId: null,
+      professionalId: "profissional-1",
+      durationMinutes: 50,
+      priceInCents: 18000,
+    });
+
+    const confirmacao = await escolher("1", "wamid.agendar-escolha");
+    expect(confirmacao).toMatchObject({
+      outcome: "SCHEDULE_CONFIRMED",
+      reply: "PLANNED",
+    });
+    const appointmentId = "wa-wamid.agendar-escolha-appointment";
+    const agendado = store.get(caminho("appointments", appointmentId));
+    expect(agendado).toMatchObject({
+      id: appointmentId,
+      clientId: "cliente-1",
+      professionalId: "profissional-1",
+      origin: "CLIENT_SELF_SERVICE",
+      status: "SCHEDULED",
+    });
+    expect(comoIso(agendado.startsAt)).toBe(comoIso(pedido.slots[0].startsAt));
+    expect(
+      store.get(caminho("transactions", "wa-wamid.agendar-escolha-income")),
+    ).toMatchObject({
+      appointmentId,
+      amountInCents: 18000,
+      status: "PENDING",
+    });
+    expect(
+      store.get(
+        caminho("automationTasks", "wa-wamid.agendar-escolha-resposta"),
+      ),
+    ).toMatchObject({
+      event: "SCHEDULE_CONFIRMED",
+      appointmentId,
+      status: "SCHEDULED",
+    });
+  });
+
+  it("horário de agendamento tomado antes da escolha vai para a equipe sem criar cobrança", async () => {
+    consultas.rules = [regra("SCHEDULING")];
+    const quando = "2026-09-21T11:00:00.000Z";
+    await applyInboundEvent(
+      {
+        ...PEDIDO,
+        kind: "TEXT",
+        providerMessageId: "wamid.agendar-disputa",
+        text: "Quero agendar um horário",
+        button: undefined,
+        sentAt: quando,
+      },
+      { clock: () => quando, enqueue },
+    );
+    const oferecidos = store.get(caminho("bookingRequests", CONVERSA)).slots;
+    consultas.appointments.push(
+      atendimento({
+        id: "atendimento-concorrente",
+        clientId: "cliente-2",
+        startsAt: comoIso(oferecidos[0].startsAt),
+        endsAt: comoIso(oferecidos[0].endsAt),
+      }),
+    );
+
+    const resultado = await escolher("1", "wamid.agendar-disputa-escolha");
+
+    expect(resultado).toMatchObject({
+      outcome: "SCHEDULE_RETRY",
+      reason: "SLOT_TAKEN",
+      reply: "PLANNED",
+    });
+    expect(
+      store.get(
+        caminho("appointments", "wamid.agendar-disputa-escolha-appointment"),
+      ),
+    ).toBeUndefined();
+    expect(
+      store.get(
+        caminho("transactions", "wamid.agendar-disputa-escolha-income"),
+      ),
+    ).toBeUndefined();
+    expect(
+      store.get(
+        caminho("automationTasks", "wa-wamid.agendar-disputa-escolha-resposta"),
+      ),
+    ).toMatchObject({
+      event: "SCHEDULE_HANDED_OFF",
+      appointmentId: null,
+    });
+  });
+
+  it("cancelamento escrito encerra o único atendimento e a cobrança ainda pendente", async () => {
+    consultas.rules = [regra("CANCELLATION")];
+    consultas.transactions = [
+      {
+        id: "receita-1",
+        organizationId: ORG,
+        appointmentId: "atendimento-1",
+        status: "PENDING",
+        amountInCents: 18000,
+      },
+    ];
+    const quando = "2026-09-21T11:00:00.000Z";
+    const resultado = await applyInboundEvent(
+      {
+        ...PEDIDO,
+        kind: "TEXT",
+        providerMessageId: "wamid.cancelar-texto",
+        text: "Quero cancelar meu horário",
+        button: undefined,
+        sentAt: quando,
+      },
+      { clock: () => quando, enqueue },
+    );
+
+    expect(resultado).toMatchObject({
+      outcome: "CANCELLATION_CONFIRMED",
+      reply: "PLANNED",
+    });
+    expect(store.get(caminho("appointments", "atendimento-1"))).toMatchObject({
+      status: "CANCELLED",
+      origin: "CLIENT_SELF_SERVICE",
+      cancelledAt: expect.anything(),
+    });
+    expect(store.get(caminho("transactions", "receita-1"))).toMatchObject({
+      status: "CANCELLED",
+    });
+  });
+
+  it("cancelamento com pagamento feito vai para a equipe e não altera a agenda", async () => {
+    consultas.rules = [regra("CANCELLATION")];
+    consultas.transactions = [
+      {
+        id: "receita-paga",
+        organizationId: ORG,
+        appointmentId: "atendimento-1",
+        status: "PAID",
+      },
+    ];
+    const quando = "2026-09-21T11:00:00.000Z";
+    const resultado = await applyInboundEvent(
+      {
+        ...PEDIDO,
+        kind: "TEXT",
+        providerMessageId: "wamid.cancelar-pago",
+        text: "Preciso cancelar meu horário",
+        button: undefined,
+        sentAt: quando,
+      },
+      { clock: () => quando, enqueue },
+    );
+
+    expect(resultado).toMatchObject({
+      outcome: "CANCELLATION_ESCALATED",
+      reason: "FINANCIAL_REVIEW_REQUIRED",
+      reply: "PLANNED",
+    });
+    expect(store.get(caminho("appointments", "atendimento-1"))).toBeUndefined();
+    expect(
+      store.get(
+        caminho("notifications", "wa-wamid.cancelar-pago-cancelamento"),
+      ),
+    ).toMatchObject({
+      priority: "HIGH",
+      professionalId: "profissional-1",
+    });
   });
 
   it("a escolha aceita planeja a confirmação", async () => {
@@ -1636,8 +2025,13 @@ describe("resposta da assistente planejada no webhook", () => {
 
     const resultado = await escolher("1", "wamid.escolha");
 
-    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_CONFIRMED", reply: "PLANNED" });
-    expect(store.get(caminho("automationTasks", "wa-wamid.escolha-resposta"))).toMatchObject({
+    expect(resultado).toMatchObject({
+      outcome: "RESCHEDULE_CONFIRMED",
+      reply: "PLANNED",
+    });
+    expect(
+      store.get(caminho("automationTasks", "wa-wamid.escolha-resposta")),
+    ).toMatchObject({
       event: "RESCHEDULE_CONFIRMED",
       replyStage: "CHOICE",
     });
@@ -1662,8 +2056,13 @@ describe("resposta da assistente planejada no webhook", () => {
 
     const resultado = await escolher("1", "wamid.escolha");
 
-    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_RETRY", reply: "PLANNED" });
-    expect(store.get(caminho("automationTasks", "wa-wamid.escolha-resposta"))).toMatchObject({
+    expect(resultado).toMatchObject({
+      outcome: "RESCHEDULE_RETRY",
+      reply: "PLANNED",
+    });
+    expect(
+      store.get(caminho("automationTasks", "wa-wamid.escolha-resposta")),
+    ).toMatchObject({
       event: "RESCHEDULE_HANDED_OFF",
       replyStage: "CHOICE",
     });
@@ -1674,8 +2073,14 @@ describe("resposta da assistente planejada no webhook", () => {
 
     const resultado = await remarcar();
 
-    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_ESCALATED", reason: "POLICY_DISABLED", reply: "PLANNED" });
-    expect(store.get(caminho("automationTasks", "wa-wamid.remarcar-resposta"))).toMatchObject({
+    expect(resultado).toMatchObject({
+      outcome: "RESCHEDULE_ESCALATED",
+      reason: "POLICY_DISABLED",
+      reply: "PLANNED",
+    });
+    expect(
+      store.get(caminho("automationTasks", "wa-wamid.remarcar-resposta")),
+    ).toMatchObject({
       event: "RESCHEDULE_HANDED_OFF",
       replyStage: "REQUEST",
     });
@@ -1691,11 +2096,18 @@ describe("resposta da assistente planejada no webhook", () => {
   });
 
   it("sem consentimento para o WhatsApp, nada é planejado e o motivo volta no resultado", async () => {
-    consultas.clients = [cliente({ notificationConsent: { formatVersion: 2, channels: {}, legacy: null } })];
+    consultas.clients = [
+      cliente({
+        notificationConsent: { formatVersion: 2, channels: {}, legacy: null },
+      }),
+    ];
 
     const resultado = await remarcar();
 
-    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_OFFERED", reply: "CHANNEL_NOT_CONSENTED" });
+    expect(resultado).toMatchObject({
+      outcome: "RESCHEDULE_OFFERED",
+      reply: "CHANNEL_NOT_CONSENTED",
+    });
     expect(tarefas()).toHaveLength(0);
     expect(fila).toHaveLength(0);
   });
@@ -1727,30 +2139,51 @@ describe("resposta da assistente planejada no webhook", () => {
       },
     });
 
-    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_OFFERED", reply: "PLANNED" });
-    expect(store.get(caminho("rescheduleRequests", CONVERSA)).status).toBe("OFFERED");
-    expect(store.get(caminho("automationTasks", "wa-wamid.remarcar-resposta")).status).toBe("PLANNED");
+    expect(resultado).toMatchObject({
+      outcome: "RESCHEDULE_OFFERED",
+      reply: "PLANNED",
+    });
+    expect(store.get(caminho("rescheduleRequests", CONVERSA)).status).toBe(
+      "OFFERED",
+    );
+    expect(
+      store.get(caminho("automationTasks", "wa-wamid.remarcar-resposta"))
+        .status,
+    ).toBe("PLANNED");
   });
 
   it("agenda gravada só com a política de remarcação não derruba o webhook: usa o expediente padrão", async () => {
     const parcial = organizacao();
-    parcial.settings.agenda = { reschedule: parcial.settings.agenda.reschedule };
+    parcial.settings.agenda = {
+      reschedule: parcial.settings.agenda.reschedule,
+    };
     store.set(paths.organization(ORG), parcial);
 
     const resultado = await remarcar();
 
-    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_OFFERED", reply: "PLANNED" });
-    expect(store.get(caminho("rescheduleRequests", CONVERSA)).slots.length).toBeGreaterThan(0);
+    expect(resultado).toMatchObject({
+      outcome: "RESCHEDULE_OFFERED",
+      reply: "PLANNED",
+    });
+    expect(
+      store.get(caminho("rescheduleRequests", CONVERSA)).slots.length,
+    ).toBeGreaterThan(0);
   });
 
   it("regra da resposta desligada: a oferta segue e nenhuma resposta é planejada", async () => {
     const semRespostas = organizacao();
-    semRespostas.settings.notifications.rules = REGRAS.map((regra) => ({ ...regra, enabled: false }));
+    semRespostas.settings.notifications.rules = REGRAS.map((regra) => ({
+      ...regra,
+      enabled: false,
+    }));
     store.set(paths.organization(ORG), semRespostas);
 
     const resultado = await remarcar();
 
-    expect(resultado).toMatchObject({ outcome: "RESCHEDULE_OFFERED", reply: "RULE_DISABLED" });
+    expect(resultado).toMatchObject({
+      outcome: "RESCHEDULE_OFFERED",
+      reply: "RULE_DISABLED",
+    });
     expect(tarefas()).toHaveLength(0);
     expect(fila).toHaveLength(0);
   });

@@ -16,7 +16,8 @@ export function appointmentNoticeEvents(before, after) {
     }
     // O lembrete deriva do horario e de quem e atendido: mudar um dos dois pede
     // um lembrete novo, e o antigo e cancelado na primeira parte.
-    if (after.startsAt !== before.startsAt || after.clientId !== before.clientId) {
+    if (after.startsAt !== before.startsAt ||
+        after.clientId !== before.clientId) {
         events.push("APPOINTMENT_REMINDER");
     }
     if (after.status === "CANCELLED" && before.status !== "CANCELLED") {
@@ -27,6 +28,10 @@ export function appointmentNoticeEvents(before, after) {
 function stopReasonFor(task, current) {
     if (!current)
         return "APPOINTMENT_NOT_FOUND";
+    // Esta resposta existe justamente porque o atendimento acabou de ser
+    // cancelado pela pessoa. O gatilho da agenda nao pode cancelar a confirmacao.
+    if (task.event === "CANCELLATION_CONFIRMED")
+        return null;
     if (INACTIVE.includes(current.status))
         return "APPOINTMENT_CANCELLED";
     if (task.appointmentStartsAt !== current.startsAt)
@@ -46,7 +51,12 @@ function cancelledDelivery(delivery, at) {
     };
 }
 export function planAppointmentChange(input) {
-    const plan = { created: [], stopped: [], effects: [], skipped: [] };
+    const plan = {
+        created: [],
+        stopped: [],
+        effects: [],
+        skipped: [],
+    };
     // Organizacao ausente ou em exclusao: nada a gravar. Escrever agora
     // ressuscitaria documentos que a exclusao esta apagando.
     if (!input.organization || !input.profession)
@@ -67,7 +77,10 @@ export function planAppointmentChange(input) {
             patch: { stopReason: reason },
         });
         const delivery = deliveries.get(task.deliveryId);
-        plan.stopped.push({ task: stopped, delivery: delivery ? cancelledDelivery(delivery, at) : null });
+        plan.stopped.push({
+            task: stopped,
+            delivery: delivery ? cancelledDelivery(delivery, at) : null,
+        });
         plan.effects.push(auditEffect(stopped, at));
         known.set(stopped.id, stopped);
     }
@@ -106,7 +119,11 @@ export function planAppointmentChange(input) {
             });
             // Nasceria vencido: confirmacao registrada com o atendimento ja comecado.
             if (Date.parse(task.expiresAt) <= Date.parse(task.scheduledFor)) {
-                plan.skipped.push({ ruleId: planned.ruleId, channel: planned.channel, reason: "SCHEDULE_IN_THE_PAST" });
+                plan.skipped.push({
+                    ruleId: planned.ruleId,
+                    channel: planned.channel,
+                    reason: "SCHEDULE_IN_THE_PAST",
+                });
                 continue;
             }
             const delivery = {

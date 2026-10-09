@@ -1,20 +1,31 @@
 // Gerado por scripts/build-functions.mjs.
-import { AUTOMATION_TASK_META, DISPATCH_CLOCK_SKEW_SECONDS } from "./automation-config.js";
+import { AUTOMATION_TASK_META, DISPATCH_CLOCK_SKEW_SECONDS, } from "./automation-config.js";
 import { applyAttempt } from "./notifications-delivery.js";
-import { evaluateConversationReply, recheckBeforeSend } from "./notifications-eligibility.js";
+import { evaluateConversationReply, recheckBeforeSend, } from "./notifications-eligibility.js";
 import { hashBody } from "./notifications-templates.js";
 import { isConversationReplyEvent } from "./types.js";
 import { alertEffect, auditEffect } from "./automation-effects.js";
 import { expireWaitingTask } from "./automation-expiry.js";
-import { outboundBlock, switchRetryAt } from "./automation-emergency.js";
+import { outboundBlock, switchRetryAt, } from "./automation-emergency.js";
 import { isLeaseStale, isTerminalStatus, queueEnqueueAt, transitionTask, } from "./automation-tasks.js";
 function cancelledDelivery(delivery, at) {
     return delivery
-        ? { ...delivery, status: "CANCELLED", cancelledAt: at, nextAttemptAt: null, updatedAt: at, updatedBy: null }
+        ? {
+            ...delivery,
+            status: "CANCELLED",
+            cancelledAt: at,
+            nextAttemptAt: null,
+            updatedAt: at,
+            updatedBy: null,
+        }
         : null;
 }
 export function cancel(task, delivery, reason, at) {
-    const cancelled = transitionTask(task, "CANCELLED", { at, code: reason, patch: { stopReason: reason } });
+    const cancelled = transitionTask(task, "CANCELLED", {
+        at,
+        code: reason,
+        patch: { stopReason: reason },
+    });
     return {
         kind: "STOP",
         task: cancelled,
@@ -29,7 +40,9 @@ export function cancel(task, delivery, reason, at) {
  */
 export function guardDispatch(input) {
     const { payload, task, now } = input;
-    if (!task || task.id !== payload.taskId || task.organizationId !== payload.organizationId) {
+    if (!task ||
+        task.id !== payload.taskId ||
+        task.organizationId !== payload.organizationId) {
         return { kind: "IGNORE", why: "NOT_FOUND" };
     }
     if (isTerminalStatus(task.status))
@@ -61,7 +74,12 @@ export function guardDispatch(input) {
                 updatedBy: null,
             }
             : null;
-        return { kind: "STOP", task: failed, delivery, effects: [auditEffect(failed, now), alertEffect(failed, now)] };
+        return {
+            kind: "STOP",
+            task: failed,
+            delivery,
+            effects: [auditEffect(failed, now), alertEffect(failed, now)],
+        };
     }
     if (task.status === "DISPATCHED")
         return { kind: "IGNORE", why: "AWAITING_RESULT" };
@@ -73,7 +91,8 @@ export function guardDispatch(input) {
     const expired = expireWaitingTask(task, input.delivery, now);
     if (expired)
         return { kind: "STOP", ...expired };
-    if (Date.parse(task.scheduledFor) - DISPATCH_CLOCK_SKEW_SECONDS * 1000 > Date.parse(now)) {
+    if (Date.parse(task.scheduledFor) - DISPATCH_CLOCK_SKEW_SECONDS * 1000 >
+        Date.parse(now)) {
         return { kind: "REQUEUE", task, at: queueEnqueueAt(task, now) };
     }
     // A chave de emergência é conferida aqui, imediatamente antes do envio, e
@@ -121,12 +140,19 @@ export function decideDispatch(input) {
 }
 /** Adquire a tarefa e monta o pedido ao provedor. */
 function sendStep(task, delivery, sender, now, message) {
-    const scheduled = task.status === "PLANNED" ? transitionTask(task, "SCHEDULED", { at: now }) : task;
+    const scheduled = task.status === "PLANNED"
+        ? transitionTask(task, "SCHEDULED", { at: now })
+        : task;
     const dispatching = transitionTask(scheduled, "DISPATCHING", { at: now });
     return {
         kind: "SEND",
         task: dispatching,
-        delivery: { ...delivery, status: "SENDING", updatedAt: now, updatedBy: null },
+        delivery: {
+            ...delivery,
+            status: "SENDING",
+            updatedAt: now,
+            updatedBy: null,
+        },
         // Destino e texto existem so aqui, na memoria do despachante. Nenhum dos
         // dois e gravado.
         request: {
@@ -204,19 +230,32 @@ export function decideReplyDispatch(input) {
             return cancel(task, delivery, "APPOINTMENT_NOT_FOUND", now);
         }
         const { offer } = input;
-        if (!offer || offer.status !== "OFFERED" || offer.appointmentId !== appointment.id) {
+        if (!offer ||
+            offer.status !== "OFFERED" ||
+            offer.appointmentId !== appointment.id) {
             return cancel(task, delivery, "OFFER_CLOSED", now);
         }
         details = { slots: offer.slots };
         validUntil = offer.holdEndsAt;
     }
-    else if (event === "RESCHEDULE_CONFIRMED") {
+    else if (event === "SCHEDULE_OFFERED") {
+        const { offer } = input;
+        if (!offer || offer.status !== "OFFERED" || offer.appointmentId !== null) {
+            return cancel(task, delivery, "OFFER_CLOSED", now);
+        }
+        details = { slots: offer.slots };
+        validUntil = offer.holdEndsAt;
+    }
+    else if (event === "RESCHEDULE_CONFIRMED" ||
+        event === "SCHEDULE_CONFIRMED" ||
+        event === "CANCELLATION_CONFIRMED") {
         if (!appointment || appointment.id !== delivery.appointmentId) {
             return cancel(task, delivery, "APPOINTMENT_NOT_FOUND", now);
         }
         details = { startsAt: appointment.startsAt };
     }
-    else if (!appointment || appointment.id !== delivery.appointmentId) {
+    else if (!["SCHEDULE_HANDED_OFF", "CANCELLATION_HANDED_OFF"].includes(event) &&
+        (!appointment || appointment.id !== delivery.appointmentId)) {
         return cancel(task, delivery, "APPOINTMENT_NOT_FOUND", now);
     }
     const decision = evaluateConversationReply({
@@ -264,19 +303,33 @@ export function handoffDispatch(task, now) {
 export function applyDispatchResult(input) {
     const { task: dispatched, delivery, result, now } = input;
     const outcome = applyAttempt(delivery, result, now);
-    const nextDelivery = { ...delivery, ...outcome, updatedAt: now, updatedBy: null };
+    const nextDelivery = {
+        ...delivery,
+        ...outcome,
+        updatedAt: now,
+        updatedBy: null,
+    };
     if (outcome.status === "SENT") {
         const done = transitionTask(dispatched, "SUCCEEDED", {
             at: now,
             patch: { providerMessageId: result.providerMessageId, failureCode: null },
         });
-        return { task: done, delivery: nextDelivery, effects: [auditEffect(done, now)], requeueAt: null };
+        return {
+            task: done,
+            delivery: nextDelivery,
+            effects: [auditEffect(done, now)],
+            requeueAt: null,
+        };
     }
     if (outcome.status === "PLANNED" && outcome.nextAttemptAt) {
         const retry = transitionTask(dispatched, "SCHEDULED", {
             at: now,
             code: outcome.failureCode,
-            patch: { attempt: dispatched.attempt + 1, scheduledFor: outcome.nextAttemptAt, failureCode: outcome.failureCode },
+            patch: {
+                attempt: dispatched.attempt + 1,
+                scheduledFor: outcome.nextAttemptAt,
+                failureCode: outcome.failureCode,
+            },
         });
         return {
             task: retry,
@@ -302,5 +355,8 @@ export function applyDispatchResult(input) {
  * do simulado e de qualquer provedor que responda na hora.
  */
 export function completeDispatch(input) {
-    return applyDispatchResult({ ...input, task: handoffDispatch(input.task, input.now) });
+    return applyDispatchResult({
+        ...input,
+        task: handoffDispatch(input.task, input.now),
+    });
 }

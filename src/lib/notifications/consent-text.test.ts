@@ -10,7 +10,10 @@ import { listAllProfessions } from "@/config/professions";
 import { consentStatement } from "./consent-text";
 
 const fold = (text: string) =>
-  text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 
 describe("texto de consentimento dos avisos", () => {
   it("diz quem envia, por onde, o que, por quem passa e como retirar", () => {
@@ -26,7 +29,9 @@ describe("texto de consentimento dos avisos", () => {
     expect(statement.reviewStatus).toBe("DRAFT_PENDING_LEGAL_REVIEW");
     expect(text).toContain("Clinica Exemplo pode enviar");
     expect(text).toContain("E-mail e WhatsApp");
-    expect(text).toContain("lembrete antes do horário e cancelamento do horário");
+    expect(text).toContain(
+      "lembrete antes do horário e cancelamento do horário",
+    );
     expect(text).toContain(CHANNEL_META.WHATSAPP.consentIntermediary);
     expect(text).toContain("opcional");
     expect(text).toContain("retirar a autorização");
@@ -43,19 +48,53 @@ describe("texto de consentimento dos avisos", () => {
         disclosure: profession.notifications.disclosure,
       }).paragraphs.join(" ");
 
-      expect(text, profession.id).toContain("horários livres quando você pedir para remarcar");
+      expect(text, profession.id).toContain(
+        "horários livres quando você pedir para remarcar",
+      );
       expect(text, profession.id).toContain("confirmação do horário remarcado");
-      expect(text, profession.id).toContain("aviso de que o pedido de remarcação foi para a equipe");
-      expect(text, profession.id).toContain("respostas administrativas da assistente virtual");
+      expect(text, profession.id).toContain(
+        "aviso de que o pedido de remarcação foi para a equipe",
+      );
+      expect(text, profession.id).toContain(
+        "respostas administrativas da assistente virtual",
+      );
+      expect(text, profession.id).toContain(
+        "horários livres quando você pedir para agendar",
+      );
+      expect(text, profession.id).toContain("confirmação do horário agendado");
+      expect(text, profession.id).toContain(
+        "aviso de que o pedido de agendamento foi para a equipe",
+      );
+      expect(text, profession.id).toContain(
+        "confirmação do cancelamento pedido por você",
+      );
+      expect(text, profession.id).toContain(
+        "aviso de que o pedido de cancelamento foi para a equipe",
+      );
     }
-    expect(NOTIFICATION_CONSENT_TEXT_VERSION).toBe("2026-10-09-rascunho");
+    expect(NOTIFICATION_CONSENT_TEXT_VERSION).toBe(
+      "2026-10-09-dara-agenda-rascunho",
+    );
   });
 
   it("promete exatamente o grau de exposicao da profissao", () => {
-    const base = { organizationName: "X", channels: ["EMAIL"] as const, events: ["APPOINTMENT_REMINDER"] as const };
-    const onlyTime = consentStatement({ ...base, disclosure: "TIME_ONLY" }).paragraphs.join(" ");
-    const withProfessional = consentStatement({ ...base, disclosure: "TIME_AND_PROFESSIONAL" }).paragraphs.join(" ");
-    const withService = consentStatement({ ...base, disclosure: "TIME_PROFESSIONAL_AND_SERVICE" }).paragraphs.join(" ");
+    const base = {
+      organizationName: "X",
+      channels: ["EMAIL"] as const,
+      events: ["APPOINTMENT_REMINDER"] as const,
+    };
+    const onlyTime = consentStatement({
+      ...base,
+      disclosure: "TIME_ONLY",
+    }).paragraphs.join(" ");
+    const withProfessional = consentStatement({
+      ...base,
+      disclosure: "TIME_AND_PROFESSIONAL",
+    }).paragraphs.join(" ");
+    const withService = consentStatement({
+      ...base,
+      disclosure: "TIME_PROFESSIONAL_AND_SERVICE",
+    }).paragraphs.join(" ");
 
     expect(onlyTime).not.toContain("tipo de atendimento");
     expect(withProfessional).toContain("quem atende");
@@ -72,7 +111,8 @@ describe("texto de consentimento dos avisos", () => {
         disclosure: profession.notifications.disclosure,
       });
       const text = fold(statement.paragraphs.join(" "));
-      for (const term of FORBIDDEN_TEMPLATE_TERMS) expect(text, `${profession.id}: ${term}`).not.toContain(term);
+      for (const term of FORBIDDEN_TEMPLATE_TERMS)
+        expect(text, `${profession.id}: ${term}`).not.toContain(term);
       expect(statement.paragraphs[0].startsWith("Esta organização")).toBe(true);
     }
   });

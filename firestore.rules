@@ -863,6 +863,11 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
+      // A oferta de um novo horário também é mecanismo exclusivo do backend.
+      match /bookingRequests/{conversationId} {
+        allow read, write: if false;
+      }
+
       // ------------------------------------------ remetente de canal real
 
       // Quem pode falar pelo numero da organizacao (13.4). A administracao da

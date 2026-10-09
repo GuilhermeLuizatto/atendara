@@ -67,6 +67,7 @@ export const ORGANIZATION_EXPORT_SECTIONS = [
   "messagingSenders",
   "whatsappConnections",
   "rescheduleRequests",
+  "bookingRequests",
   "automationSwitches",
   "calendarConnections",
   "calendarBusyBlocks",
@@ -134,7 +135,9 @@ export interface ClientDataExport {
   organization: { id: ID; name: string | null };
   subject: Record<string, unknown>;
   appointments: Record<string, unknown>[];
-  conversations: Array<Record<string, unknown> & { messages: Record<string, unknown>[] }>;
+  conversations: Array<
+    Record<string, unknown> & { messages: Record<string, unknown>[] }
+  >;
   transactions: Record<string, unknown>[];
   /** Mensalidades da pessoa: valor, vencimento e situacao. */
   recurringCharges: Record<string, unknown>[];
@@ -169,6 +172,10 @@ export interface OrganizationExportCursor {
 
 export interface OrganizationExportPage {
   section: OrganizationExportSection;
-  documents: Array<{ id: ID; conversationId?: ID; data: Record<string, unknown> }>;
+  documents: Array<{
+    id: ID;
+    conversationId?: ID;
+    data: Record<string, unknown>;
+  }>;
   nextCursor: OrganizationExportCursor | null;
 }

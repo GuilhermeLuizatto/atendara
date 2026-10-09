@@ -86,4 +86,40 @@ export const CONVERSATION_REPLY_TEXTS: Record<
       "Esse horário acabou de ficar indisponível. A equipe vai falar com você por aqui para combinar outro.",
     ],
   },
+  SCHEDULE_OFFERED: {
+    REQUEST: [
+      `${INTRODUCTION} Estes horários estão livres para um novo atendimento:`,
+      "{{slotOptions}}",
+      "Responda com o número da opção nos próximos {{holdMinutes}} minutos.",
+    ],
+    CHOICE: [],
+  },
+  SCHEDULE_CONFIRMED: {
+    REQUEST: [],
+    CHOICE: [
+      "Pronto! Seu atendimento foi agendado para {{date}}, às {{time}}.",
+    ],
+  },
+  SCHEDULE_HANDED_OFF: {
+    REQUEST: [
+      INTRODUCTION,
+      "Recebemos seu pedido para agendar. A equipe vai falar com você por aqui.",
+    ],
+    CHOICE: [
+      "Esse horário acabou de ficar indisponível. A equipe vai falar com você por aqui para combinar outro.",
+    ],
+  },
+  CANCELLATION_CONFIRMED: {
+    REQUEST: [
+      `${INTRODUCTION} Seu atendimento de {{date}}, às {{time}}, foi cancelado.`,
+    ],
+    CHOICE: [],
+  },
+  CANCELLATION_HANDED_OFF: {
+    REQUEST: [
+      INTRODUCTION,
+      "Recebemos seu pedido de cancelamento. A equipe vai falar com você por aqui.",
+    ],
+    CHOICE: [],
+  },
 };

@@ -26,7 +26,7 @@ usá-la no piloto.
 
 O projeto já tem as áreas principais no código, mas o piloto ainda depende de
 validações controladas. A tabela distingue entrega técnica de prova em uso real;
-o [radar](project-dashboard/README.md) guarda o próximo passo de cada frente.
+o [radar](project-dashboard/atendara-dashboard.html) guarda o próximo passo de cada frente.
 
 | Frente                                                           | Situação                                                                                                           | Evidência e próximo passo                                                                                                                                                                     |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -53,25 +53,22 @@ prova recente aparecem como **a verificar** no radar.
 - **Diferenciais técnicos:** isolamento por organização, domínio independente do
   Firebase, configuração de profissões, auditoria e testes automatizados.
 
-| O que avaliar                              | Onde começar                                                                               |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| Desenvolvimento, pendências, bugs e testes | [Radar do projeto](project-dashboard/README.md) e [painel de trabalho](PAINEL-ATENDARA.md) |
-| Mudanças relevantes integradas à `main`    | [Changelog](CHANGELOG.md)                                                                  |
-| Rotina de colaboração com agentes          | [Guia dos agentes](docs/AGENTES-DESENVOLVIMENTO.md)                                        |
-| Decisões e limites da arquitetura          | [Arquitetura](docs/ARCHITECTURE.md)                                                        |
-| Estrutura dos dados e consultas            | [Modelo do Firestore](docs/FIRESTORE-DATA-MODEL.md)                                        |
-| Profissões como configuração               | [Definições](src/config/professions/definitions.ts)                                        |
-| Permissões e proteção dos dados            | [Matriz de permissões](src/config/permissions.ts) e [Security Rules](firestore.rules)      |
-| Motor administrativo da Dara               | [Decisões](src/lib/ai/decision-engine.ts) e [testes](src/lib/ai/decision-engine.test.ts)   |
-| Fila de automação no servidor              | [Cloud Functions](functions/automation.js)                                                 |
-| Integração contínua                        | [Workflow de CI](.github/workflows/ci.yml)                                                 |
+| O que avaliar                              | Onde começar                                                                                         |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Desenvolvimento, pendências, bugs e testes | [Radar visual](project-dashboard/atendara-dashboard.html) e [painel de trabalho](PAINEL-ATENDARA.md) |
+| Mudanças relevantes integradas à `main`    | [Changelog](CHANGELOG.md)                                                                            |
+| Rotina de colaboração com agentes          | [Guia dos agentes](docs/AGENTES-DESENVOLVIMENTO.md)                                                  |
+| Decisões e limites da arquitetura          | [Arquitetura](docs/ARCHITECTURE.md)                                                                  |
+| Estrutura dos dados e consultas            | [Modelo do Firestore](docs/FIRESTORE-DATA-MODEL.md)                                                  |
+| Profissões como configuração               | [Definições](src/config/professions/definitions.ts)                                                  |
+| Permissões e proteção dos dados            | [Matriz de permissões](src/config/permissions.ts) e [Security Rules](firestore.rules)                |
+| Motor administrativo da Dara               | [Decisões](src/lib/ai/decision-engine.ts) e [testes](src/lib/ai/decision-engine.test.ts)             |
+| Fila de automação no servidor              | [Cloud Functions](functions/automation.js)                                                           |
+| Integração contínua                        | [Workflow de CI](.github/workflows/ci.yml)                                                           |
 
-O radar é público e fica neste repositório. O [resumo no GitHub](project-dashboard/README.md)
-é legível na página; para usar os filtros visuais, baixe o
-[dashboard HTML](project-dashboard/atendara-dashboard.html) pelo botão **Download raw file**
-e abra o arquivo no navegador. O HTML inclui uma cópia do estado e tenta buscar
-o `status.json` da `main` quando há rede; se a busca falhar, informa que mostra
-a cópia incluída. Atualizações de estado exigem um commit no repositório.
+Para visualizar o [radar HTML](project-dashboard/atendara-dashboard.html),
+clique em **Download raw file** no GitHub e abra o arquivo baixado no navegador;
+ele funciona com a cópia de dados incluída mesmo sem acesso à rede.
 
 O repositório é mantido por [Guilherme Luizatto](https://github.com/GuilhermeLuizatto).
 O [histórico de desenvolvimento](https://github.com/GuilhermeLuizatto/atendara/commits/main/)

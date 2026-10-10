@@ -1174,6 +1174,9 @@ export async function applyInboundEvent(event, deps = {}) {
             const withoutConsent = leadConsentProblem(
               current.notificationConsent,
             );
+            let priority = "NORMAL";
+            if (current.attention === "CRITICAL") priority = "CRITICAL";
+            else if (needsTeam || routing?.requiresHuman) priority = "HIGH";
             transaction.create(
               scope.doc("notifications", alertId),
               toStored("notifications", {
@@ -1184,12 +1187,7 @@ export async function applyInboundEvent(event, deps = {}) {
                     ? "POSSIBLE_RISK_DETECTED"
                     : "NEW_LEAD",
                 status: "UNREAD",
-                priority:
-                  current.attention === "CRITICAL"
-                    ? "CRITICAL"
-                    : needsTeam || routing?.requiresHuman
-                      ? "HIGH"
-                      : "NORMAL",
+                priority,
                 title: leadWrite.created
                   ? "Novo contato pelo WhatsApp"
                   : "Contato sem cadastro aguarda a equipe",

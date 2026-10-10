@@ -32,6 +32,14 @@ import {
   type LeadStatus,
 } from "@/types";
 
+type LeadFilter = LeadStatus | "OPEN" | "ALL";
+
+function matchesFilter(lead: Lead, filter: LeadFilter): boolean {
+  if (filter === "ALL") return true;
+  if (filter === "OPEN") return lead.status !== "CLOSED";
+  return lead.status === filter;
+}
+
 const STATUS_TONE: Record<LeadStatus, BadgeTone> = {
   NEW: "info",
   WAITING_TEAM: "warning",
@@ -85,18 +93,12 @@ export function LeadsView() {
 function LeadsList({ leads }: { leads: Lead[] }) {
   const { data, session } = useWorkspace();
   const { run, loadMore } = useWorkspaceActions();
-  const [filter, setFilter] = useState<LeadStatus | "OPEN" | "ALL">("OPEN");
+  const [filter, setFilter] = useState<LeadFilter>("OPEN");
   const [closing, setClosing] = useState<Lead | null>(null);
   if (!data) return null;
   const canManage = session?.permissions.includes("lead:manage") ?? false;
   const visible = leads
-    .filter((lead) =>
-      filter === "ALL"
-        ? true
-        : filter === "OPEN"
-          ? lead.status !== "CLOSED"
-          : lead.status === filter,
-    )
+    .filter((lead) => matchesFilter(lead, filter))
     .sort((a, b) => b.lastContactAt.localeCompare(a.lastContactAt));
   const professionalName = (id: string | null) =>
     data.professionals.find((item) => item.id === id)?.displayName ??

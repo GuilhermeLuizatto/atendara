@@ -356,7 +356,7 @@ export function decideReplyDispatch(input: ReplyDispatchInput): DispatchStep {
   }
   // Lead sem consentimento vigente chega aqui como `null`: a resposta para.
   const recipientId = delivery.leadId ?? delivery.clientId;
-  if (!client || client.id !== recipientId)
+  if (client?.id !== recipientId)
     return cancel(
       task,
       delivery,

@@ -72,17 +72,18 @@ export async function pendingAutomationOf(ctx) {
       fromStored("automationTasks", document.id, document.data()),
     )
     .filter((task) => task[field] === id && WAITING.has(task.status));
-  const deliveries = [];
-  for (const task of tasks) {
-    if (!task.deliveryId) continue;
-    const snapshot = await transaction.get(
-      scope.doc("notificationDeliveries", task.deliveryId),
+  const snapshots = await Promise.all(
+    tasks
+      .filter((task) => task.deliveryId)
+      .map((task) =>
+        transaction.get(scope.doc("notificationDeliveries", task.deliveryId)),
+      ),
+  );
+  const deliveries = snapshots
+    .filter((snapshot) => snapshot.exists)
+    .map((snapshot) =>
+      fromStored("notificationDeliveries", snapshot.id, snapshot.data()),
     );
-    if (snapshot.exists)
-      deliveries.push(
-        fromStored("notificationDeliveries", snapshot.id, snapshot.data()),
-      );
-  }
   return { tasks, deliveries };
 }
 

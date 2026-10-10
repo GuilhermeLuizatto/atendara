@@ -398,10 +398,11 @@ export const eraseClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
   const leadSnapshots = phone
     ? (await db().collection(paths.collection(organizationId, "leads")).where("phone", "==", phone).get()).docs
     : [];
-  let linked = await linkedToClient(organizationId, input.clientId);
-  for (const leadSnapshot of leadSnapshots) {
-    linked = mergeLinked(linked, await linkedToLead(organizationId, leadSnapshot));
-  }
+  const [ofClient, ...ofLeads] = await Promise.all([
+    linkedToClient(organizationId, input.clientId),
+    ...leadSnapshots.map((leadSnapshot) => linkedToLead(organizationId, leadSnapshot)),
+  ]);
+  const linked = ofLeads.reduce(mergeLinked, ofClient);
   const leadIds = new Set(leadSnapshots.map((document) => document.id));
 
   // A mesma trava de excluir cadastro pela interface (`planDeleteClient`).

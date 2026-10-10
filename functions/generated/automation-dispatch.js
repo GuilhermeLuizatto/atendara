@@ -196,7 +196,7 @@ export function decideReplyDispatch(input) {
     }
     // Lead sem consentimento vigente chega aqui como `null`: a resposta para.
     const recipientId = delivery.leadId ?? delivery.clientId;
-    if (!client || client.id !== recipientId)
+    if (client?.id !== recipientId)
         return cancel(task, delivery, delivery.leadId ? "MISSING_CONSENT" : "CLIENT_NOT_FOUND", now);
     // Sem conversa nao ha janela conhecida — e sem janela a Meta nao aceita texto.
     if (!input.conversation)

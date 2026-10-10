@@ -47,6 +47,11 @@ export function planConversationReply(
     professionalId?: ID | null;
     scheduledFor?: ISODateString;
     sourceDecisionId?: ID | null;
+    /**
+     * Resposta a um lead: `client` é o `leadRecipient`, e o registro aponta
+     * para o lead em vez de um cadastro que não existe.
+     */
+    leadId?: ID | null;
   },
 ): ConversationReplyPlan {
   if (!input.client) {
@@ -76,6 +81,8 @@ export function planConversationReply(
   const scheduledFor = input.scheduledFor ?? at;
   const expiresAt = replyExpiresAt(input, scheduledFor);
   const { appointment, client } = input;
+  const leadId = input.leadId ?? null;
+  const clientId = leadId ? null : client.id;
   const professionalId =
     appointment?.professionalId ?? input.professionalId ?? null;
 
@@ -91,7 +98,8 @@ export function planConversationReply(
     channel: input.channel,
     ruleId: rule.id,
     appointmentId: appointment?.id ?? null,
-    clientId: client.id,
+    clientId,
+    leadId,
     professionalId,
     scheduledFor,
     status: "PLANNED",
@@ -127,7 +135,8 @@ export function planConversationReply(
     idempotencyKey: id,
     appointmentId: appointment?.id ?? null,
     appointmentStartsAt: appointment?.startsAt ?? null,
-    clientId: client.id,
+    clientId,
+    leadId,
     professionalId,
     deliveryId: id,
     sourceTaskId: null,

@@ -43,7 +43,7 @@ import {
   PLANNING_EVENT_MAX_AGE_MINUTES,
 } from "./generated/automation-config.js";
 import { providerFor } from "./generated/notifications-providers.js";
-import { whatsappConversationId } from "./generated/automation-inbound.js";
+import { replyContactOf } from "./leads.js";
 import { bridgeProviderFrom } from "./n8n-bridge.js";
 import { runAs, SERVICE_ACCOUNTS } from "./service-accounts.js";
 import { withOrganizationDefaults } from "./generated/organization-config.js";
@@ -838,13 +838,17 @@ export async function runAutomationTask(data, deps = {}) {
           ),
         );
       }
-      if (task.type === "SEND_CONVERSATION_REPLY" && task.clientId) {
-        if (!context.client) {
-          context.client = stored(
-            "clients",
-            await transaction.get(scope.doc("clients", task.clientId)),
-          );
-        }
+      if (
+        task.type === "SEND_CONVERSATION_REPLY" &&
+        (task.clientId || task.leadId)
+      ) {
+        const contact = await replyContactOf({
+          transaction,
+          scope,
+          task,
+          known: context.client,
+        });
+        context.client = contact.client;
         if (!context.professional && task.professionalId) {
           context.professional = stored(
             "professionals",
@@ -853,22 +857,24 @@ export async function runAutomationTask(data, deps = {}) {
             ),
           );
         }
-        // A conversa e o pedido se deduzem do cadastro, pela regra do webhook:
-        // a tarefa nao guarda o id da conversa, que carrega o do cadastro.
-        const conversationId = whatsappConversationId(task.clientId, "");
-        context.conversation = stored(
-          "conversations",
-          await transaction.get(scope.doc("conversations", conversationId)),
-        );
+        const { conversationId } = contact;
+        context.conversation = conversationId
+          ? stored(
+              "conversations",
+              await transaction.get(scope.doc("conversations", conversationId)),
+            )
+          : null;
         const offerCollection =
           task.event === "SCHEDULE_OFFERED"
             ? "bookingRequests"
             : "rescheduleRequests";
-        context.offer = stored(
-          offerCollection,
-          await transaction.get(scope.doc(offerCollection, conversationId)),
-        );
-        if (task.sourceMessageId) {
+        context.offer = conversationId
+          ? stored(
+              offerCollection,
+              await transaction.get(scope.doc(offerCollection, conversationId)),
+            )
+          : null;
+        if (task.sourceMessageId && conversationId) {
           context.sourceMessage = stored(
             "messages",
             await transaction.get(

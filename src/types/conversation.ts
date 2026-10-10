@@ -33,7 +33,23 @@ export interface Conversation extends TenantScopedEntity {
   escalationReason: string | null;
   /** Resposta administrativa ainda cancelável por uma resposta humana. */
   pendingAssistantTaskId?: ID | null;
+  /** Lead dono da conversa, quando o número não tem cadastro. */
+  leadId?: ID | null;
+  /**
+   * Quando e por onde a equipe assumiu. Assumir é ato humano; a Dara e os
+   * webhooks nunca limpam este campo.
+   */
+  humanTakeoverAt?: ISODateString | null;
+  humanTakeoverSource?: HumanTakeoverSource | null;
+  /**
+   * Registro da trilha que acompanhou a última retomada da automação. As
+   * rules só aceitam devolver a conversa à Dara com esse registro gravado no
+   * mesmo lote: retomar sem trilha é retomar em silêncio.
+   */
+  automationResumeAuditId?: ID | null;
 }
+
+export type HumanTakeoverSource = "PANEL" | "WHATSAPP_BUSINESS";
 
 export interface Message extends TenantScopedEntity {
   conversationId: ID;

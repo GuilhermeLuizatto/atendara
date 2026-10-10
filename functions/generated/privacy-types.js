@@ -13,6 +13,8 @@
 export const PRIVACY_REQUEST_TYPES = [
     "CLIENT_EXPORT",
     "CLIENT_ERASURE",
+    "LEAD_EXPORT",
+    "LEAD_ERASURE",
     "ORGANIZATION_EXPORT",
 ];
 /**
@@ -58,6 +60,7 @@ export const ORGANIZATION_EXPORT_SECTIONS = [
     "services",
     "messagingSenders",
     "whatsappConnections",
+    "leads",
     "rescheduleRequests",
     "bookingRequests",
     "automationSwitches",

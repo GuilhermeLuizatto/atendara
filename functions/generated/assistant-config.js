@@ -41,7 +41,13 @@ export const REPLY_VARIABLES = [
  * caiu.
  */
 /** Apresentação, só na primeira mensagem da assistente num pedido. */
-const INTRODUCTION = "Olá, {{clientName}}! Aqui é a {{assistantName}}, assistente virtual de {{organizationName}}.";
+export const REPLY_INTRODUCTION = "Olá, {{clientName}}! Aqui é a {{assistantName}}, assistente virtual de {{organizationName}}.";
+/**
+ * A mesma apresentação para quem não tem cadastro (lead): não há nome a usar,
+ * e inventar um seria pior do que não cumprimentar pelo nome.
+ */
+export const REPLY_INTRODUCTION_WITHOUT_NAME = "Olá! Aqui é a {{assistantName}}, assistente virtual de {{organizationName}}.";
+const INTRODUCTION = REPLY_INTRODUCTION;
 /**
  * Parágrafos de cada resposta, na ordem. `{{slotOptions}}` ocupa um parágrafo
  * inteiro: é a lista numerada, uma opção por linha.

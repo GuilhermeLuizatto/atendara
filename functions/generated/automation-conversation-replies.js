@@ -33,6 +33,8 @@ export function planConversationReply(input) {
     const scheduledFor = input.scheduledFor ?? at;
     const expiresAt = replyExpiresAt(input, scheduledFor);
     const { appointment, client } = input;
+    const leadId = input.leadId ?? null;
+    const clientId = leadId ? null : client.id;
     const professionalId = appointment?.professionalId ?? input.professionalId ?? null;
     const delivery = {
         id,
@@ -46,7 +48,8 @@ export function planConversationReply(input) {
         channel: input.channel,
         ruleId: rule.id,
         appointmentId: appointment?.id ?? null,
-        clientId: client.id,
+        clientId,
+        leadId,
         professionalId,
         scheduledFor,
         status: "PLANNED",
@@ -81,7 +84,8 @@ export function planConversationReply(input) {
         idempotencyKey: id,
         appointmentId: appointment?.id ?? null,
         appointmentStartsAt: appointment?.startsAt ?? null,
-        clientId: client.id,
+        clientId,
+        leadId,
         professionalId,
         deliveryId: id,
         sourceTaskId: null,

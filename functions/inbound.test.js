@@ -18,7 +18,10 @@ const consultas = vi.hoisted(() => ({
   rules: [],
   appointments: [],
   transactions: [],
+  professionals: [],
 }));
+// Todo caminho tocado pelo webhook, para provar o que ele NAO alcanca.
+const acessos = vi.hoisted(() => []);
 const gemini = vi.hoisted(() => ({ generate: vi.fn(), reserve: vi.fn() }));
 vi.mock("./rate-limit.js", () => ({ consumeRateLimit: gemini.reserve }));
 
@@ -52,11 +55,36 @@ vi.mock("firebase-admin/firestore", () => {
     limit: () => consulta(lista),
     get: async () => docsDe(lista),
   });
+  // A fila e lida do proprio armazem: o cancelamento precisa ver o que o
+  // webhook acabou de planejar.
+  const doArmazem = (path) => ({
+    where: () => doArmazem(path),
+    orderBy: () => doArmazem(path),
+    limit: () => doArmazem(path),
+    get: async () =>
+      docsDe(
+        [...store.entries()]
+          .filter(
+            ([chave]) =>
+              chave.startsWith(`${path}/`) &&
+              !chave.slice(path.length + 1).includes("/"),
+          )
+          .map(([chave, dado]) => ({ ...dado, id: chave.split("/").pop() })),
+      ),
+  });
   return {
     getFirestore: () => ({
-      doc: (path) => ({ path, get: async () => snapshot(path) }),
+      doc: (path) => {
+        acessos.push(path);
+        return { path, get: async () => snapshot(path) };
+      },
       collection: (path) =>
-        path.endsWith("/aiRules")
+        (acessos.push(path), false) ||
+        path.endsWith("/professionals")
+          ? consulta(consultas.professionals)
+          : path.endsWith("/automationTasks")
+            ? doArmazem(path)
+            : path.endsWith("/aiRules")
           ? consulta(consultas.rules)
           : path.endsWith("/appointments")
             ? consulta(consultas.appointments)
@@ -228,6 +256,8 @@ function resposta() {
 
 beforeEach(() => {
   store.clear();
+  acessos.length = 0;
+  consultas.professionals = [];
   consultas.senders = [sender()];
   consultas.clients = [];
   consultas.rules = [];
@@ -381,7 +411,7 @@ describe("as duas assinaturas", () => {
     expect(res.enviado).toMatchObject({ status: 200, body: { received: 1 } });
     expect(
       [...store.keys()].some((k) =>
-        k.includes(`/conversations/wa-anonimo-+${FROM}/messages/`),
+        k.includes("/conversations/wa-contato-") && k.includes("/messages/"),
       ),
     ).toBe(true);
   });
@@ -2186,5 +2216,541 @@ describe("resposta da assistente planejada no webhook", () => {
     });
     expect(tarefas()).toHaveLength(0);
     expect(fila).toHaveLength(0);
+  });
+});
+
+const { NOTIFICATION_CONSENT_TEXT_VERSION } = await import(
+  "./generated/notifications-config.js"
+);
+
+describe("primeiro contato pelo WhatsApp (leads)", () => {
+  const OUTRA = "org-outra-clinica";
+  const SEGUNDA = "2026-09-21T14:00:00.000Z"; // segunda, 11h em São Paulo
+  const REGRAS = ["ADMINISTRATIVE_REPLY"].map((event) => ({
+    id: `${event}:WHATSAPP`,
+    event,
+    channel: "WHATSAPP",
+    enabled: true,
+    leadMinutes: 0,
+    customTemplate: null,
+  }));
+  const comoIso = (valor) =>
+    typeof valor === "string" ? valor : valor.toDate().toISOString();
+  let fila;
+  const enqueue = async (payload, opcoes) => {
+    fila.push({ payload, ...opcoes });
+  };
+
+  function organizacao(id = ORG) {
+    return {
+      id,
+      name: "Consultório Fictício",
+      primaryProfession: "PSYCHOLOGIST",
+      ownerId: "dono",
+      timezone: "America/Sao_Paulo",
+      settings: {
+        notifications: {
+          enabled: true,
+          verifiedSenderChannels: ["WHATSAPP"],
+          rules: REGRAS,
+        },
+      },
+    };
+  }
+
+  function regraDePreco(organizationId = ORG) {
+    return {
+      id: "regra-preco",
+      organizationId,
+      professionalId: "profissional-1",
+      name: "Informar preços",
+      description: "Autoriza a informação administrativa de preço.",
+      level: "PROFESSIONAL",
+      category: "PRICING",
+      enabled: true,
+      priority: 100,
+      conditions: {
+        combinator: "AND",
+        conditions: [
+          {
+            field: "message.classification",
+            operator: "EQUALS",
+            value: "ADMINISTRATIVE",
+          },
+        ],
+      },
+      actions: [{ type: "ALLOW_TOPIC", payload: { topic: "PRICING" } }],
+      source: "MANUAL",
+      immutable: false,
+      version: 1,
+      naturalLanguageInput: null,
+      lastAppliedAt: null,
+    };
+  }
+
+  function mensagem(texto, id, quando = SEGUNDA) {
+    return applyInboundEvent(
+      evento({ providerMessageId: id, text: texto, sentAt: quando }),
+      { clock: () => quando, enqueue },
+    );
+  }
+
+  function eco(id, quando) {
+    return applyHumanEcho(
+      {
+        kind: "HUMAN_ECHO",
+        providerSenderId: SENDER_ID,
+        to: FROM,
+        providerMessageId: id,
+        text: "Olá, aqui é a equipe.",
+        sentAt: quando,
+      },
+      { clock: () => quando },
+    );
+  }
+
+  const chaves = (organizationId, colecao) =>
+    [...store.keys()].filter((chave) =>
+      chave.startsWith(`organizations/${organizationId}/${colecao}/`),
+    );
+  const leadDe = (organizationId = ORG) => {
+    const [chave] = chaves(organizationId, "leads");
+    return chave ? store.get(chave) : undefined;
+  };
+  const tarefas = () => chaves(ORG, "automationTasks");
+
+  async function autorizar(id = "wamid.autorizo", quando = SEGUNDA) {
+    return mensagem("Autorizo mensagens pelo WhatsApp", id, quando);
+  }
+
+  beforeEach(() => {
+    fila = [];
+    store.set(paths.organization(ORG), organizacao());
+    consultas.rules = [regraDePreco()];
+    consultas.professionals = [
+      { id: "profissional-1", organizationId: ORG, active: true },
+    ];
+  });
+
+  it("primeiro contato desconhecido cria um único lead, sem cadastro de cliente", async () => {
+    const resultado = await mensagem(
+      "Bom dia, queria conhecer o atendimento",
+      "wamid.primeiro",
+    );
+
+    expect(resultado.clientId).toBeNull();
+    expect(resultado.leadId).toMatch(/^lead-[0-9a-f]{32}$/);
+    expect(chaves(ORG, "leads")).toHaveLength(1);
+    expect(chaves(ORG, "clients")).toHaveLength(0);
+    const lead = leadDe();
+    expect(lead).toMatchObject({
+      id: resultado.leadId,
+      organizationId: ORG,
+      source: "WHATSAPP",
+      conversationId: resultado.conversationId,
+      phone: `+${FROM}`,
+      contactHint: "***0000",
+      professionalId: "profissional-1",
+      status: "WAITING_TEAM",
+      notificationConsent: null,
+    });
+    expect(resultado.conversationId).toMatch(/^wa-contato-/);
+    // Dado mínimo: nem o texto nem um nome vão para o lead.
+    expect(JSON.stringify(lead)).not.toContain("atendimento");
+    expect(Object.keys(lead)).not.toContain("fullName");
+    expect(
+      store.get(paths.document(ORG, "conversations", resultado.conversationId)),
+    ).toMatchObject({ leadId: resultado.leadId, clientId: null });
+    expect(
+      store.get(paths.document(ORG, "auditLogs", "wa-wamid.primeiro-lead")),
+    ).toMatchObject({ resource: { type: "lead", id: resultado.leadId } });
+    const alerta = store.get(
+      paths.document(ORG, "notifications", "wa-wamid.primeiro-alerta"),
+    );
+    expect(alerta).toMatchObject({
+      type: "NEW_LEAD",
+      target: { type: "conversation", id: resultado.conversationId },
+      channels: ["DASHBOARD"],
+    });
+    expect(alerta.body).toContain("Sem consentimento vigente");
+    expect(alerta.body).not.toContain("atendimento");
+  });
+
+  it("webhook repetido não duplica o lead, e a mensagem seguinte usa o mesmo", async () => {
+    const primeiro = await mensagem("Oi, tudo bem?", "wamid.oi");
+    const antes = store.size;
+    expect(await mensagem("Oi, tudo bem?", "wamid.oi")).toMatchObject({
+      outcome: "DUPLICATE",
+    });
+    expect(store.size).toBe(antes);
+
+    const segunda = await mensagem(
+      "Vocês atendem online?",
+      "wamid.segunda",
+      "2026-09-21T14:05:00.000Z",
+    );
+    expect(chaves(ORG, "leads")).toHaveLength(1);
+    expect(segunda).toMatchObject({
+      leadId: primeiro.leadId,
+      conversationId: primeiro.conversationId,
+    });
+    const lead = leadDe();
+    expect(comoIso(lead.firstContactAt)).toBe(SEGUNDA);
+    expect(comoIso(lead.lastContactAt)).toBe("2026-09-21T14:05:00.000Z");
+  });
+
+  it("o mesmo telefone em outra organização é outro lead, sem cruzar dados", async () => {
+    const daqui = await mensagem("Oi", "wamid.aqui");
+    consultas.senders = [
+      sender({ organizationId: OUTRA, providerSenderId: SENDER_ID }),
+    ];
+    store.set(paths.organization(OUTRA), organizacao(OUTRA));
+    acessos.length = 0;
+    const dela = await mensagem("Oi", "wamid.la");
+
+    expect(dela.organizationId).toBe(OUTRA);
+    expect(chaves(ORG, "leads")).toHaveLength(1);
+    expect(chaves(OUTRA, "leads")).toHaveLength(1);
+    expect(dela.leadId).not.toBe(daqui.leadId);
+    expect(dela.conversationId).not.toBe(daqui.conversationId);
+    expect(
+      acessos.every((caminho) => !caminho.startsWith(`organizations/${ORG}/`)),
+    ).toBe(true);
+  });
+
+  it("contato conhecido não cria lead, nem depois de ter sido lead", async () => {
+    await mensagem("Oi", "wamid.antes");
+    const lead = leadDe();
+    consultas.clients = [
+      {
+        id: "cliente-1",
+        organizationId: ORG,
+        fullName: "Alex Fictício",
+        phone: `+${FROM}`,
+        assignedProfessionalIds: ["profissional-1"],
+        notificationConsent: null,
+      },
+    ];
+    const resultado = await mensagem(
+      "Bom dia",
+      "wamid.depois",
+      "2026-09-21T15:00:00.000Z",
+    );
+
+    expect(resultado).toMatchObject({ clientId: "cliente-1" });
+    expect(resultado.leadId).toBeUndefined();
+    expect(resultado.conversationId).toBe("wa-cliente-1");
+    expect(chaves(ORG, "leads")).toHaveLength(1);
+    expect(leadDe()).toEqual(lead);
+  });
+
+  it("sem consentimento a Dara registra e alerta, mas não responde", async () => {
+    const resultado = await mensagem(
+      "Qual o valor da consulta?",
+      "wamid.valor",
+    );
+
+    expect(resultado).toMatchObject({
+      outcome: "CLASSIFIED",
+      classification: "ADMINISTRATIVE",
+      action: "SUGGEST_RESPONSE",
+      reply: "MISSING_CONSENT",
+      queue: "COMMERCIAL",
+      leadStatus: "WAITING_TEAM",
+    });
+    expect(tarefas()).toHaveLength(0);
+    expect(fila).toHaveLength(0);
+    expect(
+      store.get(paths.document(ORG, "notifications", "wa-wamid.valor-alerta")),
+    ).toBeTruthy();
+  });
+
+  it("mensagem que não é a frase de autorização não registra consentimento", async () => {
+    for (const [texto, id] of [
+      ["Oi, quero receber mensagens", "wamid.oi"],
+      ["Sim, pode mandar", "wamid.sim"],
+      ["aceito", "wamid.aceito"],
+    ]) {
+      await mensagem(texto, id);
+      expect(leadDe().notificationConsent, texto).toBeNull();
+    }
+  });
+
+  it("consentimento explícito e vigente libera somente a resposta administrativa elegível", async () => {
+    expect(await autorizar()).toMatchObject({
+      outcome: "LEAD_CONSENT_GRANTED",
+    });
+    const registro = leadDe().notificationConsent.channels.WHATSAPP.at(-1);
+    expect(registro).toMatchObject({
+      textVersion: NOTIFICATION_CONSENT_TEXT_VERSION,
+      granted: { recordedBy: { kind: "SUBJECT", userId: null }, medium: "MESSAGE" },
+      withdrawn: null,
+    });
+    expect(
+      store.get(paths.document(ORG, "auditLogs", "wa-wamid.autorizo-consent")),
+    ).toMatchObject({ resource: { type: "lead" } });
+
+    const resposta = await mensagem(
+      "Qual o valor da consulta?",
+      "wamid.preco",
+      "2026-09-21T14:10:00.000Z",
+    );
+    expect(resposta).toMatchObject({
+      action: "AUTO_RESPONSE",
+      reply: "PLANNED",
+      queue: "COMMERCIAL",
+      leadStatus: "WAITING_TEAM",
+    });
+    const tarefa = store.get(
+      paths.document(ORG, "automationTasks", "wa-wamid.preco-resposta"),
+    );
+    expect(tarefa).toMatchObject({
+      event: "ADMINISTRATIVE_REPLY",
+      clientId: null,
+      leadId: resposta.leadId,
+    });
+    expect(
+      store.get(
+        paths.document(ORG, "notificationDeliveries", "wa-wamid.preco-resposta"),
+      ),
+    ).toMatchObject({ clientId: null, leadId: resposta.leadId, contactHint: "***0000" });
+
+    // Consentimento não abre exceção: risco continua só com gente.
+    const risco = await mensagem(
+      "não consigo mais, penso em me matar",
+      "wamid.risco",
+      "2026-09-21T14:20:00.000Z",
+    );
+    expect(risco).toMatchObject({ classification: "POSSIBLE_RISK" });
+    expect(risco.reply).toBeUndefined();
+    expect(tarefas()).toHaveLength(1);
+  });
+
+  it("consentimento de versão anterior do texto não autoriza a resposta", async () => {
+    await autorizar();
+    const lead = leadDe();
+    const antigo = structuredClone(lead.notificationConsent);
+    antigo.channels.WHATSAPP[0].textVersion = "versao-anterior";
+    store.set(paths.document(ORG, "leads", lead.id), {
+      ...lead,
+      notificationConsent: antigo,
+    });
+
+    expect(
+      await mensagem(
+        "Qual o valor da consulta?",
+        "wamid.antigo",
+        "2026-09-21T14:10:00.000Z",
+      ),
+    ).toMatchObject({ reply: "CONSENT_TEXT_OUTDATED" });
+    expect(tarefas()).toHaveLength(0);
+  });
+
+  it("SAIR cancela na hora a resposta pendente e retira o consentimento", async () => {
+    await autorizar();
+    await mensagem(
+      "Qual o valor da consulta?",
+      "wamid.preco",
+      "2026-09-21T14:10:00.000Z",
+    );
+    const id = "wa-wamid.preco-resposta";
+    expect(
+      store.get(paths.document(ORG, "automationTasks", id)).status,
+    ).toBe("SCHEDULED");
+
+    const saida = await mensagem(
+      "SAIR",
+      "wamid.sair",
+      "2026-09-21T14:11:00.000Z",
+    );
+
+    expect(saida).toMatchObject({ outcome: "OPT_OUT", cancelled: 1 });
+    expect(store.get(paths.document(ORG, "automationTasks", id))).toMatchObject({
+      status: "CANCELLED",
+      stopReason: "CONSENT_REVOKED",
+    });
+    expect(
+      store.get(paths.document(ORG, "notificationDeliveries", id)),
+    ).toMatchObject({ status: "CANCELLED" });
+    expect(
+      leadDe().notificationConsent.channels.WHATSAPP.at(-1).withdrawn,
+    ).toMatchObject({ recordedBy: { kind: "SUBJECT" }, medium: "MESSAGE" });
+    expect(
+      store.get(paths.document(ORG, "conversations", saida.conversationId))
+        .pendingAssistantTaskId,
+    ).toBeNull();
+  });
+
+  it("SAIR de cliente cadastrado também cancela os avisos que esperavam a vez", async () => {
+    consultas.clients = [
+      {
+        id: "cliente-1",
+        organizationId: ORG,
+        fullName: "Alex Fictício",
+        phone: `+${FROM}`,
+        assignedProfessionalIds: ["profissional-1"],
+        notificationConsent: null,
+      },
+    ];
+    const lembrete = {
+      id: "lembrete-1",
+      organizationId: ORG,
+      type: "SEND_REMINDER",
+      status: "SCHEDULED",
+      attempt: 1,
+      clientId: "cliente-1",
+      deliveryId: "lembrete-1",
+      history: [],
+    };
+    store.set(paths.document(ORG, "automationTasks", "lembrete-1"), lembrete);
+    store.set(paths.document(ORG, "notificationDeliveries", "lembrete-1"), {
+      id: "lembrete-1",
+      organizationId: ORG,
+      status: "PLANNED",
+    });
+
+    const saida = await mensagem("PARAR", "wamid.parar");
+
+    expect(saida).toMatchObject({ outcome: "OPT_OUT", cancelled: 1 });
+    expect(
+      store.get(paths.document(ORG, "automationTasks", "lembrete-1")),
+    ).toMatchObject({ status: "CANCELLED", stopReason: "CONSENT_REVOKED" });
+    expect(
+      store.get(paths.document(ORG, "notificationDeliveries", "lembrete-1")),
+    ).toMatchObject({ status: "CANCELLED" });
+  });
+
+  it("resposta humana pelo WhatsApp Business vence a resposta pendente do lead", async () => {
+    await autorizar();
+    const resposta = await mensagem(
+      "Qual o valor da consulta?",
+      "wamid.preco",
+      "2026-09-21T14:10:00.000Z",
+    );
+
+    expect(await eco("wamid.eco", "2026-09-21T14:11:00.000Z")).toMatchObject({
+      outcome: "HUMAN_ECHO",
+      leadId: resposta.leadId,
+    });
+    expect(
+      store.get(
+        paths.document(ORG, "automationTasks", "wa-wamid.preco-resposta"),
+      ),
+    ).toMatchObject({ status: "CANCELLED", stopReason: "CONVERSATION_WITH_HUMAN" });
+    expect(leadDe()).toMatchObject({ status: "TAKEN_OVER" });
+    expect(
+      store.get(paths.document(ORG, "conversations", resposta.conversationId)),
+    ).toMatchObject({
+      escalated: true,
+      humanTakeoverSource: "WHATSAPP_BUSINESS",
+      pendingAssistantTaskId: null,
+    });
+  });
+
+  it("conversa assumida não é retomada pela Dara, e eco atrasado não volta o resumo", async () => {
+    await autorizar();
+    await eco("wamid.eco", "2026-09-21T14:05:00.000Z");
+    const depois = await mensagem(
+      "Qual o valor da consulta?",
+      "wamid.depois",
+      "2026-09-21T14:10:00.000Z",
+    );
+
+    expect(depois.action).not.toBe("AUTO_RESPONSE");
+    expect(tarefas()).toHaveLength(0);
+    expect(leadDe()).toMatchObject({ status: "TAKEN_OVER" });
+    const conversa = () =>
+      store.get(paths.document(ORG, "conversations", depois.conversationId));
+    expect(conversa()).toMatchObject({
+      escalated: true,
+      humanTakeoverSource: "WHATSAPP_BUSINESS",
+    });
+
+    await eco("wamid.eco-velho", "2026-09-21T14:01:00.000Z");
+    expect(conversa()).toMatchObject({
+      lastMessagePreview: "Qual o valor da consulta?",
+      escalated: true,
+    });
+    expect(leadDe()).toMatchObject({ status: "TAKEN_OVER" });
+  });
+
+  it("mensagem atrasada não retrocede a situação nem a fila do lead", async () => {
+    await mensagem(
+      "não consigo mais, penso em me matar",
+      "wamid.risco",
+      "2026-09-21T14:10:00.000Z",
+    );
+    const depoisDoRisco = leadDe();
+    await mensagem(
+      "Qual o valor da consulta?",
+      "wamid.velha",
+      "2026-09-21T14:00:00.000Z",
+    );
+    expect(leadDe()).toMatchObject({
+      status: depoisDoRisco.status,
+      queue: "HUMAN_REVIEW",
+      routingReason: "POSSIBLE_RISK",
+      attention: "CRITICAL",
+    });
+    expect(comoIso(leadDe().lastContactAt)).toBe("2026-09-21T14:10:00.000Z");
+  });
+
+  it("mensagem clínica, ambígua ou de risco só alerta a equipe, mesmo com consentimento", async () => {
+    await autorizar();
+    const casos = [
+      ["não consigo mais, penso em me matar", "wamid.risco", "POSSIBLE_RISK"],
+      [
+        "Qual o valor da consulta e posso remarcar para sexta?",
+        "wamid.ambigua",
+        null,
+      ],
+      [
+        "Estou tendo crises de ansiedade, devo aumentar o remédio?",
+        "wamid.clinica",
+        null,
+      ],
+    ];
+    let minuto = 10;
+    for (const [texto, id, motivo] of casos) {
+      const quando = `2026-09-21T14:${minuto}:00.000Z`;
+      minuto += 5;
+      const resultado = await mensagem(texto, id, quando);
+      expect(resultado.action, texto).not.toBe("AUTO_RESPONSE");
+      expect(resultado.queue, texto).toBe("HUMAN_REVIEW");
+      expect(
+        store.get(paths.document(ORG, "notifications", `wa-${id}-alerta`)),
+        texto,
+      ).toBeTruthy();
+      const decisao = store.get(
+        paths.document(ORG, "aiDecisions", `wa-${id}-decision`),
+      );
+      expect(decisao.responseText, texto).toBeNull();
+      if (motivo) expect(leadDe().routingReason).toBe(motivo);
+    }
+    expect(tarefas()).toHaveLength(0);
+    const alertaDeRisco = store.get(
+      paths.document(ORG, "notifications", "wa-wamid.risco-alerta"),
+    );
+    expect(alertaDeRisco).toMatchObject({
+      type: "POSSIBLE_RISK_DETECTED",
+      priority: "CRITICAL",
+    });
+    // O alerta não carrega o que a pessoa escreveu.
+    expect(alertaDeRisco.body).not.toContain("matar");
+  });
+
+  it("encaminhamento financeiro fica no financeiro da organização e não toca a cobrança da plataforma", async () => {
+    acessos.length = 0;
+    const resultado = await mensagem(
+      "Posso pagar a consulta por pix?",
+      "wamid.pix",
+    );
+
+    expect(resultado.queue).toBe("TENANT_FINANCE");
+    expect(leadDe()).toMatchObject({ queue: "TENANT_FINANCE" });
+    expect(acessos.some((caminho) => caminho.startsWith("platform"))).toBe(false);
+    expect(
+      [...store.keys()].some((chave) => chave.startsWith("platform")),
+    ).toBe(false);
   });
 });

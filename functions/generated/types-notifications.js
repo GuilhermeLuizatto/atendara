@@ -115,6 +115,9 @@ export const NOTIFICATION_SKIP_REASONS = [
     "CONSENT_REVOKED",
     "CHANNEL_NOT_CONSENTED",
     "CONSENT_INCOMPLETE",
+    // Lead autorizou por uma frase de texto anterior: o texto vigente promete
+    // outra coisa, e so a versao vigente autoriza resposta.
+    "CONSENT_TEXT_OUTDATED",
     "SCHEDULE_IN_THE_PAST",
     "ALREADY_PLANNED",
     "TEMPLATE_REJECTED",

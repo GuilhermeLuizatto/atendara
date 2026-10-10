@@ -54,9 +54,31 @@ import {
   hasActiveAppointment,
 } from "./generated/automation-assistant-availability.js";
 import { scheduleTask } from "./automation-queue.js";
-import { transitionTask } from "./generated/automation.js";
 import { verifyBridgeSignature } from "./n8n-bridge.js";
 import { runAs } from "./service-accounts.js";
+import { routeContact } from "./generated/leads-routing.js";
+import {
+  grantLeadConsent,
+  isLeadConsentAcceptance,
+  leadConsentProblem,
+  leadRecipient,
+  leadStatusAfterInbound,
+  withdrawLeadConsent,
+} from "./generated/leads-lifecycle.js";
+import {
+  LEAD_CONSENT_NOTE,
+  LEAD_CREATED_NOTE,
+  ROUTING_QUEUE_LABELS,
+  ROUTING_REASON_LABELS,
+} from "./generated/leads-config.js";
+import { maskPhone } from "./generated/notifications-contacts.js";
+import {
+  cancelPendingAutomation,
+  leadIdFor,
+  newLeadConversationId,
+  pendingAutomationOf,
+  soleActiveProfessionalId,
+} from "./leads.js";
 import { classifyWithGemini, geminiEnabledFor } from "./gemini.js";
 import { materializeSeededRules } from "./generated/system-rules-config.js";
 
@@ -71,9 +93,9 @@ import { materializeSeededRules } from "./generated/system-rules-config.js";
  *
  * **Quem e quem nao sai do corpo.** A organizacao sai do `phone_number_id`
  * cadastrado em `messagingSenders`; a pessoa sai do telefone normalizado
- * **dentro daquela organizacao**. Numero desconhecido vira conversa sem
- * vinculo — e **nunca** e procurado em outra organizacao: fazer isso contaria a
- * uma clinica que aquela pessoa e atendida na outra.
+ * **dentro daquela organizacao**. Numero desconhecido vira lead daquela
+ * organizacao — e **nunca** e procurado em outra: fazer isso contaria a uma
+ * clinica que aquela pessoa e atendida na outra. Lead nao vira cliente sozinho.
  */
 
 const REGION = "southamerica-east1";
@@ -129,14 +151,33 @@ export async function organizationOfSender(providerSenderId) {
     : null;
 }
 
-/** A pessoa, procurada SO dentro daquela organizacao. */
+/**
+ * A pessoa, procurada SO dentro daquela organizacao. Dois cadastros com o mesmo
+ * numero sao contato conhecido, mas ambiguo: nao viram lead, porque a pessoa
+ * ja e cliente — so nao se sabe qual dos cadastros.
+ */
 async function clientOfPhone(transaction, organizationId, phone) {
   const found = await db()
     .collection(paths.collection(organizationId, "clients"))
     .where("phone", "==", phone)
     .limit(2);
   const snapshot = await transaction.get(found);
-  return snapshot.size === 1 ? stored("clients", snapshot.docs[0]) : null;
+  return {
+    client: snapshot.size === 1 ? stored("clients", snapshot.docs[0]) : null,
+    ambiguous: snapshot.size > 1,
+  };
+}
+
+/**
+ * De qual conversa e a mensagem: do cadastro, do lead ou — so no caso ambiguo
+ * de dois cadastros com o mesmo numero — a conversa sem vinculo de antes.
+ * `null` e lead novo, que ainda nao tem conversa.
+ */
+function conversationOfContact({ client, leadId, lead, phone }) {
+  if (client) return whatsappConversationId(client.id, phone);
+  if (lead) return lead.conversationId;
+  if (leadId) return null;
+  return whatsappConversationId(null, phone);
 }
 
 /**
@@ -153,12 +194,20 @@ async function semanticBeforeTransaction(ctx) {
     .limit(2)
     .get();
   const client = found.size === 1 ? stored("clients", found.docs[0]) : null;
-  const conversationId = whatsappConversationId(client?.id ?? null, phone);
+  const leadId = found.size === 0 ? leadIdFor(organizationId, phone) : null;
+  const lead = leadId
+    ? stored("leads", await scope.doc("leads", leadId).get())
+    : null;
+  const conversationId = conversationOfContact({ client, leadId, lead, phone });
 
   const [orgSnapshot, previousSnapshot, existingSnapshot] = await Promise.all([
     firestore.doc(paths.organization(organizationId)).get(),
-    scope.doc("conversations", conversationId).get(),
-    firestore.doc(messagePath(organizationId, conversationId, messageId)).get(),
+    conversationId ? scope.doc("conversations", conversationId).get() : null,
+    conversationId
+      ? firestore
+          .doc(messagePath(organizationId, conversationId, messageId))
+          .get()
+      : { exists: false },
   ]);
   const org = stored("organizations", orgSnapshot);
   const previous = stored("conversations", previousSnapshot);
@@ -192,7 +241,11 @@ async function semanticBeforeTransaction(ctx) {
     organizationId,
     enabled: organization.settings.ai.enabled,
   });
-  return { conversationId, profession: org.primaryProfession, result };
+  return {
+    contactKey: client?.id ?? leadId ?? conversationId,
+    profession: org.primaryProfession,
+    result,
+  };
 }
 
 // A fila é local à tentativa: todos os ramos concluem as leituras antes de
@@ -258,8 +311,22 @@ export async function applyInboundEvent(event, deps = {}) {
     withDeferredWrites(realTransaction, async (transaction) => {
       // A leitura participa da transação para não sobrescrever consentimento ou
       // cadastro alterado pela equipe enquanto a mensagem está sendo processada.
-      const client = await clientOfPhone(transaction, organizationId, phone);
-      const conversationId = whatsappConversationId(client?.id ?? null, phone);
+      const { client, ambiguous } = await clientOfPhone(
+        transaction,
+        organizationId,
+        phone,
+      );
+      // Sem cadastro, o contato e um lead DESTA organizacao. O id deriva do
+      // telefone: a reentrega encontra o mesmo lead, e nunca cria outro.
+      const leadId =
+        !client && !ambiguous ? leadIdFor(organizationId, phone) : null;
+      const lead = leadId
+        ? stored("leads", await transaction.get(scope.doc("leads", leadId)))
+        : null;
+      const conversationId =
+        conversationOfContact({ client, leadId, lead, phone }) ??
+        newLeadConversationId();
+      const contactKey = client?.id ?? leadId ?? conversationId;
       const messageRef = firestore.doc(
         messagePath(organizationId, conversationId, messageId),
       );
@@ -267,11 +334,28 @@ export async function applyInboundEvent(event, deps = {}) {
         "conversations",
         await transaction.get(scope.doc("conversations", conversationId)),
       );
-      const professionalId =
+      let professionalId =
         conversation?.professionalId ??
+        lead?.professionalId ??
         (client?.assignedProfessionalIds?.length === 1
           ? client.assignedProfessionalIds[0]
           : null);
+      if (!professionalId && leadId && !lead) {
+        professionalId = await soleActiveProfessionalId(
+          transaction,
+          firestore,
+          organizationId,
+        );
+      }
+      // Campos que so a equipe e a tomada humana escrevem: a mensagem que
+      // chega regrava a conversa, mas nunca os apaga.
+      const carried = {
+        humanTakeoverAt: conversation?.humanTakeoverAt ?? null,
+        humanTakeoverSource: conversation?.humanTakeoverSource ?? null,
+        automationResumeAuditId: conversation?.automationResumeAuditId ?? null,
+        ...(leadId ? { leadId } : {}),
+      };
+      const leadConsent = lead?.notificationConsent ?? null;
       const existing = await transaction.get(messageRef);
       // Compatibilidade com a versão que gravava na raiz e retirava pontuação.
       // Conferir o id original impede que colisões antigas descartem mensagens.
@@ -314,13 +398,26 @@ export async function applyInboundEvent(event, deps = {}) {
 
       // Resposta da assistente, planejada nesta transacao. Tudo o que ela
       // confere ja foi lido acima: organizacao, cadastro, conversa e remetente.
-      const replyTo = (reply) =>
-        planReply({
+      // Lead so recebe resposta com consentimento vigente dado por ele mesmo;
+      // sem isso, nada e planejado e o motivo volta no resultado.
+      const replyTo = (reply) => {
+        const consentProblem = leadId ? leadConsentProblem(leadConsent) : null;
+        if (consentProblem) return { kind: "SKIPPED", reason: consentProblem };
+        return planReply({
           transaction,
           scope,
           organizationId,
           organizationSnapshot,
-          client,
+          client:
+            client ??
+            (leadId
+              ? leadRecipient({
+                  id: leadId,
+                  phone,
+                  notificationConsent: leadConsent,
+                })
+              : null),
+          leadId,
           sender,
           conversation,
           sentAt: event.sentAt,
@@ -328,6 +425,75 @@ export async function applyInboundEvent(event, deps = {}) {
           now,
           ...reply,
         });
+      };
+
+      /**
+       * O lead como fica depois desta mensagem. Mensagem atrasada nao muda
+       * situacao, fila nem atencao; risco, uma vez visto, so sai pela equipe.
+       */
+      const writeLead = ({ routing, attention, requiresHuman, consent }) => {
+        if (!leadId) return null;
+        const newer =
+          !lead || Date.parse(event.sentAt) > Date.parse(lead.lastContactAt);
+        const status = leadStatusAfterInbound(lead?.status ?? null, {
+          requiresHuman,
+          newer,
+        });
+        const keep =
+          lead && (!routing || !newer || lead.attention === "CRITICAL");
+        const next = {
+          id: leadId,
+          organizationId,
+          source: "WHATSAPP",
+          conversationId,
+          phone,
+          contactHint: maskPhone(phone),
+          professionalId: lead?.professionalId ?? professionalId,
+          status,
+          queue: keep ? lead.queue : (routing?.queue ?? "HUMAN_REVIEW"),
+          routingReason: keep
+            ? lead.routingReason
+            : (routing?.reason ?? "MISSING_CONTEXT"),
+          attention: keep ? lead.attention : (attention ?? "NORMAL"),
+          firstContactAt: lead?.firstContactAt ?? event.sentAt,
+          lastContactAt: newer ? event.sentAt : lead.lastContactAt,
+          statusChangedAt:
+            lead && lead.status === status ? lead.statusChangedAt : now,
+          notificationConsent:
+            consent === undefined ? leadConsent : (consent ?? null),
+          createdAt: lead?.createdAt ?? now,
+          createdBy: null,
+          updatedAt: now,
+          updatedBy: null,
+        };
+        transaction.set(scope.doc("leads", leadId), toStored("leads", next));
+        if (!lead) {
+          transaction.create(
+            scope.doc("auditLogs", `${messageId}-lead`),
+            toStored("auditLogs", {
+              id: `${messageId}-lead`,
+              organizationId,
+              actorType: "SYSTEM",
+              actorId: null,
+              actorName: "Automação do Atendara",
+              action: "CREATE",
+              resource: { type: "lead", id: leadId },
+              summary: LEAD_CREATED_NOTE,
+              metadata: { channel: "WHATSAPP", messageId },
+              occurredAt: now,
+              createdAt: now,
+              createdBy: null,
+              updatedAt: now,
+              updatedBy: null,
+            }),
+          );
+        }
+        return {
+          lead: next,
+          created: !lead,
+          reopened: lead?.status === "CLOSED" && status !== "CLOSED",
+        };
+      };
 
       const decision = decideInbound({
         event,
@@ -400,6 +566,7 @@ export async function applyInboundEvent(event, deps = {}) {
             unreadCount: (conversation?.unreadCount ?? 0) + 1,
             escalated: conversation?.escalated ?? false,
             escalationReason: conversation?.escalationReason ?? null,
+            ...carried,
             // A janela de texto livre que a propria pessoa abriu.
             inboundWindowEndsAt: inboundWindowEndsAt(event.sentAt),
             createdAt: conversation?.createdAt ?? now,
@@ -422,7 +589,110 @@ export async function applyInboundEvent(event, deps = {}) {
         );
       }
 
-      if (decision.kind === "OPT_OUT" && client) {
+      // Autorizacao explicita do lead, pela frase que nomeia o canal. E ato da
+      // propria pessoa, nao pergunta: nao vai ao motor nem gera resposta.
+      if (
+        leadId &&
+        event.kind === "TEXT" &&
+        decision.kind !== "OPT_OUT" &&
+        isLeadConsentAcceptance(event.text)
+      ) {
+        const consent = grantLeadConsent(leadConsent, now);
+        writeLead({ routing: null, requiresHuman: true, consent });
+        transaction.create(
+          scope.doc("auditLogs", `${messageId}-consent`),
+          toStored("auditLogs", {
+            id: `${messageId}-consent`,
+            organizationId,
+            actorType: "SYSTEM",
+            actorId: null,
+            actorName: "Automação do Atendara",
+            action: "UPDATE",
+            resource: { type: "lead", id: leadId },
+            summary: LEAD_CONSENT_NOTE,
+            metadata: {
+              channel: "WHATSAPP",
+              messageId,
+              consent: {
+                act: "GRANTED",
+                textVersion: consent.channels.WHATSAPP.at(-1).textVersion,
+              },
+            },
+            occurredAt: now,
+            createdAt: now,
+            createdBy: null,
+            updatedAt: now,
+            updatedBy: null,
+          }),
+        );
+        return {
+          outcome: "LEAD_CONSENT_GRANTED",
+          organizationId,
+          conversationId,
+          clientId: null,
+          leadId,
+        };
+      }
+
+      // Saida vale na hora: o consentimento e retirado e tudo o que ainda
+      // esperava a vez na fila e cancelado na mesma transacao.
+      if (decision.kind === "OPT_OUT" && (client || leadId)) {
+        const pendingAutomation = await pendingAutomationOf({
+          transaction,
+          firestore,
+          scope,
+          organizationId,
+          field: client ? "clientId" : "leadId",
+          id: client?.id ?? leadId,
+        });
+        const cancelled = cancelPendingAutomation({
+          transaction,
+          scope,
+          ...pendingAutomation,
+          now,
+          code: "CONSENT_REVOKED",
+        });
+        if (!olderThanPreview) {
+          transaction.set(
+            scope.doc("conversations", conversationId),
+            { pendingAssistantTaskId: null },
+            { merge: true },
+          );
+        }
+        if (!client) {
+          writeLead({
+            routing: null,
+            requiresHuman: false,
+            consent: withdrawLeadConsent(leadConsent, now),
+          });
+          transaction.create(
+            scope.doc("auditLogs", `${messageId}-consent`),
+            toStored("auditLogs", {
+              id: `${messageId}-consent`,
+              organizationId,
+              actorType: "SYSTEM",
+              actorId: null,
+              actorName: "Automação do Atendara",
+              action: "UPDATE",
+              resource: { type: "lead", id: leadId },
+              summary: INBOUND_OPT_OUT_NOTE,
+              metadata: { channel: "WHATSAPP", messageId, cancelled },
+              occurredAt: now,
+              createdAt: now,
+              createdBy: null,
+              updatedAt: now,
+              updatedBy: null,
+            }),
+          );
+          return {
+            outcome: "OPT_OUT",
+            organizationId,
+            conversationId,
+            clientId: null,
+            leadId,
+            cancelled,
+          };
+        }
         const changes = plannedConsentChanges(
           client.notificationConsent,
           // Retira so o WhatsApp: quem pediu para parar no WhatsApp nao pediu
@@ -463,7 +733,7 @@ export async function applyInboundEvent(event, deps = {}) {
             action: "UPDATE",
             resource: { type: "client", id: client.id },
             summary: INBOUND_OPT_OUT_NOTE,
-            metadata: { channel: "WHATSAPP", messageId },
+            metadata: { channel: "WHATSAPP", messageId, cancelled },
             occurredAt: now,
             createdAt: now,
             createdBy: null,
@@ -471,7 +741,7 @@ export async function applyInboundEvent(event, deps = {}) {
             updatedBy: null,
           }),
         );
-        return { outcome: "OPT_OUT", organizationId, conversationId };
+        return { outcome: "OPT_OUT", organizationId, conversationId, cancelled };
       }
 
       if (decision.kind === "CONFIRM" && client) {
@@ -635,7 +905,7 @@ export async function applyInboundEvent(event, deps = {}) {
           // conversa e a profissão ainda forem as mesmas nesta leitura.
           const semanticResult =
             semantic &&
-            semantic.conversationId === conversationId &&
+            semantic.contactKey === contactKey &&
             semantic.profession === rawOrganization.primaryProfession
               ? semantic.result
               : null;
@@ -663,15 +933,20 @@ export async function applyInboundEvent(event, deps = {}) {
           });
 
           const decisionId = `${messageId}-decision`;
+          // As rotinas de agenda mexem em atendimento e financeiro de um
+          // cadastro: lead nao tem nenhum dos dois, e vai para a fila da agenda.
           const naturalLanguageReschedule =
+            Boolean(client) &&
             decided.action === "AUTO_RESPONSE" &&
             decided.trace.classification.classification === "ADMINISTRATIVE" &&
             decided.trace.classification.intent === "RESCHEDULING";
           const naturalLanguageBooking =
+            Boolean(client) &&
             decided.action === "AUTO_RESPONSE" &&
             decided.trace.classification.classification === "ADMINISTRATIVE" &&
             decided.trace.classification.intent === "SCHEDULING";
           const naturalLanguageCancellation =
+            Boolean(client) &&
             decided.action === "AUTO_RESPONSE" &&
             decided.trace.classification.classification === "ADMINISTRATIVE" &&
             decided.trace.classification.intent === "CANCELLATION";
@@ -848,6 +1123,7 @@ export async function applyInboundEvent(event, deps = {}) {
                   : mustEscalate
                     ? (routineResult?.reason ?? decided.reason)
                     : null,
+                ...carried,
                 pendingAssistantTaskId:
                   plannedReply?.kind === "PLANNED"
                     ? plannedReply.task.id
@@ -871,9 +1147,70 @@ export async function applyInboundEvent(event, deps = {}) {
               { merge: true },
             );
 
+          const needsTeam =
+            decided.escalated || decided.action === "SUGGEST_RESPONSE";
+          // Encaminhamento do lead: a fila sai da classificacao ja feita, e
+          // "precisa de gente" e tudo o que a Dara nao vai responder agora.
+          const routing = leadId
+            ? routeContact({
+                classification: decided.trace.classification,
+                confidenceThreshold:
+                  organization.settings.ai.autoResponseConfidenceThreshold,
+              })
+            : null;
+          const leadWrite = writeLead({
+            routing,
+            attention: decided.attention,
+            requiresHuman:
+              Boolean(routing?.requiresHuman) ||
+              plannedReply?.kind !== "PLANNED",
+          });
+          if (
+            leadWrite &&
+            (needsTeam || leadWrite.created || leadWrite.reopened)
+          ) {
+            const alertId = `${messageId}-alerta`;
+            const current = leadWrite.lead;
+            const withoutConsent = leadConsentProblem(
+              current.notificationConsent,
+            );
+            let priority = "NORMAL";
+            if (current.attention === "CRITICAL") priority = "CRITICAL";
+            else if (needsTeam || routing?.requiresHuman) priority = "HIGH";
+            transaction.create(
+              scope.doc("notifications", alertId),
+              toStored("notifications", {
+                id: alertId,
+                organizationId,
+                type:
+                  decided.classification === "POSSIBLE_RISK"
+                    ? "POSSIBLE_RISK_DETECTED"
+                    : "NEW_LEAD",
+                status: "UNREAD",
+                priority,
+                title: leadWrite.created
+                  ? "Novo contato pelo WhatsApp"
+                  : "Contato sem cadastro aguarda a equipe",
+                // Sem texto da mensagem: o alerta diz a fila e o motivo, e a
+                // conversa e o unico lugar do que foi dito.
+                body: `Encaminhado para ${ROUTING_QUEUE_LABELS[current.queue]}. Motivo: ${ROUTING_REASON_LABELS[current.routingReason]}.${withoutConsent ? " Sem consentimento vigente: a Dara não responde a este contato." : ""}`,
+                target: { type: "conversation", id: conversationId },
+                professionalId,
+                channels: ["DASHBOARD"],
+                aiDecisionId: decisionId,
+                acknowledgedAt: null,
+                acknowledgedBy: null,
+                createdAt: now,
+                createdBy: null,
+                updatedAt: now,
+                updatedBy: null,
+              }),
+            );
+          }
+
           // Risco vira alerta CRITICAL para gente, e nunca resposta automatica: a
           // trava vive em CLASSIFICATION_META e e o motor que a aplica.
-          if (decided.escalated || decided.action === "SUGGEST_RESPONSE") {
+          if (!leadWrite && needsTeam) {
             const alertId = `${messageId}-alerta`;
             transaction.create(
               scope.doc("notifications", alertId),
@@ -925,6 +1262,13 @@ export async function applyInboundEvent(event, deps = {}) {
             organizationId,
             conversationId,
             clientId: client?.id ?? null,
+            ...(leadWrite
+              ? {
+                  leadId,
+                  queue: leadWrite.lead.queue,
+                  leadStatus: leadWrite.lead.status,
+                }
+              : {}),
             classification: decided.trace.classification.classification,
             action: decided.action,
             attention: decided.attention,
@@ -934,11 +1278,15 @@ export async function applyInboundEvent(event, deps = {}) {
         }
       }
 
+      // Botao e mensagem sem texto a classificar: o lead fica registrado, para
+      // a equipe, mesmo sem decisao do motor.
+      const leadWrite = writeLead({ routing: null, requiresHuman: true });
       return {
         outcome: decision.kind,
         organizationId,
         conversationId,
         clientId: client?.id ?? null,
+        ...(leadWrite ? { leadId } : {}),
       };
     }),
   );
@@ -964,6 +1312,9 @@ export async function applyInboundEvent(event, deps = {}) {
  * O eco de coexistência prova que alguém respondeu pelo app WhatsApp Business.
  * A identidade individual não vem no evento; por isso o registro diz apenas
  * "Profissional" e a conversa fica sob responsabilidade humana até liberação.
+ *
+ * Tomar a conversa é monotônico: eco repetido não grava de novo, e eco
+ * atrasado assume a conversa sem trocar o resumo por uma mensagem mais velha.
  */
 export async function applyHumanEcho(event, deps = {}) {
   const { clock = () => new Date().toISOString() } = deps;
@@ -985,12 +1336,28 @@ export async function applyHumanEcho(event, deps = {}) {
   const messageId = inboundMessageId(event.providerMessageId);
 
   return firestore.runTransaction(async (transaction) => {
-    const client = await clientOfPhone(transaction, organizationId, phone);
-    const conversationId = whatsappConversationId(client?.id ?? null, phone);
-    const conversation = stored(
-      "conversations",
-      await transaction.get(scope.doc("conversations", conversationId)),
+    const { client, ambiguous } = await clientOfPhone(
+      transaction,
+      organizationId,
+      phone,
     );
+    const leadId =
+      !client && !ambiguous ? leadIdFor(organizationId, phone) : null;
+    const lead = leadId
+      ? stored("leads", await transaction.get(scope.doc("leads", leadId)))
+      : null;
+    const conversationId = conversationOfContact({
+      client,
+      leadId,
+      lead,
+      phone,
+    });
+    const conversation = conversationId
+      ? stored(
+          "conversations",
+          await transaction.get(scope.doc("conversations", conversationId)),
+        )
+      : null;
     if (!conversation)
       return { outcome: "ECHO_WITHOUT_CONVERSATION", organizationId };
     const messageRef = firestore.doc(
@@ -1007,16 +1374,16 @@ export async function applyHumanEcho(event, deps = {}) {
           ),
         )
       : null;
-    const pendingDelivery =
-      pendingTask?.deliveryId &&
-      (pendingTask.status === "PLANNED" || pendingTask.status === "SCHEDULED")
-        ? stored(
-            "notificationDeliveries",
-            await transaction.get(
-              scope.doc("notificationDeliveries", pendingTask.deliveryId),
-            ),
-          )
-        : null;
+    const pendingDelivery = pendingTask?.deliveryId
+      ? stored(
+          "notificationDeliveries",
+          await transaction.get(
+            scope.doc("notificationDeliveries", pendingTask.deliveryId),
+          ),
+        )
+      : null;
+    const newer =
+      Date.parse(event.sentAt) >= Date.parse(conversation.lastMessageAt);
 
     transaction.create(
       messageRef,
@@ -1046,50 +1413,47 @@ export async function applyHumanEcho(event, deps = {}) {
     transaction.set(
       scope.doc("conversations", conversationId),
       toStored("conversations", {
-        status: "WAITING_CLIENT",
-        lastMessagePreview: preview(event.text),
-        lastMessageAt: event.sentAt,
-        unreadCount: 0,
+        // Eco atrasado não vira o resumo nem tira a conversa de quem escreveu
+        // depois; a tomada humana, essa sim, vale sempre.
+        ...(newer
+          ? {
+              status: "WAITING_CLIENT",
+              lastMessagePreview: preview(event.text),
+              lastMessageAt: event.sentAt,
+              unreadCount: 0,
+            }
+          : {}),
         escalated: true,
         escalationReason:
           "Conversa assumida pelo profissional no WhatsApp Business.",
+        humanTakeoverAt: conversation.humanTakeoverAt ?? now,
+        humanTakeoverSource:
+          conversation.humanTakeoverSource ?? "WHATSAPP_BUSINESS",
         pendingAssistantTaskId: null,
         updatedAt: now,
         updatedBy: null,
       }),
       { merge: true },
     );
-    if (
-      pendingTask &&
-      (pendingTask.status === "PLANNED" || pendingTask.status === "SCHEDULED")
-    ) {
+    cancelPendingAutomation({
+      transaction,
+      scope,
+      tasks: pendingTask ? [pendingTask] : [],
+      deliveries: pendingDelivery ? [pendingDelivery] : [],
+      now,
+      code: "CONVERSATION_WITH_HUMAN",
+    });
+    if (lead && lead.status !== "TAKEN_OVER") {
       transaction.set(
-        scope.doc("automationTasks", pendingTask.id),
-        toStored(
-          "automationTasks",
-          transitionTask(pendingTask, "CANCELLED", {
-            at: now,
-            code: "CONVERSATION_WITH_HUMAN",
-            patch: {
-              stopReason: "CONVERSATION_WITH_HUMAN",
-              completedAt: now,
-            },
-          }),
-        ),
+        scope.doc("leads", lead.id),
+        toStored("leads", {
+          ...lead,
+          status: "TAKEN_OVER",
+          statusChangedAt: now,
+          updatedAt: now,
+          updatedBy: null,
+        }),
       );
-      if (pendingDelivery) {
-        transaction.set(
-          scope.doc("notificationDeliveries", pendingDelivery.id),
-          toStored("notificationDeliveries", {
-            ...pendingDelivery,
-            status: "CANCELLED",
-            cancelledAt: now,
-            nextAttemptAt: null,
-            updatedAt: now,
-            updatedBy: null,
-          }),
-        );
-      }
     }
     transaction.create(
       scope.doc("auditLogs", `${messageId}-handoff`),
@@ -1111,7 +1475,12 @@ export async function applyHumanEcho(event, deps = {}) {
         updatedBy: null,
       }),
     );
-    return { outcome: "HUMAN_ECHO", organizationId, conversationId };
+    return {
+      outcome: "HUMAN_ECHO",
+      organizationId,
+      conversationId,
+      ...(lead ? { leadId: lead.id } : {}),
+    };
   });
 }
 
@@ -1159,6 +1528,7 @@ function planReply(ctx) {
     professionalId: ctx.professionalId ?? null,
     scheduledFor: ctx.scheduledFor ?? ctx.now,
     sourceDecisionId: ctx.sourceDecisionId ?? null,
+    leadId: ctx.leadId ?? null,
   });
   if (plan.kind === "PLANNED") {
     transaction.create(

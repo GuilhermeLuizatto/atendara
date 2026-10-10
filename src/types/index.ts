@@ -13,6 +13,7 @@ export * from "./client";
 export * from "./common";
 export * from "./conversation";
 export * from "./finance";
+export * from "./lead";
 export * from "./notification";
 export * from "./notifications";
 export * from "./organization";

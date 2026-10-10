@@ -3,6 +3,7 @@ import {
   PSEUDONYM_PREFIX,
   REDACTED_NAME,
   REDACTED_TEXT,
+  SUBJECT_RESOURCE_TYPES,
   type Replacement,
   type Treatment,
 } from "@/config/privacy";
@@ -65,9 +66,11 @@ function replace(
       return pseudonymized(value, context);
     case "CLIENT_RESOURCE_ID": {
       // Na trilha, `resource.id` aponta para atendimento, lancamento, conversa.
-      // So o id de cadastro de cliente e do titular.
+      // So o id de cadastro de cliente ou de lead e do titular.
       const parent = path.split(".").slice(0, -1).join(".");
-      return readPath(data, `${parent}.type`) === "client"
+      return SUBJECT_RESOURCE_TYPES.includes(
+        String(readPath(data, `${parent}.type`)),
+      )
         ? pseudonymized(value, context)
         : value;
     }

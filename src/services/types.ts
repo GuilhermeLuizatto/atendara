@@ -18,6 +18,8 @@ import type {
   Client,
   Conversation,
   ID,
+  Lead,
+  LeadStatus,
   ISODateString,
   Membership,
   Message,
@@ -59,6 +61,7 @@ export type WorkspaceCollection =
   | "notificationDeliveries"
   | "automationTasks"
   | "calendarBusy"
+  | "leads"
   | "auditLogs";
 
 export interface CollectionPage {
@@ -128,6 +131,11 @@ export interface WorkspaceSnapshot {
   notificationDeliveries: NotificationDelivery[];
   /** Histórico da fila, somente leitura; pode estar paginado. */
   automationTasks: AutomationTask[];
+  /**
+   * Primeiro contato sem cadastro (leads). Ausente vale vazia: quem não tem
+   * `lead:read` não recebe a coleção, e as rules negam a leitura.
+   */
+  leads?: Lead[];
   /**
    * Ocupado do Google por profissional (3C). Ausente na demonstração e para
    * quem não tem o módulo de agenda — as rules negam, e a parte chega vazia.
@@ -387,6 +395,16 @@ export interface WorkspaceRepository {
         | "unreadCount"
       >
     >,
+  ): Promise<void>;
+  /**
+   * Devolve a conversa assumida à Dara, com registro na trilha. É a única
+   * porta: `updateConversation` recusa devolver.
+   */
+  resumeConversationAutomation(conversationId: ID): Promise<void>;
+  /** A equipe assume ou encerra um contato sem cadastro. */
+  updateLeadStatus(
+    leadId: ID,
+    status: Extract<LeadStatus, "TAKEN_OVER" | "CLOSED">,
   ): Promise<void>;
 
   /**

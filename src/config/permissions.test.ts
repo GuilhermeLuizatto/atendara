@@ -67,6 +67,17 @@ describe("matriz de permissoes", () => {
     expect(hasPermission("VIEWER", "notificationConsent:record")).toBe(false);
   });
 
+  // Espelha `moduleWriteAccess()` na regra de `leads`: o VIEWER nao ve o
+  // telefone de quem ainda nao e cliente.
+  it("da a fila de primeiro contato a quem responde conversas, e so a eles", () => {
+    for (const role of ROLES) {
+      const answers = ROLE_PERMISSIONS[role].includes("conversation:reply");
+      expect(ROLE_PERMISSIONS[role].includes("lead:read"), role).toBe(answers);
+      expect(ROLE_PERMISSIONS[role].includes("lead:manage"), role).toBe(answers);
+    }
+    expect(ROLE_PERMISSIONS.VIEWER).not.toContain("lead:read");
+  });
+
   it("reserva pedidos de titulares aos papeis que o backend e as rules aceitam", () => {
     for (const permission of ["privacy:export", "privacy:erase"] as const) {
       const roles = ROLES.filter((role) => hasPermission(role, permission));

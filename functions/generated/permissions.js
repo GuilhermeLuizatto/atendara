@@ -40,6 +40,10 @@ const ASSISTANT_PERMISSIONS = [
     "appointment:update",
     "appointment:cancel",
     "conversation:reply",
+    // Quem responde a conversa acompanha e assume o primeiro contato. Espelha
+    // `moduleWriteAccess()` na regra de `leads`.
+    "lead:read",
+    "lead:manage",
     "transaction:create",
     "notification:acknowledge",
 ];

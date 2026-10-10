@@ -52,6 +52,10 @@ export const PERMISSIONS = [
   "appointment:cancel",
   "conversation:read",
   "conversation:reply",
+  // Fila de primeiro contato (leads). Separada de `conversation:read` porque
+  // traz o telefone de quem ainda nao e cliente.
+  "lead:read",
+  "lead:manage",
   "transaction:read",
   "transaction:create",
   "transaction:update",

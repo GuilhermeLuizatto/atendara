@@ -1,5 +1,5 @@
 // Gerado por scripts/build-functions.mjs.
-import { ASSISTANT_NAME, CONVERSATION_REPLY_TEXTS, REPLY_MAX_BODY_LENGTH, REPLY_VARIABLES, } from "./assistant-config.js";
+import { ASSISTANT_NAME, CONVERSATION_REPLY_TEXTS, REPLY_INTRODUCTION, REPLY_INTRODUCTION_WITHOUT_NAME, REPLY_MAX_BODY_LENGTH, REPLY_VARIABLES, } from "./assistant-config.js";
 import { RESCHEDULE_HOLD_MINUTES } from "./reschedule-config.js";
 import { formatTime, formatWeekday } from "./format.js";
 import { err, ok } from "./types.js";
@@ -25,7 +25,12 @@ function valuesFor(context) {
     };
 }
 export function renderReply(event, stage, context) {
-    const paragraphs = CONVERSATION_REPLY_TEXTS[event][stage];
+    // Sem nome (lead), a apresentação perde só o vocativo; o resto do texto e
+    // as barreiras de conteúdo continuam as mesmas.
+    const named = context.clientName.trim().length > 0;
+    const paragraphs = CONVERSATION_REPLY_TEXTS[event][stage].map((paragraph) => named
+        ? paragraph
+        : paragraph.replace(REPLY_INTRODUCTION, REPLY_INTRODUCTION_WITHOUT_NAME));
     if (paragraphs.length === 0)
         return err("EMPTY");
     if (paragraphs.some(hasForbiddenTerm))

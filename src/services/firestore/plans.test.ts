@@ -25,7 +25,15 @@ import {
 } from "./plans/recurring";
 import { planApprovePaymentProof, planRejectPaymentProof } from "./plans/payment-proofs";
 import { planUpdateReceiptSettings } from "./plans/receipt-settings";
-import { planReceiveMessage, planReplyToConversation } from "./plans/messaging";
+import {
+  planReceiveMessage,
+  planReplyToConversation,
+  planUpdateConversation,
+} from "./plans/messaging";
+import {
+  planResumeConversationAutomation,
+  planUpdateLeadStatus,
+} from "./plans/leads";
 import { planUpdateAgendaSettings, planUpdateAISettings } from "./plans/organization";
 import { planUpdateNotificationSettings } from "./plans/outbound";
 import {
@@ -681,5 +689,72 @@ describe("conversas e decisoes do agente", () => {
     expect(() => planReplyToConversation(ctx, conversation.id, "   ")).toThrow(
       /1 a 4000/,
     );
+  });
+});
+
+describe("primeiro contato e tomada humana pelo painel", () => {
+  const leadDemo = (ctx: PlanContext, status: string) =>
+    (ctx.snapshot.leads ?? []).find((lead) => lead.status === status)!;
+
+  it("assumir o lead assume a conversa e deixa trilha", () => {
+    const ctx = makeContext();
+    const lead = leadDemo(ctx, "NEW");
+    const plan = planUpdateLeadStatus(ctx, lead.id, "TAKEN_OVER");
+    expect(collections(plan.writes)).toEqual(["leads", "auditLogs", "conversations"]);
+    expect(plan.writes[0]).toMatchObject({
+      op: "update",
+      data: { status: "TAKEN_OVER", statusChangedAt: NOW, updatedBy: "owner" },
+    });
+    expect(plan.writes[2]).toMatchObject({
+      data: { escalated: true, humanTakeoverSource: "PANEL", humanTakeoverAt: NOW },
+    });
+  });
+
+  it("quem não tem lead:manage não muda a fila, e transição fora da tabela é recusada", () => {
+    const ctx = makeContext();
+    const lead = leadDemo(ctx, "WAITING_TEAM");
+    const viewer = makeContext(undefined, { role: "VIEWER", permissions: permissionsForRole("VIEWER") });
+    expect(() => planUpdateLeadStatus(viewer, lead.id, "TAKEN_OVER")).toThrow("Sem permissão");
+    const closed = makeContext((snapshot) => ({
+      ...snapshot,
+      leads: snapshot.leads?.map((item) => (item.id === lead.id ? { ...item, status: "CLOSED" } : item)),
+    }));
+    expect(() => planUpdateLeadStatus(closed, lead.id, "CLOSED")).toThrow("não é permitida");
+  });
+
+  it("responder pelo painel assume a conversa do lead na mesma escrita", () => {
+    const ctx = makeContext();
+    const lead = leadDemo(ctx, "NEW");
+    const plan = planReplyToConversation(ctx, lead.conversationId, "Olá, aqui é a equipe.");
+    expect(collections(plan.writes)).toEqual(["messages", "conversations", "leads", "auditLogs"]);
+    expect(plan.writes[1]).toMatchObject({
+      data: { escalated: true, humanTakeoverSource: "PANEL" },
+    });
+  });
+
+  it("devolver à Dara só pela retomada, com a trilha apontada na conversa", () => {
+    const ctx = makeContext();
+    const lead = leadDemo(ctx, "WAITING_TEAM");
+    expect(() =>
+      planUpdateConversation(ctx, lead.conversationId, { escalated: false }),
+    ).toThrow("Retomar automação");
+
+    const plan = planResumeConversationAutomation(ctx, lead.conversationId);
+    expect(collections(plan.writes)).toEqual(["auditLogs", "conversations"]);
+    const auditId = plan.writes[0].path.split("/").pop();
+    expect(plan.writes[0]).toMatchObject({
+      data: { action: "UPDATE", actorId: "owner", resource: { type: "conversation", id: lead.conversationId } },
+    });
+    expect(plan.writes[1]).toMatchObject({
+      data: { escalated: false, automationResumeAuditId: auditId },
+    });
+
+    const withAgent = makeContext((snapshot) => ({
+      ...snapshot,
+      conversations: snapshot.conversations.map((item) =>
+        item.id === lead.conversationId ? { ...item, escalated: false } : item,
+      ),
+    }));
+    expect(() => planResumeConversationAutomation(withAgent, lead.conversationId)).toThrow();
   });
 });

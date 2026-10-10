@@ -31,6 +31,7 @@ const COLLECTION_LABELS: Record<WorkspaceCollection, string> = {
   notificationDeliveries: "fila de avisos",
   automationTasks: "fila de automações",
   calendarBusy: "ocupado do Google",
+  leads: "contatos novos",
   decisionReviews: "revisões da Dara",
   auditLogs: "trilha de auditoria",
 };

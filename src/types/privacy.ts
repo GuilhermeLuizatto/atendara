@@ -15,6 +15,8 @@ import type { ID, ISODateString, TenantScopedEntity } from "./common";
 export const PRIVACY_REQUEST_TYPES = [
   "CLIENT_EXPORT",
   "CLIENT_ERASURE",
+  "LEAD_EXPORT",
+  "LEAD_ERASURE",
   "ORGANIZATION_EXPORT",
 ] as const;
 
@@ -66,6 +68,7 @@ export const ORGANIZATION_EXPORT_SECTIONS = [
   "services",
   "messagingSenders",
   "whatsappConnections",
+  "leads",
   "rescheduleRequests",
   "bookingRequests",
   "automationSwitches",
@@ -79,7 +82,10 @@ export const ORGANIZATION_EXPORT_SECTIONS = [
 export type OrganizationExportSection =
   (typeof ORGANIZATION_EXPORT_SECTIONS)[number];
 
-export type RedactionScope = "CLIENT_ERASURE" | "ORGANIZATION_DELETION";
+export type RedactionScope =
+  | "CLIENT_ERASURE"
+  | "LEAD_ERASURE"
+  | "ORGANIZATION_DELETION";
 
 /**
  * Marca gravada em cada documento pseudonimizado. Quem ler a trilha depois ve
@@ -149,6 +155,27 @@ export interface ClientDataExport {
   /** Execucoes da fila de automacao ligadas a esta pessoa: ids e estado, sem texto. */
   automationTasks: Record<string, unknown>[];
   /** Decisoes automatizadas tomadas sobre mensagens desta pessoa. */
+  aiDecisions: Record<string, unknown>[];
+  auditTrail: ExportedAuditEntry[];
+}
+
+/**
+ * Arquivo entregue a quem escreveu sem ter cadastro (lead). Mesmo formato do
+ * titular com cadastro, sem as partes que um lead não tem: agenda, financeiro,
+ * recibos.
+ */
+export interface LeadDataExport {
+  format: "atendara.titular";
+  version: 1;
+  requestId: ID;
+  generatedAt: ISODateString;
+  organization: { id: ID; name: string | null };
+  subject: Record<string, unknown>;
+  conversations: Array<
+    Record<string, unknown> & { messages: Record<string, unknown>[] }
+  >;
+  notificationDeliveries: Record<string, unknown>[];
+  automationTasks: Record<string, unknown>[];
   aiDecisions: Record<string, unknown>[];
   auditTrail: ExportedAuditEntry[];
 }

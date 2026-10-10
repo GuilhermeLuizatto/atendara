@@ -34,6 +34,7 @@ import type {
   OrganizationNotificationSettings,
   ProfessionId,
   RecurringChargeStatus,
+  LeadStatus,
 } from "@/types";
 
 import type { DecisionReviewInput } from "@/lib/ai/decision-review";
@@ -96,6 +97,10 @@ import {
   planReplyToConversation,
   planUpdateConversation,
 } from "./plans/messaging";
+import {
+  planResumeConversationAutomation,
+  planUpdateLeadStatus,
+} from "./plans/leads";
 import { planReviewDecision } from "./plans/decision-reviews";
 import { planUpdateAgendaSettings, planUpdateAISettings } from "./plans/organization";
 import {
@@ -160,6 +165,7 @@ const COLLECTION_PARTS: Array<[PagedPart, ConvertedCollection, WorkspaceCollecti
   ["notificationDeliveries", "notificationDeliveries", "notificationDeliveries"],
   ["automationTasks", "automationTasks", "automationTasks"],
   ["calendarBusyBlocks", "calendarBusyBlocks", "calendarBusy"],
+  ["leads", "leads", "leads"],
   ["auditLogs", "auditLogs", "auditLogs"],
 ];
 
@@ -180,6 +186,7 @@ const SCOPED_PARTS = new Set<PagedPart>([
   "notificationDeliveries",
   "automationTasks",
   "calendarBusyBlocks",
+  "leads",
 ]);
 
 const PART_ORDER: Partial<
@@ -202,6 +209,7 @@ const PART_ORDER: Partial<
   notifications: { field: "createdAt", direction: "desc" },
   notificationDeliveries: { field: "scheduledFor", direction: "desc" },
   automationTasks: { field: "createdAt", direction: "desc" },
+  leads: { field: "lastContactAt", direction: "desc" },
   auditLogs: { field: "occurredAt", direction: "desc" },
 };
 
@@ -936,6 +944,21 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
     const plan = planRecordDecision(this.context(), input);
     await this.commit(plan.writes);
     return plan.result;
+  }
+
+  async resumeConversationAutomation(conversationId: ID): Promise<void> {
+    await this.commit(
+      planResumeConversationAutomation(this.context(), conversationId).writes,
+    );
+  }
+
+  async updateLeadStatus(
+    leadId: ID,
+    status: Extract<LeadStatus, "TAKEN_OVER" | "CLOSED">,
+  ): Promise<void> {
+    await this.commit(
+      planUpdateLeadStatus(this.context(), leadId, status).writes,
+    );
   }
 
   async updateConversation(

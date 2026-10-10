@@ -31,6 +31,8 @@ export const DECISION_INPUT_PREVIEW_CHARS = {
     HIGH: 0,
 };
 // ----------------------------------------------------------- valores fixos
+/** Tipos de `resource` da trilha que apontam para um titular de dados. */
+export const SUBJECT_RESOURCE_TYPES = ["client", "lead"];
 /** Prefixo do pseudonimo. O resto e aleatorio e nao deriva do `clientId`. */
 export const PSEUDONYM_PREFIX = "titular-removido-";
 export const REDACTED_TEXT = "[conteúdo removido a pedido do titular dos dados]";
@@ -380,12 +382,16 @@ export const PERSONAL_DATA_MAP = {
         onOrganizationDeletion: DELETE,
     },
     notificationDeliveries: {
-        personalFields: ["clientId", "contactHint"],
+        personalFields: ["clientId", "leadId", "contactHint"],
         // TTL pendente desde a Etapa 5B.
         retention: { kind: "UNDEFINED" },
         onClientErasure: {
             action: "PSEUDONYMIZE",
-            fields: { clientId: "CLIENT_ID", contactHint: "MASKED_CONTACT" },
+            fields: {
+                clientId: "CLIENT_ID",
+                leadId: "CLIENT_ID",
+                contactHint: "MASKED_CONTACT",
+            },
         },
         onOrganizationDeletion: DELETE,
     },
@@ -468,17 +474,29 @@ export const PERSONAL_DATA_MAP = {
         onClientErasure: { action: "NOT_APPLICABLE" },
         onOrganizationDeletion: DELETE,
     },
+    // Primeiro contato sem cadastro (lead): telefone, dica e o histórico do
+    // consentimento dado pela própria pessoa. Nenhum nome nem texto de mensagem
+    // — o que foi dito fica só na conversa. Quem virou cliente leva o lead junto
+    // na eliminação do cadastro (mesmo telefone); o pedido do próprio lead tem
+    // callables próprias (`exportLeadData`, `eraseLeadData`). Prazo pendente do
+    // jurídico, como o das demais coleções sem retenção decidida.
+    leads: {
+        personalFields: ["phone", "contactHint", "notificationConsent"],
+        retention: { kind: "UNDEFINED" },
+        onClientErasure: DELETE,
+        onOrganizationDeletion: DELETE,
+    },
     automationTasks: {
         // Ids e estado da execucao. Texto, contato e nome nunca sao gravados: o
         // despachante recompoe os dois primeiros no envio e os descarta.
-        personalFields: ["clientId"],
+        personalFields: ["clientId", "leadId"],
         // `expiresAt` e a validade da execucao, nao prazo de retencao: nenhuma
         // politica de TTL pode ser ligada nele. Retencao pendente, como a da fila de
         // avisos.
         retention: { kind: "UNDEFINED" },
         onClientErasure: {
             action: "PSEUDONYMIZE",
-            fields: { clientId: "CLIENT_ID" },
+            fields: { clientId: "CLIENT_ID", leadId: "CLIENT_ID" },
         },
         onOrganizationDeletion: DELETE,
     },

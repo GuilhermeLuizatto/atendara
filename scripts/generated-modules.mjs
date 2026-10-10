@@ -38,6 +38,7 @@ export const SOURCES = [
   ["src/types/client.ts", "types-client"],
   ["src/types/common.ts", "types-common"],
   ["src/types/conversation.ts", "types-conversation"],
+  ["src/types/lead.ts", "types-lead"],
   ["src/types/finance.ts", "types-finance"],
   ["src/types/notification.ts", "types-notification"],
   ["src/types/notifications.ts", "types-notifications"],
@@ -101,6 +102,11 @@ export const SOURCES = [
   ],
   ["src/lib/automation/emergency.ts", "automation-emergency"],
   ["src/lib/automation/inbound.ts", "automation-inbound"],
+  // Primeiro contato: fila, situacao e consentimento do lead, iguais na tela e
+  // no webhook.
+  ["src/config/leads.ts", "leads-config"],
+  ["src/lib/leads/routing.ts", "leads-routing"],
+  ["src/lib/leads/lifecycle.ts", "leads-lifecycle"],
   ["src/lib/ai/decision-engine.ts", "decision-engine"],
   ["src/lib/ai/classify.ts", "classify"],
   ["src/lib/ai/semantic.ts", "ai-semantic"],

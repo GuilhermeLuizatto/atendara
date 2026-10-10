@@ -18,6 +18,7 @@ import {
   RECENT_LOGIN_SECONDS,
 } from "./generated/privacy-config.js";
 import { pseudonymFrom, redactionPatch } from "./generated/privacy-redaction.js";
+import { normalizePhone } from "./generated/notifications-contacts.js";
 import { ACCOUNT_CALL_OPTIONS, accountOf, parse } from "./platform-auth.js";
 import { auditEntry } from "./platform.js";
 import { consumeRateLimit } from "./rate-limit.js";
@@ -228,6 +229,82 @@ async function linkedToClient(organizationId, clientId) {
   return { appointments, conversations, messages, transactions, recurringCharges, paymentProofs, receipts, notificationDeliveries, automationTasks, aiDecisions, auditLogs, notifications, privacyRequests };
 }
 
+/**
+ * Tudo o que a organizacao guarda sobre um lead: o proprio lead, a conversa e
+ * o que dela deriva. A decisao do agente nao tem `clientId` de lead; e achada
+ * pela conversa, que e aleatoria e so deste contato.
+ */
+export async function linkedToLead(organizationId, leadSnapshot) {
+  const lead = leadSnapshot.data();
+  const tenant = (name) => db().collection(paths.collection(organizationId, name));
+  const byLead = (name) => tenant(name).where("leadId", "==", leadSnapshot.id).get().then((snapshot) => snapshot.docs);
+  const conversation = await db().doc(paths.document(organizationId, "conversations", lead.conversationId)).get();
+  const conversations = conversation.exists ? [conversation] : [];
+  const [messages, notificationDeliveries, automationTasks, aiDecisions, privacyRequests] = await Promise.all([
+    conversation.exists ? db().collection(messagesPath(organizationId, lead.conversationId)).get().then((snapshot) => snapshot.docs) : [],
+    byLead("notificationDeliveries"),
+    byLead("automationTasks"),
+    tenant("aiDecisions").where("conversationId", "==", lead.conversationId).get().then((snapshot) => snapshot.docs),
+    tenant("privacyRequests").where("subjectId", "==", leadSnapshot.id).get().then((snapshot) => snapshot.docs),
+  ]);
+  const relatedIds = [leadSnapshot.id, lead.conversationId, ...[messages, notificationDeliveries, aiDecisions].flat().map((document) => document.id)];
+  const [auditLogs, byTarget, byDecision] = await Promise.all([
+    inChunks(tenant("auditLogs"), "resource.id", relatedIds),
+    inChunks(tenant("notifications"), "target.id", relatedIds),
+    aiDecisions.length ? inChunks(tenant("notifications"), "aiDecisionId", aiDecisions.map((document) => document.id)) : [],
+  ]);
+  const notifications = [...new Map([...byTarget, ...byDecision].map((document) => [document.ref.path, document])).values()];
+  return { leads: [leadSnapshot], conversations, messages, notificationDeliveries, automationTasks, aiDecisions, auditLogs, notifications, privacyRequests };
+}
+
+/** Junta duas buscas sem repetir documento: o mesmo alerta pode vir pelas duas. */
+function mergeLinked(base, extra) {
+  const result = { ...base };
+  for (const [name, documents] of Object.entries(extra)) {
+    const all = [...(result[name] ?? []), ...documents];
+    result[name] = [...new Map(all.map((document) => [document.ref.path, document])).values()];
+  }
+  return result;
+}
+
+/**
+ * O que a eliminacao faz com cada documento ligado ao titular, pelo mapa.
+ * Pura: recebe o que foi lido e devolve as operacoes, sem gravar — o destino
+ * de cada colecao continua sendo decisao de `src/config/privacy.ts`.
+ */
+export function erasureOperations(linked, collections, context) {
+  const operations = [];
+  for (const collection of collections) {
+    const treatment = PERSONAL_DATA_MAP[collection].onClientErasure;
+    for (const document of linked[collection] ?? []) {
+      if (treatment.action === "DELETE") {
+        operations.push({ collection, kind: "delete", ref: document.ref });
+        continue;
+      }
+      const patch = redactionPatch(treatment, document.data(), context);
+      if (patch) operations.push({ collection, kind: "update", ref: document.ref, patch });
+    }
+  }
+  return operations;
+}
+
+async function applyErasure(operations, add) {
+  const writer = db().bulkWriter();
+  const results = [];
+  for (const operation of operations) {
+    if (operation.kind === "delete") {
+      results.push(tracked(writer.delete(operation.ref)));
+      add(operation.collection, "deleted");
+    } else {
+      results.push(tracked(writer.update(operation.ref, operation.patch)));
+      add(operation.collection, "pseudonymized");
+    }
+  }
+  await settle(writer, results);
+}
+
+const ERASURE_ORDER = ["messages", "conversations", "appointments", "transactions", "recurringCharges", "paymentProofs", "notificationDeliveries", "automationTasks", "notifications", "aiDecisions", "auditLogs", "privacyRequests", "leads"];
+
 // ---------------------------------------------------------------- cliente
 
 const clientRequest = z
@@ -315,7 +392,18 @@ export const eraseClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
   const input = parse(clientRequest, request.data);
   await consumeRateLimit(request.auth.uid, "eraseClientData");
   const client = await existingClient(organizationId, input.clientId);
-  const linked = await linkedToClient(organizationId, input.clientId);
+  // Quem virou cliente pode ter sido lead antes, pelo mesmo telefone: e a
+  // mesma pessoa, e o pedido alcanca o lead e a conversa dele.
+  const phone = normalizePhone(client.data().phone)?.e164 ?? null;
+  const leadSnapshots = phone
+    ? (await db().collection(paths.collection(organizationId, "leads")).where("phone", "==", phone).get()).docs
+    : [];
+  const [ofClient, ...ofLeads] = await Promise.all([
+    linkedToClient(organizationId, input.clientId),
+    ...leadSnapshots.map((leadSnapshot) => linkedToLead(organizationId, leadSnapshot)),
+  ]);
+  const linked = ofLeads.reduce((acc, extra) => mergeLinked(acc, extra), ofClient);
+  const leadIds = new Set(leadSnapshots.map((document) => document.id));
 
   // A mesma trava de excluir cadastro pela interface (`planDeleteClient`).
   // Pendencia em aberto e resolvida antes, por quem cobra — sem nome no
@@ -334,33 +422,17 @@ export const eraseClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
   const pseudonym = pseudonymFrom(randomUUID());
   const context = {
     mark: { scope: "CLIENT_ERASURE", requestId, redactedAt: at.toISOString() },
-    pseudonymOf: (clientId) => (clientId === input.clientId ? pseudonym : null),
+    pseudonymOf: (subjectId) => (subjectId === input.clientId || leadIds.has(subjectId) ? pseudonym : null),
   };
 
   const { counts, add } = counter();
-  const writer = db().bulkWriter();
-  const results = [];
   // O arquivo do comprovante sai antes do registro: sem o registro, nada
   // apontaria mais para ele.
   for (const proof of linked.paymentProofs) {
     const storagePath = proof.data().storagePath;
     if (storagePath) await getStorage().bucket().file(storagePath).delete({ ignoreNotFound: true });
   }
-  for (const collection of ["messages", "conversations", "appointments", "transactions", "recurringCharges", "paymentProofs", "notificationDeliveries", "automationTasks", "notifications", "aiDecisions", "auditLogs", "privacyRequests"]) {
-    const treatment = PERSONAL_DATA_MAP[collection].onClientErasure;
-    for (const document of linked[collection]) {
-      if (treatment.action === "DELETE") {
-        results.push(tracked(writer.delete(document.ref)));
-        add(collection, "deleted");
-        continue;
-      }
-      const patch = redactionPatch(treatment, document.data(), context);
-      if (!patch) continue;
-      results.push(tracked(writer.update(document.ref, patch)));
-      add(collection, "pseudonymized");
-    }
-  }
-  await settle(writer, results);
+  await applyErasure(erasureOperations(linked, ERASURE_ORDER, context), add);
 
   add("clients", "deleted");
   const record = privacyRequestRecord({ id: requestId, organizationId, type: "CLIENT_ERASURE", subjectId: pseudonym, receivedVia: input.receivedVia, actorId: request.auth.uid, counts, at });
@@ -373,6 +445,100 @@ export const eraseClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
   batch.create(audit.ref, audit.data);
   await batch.commit();
 
+  return { requestId, counts };
+});
+
+// ---------------------------------------------------------------- lead
+
+const leadRequest = z
+  .object({ leadId: z.string().min(1).max(128), receivedVia: z.enum(PRIVACY_REQUEST_CHANNELS) })
+  .strict();
+
+async function existingLead(organizationId, leadId) {
+  const snapshot = await db().doc(paths.document(organizationId, "leads", leadId)).get();
+  // Mesma resposta para "nao existe" e "e de outra organizacao".
+  if (!snapshot.exists) throw new HttpsError("not-found", "Contato não encontrado nesta organização.");
+  return snapshot;
+}
+
+/** Arquivo do lead: o que a organizacao guarda sobre quem escreveu sem cadastro. */
+export function leadExportDocument({ requestId, at, organizationId, organization, linked }) {
+  const messagesOf = (conversationId) =>
+    linked.messages.filter((message) => message.ref.parent.parent.id === conversationId).map(withId);
+  return {
+    format: "atendara.titular",
+    version: 1,
+    requestId,
+    generatedAt: at.toISOString(),
+    organization: { id: organizationId, name: organization.name ?? null },
+    subject: withId(linked.leads[0]),
+    conversations: linked.conversations.map((conversation) => ({ ...withId(conversation), messages: messagesOf(conversation.id) })),
+    notificationDeliveries: linked.notificationDeliveries.map(withId),
+    automationTasks: linked.automationTasks.map(withId),
+    aiDecisions: linked.aiDecisions.map(withId),
+    auditTrail: linked.auditLogs.map((entry) => {
+      const data = portable(entry.data());
+      return { id: entry.id, action: data.action ?? null, occurredAt: data.occurredAt ?? null, resourceType: data.resource?.type ?? null, summary: data.summary ?? null };
+    }),
+  };
+}
+
+export const exportLeadData = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
+  const { account, organizationId, organization } = await responsibleMember(request);
+  const input = parse(leadRequest, request.data);
+  await consumeRateLimit(request.auth.uid, "exportLeadData");
+  const lead = await existingLead(organizationId, input.leadId);
+  const linked = await linkedToLead(organizationId, lead);
+
+  const at = new Date();
+  const requestId = randomUUID();
+  const result = leadExportDocument({ requestId, at, organizationId, organization, linked });
+  const { counts, add } = counter();
+  for (const name of ["leads", "conversations", "messages", "notificationDeliveries", "automationTasks", "aiDecisions", "auditLogs"]) {
+    add(name, "exported", linked[name].length);
+  }
+  const record = privacyRequestRecord({ id: requestId, organizationId, type: "LEAD_EXPORT", subjectId: input.leadId, receivedVia: input.receivedVia, actorId: request.auth.uid, counts, at });
+  const audit = tenantAuditEntry({ organizationId, actorId: request.auth.uid, actorName: account.displayName, action: "EXPORT", resource: { type: "lead", id: input.leadId }, summary: "Dados de contato sem cadastro exportados a pedido.", requestId, at });
+  const batch = db().batch();
+  batch.create(record.ref, record.data);
+  batch.create(audit.ref, audit.data);
+  await batch.commit();
+  return result;
+});
+
+/**
+ * Eliminacao a pedido de quem escreveu sem cadastro. Lead, conversa e
+ * mensagens saem; decisoes, alertas, fila e trilha ficam sem o que identifica
+ * a pessoa, como na eliminacao de um cliente.
+ */
+export const eraseLeadData = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
+  const { account, organizationId } = await responsibleMember(request);
+  const input = parse(leadRequest, request.data);
+  await consumeRateLimit(request.auth.uid, "eraseLeadData");
+  const lead = await existingLead(organizationId, input.leadId);
+  const linked = await linkedToLead(organizationId, lead);
+
+  const at = new Date();
+  const requestId = randomUUID();
+  const pseudonym = pseudonymFrom(randomUUID());
+  const context = {
+    mark: { scope: "LEAD_ERASURE", requestId, redactedAt: at.toISOString() },
+    pseudonymOf: (subjectId) => (subjectId === input.leadId ? pseudonym : null),
+  };
+  const { counts, add } = counter();
+  // O proprio lead sai por ultimo, junto do registro: se algo falhar antes, o
+  // pedido pode ser repetido.
+  const operations = erasureOperations(linked, ERASURE_ORDER, context).filter((operation) => operation.collection !== "leads");
+  await applyErasure(operations, add);
+
+  add("leads", "deleted");
+  const record = privacyRequestRecord({ id: requestId, organizationId, type: "LEAD_ERASURE", subjectId: pseudonym, receivedVia: input.receivedVia, actorId: request.auth.uid, counts, at });
+  const audit = tenantAuditEntry({ organizationId, actorId: request.auth.uid, actorName: account.displayName, action: "DELETE", resource: { type: "lead", id: pseudonym }, summary: "Dados de contato sem cadastro eliminados ou pseudonimizados a pedido.", requestId, at });
+  const batch = db().batch();
+  batch.delete(lead.ref);
+  batch.create(record.ref, record.data);
+  batch.create(audit.ref, audit.data);
+  await batch.commit();
   return { requestId, counts };
 });
 

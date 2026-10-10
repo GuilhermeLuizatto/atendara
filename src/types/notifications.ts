@@ -319,7 +319,10 @@ export interface NotificationDelivery extends TenantScopedEntity {
   ruleId: ID;
   /** `null` na resposta administrativa, que nasce da conversa e não da agenda. */
   appointmentId: ID | null;
-  clientId: ID;
+  /** `null` na resposta a um lead, que não tem cadastro. */
+  clientId: ID | null;
+  /** Resposta a um lead. Exclusivo com `clientId`. */
+  leadId?: ID | null;
   professionalId: ID | null;
   /** Instante em que o envio deve ocorrer (evento menos antecedencia). */
   scheduledFor: ISODateString;
@@ -374,6 +377,9 @@ export const NOTIFICATION_SKIP_REASONS = [
   "CONSENT_REVOKED",
   "CHANNEL_NOT_CONSENTED",
   "CONSENT_INCOMPLETE",
+  // Lead autorizou por uma frase de texto anterior: o texto vigente promete
+  // outra coisa, e so a versao vigente autoriza resposta.
+  "CONSENT_TEXT_OUTDATED",
   "SCHEDULE_IN_THE_PAST",
   "ALREADY_PLANNED",
   "TEMPLATE_REJECTED",

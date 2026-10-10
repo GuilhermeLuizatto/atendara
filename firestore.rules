@@ -427,6 +427,32 @@ service cloud.firestore {
       return after == before ? true : consentOk(before, after);
     }
 
+    // ------------------------------------------------ primeiro contato e Dara
+
+    // Espelho de `LEAD_TEAM_TRANSITIONS` (`src/config/leads.ts`): a equipe
+    // assume e encerra; reabrir um encerrado e assumi-lo de novo. Voltar para
+    // novo ou para a fila e coisa do webhook, nunca do navegador.
+    function leadTeamTransitionOk(before, after) {
+      return (before in ['NEW', 'WAITING_TEAM', 'CLOSED'] && after == 'TAKEN_OVER')
+        || (before in ['NEW', 'WAITING_TEAM', 'TAKEN_OVER'] && after == 'CLOSED');
+    }
+
+    // Devolver a conversa a Dara (`escalated` de true para false) exige um
+    // registro na trilha gravado no MESMO lote, apontando esta conversa e
+    // escrito por quem devolve. Retomar sem esse registro seria retomar em
+    // silencio. Assumir continua livre: parar a automacao nunca espera trilha.
+    function automationResumeOk(orgId, conversationId) {
+      let backToAgent = resource.data.get('escalated', false) == true
+        && request.resource.data.get('escalated', false) == false;
+      let auditId = request.resource.data.get('automationResumeAuditId', null);
+      let auditPath = /databases/$(database)/documents/organizations/$(orgId)/auditLogs/$(auditId);
+      return !backToAgent
+        || (auditId is string
+          && auditId != resource.data.get('automationResumeAuditId', null)
+          && getAfter(auditPath).data.resource == {'type': 'conversation', 'id': conversationId}
+          && getAfter(auditPath).data.actorId == uid());
+    }
+
     // ------------------------------------------------- indice de organizacoes
 
     // Responde "de quais organizacoes este usuario participa?" sem exigir uma
@@ -574,6 +600,24 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // ---------------------------------------------------------------- leads
+      //
+      // Quem escreveu sem ter cadastro. Nasce so no backend, no webhook; a
+      // equipe le e muda a situacao, e mais nada — telefone, fila, profissional
+      // e consentimento sao do backend. Espelha `lead:read` e `lead:manage`
+      // (`src/config/permissions.ts`): papeis que respondem conversas, nunca o
+      // VIEWER, porque o lead traz o telefone de quem ainda nao e cliente.
+      match /leads/{leadId} {
+        allow read: if moduleWriteAccess(orgId, 'mensagens')
+          && existingProfessionalScope(orgId, 'professionalId');
+        allow update: if moduleWriteAccess(orgId, 'mensagens')
+          && existingProfessionalScope(orgId, 'professionalId')
+          && onlyChanges(['status', 'statusChangedAt', 'updatedAt', 'updatedBy'])
+          && request.resource.data.updatedBy == uid()
+          && leadTeamTransitionOk(resource.data.status, request.resource.data.status);
+        allow create, delete: if false;
+      }
+
       // ------------------------------------------------------------ conversas
 
       match /conversations/{conversationId} {
@@ -587,7 +631,8 @@ service cloud.firestore {
           && belongsToOrg(orgId)
           && existingProfessionalScope(orgId, 'professionalId')
           && requestedProfessionalScope(orgId, 'professionalId')
-          && clientAssignedToProfessional(orgId, request.resource.data);
+          && clientAssignedToProfessional(orgId, request.resource.data)
+          && automationResumeOk(orgId, conversationId);
         allow delete: if false;
 
         // Mensagens sao imutaveis: registrar o que foi dito e o que permite

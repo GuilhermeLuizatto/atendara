@@ -12,12 +12,12 @@
 
 ## Próximas frentes
 
-| Frente                                       | Estado em 10/10                                           | Responsável | Próximo passo e evidência esperada                                                                                                                                                                                                            |
-| -------------------------------------------- | --------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Revisão de segurança de arquivos e trilhas   | Correções locais em andamento; revisão ainda aberta       | A definir   | Integrar e testar as correções de acesso. Avaliar migração da criação de `auditLogs` e `aiDecisions` para operações de backend e tratar links antigos antes de declarar o bloco fechado. Registrar PR, testes e decisão de publicação.        |
-| Validações reais do piloto                   | Pendentes                                                 | A definir   | Escolher um fluxo do roteiro em `docs/VALIDACOES-REAIS-PENDENTES.md`, executar com dados fictícios e registrar evidência real. Não confundir testes automatizados com validação de produção.                                                  |
-| Cobrador automático do cliente               | Proposta; lembrete automático ainda não implementado      | A definir   | Decidir escopo mínimo e consentimento específico de cobrança. Implementar somente após critérios de aceite e revisão das travas de envio. O desenho inicial está em `COBRADOR-DARA-RECEITA-SAUDE.md` enquanto esse arquivo não for integrado. |
-| Guia e papéis dos agentes de desenvolvimento | Preparados localmente; compartilhamento pelo Git pendente | A definir   | Revisar e integrar `docs/AGENTES-DESENVOLVIMENTO.md` e `.claude/agents/` para disponibilizar à equipe.                                                                                                                                        |
+| Frente                                       | Estado em 10/10                                      | Responsável | Próximo passo e evidência esperada                                                                                                                                                                                                            |
+| -------------------------------------------- | ---------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Revisão de segurança de arquivos e trilhas   | Correções locais em andamento; revisão ainda aberta  | A definir   | Integrar e testar as correções de acesso. Avaliar migração da criação de `auditLogs` e `aiDecisions` para operações de backend e tratar links antigos antes de declarar o bloco fechado. Registrar PR, testes e decisão de publicação.        |
+| Validações reais do piloto                   | Pendentes                                            | A definir   | Escolher um fluxo do roteiro em `docs/VALIDACOES-REAIS-PENDENTES.md`, executar com dados fictícios e registrar evidência real. Não confundir testes automatizados com validação de produção.                                                  |
+| Cobrador automático do cliente               | Proposta; lembrete automático ainda não implementado | A definir   | Decidir escopo mínimo e consentimento específico de cobrança. Implementar somente após critérios de aceite e revisão das travas de envio. O desenho inicial está em `COBRADOR-DARA-RECEITA-SAUDE.md` enquanto esse arquivo não for integrado. |
+| Guia e papéis dos agentes de desenvolvimento | PR de revisão aberto; ainda fora da `main`           | A definir   | Revisar e integrar `docs/AGENTES-DESENVOLVIMENTO.md` e `.claude/agents/` para disponibilizar à equipe.                                                                                                                                        |
 
 ## Dependências externas
 
@@ -29,7 +29,7 @@
 
 ## Concluído recentemente
 
-- **10/10:** papéis de desenvolvimento e guia de orquestração preparados no checkout local. Ainda não são uma entrega compartilhada até serem integrados ao repositório.
+- **10/10:** papéis de desenvolvimento, guia de orquestração e este painel preparados em um PR. A equipe pode revisá-los; os novos chats na `main` só os receberão depois do merge.
 - **10/10:** desenho inicial do cobrador e da Dara fiscal preparado; o lembrete automático e a emissão fiscal não foram implementados.
 
 ## Registro de passagem

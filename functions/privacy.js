@@ -402,7 +402,7 @@ export const eraseClientData = onCall(PRIVACY_CALL_OPTIONS, async (request) => {
     linkedToClient(organizationId, input.clientId),
     ...leadSnapshots.map((leadSnapshot) => linkedToLead(organizationId, leadSnapshot)),
   ]);
-  const linked = ofLeads.reduce(mergeLinked, ofClient);
+  const linked = ofLeads.reduce((acc, extra) => mergeLinked(acc, extra), ofClient);
   const leadIds = new Set(leadSnapshots.map((document) => document.id));
 
   // A mesma trava de excluir cadastro pela interface (`planDeleteClient`).

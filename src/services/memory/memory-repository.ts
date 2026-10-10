@@ -1926,75 +1926,92 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     });
   }
 
-  async resumeConversationAutomation(conversationId: ID): Promise<void> {
-    this.assertPermission("conversation:reply");
-    const conversation = this.requireConversation(conversationId);
-    if (!conversation.escalated) {
-      throw new RepositoryError("A conversa já está com a assistente.");
-    }
-    const now = this.now();
-    const entry = this.audit(
-      {
-        action: "UPDATE",
-        actorType: "USER",
-        resource: { type: "conversation", id: conversationId },
-        summary: "Automação retomada pelo profissional.",
-      },
-      now,
-    );
-    this.commit({
-      ...this.snapshot,
-      conversations: this.snapshot.conversations.map((item) =>
-        item.id === conversationId
-          ? {
-              ...item,
-              escalated: false,
-              escalationReason: null,
-              attention: "NORMAL",
-              status: "OPEN",
-              unreadCount: 0,
-              automationResumeAuditId: entry.id,
-              updatedAt: now,
-            }
-          : item,
-      ),
-      auditLogs: [entry, ...this.snapshot.auditLogs],
+  resumeConversationAutomation(conversationId: ID): Promise<void> {
+    return this.mutate(() => {
+      this.assertPermission("conversation:reply");
+      const conversation = this.requireConversation(conversationId);
+      if (!conversation.escalated) {
+        throw new RepositoryError("A conversa já está com a assistente.");
+      }
+      const now = this.now();
+      const entry = this.audit(
+        {
+          action: "UPDATE",
+          actorType: "USER",
+          resource: { type: "conversation", id: conversationId },
+          summary: "Automação retomada pelo profissional.",
+        },
+        now,
+      );
+      this.commit({
+        ...this.snapshot,
+        conversations: this.snapshot.conversations.map((item) =>
+          item.id === conversationId
+            ? {
+                ...item,
+                escalated: false,
+                escalationReason: null,
+                attention: "NORMAL",
+                status: "OPEN",
+                unreadCount: 0,
+                automationResumeAuditId: entry.id,
+                updatedAt: now,
+              }
+            : item,
+        ),
+        auditLogs: [entry, ...this.snapshot.auditLogs],
+      });
     });
   }
 
-  async updateLeadStatus(
+  updateLeadStatus(
     leadId: ID,
     status: Extract<LeadStatus, "TAKEN_OVER" | "CLOSED">,
   ): Promise<void> {
-    this.assertPermission("lead:manage");
-    const lead = this.leadOf(leadId);
-    if (!lead) throw new RepositoryError("Contato não encontrado.");
-    if (!canTeamMoveLead(lead.status, status)) {
-      throw new RepositoryError("Esta mudança de situação não é permitida.");
-    }
-    const now = this.now();
-    const changes = this.withLeadStatus(lead, status, now);
-    this.commit({
-      ...this.snapshot,
-      ...changes,
-      // Assumir o lead é assumir a conversa: a Dara para na hora.
-      conversations:
-        status === "TAKEN_OVER"
-          ? this.snapshot.conversations.map((item) =>
-              item.id === lead.conversationId && !item.escalated
-                ? {
-                    ...item,
-                    escalated: true,
-                    escalationReason: "Conversa assumida pelo profissional.",
-                    status: "WAITING_PROFESSIONAL",
-                    humanTakeoverAt: now,
-                    humanTakeoverSource: "PANEL",
-                    updatedAt: now,
-                  }
-                : item,
-            )
-          : this.snapshot.conversations,
+    return this.mutate(() => {
+      this.assertPermission("lead:manage");
+      const lead = this.leadOf(leadId);
+      if (!lead) throw new RepositoryError("Contato não encontrado.");
+      if (!canTeamMoveLead(lead.status, status)) {
+        throw new RepositoryError("Esta mudança de situação não é permitida.");
+      }
+      const now = this.now();
+      const changes = this.withLeadStatus(lead, status, now);
+      this.commit({
+        ...this.snapshot,
+        ...changes,
+        // Assumir o lead é assumir a conversa: a Dara para na hora.
+        conversations:
+          status === "TAKEN_OVER"
+            ? this.snapshot.conversations.map((item) =>
+                item.id === lead.conversationId && !item.escalated
+                  ? {
+                      ...item,
+                      escalated: true,
+                      escalationReason: "Conversa assumida pelo profissional.",
+                      status: "WAITING_PROFESSIONAL",
+                      humanTakeoverAt: now,
+                      humanTakeoverSource: "PANEL",
+                      updatedAt: now,
+                    }
+                  : item,
+              )
+            : this.snapshot.conversations,
+      });
     });
+  }
+
+  /**
+   * Mudanca sincrona com a forma das portas assincronas: falha vira promessa
+   * rejeitada, como no repositorio do Firestore.
+   */
+  private mutate(change: () => void): Promise<void> {
+    try {
+      change();
+      return Promise.resolve();
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 
   private leadOf(id: ID): Lead | null {

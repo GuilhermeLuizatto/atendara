@@ -58,8 +58,8 @@ jobs:
       - name: Instalar dependencias
         if: steps.token.outputs.present == 'true'
         run: |
-          npm ci
-          npm ci --prefix functions
+          npm ci --ignore-scripts
+          npm ci --ignore-scripts --prefix functions
 
       - name: Testes com cobertura
         if: steps.token.outputs.present == 'true'

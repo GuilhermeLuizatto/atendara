@@ -36,11 +36,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
+      # Sem scripts de instalacao: dependencia comprometida nao executa nada
+      # aqui. Nenhuma das nossas precisa deles (@firebase/util ja traz o arquivo
+      # que o script geraria; protobufjs so confere versao; unrs-resolver usa o
+      # binario opcional que o npm ja instala).
       - name: Instalar dependencias
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Instalar dependencias do backend
-        run: npm ci --prefix functions
+        run: npm ci --ignore-scripts --prefix functions
 
       # Antes de qualquer outra coisa: segredo que entrou no commit tem de
       # parar aqui, nao depois do build.

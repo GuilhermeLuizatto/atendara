@@ -107,23 +107,21 @@ são a Dara do produto.
 
 ## Rotina compartilhada de trabalho
 
-Ao iniciar uma conversa sobre o Atendara, leia
-[PAINEL-ATENDARA.md](PAINEL-ATENDARA.md) antes de propor prioridades ou dizer
-que algo está concluído. Consulte o código, os testes e a documentação citada
-no painel para confirmar estados que possam ter mudado. O painel é o resumo
-compartilhado; chats antigos e documentos locais não substituem a verificação.
-Se houver divergência, corrija o painel com fonte e data, sem inventar status.
-O dashboard visual usa [project-dashboard/status.json](project-dashboard/status.json).
-Quando uma frente mudar de estado, atualize o painel e o JSON no mesmo trabalho,
-gere novamente o HTML com `node scripts/build-project-dashboard.mjs` e confira
-com `node scripts/build-project-dashboard.mjs --check`. Merge, publicação e
-validação real são estados diferentes; não marque conclusão só pelo merge.
+Ao iniciar uma conversa sobre o Atendara, consulte o radar de trabalho no
+repositório privado `GuilhermeLuizatto/atendara-radar` antes de propor
+prioridades ou dizer que algo está concluído. O acesso exige convite explícito.
+Consulte também o código, os testes e a documentação citada no radar para
+confirmar estados que possam ter mudado. Chats antigos não substituem essa
+verificação. Se houver divergência, corrija o radar com fonte e data, sem
+inventar status. Quando uma frente mudar de estado, atualize o painel e o JSON
+no repositório privado no mesmo trabalho. Merge, publicação e validação real
+são estados diferentes; não marque conclusão só pelo merge.
 Ao integrar mudança relevante de comportamento, segurança, dados ou operação,
 registre um resumo verificável em [CHANGELOG.md](CHANGELOG.md), com link do PR.
 
 "Bom dia, Atendara": apresente até três prioridades, o que foi concluído desde
 a última atualização, bloqueios e a primeira ação concreta. "Fechar o dia":
-atualize o painel com entregas verificadas, trabalho em andamento, bloqueios,
+atualize o radar privado com entregas verificadas, trabalho em andamento, bloqueios,
 responsável e próximo passo. Ao concluir qualquer tarefa que altere prioridades
-ou status, atualize o painel no mesmo trabalho. Não inclua segredos, dados de
+ou status, atualize o radar no mesmo trabalho. Não inclua segredos, dados de
 clientes nem detalhes privados; registre apenas o necessário para a equipe.

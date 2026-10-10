@@ -12,10 +12,14 @@ profissional e encaminha assuntos que exigem atenção humana.
 
 > **A IA auxilia. O humano decide.**
 
-**Estágio atual:** demonstração e desenvolvimento. Os módulos têm persistência
-no Firestore com isolamento por organização. Dara usa um motor de simulação,
-o provedor de mensagens é simulado e a cobrança usa o modo de testes do gateway.
-Isso não representa integrações de WhatsApp, n8n ou IA externa em produção.
+**Estágio atual (10/10/2026):** desenvolvimento e validação controlada. Os
+módulos têm persistência no Firestore com isolamento por organização. A Dara
+combina regras locais com classificação semântica por Gemini, liberada somente
+para organizações de uma lista explícita. A fila de automação e a integração
+local com n8n existem; o WhatsApp real aguarda habilitação e validação pela Meta.
+A cobrança da plataforma permanece em testes. Código integrado, publicação e
+validação real são etapas distintas; confirme a situação de cada frente antes de
+usá-la no piloto.
 
 ## Para conhecer o projeto
 
@@ -28,8 +32,6 @@ Isso não representa integrações de WhatsApp, n8n ou IA externa em produção.
 
 | O que avaliar                                       | Onde começar                                                                             |
 | --------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Prioridades, responsáveis e próximo passo da equipe | [Painel de trabalho](PAINEL-ATENDARA.md)                                                 |
-| Acompanhamento visual de bugs, testes e entregas    | [Radar do projeto](project-dashboard/atendara-dashboard.html)                            |
 | Mudanças relevantes integradas à `main`             | [Changelog](CHANGELOG.md)                                                                |
 | Rotina de colaboração com agentes                   | [Guia dos agentes](docs/AGENTES-DESENVOLVIMENTO.md)                                      |
 | Decisões e limites da arquitetura                   | [Arquitetura](docs/ARCHITECTURE.md)                                                      |

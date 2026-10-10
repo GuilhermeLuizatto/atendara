@@ -1,6 +1,6 @@
 # Mudanças do Atendara
 
-Este registro resume mudanças relevantes integradas à `main`. O [Radar do projeto](project-dashboard/atendara-dashboard.html) mostra automaticamente os PRs mesclados mais recentes. Código integrado, publicação e validação real são estados diferentes; acompanhe as pendências no [painel de trabalho](PAINEL-ATENDARA.md).
+Este registro resume mudanças relevantes integradas à `main`. Código integrado, publicação e validação real são estados diferentes.
 
 ## 10/10/2026
 

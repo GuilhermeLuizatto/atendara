@@ -42,7 +42,7 @@ O orquestrador pode distribuir investigação, frontend e backend em paralelo so
 1. Critérios de aceite verificados; defeitos descobertos voltam ao `bug-fixer`.
 2. Testes da área executados e, antes de PR, `npm run verify`.
 3. Para mudança em Rules, Storage, acesso ou persistência, testes de emulador relevantes e revisão de segurança. `npm run test:emulator` cobre o conjunto local; escolha comandos específicos quando apropriado.
-4. Documentação e `docs/VALIDACOES-REAIS-PENDENTES.md` atualizadas quando o comportamento ou o roteiro real mudar.
+4. Documentação atualizada no projeto principal; roteiro de validações reais e radar atualizados no repositório privado de acompanhamento quando o comportamento ou o roteiro mudar.
 5. Dependências de credenciais, integrações reais, publicação e decisões do titular relatadas como pendentes, com evidência esperada. Não marque como concluído o que não foi testado.
 
 ## Como pedir trabalho

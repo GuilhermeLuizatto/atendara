@@ -118,6 +118,8 @@ Quando uma frente mudar de estado, atualize o painel e o JSON no mesmo trabalho,
 gere novamente o HTML com `node scripts/build-project-dashboard.mjs` e confira
 com `node scripts/build-project-dashboard.mjs --check`. Merge, publicação e
 validação real são estados diferentes; não marque conclusão só pelo merge.
+Ao integrar mudança relevante de comportamento, segurança, dados ou operação,
+registre um resumo verificável em [CHANGELOG.md](CHANGELOG.md), com link do PR.
 
 "Bom dia, Atendara": apresente até três prioridades, o que foi concluído desde
 a última atualização, bloqueios e a primeira ação concreta. "Fechar o dia":

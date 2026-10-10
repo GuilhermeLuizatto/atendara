@@ -26,18 +26,19 @@ Isso não representa integrações de WhatsApp, n8n ou IA externa em produção.
 - **Diferenciais técnicos:** isolamento por organização, domínio independente do
   Firebase, configuração de profissões, auditoria e testes automatizados.
 
-| O que avaliar | Onde começar |
-| --- | --- |
-| Prioridades, responsáveis e próximo passo da equipe | [Painel de trabalho](PAINEL-ATENDARA.md) |
-| Acompanhamento visual de bugs, testes e entregas | [Radar do projeto](project-dashboard/atendara-dashboard.html) |
-| Rotina de colaboração com agentes | [Guia dos agentes](docs/AGENTES-DESENVOLVIMENTO.md) |
-| Decisões e limites da arquitetura | [Arquitetura](docs/ARCHITECTURE.md) |
-| Estrutura dos dados e consultas | [Modelo do Firestore](docs/FIRESTORE-DATA-MODEL.md) |
-| Profissões como configuração | [Definições](src/config/professions/definitions.ts) |
-| Permissões e proteção dos dados | [Matriz de permissões](src/config/permissions.ts) e [Security Rules](firestore.rules) |
-| Motor administrativo da Dara | [Decisões](src/lib/ai/decision-engine.ts) e [testes](src/lib/ai/decision-engine.test.ts) |
-| Fila de automação no servidor | [Cloud Functions](functions/automation.js) |
-| Integração contínua | [Workflow de CI](.github/workflows/ci.yml) |
+| O que avaliar                                       | Onde começar                                                                             |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Prioridades, responsáveis e próximo passo da equipe | [Painel de trabalho](PAINEL-ATENDARA.md)                                                 |
+| Acompanhamento visual de bugs, testes e entregas    | [Radar do projeto](project-dashboard/atendara-dashboard.html)                            |
+| Mudanças relevantes integradas à `main`             | [Changelog](CHANGELOG.md)                                                                |
+| Rotina de colaboração com agentes                   | [Guia dos agentes](docs/AGENTES-DESENVOLVIMENTO.md)                                      |
+| Decisões e limites da arquitetura                   | [Arquitetura](docs/ARCHITECTURE.md)                                                      |
+| Estrutura dos dados e consultas                     | [Modelo do Firestore](docs/FIRESTORE-DATA-MODEL.md)                                      |
+| Profissões como configuração                        | [Definições](src/config/professions/definitions.ts)                                      |
+| Permissões e proteção dos dados                     | [Matriz de permissões](src/config/permissions.ts) e [Security Rules](firestore.rules)    |
+| Motor administrativo da Dara                        | [Decisões](src/lib/ai/decision-engine.ts) e [testes](src/lib/ai/decision-engine.test.ts) |
+| Fila de automação no servidor                       | [Cloud Functions](functions/automation.js)                                               |
+| Integração contínua                                 | [Workflow de CI](.github/workflows/ci.yml)                                               |
 
 O repositório é mantido por [Guilherme Luizatto](https://github.com/GuilhermeLuizatto).
 O [histórico de desenvolvimento](https://github.com/GuilhermeLuizatto/atendara/commits/main/)
@@ -48,18 +49,18 @@ representam o estado do projeto, sem alegação de autoria individual exclusiva.
 
 ## Stack
 
-| Camada    | Tecnologia                         |
-| --------- | ---------------------------------- |
-| Framework | Next.js 16 (App Router, Turbopack) |
-| UI        | React 19, Tailwind CSS 4           |
-| Linguagem | TypeScript 5 (strict)              |
-| Auth      | Firebase Authentication            |
-| Banco     | Cloud Firestore                    |
+| Camada    | Tecnologia                           |
+| --------- | ------------------------------------ |
+| Framework | Next.js 16 (App Router, Turbopack)   |
+| UI        | React 19, Tailwind CSS 4             |
+| Linguagem | TypeScript 5 (strict)                |
+| Auth      | Firebase Authentication              |
+| Banco     | Cloud Firestore                      |
 | Backend   | Cloud Functions (southamerica-east1) |
-| Hosting   | Firebase Hosting (export estatico) |
-| Testes    | Vitest e emuladores do Firebase    |
-| Qualidade | ESLint 9, Prettier                 |
-| CI/CD     | GitHub Actions                     |
+| Hosting   | Firebase Hosting (export estatico)   |
+| Testes    | Vitest e emuladores do Firebase      |
+| Qualidade | ESLint 9, Prettier                   |
+| CI/CD     | GitHub Actions                       |
 
 ---
 
@@ -199,19 +200,19 @@ apontam para os emuladores.
 | `npm run type-check`   | Gera tipos de rota e roda `tsc --noEmit`                   |
 | `npm run test`         | Suite de testes                                            |
 | `npm run check:bundle` | Confere que nenhum segredo foi parar em `out/`             |
-| `npm run scan:secrets` | Varre a arvore versionada atras de credencial               |
+| `npm run scan:secrets` | Varre a arvore versionada atras de credencial              |
 | `npm run format`       | Prettier                                                   |
 | `npm run verify`       | lint + type-check + testes + build + conferencia do bundle |
 
 Suites que exigem o emulador (Java e a CLI do Firebase):
 
-| Comando                   | O que prova                                                          |
-| ------------------------- | -------------------------------------------------------------------- |
-| `npm run test:rules`      | Security Rules: isolamento entre organizacoes, modulos, append-only  |
-| `npm run test:storage`    | Arquivos: logo, anexos, tipos, tamanhos e visibilidade               |
-| `npm run test:repository` | Fiacao do repositorio: `Timestamp` <-> ISO, lote atomico, transacao  |
+| Comando                   | O que prova                                                           |
+| ------------------------- | --------------------------------------------------------------------- |
+| `npm run test:rules`      | Security Rules: isolamento entre organizacoes, modulos, append-only   |
+| `npm run test:storage`    | Arquivos: logo, anexos, tipos, tamanhos e visibilidade                |
+| `npm run test:repository` | Fiacao do repositorio: `Timestamp` <-> ISO, lote atomico, transacao   |
 | `npm run test:access`     | Matriz de acesso e cobranca: Auth, callables, webhook e regras juntos |
-| `npm run test:emulator`   | As quatro suites de emulador em sequencia                            |
+| `npm run test:emulator`   | As quatro suites de emulador em sequencia                             |
 
 ---
 
@@ -247,13 +248,13 @@ install → varredura → lint → type-check → testes → auditoria → build
 
 Configuração do deploy no GitHub Actions:
 
-| Configuração | Para que serve |
-| --- | --- |
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Provedor de federação usado na autenticação OIDC |
-| `GCP_SERVICE_ACCOUNT` | Conta de serviço usada pela federação |
-| `FIREBASE_PROJECT_ID` | Projeto de destino |
-| `NEXT_PUBLIC_FIREBASE_*` | Identificadores públicos do Firebase usados no build |
-| `NEXT_PUBLIC_APP_CHECK_SITE_KEY` | Chave pública do App Check |
+| Configuração                     | Para que serve                                       |
+| -------------------------------- | ---------------------------------------------------- |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Provedor de federação usado na autenticação OIDC     |
+| `GCP_SERVICE_ACCOUNT`            | Conta de serviço usada pela federação                |
+| `FIREBASE_PROJECT_ID`            | Projeto de destino                                   |
+| `NEXT_PUBLIC_FIREBASE_*`         | Identificadores públicos do Firebase usados no build |
+| `NEXT_PUBLIC_APP_CHECK_SITE_KEY` | Chave pública do App Check                           |
 
 O workflow usa credenciais temporárias via federação. Se a federação não estiver
 configurada, o deploy é pulado. Com a federação configurada, a ausência dos campos
@@ -271,17 +272,17 @@ bloco único: o núcleo da fila e os contratos de automação já existem, enqua
 a ativação de canais externos continua controlada por configuração, segredos e
 testes de ponta a ponta.
 
-| Fase | Escopo | Status |
-| --- | --- | --- |
-| **0** | Fundação: tipos, multi-tenancy, Security Rules, design system, shell e CI | ✅ |
-| **1** | Operação: dashboard, agenda, CRM, financeiro, mensagens, regras e simulador | ✅ |
-| **2** | Persistência: Firestore, RBAC, auditoria, notificações e isolamento entre tenants | ✅ |
-| **3A** | Automação interna: fila, HMAC, callback, controle de emergência e n8n local | ✅ |
-| **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco | ⏸️ Em espera; validação externa pendente |
-| **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | 🟨 Código integrado à `main` e Functions publicadas; validações reais pendentes |
-| **4** | IA: assistente autorizado, regras contextuais, classificação avançada e analytics | ✅ Gemini por allowlist em 6 organizações; acerto revisado e entrega nos indicadores |
-| **5** | Produto: equipes, importação administrativa, suporte, marca e preparação da cobrança | 🟨 Base, escopo multiprofissional, administração de membros e migração concluídos; validações reais pendentes |
-| **6** | Cobrador dos clientes: mensalidades, comprovantes e recibos, sem processar pagamento | 🟨 Código integrado à `main`; validações reais pendentes |
+| Fase   | Escopo                                                                                    | Status                                                                                                        |
+| ------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **0**  | Fundação: tipos, multi-tenancy, Security Rules, design system, shell e CI                 | ✅                                                                                                            |
+| **1**  | Operação: dashboard, agenda, CRM, financeiro, mensagens, regras e simulador               | ✅                                                                                                            |
+| **2**  | Persistência: Firestore, RBAC, auditoria, notificações e isolamento entre tenants         | ✅                                                                                                            |
+| **3A** | Automação interna: fila, HMAC, callback, controle de emergência e n8n local               | ✅                                                                                                            |
+| **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco                       | ⏸️ Em espera; validação externa pendente                                                                      |
+| **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | 🟨 Código integrado à `main` e Functions publicadas; validações reais pendentes                               |
+| **4**  | IA: assistente autorizado, regras contextuais, classificação avançada e analytics         | ✅ Gemini por allowlist em 6 organizações; acerto revisado e entrega nos indicadores                          |
+| **5**  | Produto: equipes, importação administrativa, suporte, marca e preparação da cobrança      | 🟨 Base, escopo multiprofissional, administração de membros e migração concluídos; validações reais pendentes |
+| **6**  | Cobrador dos clientes: mensalidades, comprovantes e recibos, sem processar pagamento      | 🟨 Código integrado à `main`; validações reais pendentes                                                      |
 
 As validações externas ou manuais que dependem do titular, inclusive as da
 Fase 3B, são acompanhadas fora do repositório.
@@ -369,13 +370,13 @@ fronteira real de autorização. A ordem é deliberada: nenhuma aba pode ser
 tratada como proteção antes de consultas, backend e Security Rules aplicarem o
 mesmo escopo.
 
-| Sprint | Entrega | Critério de aceite |
-| --- | --- | --- |
-| **5.1 — Contrato de acesso** | Consolidar `PLATFORM_ADMIN` como papel interno da Atendara, `PROFESSIONAL` e `ASSISTANT` como acessos da organização, e `Client` como cadastro administrativo sem login no piloto. Titularidade continua separada do papel. | Novos convites não oferecem OWNER, ADMIN organizacional ou VIEWER; compatibilidade com contas antigas permanece documentada e testada. |
-| **5.2 — Administração de membros** | Fazer convite, suspensão, reativação e remoção por operações específicas da administração da Atendara, com segundo fator, motivo e auditoria. O profissional solicita a inclusão, mas não cria a conta diretamente. | O administrador não ganha leitura geral do tenant; cada ato administrativo é autorizado no backend, revoga sessões quando necessário e gera registro append-only. |
-| **5.3 — Escopo por vínculo (concluído no código)** | Aplicar `linkedProfessionalIds` nas consultas, escritas, callables e Security Rules de agenda, clientes, mensagens, financeiro, regras e alertas. Vínculo vazio nunca significa acesso a todos. | Um assistente ligado aos profissionais A e B não lê nem altera dados do profissional C, inclusive por chamada direta ao Firestore ou às Functions. Testes de emulador cobrem leitura, criação, alteração e remoção de vínculo. |
-| **5.4 — Contexto por abas e clientes (concluído no código)** | Criar um contexto global por profissional, com uma aba para cada vínculo ativo e sem opção silenciosa de combinar dados. O profissional ou assistente autorizado cadastra clientes diretamente; a administração da Atendara não participa do fluxo cotidiano. Um cliente da organização pode ser associado explicitamente a mais de um profissional sem duplicar o cadastro. | Agenda, clientes, mensagens, financeiro e Dara seguem a mesma aba ativa. Trocar ou perder vínculo troca ou fecha o contexto imediatamente. O cadastro do cliente não cria conta de acesso. |
-| **5.5 — Migração e liberação (aplicada em produção)** | Preservar UID, e-mail, senha, organização, perfis e histórico; mapear papéis antigos, preencher vínculos explícitos e revisar manualmente organizações multiprofissionais ambíguas. | Migração repetível e auditável, sem concessão implícita de acesso. Contagens antes/depois conferidas, testes completos aprovados e piloto bloqueado enquanto houver membro ativo sem escopo resolvido. |
+| Sprint                                                       | Entrega                                                                                                                                                                                                                                                                                                                                                                      | Critério de aceite                                                                                                                                                                                                             |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **5.1 — Contrato de acesso**                                 | Consolidar `PLATFORM_ADMIN` como papel interno da Atendara, `PROFESSIONAL` e `ASSISTANT` como acessos da organização, e `Client` como cadastro administrativo sem login no piloto. Titularidade continua separada do papel.                                                                                                                                                  | Novos convites não oferecem OWNER, ADMIN organizacional ou VIEWER; compatibilidade com contas antigas permanece documentada e testada.                                                                                         |
+| **5.2 — Administração de membros**                           | Fazer convite, suspensão, reativação e remoção por operações específicas da administração da Atendara, com segundo fator, motivo e auditoria. O profissional solicita a inclusão, mas não cria a conta diretamente.                                                                                                                                                          | O administrador não ganha leitura geral do tenant; cada ato administrativo é autorizado no backend, revoga sessões quando necessário e gera registro append-only.                                                              |
+| **5.3 — Escopo por vínculo (concluído no código)**           | Aplicar `linkedProfessionalIds` nas consultas, escritas, callables e Security Rules de agenda, clientes, mensagens, financeiro, regras e alertas. Vínculo vazio nunca significa acesso a todos.                                                                                                                                                                              | Um assistente ligado aos profissionais A e B não lê nem altera dados do profissional C, inclusive por chamada direta ao Firestore ou às Functions. Testes de emulador cobrem leitura, criação, alteração e remoção de vínculo. |
+| **5.4 — Contexto por abas e clientes (concluído no código)** | Criar um contexto global por profissional, com uma aba para cada vínculo ativo e sem opção silenciosa de combinar dados. O profissional ou assistente autorizado cadastra clientes diretamente; a administração da Atendara não participa do fluxo cotidiano. Um cliente da organização pode ser associado explicitamente a mais de um profissional sem duplicar o cadastro. | Agenda, clientes, mensagens, financeiro e Dara seguem a mesma aba ativa. Trocar ou perder vínculo troca ou fecha o contexto imediatamente. O cadastro do cliente não cria conta de acesso.                                     |
+| **5.5 — Migração e liberação (aplicada em produção)**        | Preservar UID, e-mail, senha, organização, perfis e histórico; mapear papéis antigos, preencher vínculos explícitos e revisar manualmente organizações multiprofissionais ambíguas.                                                                                                                                                                                          | Migração repetível e auditável, sem concessão implícita de acesso. Contagens antes/depois conferidas, testes completos aprovados e piloto bloqueado enquanto houver membro ativo sem escopo resolvido.                         |
 
 Situação do sprint 5.2: concluído no código. Aprovação/recusa, convite,
 suspensão, reativação e remoção são exclusivos da administração da Atendara,

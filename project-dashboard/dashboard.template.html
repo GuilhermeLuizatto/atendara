@@ -348,6 +348,37 @@
         color: var(--muted);
         background: white;
       }
+      .changes {
+        margin-top: 38px;
+      }
+      .change-list {
+        margin-top: 16px;
+        padding: 0;
+        list-style: none;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        overflow: hidden;
+        background: var(--surface);
+      }
+      .change-list li {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 14px 18px;
+        border-top: 1px solid var(--line);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      .change-list li:first-child {
+        border-top: 0;
+      }
+      .change-list time {
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .changes .main-link {
+        display: inline;
+      }
       .footnote {
         margin-top: 24px;
         color: var(--muted);
@@ -502,6 +533,26 @@
         </div>
         <div id="items" class="list" aria-live="polite"></div>
       </section>
+      <section class="changes" aria-labelledby="changes-title">
+        <div class="work-head">
+          <div>
+            <h2 id="changes-title">Últimas mudanças na main</h2>
+            <p class="subtle">
+              PRs mesclados, sem confundir merge com validação.
+            </p>
+          </div>
+          <a
+            class="main-link"
+            href="https://github.com/GuilhermeLuizatto/atendara/blob/main/CHANGELOG.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Ler changelog ↗</a
+          >
+        </div>
+        <ul id="change-list" class="change-list">
+          <li>Consultando o GitHub…</li>
+        </ul>
+      </section>
       <p class="footnote">
         Um merge muda o código, mas não aprova automaticamente testes reais,
         publicação ou decisões de produto. Itens históricos ficam marcados “a
@@ -546,10 +597,11 @@
         };
         const evidenceUrl = (value) => {
           if (typeof value !== "string") return null;
-          if (
-            value.startsWith("https://github.com/GuilhermeLuizatto/atendara/")
-          )
-            return value;
+          const pull =
+            /^https:\/\/github\.com\/GuilhermeLuizatto\/atendara\/pull\/([1-9][0-9]*)$/.exec(
+              value,
+            );
+          if (pull) return `https://github.com/${repository}/pull/${pull[1]}`;
           if (/^[a-zA-Z0-9_./-]+$/.test(value) && !value.includes(".."))
             return `https://github.com/${repository}/blob/main/${value}`;
           return null;
@@ -650,30 +702,56 @@
               `${apiUrl}/pulls?state=closed&per_page=20`,
               { headers: { Accept: "application/vnd.github+json" } },
             );
-            if (response.ok) {
-              const prs = await response.json();
-              const latest = prs
-                .filter((x) => x.merged_at && x.base?.ref === "main")
-                .sort(
-                  (a, b) => Date.parse(b.merged_at) - Date.parse(a.merged_at),
-                )[0];
-              if (latest) {
-                const date = new Date(latest.merged_at).toLocaleDateString(
-                  "pt-BR",
-                );
-                const node = $("merge-detail");
-                node.replaceChildren();
-                node.append(`Último merge: ${date} · `);
-                const link = el("a", "", latest.title);
-                link.href = latest.html_url;
-                link.target = "_blank";
-                link.rel = "noopener noreferrer";
-                node.append(link);
-              }
+            if (!response.ok) throw new Error("GitHub indisponível");
+            const prs = await response.json();
+            const recent = prs
+              .filter((x) => x.merged_at && x.base?.ref === "main")
+              .sort((a, b) => Date.parse(b.merged_at) - Date.parse(a.merged_at))
+              .slice(0, 5);
+            const changeList = $("change-list");
+            changeList.replaceChildren();
+            for (const pr of recent) {
+              const row = el("li", "");
+              const link = el("a", "", pr.title);
+              link.href = pr.html_url;
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+              const date = el(
+                "time",
+                "",
+                new Date(pr.merged_at).toLocaleDateString("pt-BR"),
+              );
+              row.append(link, date);
+              changeList.append(row);
+            }
+            if (!recent.length)
+              changeList.append(
+                el("li", "", "Nenhum merge recente encontrado."),
+              );
+            const latest = recent[0];
+            if (latest) {
+              const date = new Date(latest.merged_at).toLocaleDateString(
+                "pt-BR",
+              );
+              const node = $("merge-detail");
+              node.replaceChildren();
+              node.append(`Último merge: ${date} · `);
+              const link = el("a", "", latest.title);
+              link.href = latest.html_url;
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+              node.append(link);
             }
           } catch {
             $("merge-detail").textContent =
               "Último merge indisponível no momento.";
+            $("change-list").replaceChildren(
+              el(
+                "li",
+                "",
+                "Não foi possível consultar os merges agora. Leia o changelog no repositório.",
+              ),
+            );
           }
           $("refresh").disabled = false;
         }

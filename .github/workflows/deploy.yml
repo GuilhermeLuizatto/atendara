@@ -77,13 +77,17 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
+      # Sem scripts de instalacao: dependencia comprometida nao executa nada
+      # aqui. Nenhuma das nossas precisa deles (@firebase/util ja traz o arquivo
+      # que o script geraria; protobufjs so confere versao; unrs-resolver usa o
+      # binario opcional que o npm ja instala).
       - name: Instalar dependencias
         if: steps.guard.outputs.ready == 'true'
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Instalar dependencias do backend
         if: steps.guard.outputs.ready == 'true'
-        run: npm ci --prefix functions
+        run: npm ci --ignore-scripts --prefix functions
 
       - name: Verificacao completa
         if: steps.guard.outputs.ready == 'true'
@@ -126,18 +130,24 @@ jobs:
 
       # As Security Rules vao antes do Hosting: se as regras falharem, a versao
       # nova do frontend nao entra no ar com o banco ainda desprotegido.
+      # O projeto entra por variavel de ambiente, nunca expandido dentro do
+      # script: valor de segredo colado no shell vira codigo se tiver aspas.
       - name: Publicar Security Rules e indices
         if: steps.guard.outputs.ready == 'true'
+        env:
+          PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
         run: |
-          npx --yes firebase-tools@${{ env.FIREBASE_TOOLS_VERSION }} deploy \
+          npx --yes "firebase-tools@$FIREBASE_TOOLS_VERSION" deploy \
             --only firestore:rules,firestore:indexes \
-            --project "${{ secrets.FIREBASE_PROJECT_ID }}" \
+            --project "$PROJECT_ID" \
             --non-interactive
 
       - name: Publicar no Firebase Hosting
         if: steps.guard.outputs.ready == 'true'
+        env:
+          PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
         run: |
-          npx --yes firebase-tools@${{ env.FIREBASE_TOOLS_VERSION }} deploy \
+          npx --yes "firebase-tools@$FIREBASE_TOOLS_VERSION" deploy \
             --only hosting \
-            --project "${{ secrets.FIREBASE_PROJECT_ID }}" \
+            --project "$PROJECT_ID" \
             --non-interactive

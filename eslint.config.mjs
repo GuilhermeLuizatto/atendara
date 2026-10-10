@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Relatorio do `npm run test:coverage`, gerado e fora do Git.
     "coverage/**",
+    // Ferramentas e copias de trabalho locais (worktrees), fora do Git: cada
+    // copia tem o proprio lint.
+    ".local/**",
   ]),
 ]);
 

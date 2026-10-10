@@ -81,7 +81,5 @@ next-env.d.ts
 !/docs/ARCHITECTURE.md
 !/docs/FIRESTORE-DATA-MODEL.md
 !/docs/GOOGLE-CALENDAR.md
-!/docs/VALIDACOES-REAIS-PENDENTES.md
-!/docs/VALIDACOES-REAIS-PENDENTES.pdf
 !/docs/AGENTES-DESENVOLVIMENTO.md
 /scripts/render-report.mjs

@@ -1,0 +1,72 @@
+name: SonarQube Cloud
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: sonarqube-${{ github.ref }}
+  cancel-in-progress: true
+
+# O token so envia o relatorio; o comentario no PR vem do aplicativo do
+# SonarQube Cloud no GitHub, nao deste workflow.
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  analyze:
+    name: Qualidade e cobertura
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # Sem o segredo (fork, ou antes de o projeto existir no SonarQube Cloud)
+      # o job termina com sucesso e so registra que pulou, como o deploy.
+      - name: Conferir token
+        id: token
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -n "$SONAR_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SONAR_TOKEN ausente: analise do SonarQube Cloud pulada."
+          fi
+
+      # Acoes fixadas por hash, como no ci.yml. Historico completo: o
+      # SonarQube Cloud usa o blame para separar codigo novo do antigo.
+      - name: Checkout
+        if: steps.token.outputs.present == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Configurar Node
+        if: steps.token.outputs.present == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Instalar dependencias
+        if: steps.token.outputs.present == 'true'
+        run: |
+          npm ci
+          npm ci --prefix functions
+
+      - name: Testes com cobertura
+        if: steps.token.outputs.present == 'true'
+        run: npm run test:coverage
+
+      - name: Analisar
+        if: steps.token.outputs.present == 'true'
+        uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8.2.2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

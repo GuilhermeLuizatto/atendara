@@ -43,8 +43,7 @@ import {
   PLANNING_EVENT_MAX_AGE_MINUTES,
 } from "./generated/automation-config.js";
 import { providerFor } from "./generated/notifications-providers.js";
-import { whatsappConversationId } from "./generated/automation-inbound.js";
-import { leadRecipient } from "./generated/leads-lifecycle.js";
+import { replyContactOf } from "./leads.js";
 import { bridgeProviderFrom } from "./n8n-bridge.js";
 import { runAs, SERVICE_ACCOUNTS } from "./service-accounts.js";
 import { withOrganizationDefaults } from "./generated/organization-config.js";
@@ -843,22 +842,13 @@ export async function runAutomationTask(data, deps = {}) {
         task.type === "SEND_CONVERSATION_REPLY" &&
         (task.clientId || task.leadId)
       ) {
-        // Lead: relido agora, e so vira destinatario com consentimento vigente.
-        // Retirado ou de texto antigo entre planejar e enviar, a resposta para.
-        const lead =
-          !task.clientId && task.leadId
-            ? stored(
-                "leads",
-                await transaction.get(scope.doc("leads", task.leadId)),
-              )
-            : null;
-        if (lead) context.client = leadRecipient(lead);
-        if (!context.client && task.clientId) {
-          context.client = stored(
-            "clients",
-            await transaction.get(scope.doc("clients", task.clientId)),
-          );
-        }
+        const contact = await replyContactOf({
+          transaction,
+          scope,
+          task,
+          known: context.client,
+        });
+        context.client = contact.client;
         if (!context.professional && task.professionalId) {
           context.professional = stored(
             "professionals",
@@ -867,12 +857,7 @@ export async function runAutomationTask(data, deps = {}) {
             ),
           );
         }
-        // A conversa e o pedido se deduzem do cadastro, pela regra do webhook:
-        // a tarefa nao guarda o id da conversa, que carrega o do cadastro. A do
-        // lead esta no proprio lead.
-        const conversationId = task.clientId
-          ? whatsappConversationId(task.clientId, "")
-          : (lead?.conversationId ?? null);
+        const { conversationId } = contact;
         context.conversation = conversationId
           ? stored(
               "conversations",

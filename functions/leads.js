@@ -2,6 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { fromStored, toStored } from "./firestore-dates.js";
 import { transitionTask } from "./generated/automation.js";
+import { whatsappConversationId } from "./generated/automation-inbound.js";
+import { leadRecipient } from "./generated/leads-lifecycle.js";
 import { paths } from "./generated/paths.js";
 
 /**
@@ -50,6 +52,42 @@ export async function soleActiveProfessionalId(
       .limit(2),
   );
   return found.size === 1 ? found.docs[0].id : null;
+}
+
+function stored(collection, snapshot) {
+  return snapshot?.exists
+    ? fromStored(collection, snapshot.id, snapshot.data())
+    : null;
+}
+
+/**
+ * Quem recebe uma resposta e em qual conversa, relidos na transacao do envio.
+ *
+ * Cadastro: a conversa se deduz do id, pela regra do webhook — a tarefa nao
+ * guarda o id da conversa, que carrega o do cadastro. Lead: a conversa esta no
+ * proprio lead, e ele so vira destinatario com consentimento vigente; retirado
+ * ou de texto antigo entre planejar e enviar, a resposta para.
+ */
+export async function replyContactOf({ transaction, scope, task, known = null }) {
+  if (task.clientId) {
+    const client =
+      known ??
+      stored(
+        "clients",
+        await transaction.get(scope.doc("clients", task.clientId)),
+      );
+    return {
+      client,
+      conversationId: whatsappConversationId(task.clientId, ""),
+    };
+  }
+  const lead = task.leadId
+    ? stored("leads", await transaction.get(scope.doc("leads", task.leadId)))
+    : null;
+  return {
+    client: lead ? leadRecipient(lead) : null,
+    conversationId: lead?.conversationId ?? null,
+  };
 }
 
 const WAITING = new Set(["PLANNED", "SCHEDULED"]);

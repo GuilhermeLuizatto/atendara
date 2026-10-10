@@ -140,6 +140,15 @@ describe("tomada da conversa pelo painel", () => {
     );
   });
 
+  it("o gatilho cancela quando a conversa chega assumida com resposta pendente", async () => {
+    cenario();
+    await cancelRepliesOnHumanTakeover({
+      params: { organizationId: ORG, conversationId: CONVERSA },
+      data: { after: { data: () => store.get(caminho("conversations", CONVERSA)) } },
+    });
+    expect(store.get(caminho("automationTasks", TAREFA)).status).toBe("CANCELLED");
+  });
+
   it("o gatilho só age quando a conversa foi assumida com resposta pendente", async () => {
     cenario({ escalated: false });
     await cancelRepliesOnHumanTakeover({

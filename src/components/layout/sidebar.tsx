@@ -52,6 +52,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     };
   }, [data]);
 
+  const activeHref = NAV_ITEMS.map((item) => item.href)
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.length - a.length)[0];
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2.5 px-4 py-4">
@@ -75,10 +79,11 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <nav aria-label="Principal" className="scrollbar-slim flex-1 overflow-y-auto px-2 pb-4">
         <ul className="space-y-0.5">
           {isPlatformAdmin(user?.access) ? <li><Link href="/admin" onClick={onNavigate} className="text-primary block rounded-lg px-3 py-2 text-sm font-medium">Administração</Link></li> : null}
-          {NAV_ITEMS.filter((item) => canAccessModule(user?.access, item.href.slice(1) as AppModule)).map(
+          {NAV_ITEMS.filter((item) => canAccessModule(user?.access, item.href.split("/")[1] as AppModule)).map(
             (item) => {
-              const active =
-                pathname === item.href || pathname.startsWith(`${item.href}/`);
+              // A rota mais especifica ganha: o primeiro contato fica dentro de
+              // mensagens, e so um dos dois aparece como atual.
+              const active = item.href === activeHref;
               const count = counts[item.href];
 
               return (

@@ -33,15 +33,21 @@ import { RepositoryError, type RepositoryActor } from "./types";
  * servidor, e para que memoria e Firestore recusem exatamente as mesmas acoes.
  */
 
+export function actorCan(
+  actor: RepositoryActor,
+  permission: Permission,
+): boolean {
+  return actor.permissions
+    ? actor.permissions.includes(permission)
+    : hasPermission(actor.role ?? "VIEWER", permission);
+}
+
 export function assertPermission(
   actor: RepositoryActor,
   permission: Permission,
 ): void {
-  const allowed = actor.permissions
-    ? actor.permissions.includes(permission)
-    : hasPermission(actor.role ?? "VIEWER", permission);
-
-  if (!allowed) throw new RepositoryError("Sem permissão para esta ação.");
+  if (!actorCan(actor, permission))
+    throw new RepositoryError("Sem permissão para esta ação.");
 }
 
 export function assertProfessionalScope(

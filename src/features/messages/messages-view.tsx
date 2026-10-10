@@ -1,10 +1,12 @@
 "use client";
 
 import { MessagesSquare } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { LoadMore } from "@/components/ui/load-more";
@@ -51,7 +53,8 @@ function MessagesWorkspace() {
   const { loadMore } = useWorkspaceActions();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("ALL");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const requested = useSearchParams().get("conversa");
+  const [selectedId, setSelectedId] = useState<string | null>(requested);
   if (!data) return <MessagesSkeleton />;
   const demonstrative = repository?.mode === "memory";
 
@@ -217,6 +220,7 @@ function ConversationPanel({
   const { run } = useWorkspaceActions();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resuming, setResuming] = useState(false);
   if (!data) return null;
   const messages = data.messages
     .filter((message) => message.conversationId === conversation.id)
@@ -290,21 +294,27 @@ function ConversationPanel({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() =>
-                  change({
-                    escalated: false,
-                    escalationReason: null,
-                    attention: "NORMAL",
-                    status: "OPEN",
-                    unreadCount: 0,
-                  })
-                }
+                onClick={() => setResuming(true)}
               >
-                Liberar agente
+                Retomar automação
               </Button>
             )}
           </div>
         )}
+        <ConfirmDialog
+          open={resuming}
+          onClose={() => setResuming(false)}
+          onConfirm={() =>
+            void run(
+              (repo) => repo.resumeConversationAutomation(conversation.id),
+              "Automação retomada. O registro ficou na trilha.",
+            )
+          }
+          title="Devolver a conversa à assistente?"
+          message="A assistente volta a poder responder perguntas administrativas desta conversa, dentro das regras e do consentimento da pessoa. A retomada fica registrada na trilha de auditoria."
+          confirmLabel="Retomar automação"
+          destructive={false}
+        />
       </div>
       <div className="max-h-[55dvh] space-y-4 overflow-y-auto p-4">
         {messages.map((message) => (

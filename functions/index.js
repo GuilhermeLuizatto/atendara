@@ -140,6 +140,8 @@ export { createPlatformAdmin, setPlatformAdminStatus } from "./platform-admins.j
 export {
   exportClientData,
   eraseClientData,
+  exportLeadData,
+  eraseLeadData,
   startOrganizationExport,
   exportOrganizationPage,
   deleteOrganization,
@@ -153,6 +155,8 @@ export { expireAutomationTasksEveryFiveMinutes } from "./automation-expiry.js";
 export { registerMessagingSender } from "./messaging-senders.js";
 export { completeWhatsappEmbeddedSignup } from "./whatsapp-signup.js";
 export { inboundWebhook } from "./inbound.js";
+// Resposta humana pelo painel cancela a resposta da Dara que esperava a vez.
+export { cancelRepliesOnHumanTakeover } from "./handoff.js";
 export { previewAI } from "./ai-preview.js";
 export {
   startCalendarConnection,

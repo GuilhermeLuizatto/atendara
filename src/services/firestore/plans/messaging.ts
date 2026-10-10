@@ -27,6 +27,7 @@ import {
   type PlanContext,
   type WriteOperation,
 } from "../plan";
+import { takeoverWrites } from "./leads";
 
 /**
  * Conversas e mensagens.
@@ -105,6 +106,7 @@ export function planReplyToConversation(
   assertProfessionalScope(ctx.actor, conversation.professionalId);
   const body = validateMessageBody(text);
   const id = ctx.newMessageId(conversationId);
+  const takeover = takeoverWrites(ctx, conversation);
 
   const message: Message = {
     id,
@@ -138,7 +140,9 @@ export function planReplyToConversation(
         // depois de liberacao explicita do profissional.
         escalated: true,
         escalationReason: "Conversa assumida pelo profissional.",
+        ...takeover.patch,
       }),
+      ...takeover.writes,
     ],
   };
 }
@@ -156,9 +160,23 @@ export function planUpdateConversation(
   assertPermission(ctx.actor, "conversation:reply");
   const conversation = requireConversation(ctx, id);
   assertProfessionalScope(ctx.actor, conversation.professionalId);
+  // Devolver a conversa a Dara tem porta propria, com trilha
+  // (`planResumeConversationAutomation`): por aqui seria retomar em silencio.
+  if (conversation.escalated && patch.escalated === false) {
+    throw new RepositoryError(
+      "Para devolver a conversa à assistente, use Retomar automação.",
+    );
+  }
+  const takeover =
+    patch.escalated === true && !conversation.escalated
+      ? takeoverWrites(ctx, conversation)
+      : { patch: {}, writes: [] };
   return {
     result: undefined,
-    writes: [conversationUpdate(ctx, id, { ...patch })],
+    writes: [
+      conversationUpdate(ctx, id, { ...patch, ...takeover.patch }),
+      ...takeover.writes,
+    ],
   };
 }
 

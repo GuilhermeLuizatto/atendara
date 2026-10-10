@@ -22,6 +22,7 @@ import {
   buildRules,
 } from "./generators/governance";
 import { buildInbox } from "./generators/inbox";
+import { buildLeads } from "./generators/leads";
 import { buildOrganization } from "./generators/organization";
 import { buildClients, buildProfessionals } from "./generators/people";
 
@@ -62,11 +63,12 @@ export function buildMockDataset(
   clients = applyOutstandingBalances(clients, transactions);
 
   const rules = buildRules(ctx);
-  const { conversations, messages, decisions } = buildInbox(
-    ctx,
-    clients,
-    rules,
-  );
+  const inbox = buildInbox(ctx, clients, rules);
+  const firstContacts = buildLeads(ctx, professionals, rules);
+  const decisions = [...inbox.decisions, ...firstContacts.decisions];
+  const conversations = [...inbox.conversations, ...firstContacts.conversations]
+    .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
+  const messages = [...inbox.messages, ...firstContacts.messages];
 
   const notifications = buildNotifications(
     ctx,
@@ -107,6 +109,7 @@ export function buildMockDataset(
     // ninguem, e mock nao e historico que possa virar envio.
     notificationDeliveries: [],
     automationTasks: [],
+    leads: firstContacts.leads,
     auditLogs,
   };
 }

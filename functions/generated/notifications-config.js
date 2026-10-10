@@ -154,8 +154,9 @@ export function channelsForEvent(event, professionChannels) {
  * RASCUNHO: redacao, base legal e necessidade do consentimento para cada
  * evento dependem de revisao por profissional qualificado.
  */
-// 09/10: entram as jornadas de agenda feitas pela assistente na conversa.
-export const NOTIFICATION_CONSENT_TEXT_VERSION = "2026-10-09-dara-agenda-rascunho";
+// 09/10: entram as jornadas de agenda feitas pela assistente na conversa e a
+// autorização dada pelo próprio contato novo, por mensagem (`config/leads.ts`).
+export const NOTIFICATION_CONSENT_TEXT_VERSION = "2026-10-09-dara-leads-rascunho";
 export const NOTIFICATION_CONSENT_REVIEW_STATUS = "DRAFT_PENDING_LEGAL_REVIEW";
 /**
  * O que o aviso mostra, dito a pessoa. Precisa acompanhar
@@ -284,6 +285,7 @@ export const SKIP_REASON_LABELS = {
     CONSENT_REVOKED: "O consentimento deste canal foi retirado.",
     CHANNEL_NOT_CONSENTED: "Não há consentimento registrado para este canal.",
     CONSENT_INCOMPLETE: "O registro do consentimento deste canal está incompleto: faltam data, versão do texto, quem registrou, meio ou responsável legal.",
+    CONSENT_TEXT_OUTDATED: "O contato autorizou uma versão anterior do texto de consentimento.",
     SCHEDULE_IN_THE_PAST: "O horário de envio já passou.",
     ALREADY_PLANNED: "Já existe um envio planejado igual a este.",
     TEMPLATE_REJECTED: "O modelo foi recusado pela política de conteúdo.",

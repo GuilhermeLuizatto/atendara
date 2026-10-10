@@ -7,7 +7,7 @@ import { messagePath, messagesPath, paths } from "../functions/generated/paths.j
 const requireTools = createRequire(new URL("../.local/firebase-tools/package.json", import.meta.url));
 const { initializeTestEnvironment, assertSucceeds, assertFails } = requireTools("@firebase/rules-unit-testing");
 const firestoreSdk = requireTools("firebase/firestore");
-const { doc, collection, collectionGroup, query, where, limit } = firestoreSdk;
+const { doc, collection, collectionGroup, query, where, limit, writeBatch } = firestoreSdk;
 
 // Cobertura por papel (H.6). Cada operacao guarda o alvo; cada negacao registra
 // o alvo com QUEM tentou. No fim, toda colecao de `firestore.rules` precisa de
@@ -116,7 +116,10 @@ try {
       await setDoc(doc(db, paths.document(org, "memberRequests", "example")), { organizationId: org });
       await setDoc(doc(db, paths.document(org, "memberInvitations", "example")), { organizationId: org });
       await setDoc(doc(db, paths.document(org, "importMappings", "example")), { organizationId: org });
+      await setDoc(doc(db, paths.document(org, "leads", "lead-1")), { organizationId: org, professionalId: org === "org-b" ? "b" : "a", status: "WAITING_TEAM", phone: "+5513999990000", contactHint: "***0000", queue: "AGENDA", routingReason: "AGENDA_REQUEST", notificationConsent: null, lastContactAt: new Date() });
     }
+    await setDoc(doc(db, paths.document("org-a", "leads", "lead-c")), { organizationId: "org-a", professionalId: "professional-c", status: "NEW", phone: "+5513999990001", lastContactAt: new Date() });
+    await setDoc(doc(db, paths.document("org-a", "conversations", "conv-assumida")), { organizationId: "org-a", professionalId: "a", clientId: null, status: "WAITING_PROFESSIONAL", escalated: true, escalationReason: "Conversa assumida pelo profissional." });
     await setDoc(doc(db, paths.initialPassword("a")), { hash: "test-only" });
     await setDoc(doc(db, paths.document("org-a", "clients", "consentido")), { organizationId: "org-a", assignedProfessionalIds: ["a"], fullName: "Alex Ficticio", notificationConsent: recordConsent({ EMAIL: [SEEDED_EMAIL], SMS: [SEEDED_SMS] }) });
     await setDoc(doc(db, paths.document("org-a", "clients", "antigo")), { organizationId: "org-a", assignedProfessionalIds: ["a"], fullName: "Cadastro Antigo", notificationConsent: LEGACY_CONSENT });
@@ -583,7 +586,7 @@ try {
   await denied(getDoc(doc(operator, paths.document("org-a", "members", "a"))));
   await denied(updateDoc(doc(operator, paths.document("org-a", "members", "a")), { role: "OWNER" }));
   await denied(deleteDoc(doc(operator, paths.document("org-a", "members", "restricted"))));
-  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "whatsappConnections", "rescheduleRequests", "bookingRequests", "calendarConnections", "calendarBusyBlocks", "automationSwitches", "services", "aiDecisionReviews", "recurringCharges", "paymentLinks", "paymentProofs", "receipts", "receiptSettings", "receiptCounters", "auditLogs"]) {
+  for (const name of ["professionals", "clients", "appointments", "conversations", "transactions", "aiRules", "aiDecisions", "notifications", "notificationDeliveries", "automationTasks", "messagingSenders", "whatsappConnections", "rescheduleRequests", "bookingRequests", "calendarConnections", "calendarBusyBlocks", "automationSwitches", "services", "aiDecisionReviews", "recurringCharges", "paymentLinks", "paymentProofs", "receipts", "receiptSettings", "receiptCounters", "auditLogs", "leads"]) {
     await denied(getDoc(doc(operator, own(name))));
     await denied(setDoc(doc(operator, paths.document("org-a", name, "da-operadora")), { organizationId: "org-a" }));
   }
@@ -821,6 +824,64 @@ try {
   await allowed(updateDoc(antigo(), { notificationConsent: recordConsent(threeGrants(), LEGACY_CONSENT) }));
   await deniedBecause("reescrever o formato antigo guardado", updateDoc(antigo(), { notificationConsent: recordConsent(threeGrants(), { ...LEGACY_CONSENT, channels: ["EMAIL", "SMS"] }) }));
 
+  // ------------------------------------------------------- Bloco 3: leads
+  // Primeiro contato sem cadastro. Quem responde conversas le e muda a
+  // situacao; o VIEWER nao ve o telefone de quem ainda nao e cliente; criar,
+  // apagar e trocar telefone, fila ou consentimento e do backend.
+  const leadOf = (uid, org = "org-a", id = "lead-1") => doc(db(uid), paths.document(org, "leads", id));
+  const leadMove = (uid, status, extra = {}) => ({ status, statusChangedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), updatedBy: uid, ...extra });
+  await allowed(getDoc(leadOf("a")));
+  await allowed(getDoc(leadOf("assistantRole")));
+  await allowed(getDocs(query(collection(db("a"), paths.collection("org-a", "leads")), where("professionalId", "==", "a"), limit(5))));
+  await allowed(getDocs(query(collection(db("adminRole"), paths.collection("org-a", "leads")), limit(5))));
+  await deniedBecause("visualizador lendo leads", getDoc(leadOf("viewerRole")));
+  await deniedBecause("visualizador listando leads", getDocs(query(collection(db("viewerRole"), paths.collection("org-a", "leads")), limit(5))));
+  await deniedBecause("lead sem o modulo de mensagens", getDoc(leadOf("restricted")));
+  await deniedBecause("assistente lendo lead de C", getDoc(leadOf("assistantRole", "org-a", "lead-c")));
+  await deniedBecause("lead de outra organizacao", getDoc(leadOf("a", "org-b")));
+  await deniedBecause("listando leads de outra organizacao", getDocs(query(collection(db("a"), paths.collection("org-b", "leads")), limit(5))));
+  await deniedBecause("assumindo lead de outra organizacao", updateDoc(leadOf("a", "org-b"), leadMove("a", "TAKEN_OVER")));
+  await deniedBecause("visualizador assumindo lead", updateDoc(leadOf("viewerRole"), leadMove("viewerRole", "TAKEN_OVER")));
+  await deniedBecause("lead criado pelo navegador", setDoc(leadOf("a", "org-a", "forjado"), { organizationId: "org-a", professionalId: "a", status: "NEW", phone: "+5513999990002" }));
+  await deniedBecause("lead apagado pelo navegador", deleteDoc(leadOf("ownerRole")));
+  await deniedBecause("trocando telefone do lead", updateDoc(leadOf("a"), leadMove("a", "TAKEN_OVER", { phone: "+5511999990000" })));
+  await deniedBecause("mudando a fila do lead", updateDoc(leadOf("a"), leadMove("a", "TAKEN_OVER", { queue: "COMMERCIAL" })));
+  await deniedBecause("forjando consentimento do lead", updateDoc(leadOf("a"), leadMove("a", "TAKEN_OVER", { notificationConsent: recordConsent({ WHATSAPP: [consentRecord("a")] }) })));
+  await deniedBecause("devolvendo lead para novo", updateDoc(leadOf("a"), leadMove("a", "NEW")));
+  await deniedBecause("assumindo em nome de outro membro", updateDoc(leadOf("a"), leadMove("b", "TAKEN_OVER")));
+  await allowed(updateDoc(leadOf("assistantRole"), leadMove("assistantRole", "TAKEN_OVER")));
+  await deniedBecause("assumido de volta para a fila", updateDoc(leadOf("a"), leadMove("a", "WAITING_TEAM")));
+  await allowed(updateDoc(leadOf("a"), leadMove("a", "CLOSED")));
+
+  // Retomada da Dara: so com registro na trilha no mesmo lote.
+  // Um lote so aceita referencias da mesma instancia: uma sessao para tudo.
+  const sessaoA = db("a");
+  const assumida = () => doc(sessaoA, paths.document("org-a", "conversations", "conv-assumida"));
+  const devolver = { escalated: false, escalationReason: null, status: "OPEN", attention: "NORMAL" };
+  const resumeAudit = (id, extra = {}) => [doc(sessaoA, paths.document("org-a", "auditLogs", id)), { id, organizationId: "org-a", actorType: "USER", actorId: "a", action: "UPDATE", resource: { type: "conversation", id: "conv-assumida" }, summary: "Automação retomada pelo profissional.", ...extra }];
+  await deniedBecause("retomada sem trilha", updateDoc(assumida(), devolver));
+  await deniedBecause("retomada apontando trilha inexistente", updateDoc(assumida(), { ...devolver, automationResumeAuditId: "nao-existe" }));
+  const semAutor = writeBatch(sessaoA);
+  semAutor.set(...resumeAudit("retomada-alheia", { actorId: "b" }));
+  semAutor.update(assumida(), { ...devolver, automationResumeAuditId: "retomada-alheia" });
+  lastTarget = assumida();
+  await deniedBecause("retomada com trilha de outra pessoa", semAutor.commit());
+  const outraConversa = writeBatch(sessaoA);
+  outraConversa.set(...resumeAudit("retomada-errada", { resource: { type: "conversation", id: "conv" } }));
+  outraConversa.update(assumida(), { ...devolver, automationResumeAuditId: "retomada-errada" });
+  lastTarget = assumida();
+  await deniedBecause("retomada com trilha de outra conversa", outraConversa.commit());
+  const retomada = writeBatch(sessaoA);
+  retomada.set(...resumeAudit("retomada-1"));
+  retomada.update(assumida(), { ...devolver, automationResumeAuditId: "retomada-1" });
+  await allowed(retomada.commit());
+  // Assumir de novo nao espera trilha: parar a automacao e sempre livre.
+  await allowed(updateDoc(assumida(), { escalated: true, escalationReason: "Conversa assumida pelo profissional.", humanTakeoverAt: new Date().toISOString(), humanTakeoverSource: "PANEL" }));
+  const reusada = writeBatch(sessaoA);
+  reusada.update(assumida(), { ...devolver, automationResumeAuditId: "retomada-1" });
+  lastTarget = assumida();
+  await deniedBecause("retomada reaproveitando trilha antiga", reusada.commit());
+
   // Cobertura por papel: lida do proprio arquivo de regras, para que uma colecao
   // nova entre na conta sem ninguem lembrar de acrescenta-la aqui.
   const COLLECTIONS = [...readFileSync("firestore.rules", "utf8").matchAll(/match \/(\w+)\/\{/g)]
@@ -834,6 +895,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 525);
+  assert.equal(checks, 556);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

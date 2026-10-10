@@ -55,6 +55,8 @@ export const SNAPSHOT_PAGE_SIZES = {
   automationTasks: 100,
   // Um documento por profissional conectado; o teto acompanha `professionals`.
   calendarBusyBlocks: 50,
+  // Fila de primeiro contato: os mais recentes primeiro.
+  leads: 200,
   auditLogs: 200,
 } as const;
 
@@ -252,6 +254,11 @@ export const snapshotQueries: Record<PagedPart, SnapshotQueryFactory> = {
       ]),
     ];
   },
+
+  leads: (db, organizationId, count, scope) =>
+    scopedTenantQueries(db, organizationId, "leads", "professionalId", scope, count, [
+      orderBy("lastContactAt", "desc"),
+    ]),
 
   aiDecisions: (db, organizationId, count, scope) =>
     scopedTenantQueries(db, organizationId, "aiDecisions", "professionalId", scope, count, [

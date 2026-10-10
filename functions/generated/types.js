@@ -14,6 +14,7 @@ export * from "./types-client.js";
 export * from "./types-common.js";
 export * from "./types-conversation.js";
 export * from "./types-finance.js";
+export * from "./types-lead.js";
 export * from "./types-notification.js";
 export * from "./types-notifications.js";
 export * from "./types-organization.js";

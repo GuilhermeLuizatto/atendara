@@ -171,6 +171,9 @@ export const CALLABLE_RATE_LIMITS = {
   // chamada: sem teto, uma sessao comprometida enche a trilha num laco. A
   // exportacao da organizacao inteira e rara e pesada; a de um cliente, pontual.
   exportClientData: { max: 10, windowSeconds: 600 },
+  // O pedido de quem escreveu sem cadastro (lead) tem o mesmo peso.
+  exportLeadData: { max: 10, windowSeconds: 600 },
+  eraseLeadData: { max: 10, windowSeconds: 600 },
   startOrganizationExport: { max: 3, windowSeconds: 600 },
   deleteOrganization: { max: 3, windowSeconds: 600 },
   // Autocadastro. A janela de uma hora e o numero baixo por origem seguram

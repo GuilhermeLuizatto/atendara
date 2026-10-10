@@ -11,6 +11,7 @@ export type NavIconName =
   | "calendar"
   | "users"
   | "messages"
+  | "leads"
   | "finance"
   | "agent"
   | "upload"
@@ -26,6 +27,7 @@ export type AppRoute =
   | "/agenda"
   | "/clientes"
   | "/mensagens"
+  | "/mensagens/primeiro-contato"
   | "/financeiro"
   | "/agente"
   | "/equipe"
@@ -76,6 +78,14 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Mensagens",
     permission: "conversation:read",
     description: "Central de atendimento",
+  },
+  {
+    // Dentro de mensagens: a guarda de rota e o modulo sao os da conversa.
+    href: "/mensagens/primeiro-contato",
+    icon: "leads",
+    label: "Primeiro contato",
+    permission: "lead:read",
+    description: "Contatos novos pelo WhatsApp",
   },
   {
     href: "/financeiro",

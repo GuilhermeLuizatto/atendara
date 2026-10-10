@@ -132,6 +132,7 @@ Colecoes sob `organizations/{organizationId}`:
 | `notificationDeliveries` | Fila de saida dos avisos ao cliente (escrita so pelo backend) |
 | `automationTasks` | Fila de automacao: cada execucao, com estado, tentativa e validade (so backend) |
 | `bookingRequests` | Oferta temporária de horários para agendamento pela conversa (só backend) |
+| `leads`         | Primeiro contato sem cadastro: telefone, fila, situação e consentimento (backend cria) |
 | `auditLogs`     | Trilha append-only                       |
 | `privacyRequests` | Registro dos pedidos de titulares atendidos |
 
@@ -744,6 +745,39 @@ do envio, o despachante relê mensagem, decisão, conversa, consentimento,
 remetente, configuração e horário de silêncio; uma entrada mais nova ou qualquer
 mudança de elegibilidade cancela a resposta. Horário de silêncio explícito é uma
 trava de envio, não um sinal de indisponibilidade.
+
+**Primeiro contato (leads).** Número sem cadastro na organização vira um
+lead DESTA organização, com id derivado de organização e telefone — a
+reentrega do webhook encontra o mesmo lead, e o mesmo número em outra clínica é
+outro lead. O lead guarda canal, telefone, dica, conversa (id aleatório, para
+que `aiDecisions.conversationId` não carregue telefone), profissional quando a
+organização tem um só ativo, fila, motivo, situação e consentimento — nunca
+nome nem texto. Nunca vira cliente sozinho; dois cadastros com o mesmo número
+não viram lead. A fila sai da classificação já feita (`src/config/leads.ts`):
+risco, urgência e assunto sensível vão para atendimento humano antes de
+qualquer intenção, e dúvida ou baixa confiança vencem a intenção
+administrativa. Financeiro operacional é `transactions` do tenant; nada do
+encaminhamento lê `platform*`. O alerta (`notifications`) diz fila e motivo,
+sem o que a pessoa escreveu.
+
+Mensagem inicial não é consentimento. Só a frase que nomeia o canal
+(`LEAD_WHATSAPP_CONSENT`) registra autorização, pela própria pessoa, por
+mensagem, na versão vigente do texto; versão anterior não autoriza. Com ela, a
+Dara responde ao lead só a resposta administrativa elegível, pelo mesmo portão
+da regra 11, cumprimentando sem nome; rotinas de agenda continuam exclusivas de
+cadastro. `SAIR` retira o consentimento e cancela na mesma transação o que
+esperava a vez na fila, de cliente ou de lead.
+
+**Tomada humana.** Resposta pelo WhatsApp Business (eco) ou pelo painel assume
+a conversa e para a Dara; o gatilho `cancelRepliesOnHumanTakeover` cancela a
+resposta pendente quando a equipe assume no painel, e o despachante confere o
+mesmo antes de enviar. Webhook nunca devolve a conversa: eco atrasado assume
+sem trocar o resumo, e mensagem atrasada não muda situação nem fila do lead.
+Devolver à Dara é a ação "Retomar automação", com entrada na trilha gravada no
+mesmo lote; as rules recusam `escalated` de true para false sem esse registro
+(`automationResumeOk`). Pedido de titular alcança o lead por
+`exportLeadData`/`eraseLeadData`, e a eliminação de um cliente leva junto o
+lead do mesmo telefone.
 
 **Tarefa.** Tipos `CONFIRM_APPOINTMENT` e `SEND_REMINDER` (externos) e
 `SEND_CONVERSATION_REPLY` (externo), além de `PROCESS_INBOUND_MESSAGE`,

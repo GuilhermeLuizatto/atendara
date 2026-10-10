@@ -31,7 +31,7 @@ export const PILOT_OPEN_MODULES: readonly AppModule[] = ["equipe", "importacao",
  * novo que nao entre em nenhuma das duas derruba a suite, em vez de sumir.
  */
 const PERMISSION_MODULE: Partial<Record<string, AppModule>> = {
-  appointment: "agenda", service: "agenda", client: "clientes", conversation: "mensagens", transaction: "financeiro",
+  appointment: "agenda", service: "agenda", client: "clientes", conversation: "mensagens", lead: "mensagens", transaction: "financeiro",
   rule: "agente", aiDecision: "agente", notification: "dashboard", organization: "dashboard",
   notificationSettings: "configuracoes", agendaSettings: "dashboard", auditLog: "configuracoes",
   // Registrado na ficha do cadastro, pela mesma tela que cria e edita o

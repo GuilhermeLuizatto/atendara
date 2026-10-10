@@ -11,4 +11,6 @@ export const NOTIFICATION_TYPES = [
     "RULE_CHANGED",
     // Cobrador (C2): o cliente mandou comprovante pelo link.
     "PAYMENT_PROOF_RECEIVED",
+    // Primeiro contato pelo WhatsApp de quem nao tem cadastro.
+    "NEW_LEAD",
 ];

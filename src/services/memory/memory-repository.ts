@@ -33,6 +33,7 @@ import { DEPOSIT_DESCRIPTION_PREFIX, type DepositChoice } from "@/config/deposit
 import { TRAVEL_DESCRIPTION_PREFIX } from "@/config/home-visit";
 import { validateHomeVisit } from "@/lib/agenda/home-visit";
 import { decisionInputPreview } from "@/lib/privacy/decision-preview";
+import { canTeamMoveLead } from "@/lib/leads/lifecycle";
 import { buildMockDataset } from "@/mocks";
 import {
   dispatchDelivery,
@@ -60,6 +61,8 @@ import type {
   Conversation,
   ID,
   ISODateString,
+  Lead,
+  LeadStatus,
   Message,
   Notification,
   NotificationDelivery,
@@ -91,6 +94,7 @@ import {
   type WorkspaceSnapshot,
 } from "../types";
 import {
+  actorCan,
   assertAllProfessionalScope,
   assertAnyProfessionalScope,
   assertClientProfessionalAssignment,
@@ -1889,17 +1893,148 @@ export class MemoryWorkspaceRepository implements WorkspaceRepository {
     >,
   ): Promise<void> {
     this.assertPermission("conversation:reply");
-    this.requireConversation(id);
+    const current = this.requireConversation(id);
+    // Mesma trava do plano do Firestore: devolver à Dara tem porta própria.
+    if (current.escalated && patch.escalated === false) {
+      throw new RepositoryError(
+        "Para devolver a conversa à assistente, use Retomar automação.",
+      );
+    }
     const now = this.now();
+    const takingOver = patch.escalated === true && !current.escalated;
+    const lead = takingOver && current.leadId ? this.leadOf(current.leadId) : null;
+    const moveLead =
+      lead &&
+      actorCan(this.actor, "lead:manage") &&
+      canTeamMoveLead(lead.status, "TAKEN_OVER");
 
     this.commit({
       ...this.snapshot,
       conversations: this.snapshot.conversations.map((conversation) =>
         conversation.id === id
-          ? { ...conversation, ...patch, updatedAt: now }
+          ? {
+              ...conversation,
+              ...patch,
+              ...(takingOver
+                ? { humanTakeoverAt: now, humanTakeoverSource: "PANEL" as const }
+                : {}),
+              updatedAt: now,
+            }
           : conversation,
       ),
+      ...(moveLead ? this.withLeadStatus(lead, "TAKEN_OVER", now) : {}),
     });
+  }
+
+  async resumeConversationAutomation(conversationId: ID): Promise<void> {
+    this.assertPermission("conversation:reply");
+    const conversation = this.requireConversation(conversationId);
+    if (!conversation.escalated) {
+      throw new RepositoryError("A conversa já está com a assistente.");
+    }
+    const now = this.now();
+    const entry = this.audit(
+      {
+        action: "UPDATE",
+        actorType: "USER",
+        resource: { type: "conversation", id: conversationId },
+        summary: "Automação retomada pelo profissional.",
+      },
+      now,
+    );
+    this.commit({
+      ...this.snapshot,
+      conversations: this.snapshot.conversations.map((item) =>
+        item.id === conversationId
+          ? {
+              ...item,
+              escalated: false,
+              escalationReason: null,
+              attention: "NORMAL",
+              status: "OPEN",
+              unreadCount: 0,
+              automationResumeAuditId: entry.id,
+              updatedAt: now,
+            }
+          : item,
+      ),
+      auditLogs: [entry, ...this.snapshot.auditLogs],
+    });
+  }
+
+  async updateLeadStatus(
+    leadId: ID,
+    status: Extract<LeadStatus, "TAKEN_OVER" | "CLOSED">,
+  ): Promise<void> {
+    this.assertPermission("lead:manage");
+    const lead = this.leadOf(leadId);
+    if (!lead) throw new RepositoryError("Contato não encontrado.");
+    if (!canTeamMoveLead(lead.status, status)) {
+      throw new RepositoryError("Esta mudança de situação não é permitida.");
+    }
+    const now = this.now();
+    const changes = this.withLeadStatus(lead, status, now);
+    this.commit({
+      ...this.snapshot,
+      ...changes,
+      // Assumir o lead é assumir a conversa: a Dara para na hora.
+      conversations:
+        status === "TAKEN_OVER"
+          ? this.snapshot.conversations.map((item) =>
+              item.id === lead.conversationId && !item.escalated
+                ? {
+                    ...item,
+                    escalated: true,
+                    escalationReason: "Conversa assumida pelo profissional.",
+                    status: "WAITING_PROFESSIONAL",
+                    humanTakeoverAt: now,
+                    humanTakeoverSource: "PANEL",
+                    updatedAt: now,
+                  }
+                : item,
+            )
+          : this.snapshot.conversations,
+    });
+  }
+
+  private leadOf(id: ID): Lead | null {
+    return (this.snapshot.leads ?? []).find((item) => item.id === id) ?? null;
+  }
+
+  private withLeadStatus(
+    lead: Lead,
+    status: LeadStatus,
+    now: ISODateString,
+  ): Pick<WorkspaceSnapshot, "leads" | "auditLogs"> {
+    return {
+      leads: (this.snapshot.leads ?? []).map((item) =>
+        item.id === lead.id
+          ? {
+              ...item,
+              status,
+              statusChangedAt: now,
+              updatedAt: now,
+              updatedBy: this.actor.userId,
+            }
+          : item,
+      ),
+      auditLogs: [
+        this.audit(
+          {
+            action: "UPDATE",
+            actorType: "USER",
+            resource: { type: "lead", id: lead.id },
+            summary:
+              status === "TAKEN_OVER"
+                ? "Contato sem cadastro assumido pela equipe."
+                : "Contato sem cadastro encerrado pela equipe.",
+            metadata: { from: lead.status, to: status },
+          },
+          now,
+        ),
+        ...this.snapshot.auditLogs,
+      ],
+    };
   }
 
   // ------------------------------------------------ avisos ao cliente

@@ -98,6 +98,8 @@ export interface AutomationTask extends TenantScopedEntity {
   /** Inicio do atendimento quando a tarefa foi planejada. Remarcar cancela. */
   appointmentStartsAt: ISODateString | null;
   clientId: ID | null;
+  /** Resposta a um lead (sem cadastro). Exclusivo com `clientId`. */
+  leadId?: ID | null;
   professionalId: ID | null;
   /** Aviso: o registro em `notificationDeliveries`, com o mesmo id. */
   deliveryId: ID | null;

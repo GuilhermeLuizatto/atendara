@@ -101,6 +101,9 @@ export const TENANT_COLLECTIONS = {
     messagingSenders: "messagingSenders",
     // Resultado da validacao do Embedded Signup; nunca guarda credencial.
     whatsappConnections: "whatsappConnections",
+    // Primeiro contato de quem nao tem cadastro (lead). Criado so pelo backend,
+    // no webhook; a equipe so muda a situacao. Nao vira cliente sozinho.
+    leads: "leads",
     auditLogs: "auditLogs",
     // Registro de cada pedido de titular de dados atendido pela organizacao.
     // Escrito so pelo backend, junto da exportacao ou da eliminacao.

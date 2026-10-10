@@ -238,4 +238,5 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   AUTOMATION_FAILURE: "Falha de automação",
   RULE_CHANGED: "Regra alterada",
   PAYMENT_PROOF_RECEIVED: "Comprovante recebido",
+  NEW_LEAD: "Novo contato",
 };

@@ -1,6 +1,8 @@
 import {
   ASSISTANT_NAME,
   CONVERSATION_REPLY_TEXTS,
+  REPLY_INTRODUCTION,
+  REPLY_INTRODUCTION_WITHOUT_NAME,
   REPLY_MAX_BODY_LENGTH,
   REPLY_VARIABLES,
   type ReplyVariable,
@@ -60,7 +62,14 @@ export function renderReply(
   stage: ReplyStage,
   context: ReplyContext,
 ): Result<string, TemplateRejection> {
-  const paragraphs = CONVERSATION_REPLY_TEXTS[event][stage];
+  // Sem nome (lead), a apresentação perde só o vocativo; o resto do texto e
+  // as barreiras de conteúdo continuam as mesmas.
+  const named = context.clientName.trim().length > 0;
+  const paragraphs = CONVERSATION_REPLY_TEXTS[event][stage].map((paragraph) =>
+    named
+      ? paragraph
+      : paragraph.replace(REPLY_INTRODUCTION, REPLY_INTRODUCTION_WITHOUT_NAME),
+  );
   if (paragraphs.length === 0) return err("EMPTY");
   if (paragraphs.some(hasForbiddenTerm)) return err("FORBIDDEN_TERM");
 

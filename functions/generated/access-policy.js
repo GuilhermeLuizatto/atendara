@@ -27,7 +27,7 @@ export const PILOT_OPEN_MODULES = ["equipe", "importacao", "suporte"];
  * novo que nao entre em nenhuma das duas derruba a suite, em vez de sumir.
  */
 const PERMISSION_MODULE = {
-    appointment: "agenda", service: "agenda", client: "clientes", conversation: "mensagens", transaction: "financeiro",
+    appointment: "agenda", service: "agenda", client: "clientes", conversation: "mensagens", lead: "mensagens", transaction: "financeiro",
     rule: "agente", aiDecision: "agente", notification: "dashboard", organization: "dashboard",
     notificationSettings: "configuracoes", agendaSettings: "dashboard", auditLog: "configuracoes",
     // Registrado na ficha do cadastro, pela mesma tela que cria e edita o

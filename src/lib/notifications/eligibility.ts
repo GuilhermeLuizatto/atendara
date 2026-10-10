@@ -147,11 +147,28 @@ function deny(
   return { eligible: false, reason };
 }
 
+/**
+ * Quem recebe uma resposta: o cadastro, ou o lead com consentimento vigente
+ * (`leadRecipient`). O portão só lê estes campos.
+ */
+export type ReplyRecipient = Pick<
+  Client,
+  | "id"
+  | "fullName"
+  | "preferredName"
+  | "email"
+  | "phone"
+  | "appointmentNotificationsEnabled"
+  | "notificationConsent"
+>;
+
 /** As travas que valem no planejamento e de novo no envio. */
 function gateProblem(
   rule: NotificationRule,
   event: AppointmentNotificationEvent,
-  input: Pick<EligibilityInput, "organization" | "profession" | "client" | "sender">,
+  input: Pick<EligibilityInput, "organization" | "profession" | "sender"> & {
+    client: ReplyRecipient;
+  },
 ): NotificationSkipReason | null {
   const settings = input.organization.settings.notifications;
 
@@ -241,8 +258,11 @@ export function consentProblemFor(
 export interface ConversationReplyInput {
   organization: Organization;
   profession: ProfessionConfig;
-  /** `null` quando o numero nao corresponde a um unico cadastro. */
-  client: Client | null;
+  /**
+   * `null` quando o numero nao corresponde a um unico cadastro nem a um lead
+   * com consentimento vigente.
+   */
+  client: ReplyRecipient | null;
   sender?: MessagingSender | null;
   event: ConversationReplyEvent;
   stage: ReplyStage;

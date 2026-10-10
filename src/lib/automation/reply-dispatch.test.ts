@@ -12,6 +12,8 @@ import {
 } from "@/lib/notifications/fixtures";
 import type { Conversation, MessagingSender, NotificationRule } from "@/types";
 
+import { grantLeadConsent, leadRecipient, withdrawLeadConsent } from "@/lib/leads/lifecycle";
+
 import { planConversationReply } from "./conversation-replies";
 import {
   decideReplyDispatch,
@@ -494,5 +496,108 @@ describe("o que mudou entre planejar e enviar para a resposta", () => {
       }),
     );
     expect(parouPor(passo)).toBe("SOURCE_MESSAGE_CHANGED");
+  });
+});
+
+describe("resposta a quem escreveu sem cadastro (lead)", () => {
+  const LEAD = {
+    id: "lead-0123456789abcdef0123456789abcdef",
+    phone: FICTITIOUS.phone,
+    notificationConsent: grantLeadConsent(null, ANCHOR),
+  };
+  const ORIGEM = {
+    sourceMessage: {
+      id: "wa-wamid.lead",
+      sentAt: ANCHOR,
+      aiDecisionId: "wa-wamid.lead-decision",
+    },
+    sourceDecision: {
+      id: "wa-wamid.lead-decision",
+      messageId: "wa-wamid.lead",
+      classification: "ADMINISTRATIVE" as const,
+      confidence: 0.96,
+      action: "AUTO_RESPONSE" as const,
+      responseText: "O valor do atendimento é R$ 180,00.",
+    },
+  };
+
+  function planejadoParaLead() {
+    const plano = planConversationReply({
+      organization: ORGANIZACAO,
+      profession: getProfession(ORGANIZACAO.primaryProfession),
+      client: leadRecipient(LEAD),
+      leadId: LEAD.id,
+      sender: REMETENTE,
+      event: "ADMINISTRATIVE_REPLY",
+      stage: "REQUEST",
+      channel: "WHATSAPP",
+      conversation: CONVERSA,
+      now: ANCHOR,
+      responseText: "O valor do atendimento é R$ 180,00.",
+      inboundMessageId: "wa-wamid.lead",
+      appointment: null,
+      professionalId: "profissional-1",
+      sourceDecisionId: "wa-wamid.lead-decision",
+    });
+    if (plano.kind !== "PLANNED") throw new Error(plano.reason);
+    return plano;
+  }
+
+  it("o registro aponta para o lead, sem cadastro inventado", () => {
+    const plano = planejadoParaLead();
+    expect(plano.task).toMatchObject({ clientId: null, leadId: LEAD.id });
+    expect(plano.delivery).toMatchObject({ clientId: null, leadId: LEAD.id });
+  });
+
+  it("com consentimento vigente, sai cumprimentando sem nome", () => {
+    const plano = planejadoParaLead();
+    const passo = decideReplyDispatch(
+      entrada(plano, {
+        appointment: null,
+        offer: null,
+        client: leadRecipient(LEAD),
+        ...ORIGEM,
+      }),
+    );
+    if (passo.kind !== "SEND") throw new Error(passo.kind);
+    expect(passo.request.body.startsWith("Olá! Aqui é a Dara")).toBe(true);
+    expect(passo.request.destination).toBe(FICTITIOUS.phone);
+  });
+
+  it("consentimento retirado depois de planejar para o envio", () => {
+    const plano = planejadoParaLead();
+    const retirado = {
+      ...LEAD,
+      notificationConsent: withdrawLeadConsent(LEAD.notificationConsent, ANCHOR),
+    };
+    expect(
+      parouPor(
+        decideReplyDispatch(
+          entrada(plano, {
+            appointment: null,
+            offer: null,
+            client: leadRecipient(retirado),
+            ...ORIGEM,
+          }),
+        ),
+      ),
+    ).toBe("MISSING_CONSENT");
+  });
+
+  it("resposta humana pelo painel antes do envio vence a resposta da Dara", () => {
+    const plano = planejadoParaLead();
+    expect(
+      parouPor(
+        decideReplyDispatch(
+          entrada(plano, {
+            appointment: null,
+            offer: null,
+            client: leadRecipient(LEAD),
+            conversation: { ...CONVERSA, escalated: true },
+            ...ORIGEM,
+          }),
+        ),
+      ),
+    ).toBe("CONVERSATION_WITH_HUMAN");
   });
 });

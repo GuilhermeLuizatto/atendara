@@ -14,6 +14,7 @@ import type {
   Client,
   Conversation,
   ID,
+  Lead,
   ISODateString,
   Membership,
   Message,
@@ -58,6 +59,7 @@ export interface SnapshotParts {
   notificationDeliveries: NotificationDelivery[];
   automationTasks: AutomationTask[];
   calendarBusyBlocks: CalendarBusySnapshot[];
+  leads: Lead[];
   auditLogs: AuditLog[];
 }
 
@@ -84,6 +86,7 @@ export function emptyParts(): SnapshotParts {
     notificationDeliveries: [],
     automationTasks: [],
     calendarBusyBlocks: [],
+    leads: [],
     auditLogs: [],
   };
 }
@@ -168,6 +171,7 @@ export function assembleSnapshot(
     notificationDeliveries: parts.notificationDeliveries,
     automationTasks: parts.automationTasks,
     calendarBusy: parts.calendarBusyBlocks,
+    leads: parts.leads,
     auditLogs: parts.auditLogs,
     membership: parts.membership,
     pagination,

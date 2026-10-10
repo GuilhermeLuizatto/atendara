@@ -5,6 +5,7 @@ import {
 import { applyAttempt, type AttemptResult } from "@/lib/notifications/delivery";
 import {
   evaluateConversationReply,
+  type ReplyRecipient,
   recheckBeforeSend,
 } from "@/lib/notifications/eligibility";
 import type { ReplyContext } from "@/lib/notifications/replies";
@@ -307,7 +308,9 @@ export interface ReplyOffer {
   holdEndsAt: ISODateString;
 }
 
-export interface ReplyDispatchInput extends DispatchInput {
+export interface ReplyDispatchInput extends Omit<DispatchInput, "client"> {
+  /** O cadastro, ou o lead como `leadRecipient` (`null` sem consentimento vigente). */
+  client: ReplyRecipient | null;
   /** Conversa atual da pessoa, lida na mesma transacao. */
   conversation: Pick<
     Conversation,
@@ -351,8 +354,15 @@ export function decideReplyDispatch(input: ReplyDispatchInput): DispatchStep {
   if (!event || !isConversationReplyEvent(event) || !task.replyStage) {
     return cancel(task, delivery, "EVENT_WITHOUT_AUTOMATION", now);
   }
-  if (!client || client.id !== delivery.clientId)
-    return cancel(task, delivery, "CLIENT_NOT_FOUND", now);
+  // Lead sem consentimento vigente chega aqui como `null`: a resposta para.
+  const recipientId = delivery.leadId ?? delivery.clientId;
+  if (!client || client.id !== recipientId)
+    return cancel(
+      task,
+      delivery,
+      delivery.leadId ? "MISSING_CONSENT" : "CLIENT_NOT_FOUND",
+      now,
+    );
   // Sem conversa nao ha janela conhecida — e sem janela a Meta nao aceita texto.
   if (!input.conversation)
     return cancel(task, delivery, "REPLY_WINDOW_CLOSED", now);

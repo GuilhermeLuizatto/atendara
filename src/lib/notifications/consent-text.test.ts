@@ -73,7 +73,7 @@ describe("texto de consentimento dos avisos", () => {
       );
     }
     expect(NOTIFICATION_CONSENT_TEXT_VERSION).toBe(
-      "2026-10-09-dara-agenda-rascunho",
+      "2026-10-09-dara-leads-rascunho",
     );
   });
 

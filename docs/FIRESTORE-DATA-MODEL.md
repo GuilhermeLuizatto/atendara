@@ -42,6 +42,7 @@ organizations/{orgId}
 ├── notifications/{notificationId}       alertas DENTRO do painel
 ├── notificationDeliveries/{deliveryId}  fila de saida dos avisos ao cliente (so backend escreve)
 ├── automationTasks/{taskId}             fila de automacao (painel autorizado le; so backend escreve)
+├── leads/{leadId}                       primeiro contato sem cadastro (backend cria; equipe so muda a situacao)
 ├── auditLogs/{logId}                    append-only (so o backend pseudonimiza)
 └── privacyRequests/{requestId}          pedidos de titulares atendidos (so backend)
 
@@ -142,6 +143,7 @@ backend grava na fila e o que a tela le.
 | `notifications` | + `acknowledgedAt`                                         |
 | `notificationDeliveries` | + `scheduledFor`, `lastAttemptAt`, `nextAttemptAt`, `sentAt`, `cancelledAt` |
 | `automationTasks` | + `scheduledFor`, `expiresAt`, `appointmentStartsAt`, `dispatchingSince`, `completedAt` |
+| `leads`         | + `firstContactAt`, `lastContactAt`, `statusChangedAt`     |
 | `auditLogs`     | + `occurredAt`                                             |
 | `privacyRequests` | + `executedAt`, `expiresAt`                              |
 | `platformSupportTickets` | + `lastMessageAt`                                  |

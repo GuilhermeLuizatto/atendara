@@ -19,6 +19,7 @@ export default defineConfig({
       include: [
         "src/**/*.{ts,tsx}",
         "functions/**/*.js",
+        "scripts/build-project-dashboard.mjs",
       ],
       exclude: [
         "**/*.test.*",

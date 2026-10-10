@@ -92,10 +92,10 @@
       "id": "google-calendar",
       "title": "Google Calendar",
       "kind": "desenvolvimento",
-      "status": "a-verificar",
+      "status": "concluido",
       "priority": "baixa",
-      "summary": "Código integrado à main; validações reais do piloto ainda pendentes.",
-      "next": "Executar o roteiro controlado de agenda e reconexão antes do piloto.",
+      "summary": "Três frentes publicadas. Roteiro real e isolamento com contas de teste concluídos na rodada de validações de 28/09/2026; o escopo calendar.app.created é não confidencial e o Google não exige verificação adicional.",
+      "next": "Repetir a conexão com um segundo membro da mesma organização junto da validação de equipe e escopo por profissional.",
       "owner": "Equipe",
       "evidence": "docs/GOOGLE-CALENDAR.md",
       "confidence": "confirmado"

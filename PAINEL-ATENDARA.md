@@ -33,6 +33,7 @@
 ## Concluído recentemente
 
 - **10/10:** papéis de desenvolvimento, guia de orquestração e este painel integrados à `main` pelo [PR #92](https://github.com/GuilhermeLuizatto/atendara/pull/92).
+- **10/10:** Google Calendar corrigido no radar para concluído. A rodada de validações de 28/09 registrou o roteiro das três frentes e o isolamento com contas de teste; falta só repetir com um segundo membro da mesma organização, junto da validação de equipe.
 - **10/10:** desenho inicial do cobrador e da Dara fiscal preparado; o lembrete automático e a emissão fiscal não foram implementados.
 
 ## Registro de passagem

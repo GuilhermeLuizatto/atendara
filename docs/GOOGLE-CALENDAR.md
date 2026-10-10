@@ -30,9 +30,10 @@ isso uma queda produz um único alerta. O alerta leva à aba Google Calendar e �
 resolvido automaticamente quando a pessoa reconecta ou desconecta.
 
 Não há bloqueio rígido. A ocupação do Google ainda é um aviso, não uma reserva
-transacional usada pela remarcação autônoma. As frentes 1 e 2 foram ativadas em
-produção; o teste real de 24/09/2026 está registrado abaixo. A frente 3 está
-concluída no código e aguarda publicação e teste real.
+transacional usada pela remarcação autônoma. As três frentes estão em produção:
+as frentes 1 e 2 desde 24/09/2026, com o teste real registrado abaixo, e a
+frente 3 desde 25/09/2026. A rodada de validações de 28/09/2026 concluiu o
+roteiro real das três frentes e o isolamento com contas de teste.
 
 ## Configuração do ambiente de teste
 
@@ -43,9 +44,10 @@ concluída no código e aguarda publicação e teste real.
    "app não verificado" (segue-se em Avançado) e limita a 100 usuários.
 2. Criar um cliente OAuth do tipo aplicação Web. Cadastrar como URI de retorno
    a URL HTTPS exata da function `googleOAuthCallback` em `southamerica-east1`.
-   O escopo `calendar.app.created` é sensível: o app não verificado limita a
-   100 usuários e mostra o aviso de app não verificado. A verificação do app no
-   Google precisa acontecer antes do piloto aberto.
+   Na Google Auth Platform, `calendar.app.created` aparece entre os escopos não
+   confidenciais, e o Google informa que não é necessária verificação adicional
+   (conferido na rodada de 28/09/2026). Se o painel passar a pedir verificação,
+   o app não verificado volta a limitar 100 usuários e a mostrar o aviso.
 3. Nas variáveis das Functions (`functions/.env.<project-id>`), preencher
    `GOOGLE_OAUTH_CLIENT_ID`, `CALENDAR_REDIRECT_URL` e `CALENDAR_KMS_KEY`
    (nome completo da CryptoKey: `projects/.../locations/.../keyRings/.../cryptoKeys/...`).
@@ -95,8 +97,9 @@ concluída no código e aguarda publicação e teste real.
 
 O resultado automatizado com respostas fictícias não substitui este teste real.
 Segredos, conta OAuth e autorização do titular são requisitos de ativação, não
-evidência de que o teste já passou. O código da fase 3C está concluído; essas
-validações externas permanecem abertas.
+evidência de que o teste já passou. Esse roteiro foi concluído na rodada de
+28/09/2026. O passo 7 com outra pessoa da mesma organização ficou para a
+validação de equipe, porque a organização de teste tinha um único membro.
 
 ## Teste real de 24/09/2026
 
@@ -156,8 +159,8 @@ criado tanto pela leitura automática quanto pela escrita de eventos.
   não entram nesta leitura e não devem ser consideradas livres por omissão.
 - `calendarBusyCallback` responde 410 até existir um contrato correlacionado
   com uma tarefa de automação. Não ligar fluxos antigos de n8n a essa rota.
-- Antes do piloto aberto, concluir a verificação do escopo sensível
-  `calendar.app.created` no Google e repetir o roteiro real das três frentes.
+- Antes do piloto aberto, conferir na Google Auth Platform que
+  `calendar.app.created` continua entre os escopos não confidenciais.
 
 Referências: [OAuth Web Server](https://developers.google.com/identity/protocols/oauth2/web-server)
 e [consulta freeBusy](https://developers.google.com/workspace/calendar/api/v3/reference/freebusy/query).

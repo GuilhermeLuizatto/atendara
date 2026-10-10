@@ -48,7 +48,10 @@ serviceAccountKey.json
 firebase-admin-initial-access.txt
 admin-initial-access.txt
 .local/
-.claude/
+.claude/*
+!.claude/agents/
+.claude/agents/*
+!.claude/agents/*.md
 functions/node_modules/
 functions/lib/
 
@@ -80,4 +83,5 @@ next-env.d.ts
 !/docs/GOOGLE-CALENDAR.md
 !/docs/VALIDACOES-REAIS-PENDENTES.md
 !/docs/VALIDACOES-REAIS-PENDENTES.pdf
+!/docs/AGENTES-DESENVOLVIMENTO.md
 /scripts/render-report.mjs

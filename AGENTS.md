@@ -93,3 +93,30 @@ SaaS multiprofissional de gestao e automacao. Leia
 ```bash
 npm run verify   # lint + type-check + testes + build
 ```
+
+## Agentes de desenvolvimento
+
+Os papéis e o fluxo de orquestração estão em
+[docs/AGENTES-DESENVOLVIMENTO.md](docs/AGENTES-DESENVOLVIMENTO.md). Os arquivos
+em `.claude/agents/` descrevem esses papéis para ferramentas que os reconheçam.
+No Codex, o agente principal deve ler a descrição do papel e incluí-la na tarefa
+de um subagente quando houver delegação disponível; esses arquivos não acionam
+execução automática. Delegue somente trabalho delimitado, com arquivos sem
+conflito, e integre o resultado após revisão. Os agentes de desenvolvimento não
+são a Dara do produto.
+
+## Rotina compartilhada de trabalho
+
+Ao iniciar uma conversa sobre o Atendara, leia
+[PAINEL-ATENDARA.md](PAINEL-ATENDARA.md) antes de propor prioridades ou dizer
+que algo está concluído. Consulte o código, os testes e a documentação citada
+no painel para confirmar estados que possam ter mudado. O painel é o resumo
+compartilhado; chats antigos e documentos locais não substituem a verificação.
+Se houver divergência, corrija o painel com fonte e data, sem inventar status.
+
+"Bom dia, Atendara": apresente até três prioridades, o que foi concluído desde
+a última atualização, bloqueios e a primeira ação concreta. "Fechar o dia":
+atualize o painel com entregas verificadas, trabalho em andamento, bloqueios,
+responsável e próximo passo. Ao concluir qualquer tarefa que altere prioridades
+ou status, atualize o painel no mesmo trabalho. Não inclua segredos, dados de
+clientes nem detalhes privados; registre apenas o necessário para a equipe.

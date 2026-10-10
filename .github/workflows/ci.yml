@@ -51,6 +51,9 @@ jobs:
       - name: Varredura de segredos
         run: npm run scan:secrets
 
+      - name: Conferir radar do projeto
+        run: node scripts/build-project-dashboard.mjs --check
+
       - name: Lint
         run: npm run lint
 

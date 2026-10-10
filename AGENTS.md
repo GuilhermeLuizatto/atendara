@@ -113,6 +113,11 @@ que algo está concluído. Consulte o código, os testes e a documentação cita
 no painel para confirmar estados que possam ter mudado. O painel é o resumo
 compartilhado; chats antigos e documentos locais não substituem a verificação.
 Se houver divergência, corrija o painel com fonte e data, sem inventar status.
+O dashboard visual usa [project-dashboard/status.json](project-dashboard/status.json).
+Quando uma frente mudar de estado, atualize o painel e o JSON no mesmo trabalho,
+gere novamente o HTML com `node scripts/build-project-dashboard.mjs` e confira
+com `node scripts/build-project-dashboard.mjs --check`. Merge, publicação e
+validação real são estados diferentes; não marque conclusão só pelo merge.
 
 "Bom dia, Atendara": apresente até três prioridades, o que foi concluído desde
 a última atualização, bloqueios e a primeira ação concreta. "Fechar o dia":

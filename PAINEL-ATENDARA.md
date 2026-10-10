@@ -2,6 +2,8 @@
 
 **Atualizado em:** 10/10/2026. Este é o resumo compartilhado para a equipe e para novos chats de desenvolvimento. O estado abaixo é uma fotografia inicial; confirme código, testes, PRs e produção antes de mudar um item para **concluído**.
 
+**Visão rápida:** [Radar visual do projeto](project-dashboard/atendara-dashboard.html). Ele consulta `project-dashboard/status.json` na `main`; se não conseguir, indica que mostra uma cópia local. O arquivo JSON e este painel devem ser atualizados no mesmo PR sempre que a situação de uma frente mudar.
+
 ## Como usar
 
 - Abra uma tarefa no projeto Atendara e diga **“Bom dia, Atendara”** para receber até três prioridades, bloqueios e uma primeira ação. As instruções de `AGENTS.md` fazem o agente ler este painel.
@@ -12,12 +14,13 @@
 
 ## Próximas frentes
 
-| Frente                                       | Estado em 10/10                                      | Responsável | Próximo passo e evidência esperada                                                                                                                                                                                                            |
-| -------------------------------------------- | ---------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Revisão de segurança de arquivos e trilhas   | Correções locais em andamento; revisão ainda aberta  | A definir   | Integrar e testar as correções de acesso. Avaliar migração da criação de `auditLogs` e `aiDecisions` para operações de backend e tratar links antigos antes de declarar o bloco fechado. Registrar PR, testes e decisão de publicação.        |
-| Validações reais do piloto                   | Pendentes                                            | A definir   | Escolher um fluxo do roteiro em `docs/VALIDACOES-REAIS-PENDENTES.md`, executar com dados fictícios e registrar evidência real. Não confundir testes automatizados com validação de produção.                                                  |
-| Cobrador automático do cliente               | Proposta; lembrete automático ainda não implementado | A definir   | Decidir escopo mínimo e consentimento específico de cobrança. Implementar somente após critérios de aceite e revisão das travas de envio. O desenho inicial está em `COBRADOR-DARA-RECEITA-SAUDE.md` enquanto esse arquivo não for integrado. |
-| Guia e papéis dos agentes de desenvolvimento | PR de revisão aberto; ainda fora da `main`           | A definir   | Revisar e integrar `docs/AGENTES-DESENVOLVIMENTO.md` e `.claude/agents/` para disponibilizar à equipe.                                                                                                                                        |
+| Frente                                       | Estado em 10/10                                       | Responsável | Próximo passo e evidência esperada                                                                                                                                                                                                            |
+| -------------------------------------------- | ----------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Revisão de segurança de arquivos e trilhas   | Correções locais em andamento; revisão ainda aberta   | A definir   | Integrar e testar as correções de acesso. Avaliar migração da criação de `auditLogs` e `aiDecisions` para operações de backend e tratar links antigos antes de declarar o bloco fechado. Registrar PR, testes e decisão de publicação.        |
+| Validações reais do piloto                   | Pendentes                                             | A definir   | Escolher um fluxo do roteiro em `docs/VALIDACOES-REAIS-PENDENTES.md`, executar com dados fictícios e registrar evidência real. Não confundir testes automatizados com validação de produção.                                                  |
+| Dara: leads e escalonamento humano           | Código integrado à `main`; validação real a confirmar | A definir   | Conferir recebimento, consentimento, encaminhamento e tomada humana em teste controlado. O merge do PR #89 não substitui essa validação.                                                                                                      |
+| Cobrador automático do cliente               | Proposta; lembrete automático ainda não implementado  | A definir   | Decidir escopo mínimo e consentimento específico de cobrança. Implementar somente após critérios de aceite e revisão das travas de envio. O desenho inicial está em `COBRADOR-DARA-RECEITA-SAUDE.md` enquanto esse arquivo não for integrado. |
+| Guia e papéis dos agentes de desenvolvimento | PR de revisão aberto; ainda fora da `main`            | A definir   | Revisar e integrar `docs/AGENTES-DESENVOLVIMENTO.md` e `.claude/agents/` para disponibilizar à equipe.                                                                                                                                        |
 
 ## Dependências externas
 

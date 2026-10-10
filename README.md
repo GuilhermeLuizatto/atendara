@@ -29,6 +29,7 @@ Isso não representa integrações de WhatsApp, n8n ou IA externa em produção.
 | O que avaliar | Onde começar |
 | --- | --- |
 | Prioridades, responsáveis e próximo passo da equipe | [Painel de trabalho](PAINEL-ATENDARA.md) |
+| Acompanhamento visual de bugs, testes e entregas | [Radar do projeto](project-dashboard/atendara-dashboard.html) |
 | Rotina de colaboração com agentes | [Guia dos agentes](docs/AGENTES-DESENVOLVIMENTO.md) |
 | Decisões e limites da arquitetura | [Arquitetura](docs/ARCHITECTURE.md) |
 | Estrutura dos dados e consultas | [Modelo do Firestore](docs/FIRESTORE-DATA-MODEL.md) |

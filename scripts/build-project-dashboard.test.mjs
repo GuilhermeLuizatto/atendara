@@ -22,7 +22,7 @@ describe("geração segura do radar", () => {
         ...state,
         items: [{ ...item, title: "</script><script>alert(1)</script>" }],
       },
-      '<script type="application/json">__STATUS_JSON__</script>',
+      "<script>const fallback = __STATUS_JSON__;</script>",
     );
     expect(html).toContain("\\u003c/script>");
     expect(html).not.toContain("</script><script>");

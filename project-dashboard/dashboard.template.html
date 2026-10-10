@@ -559,17 +559,12 @@
         verificar” até nova evidência.
       </p>
     </main>
-    <script id="snapshot" type="application/json">
-      __STATUS_JSON__
-    </script>
     <script>
       (() => {
+        const fallback = __STATUS_JSON__;
         const repository = "GuilhermeLuizatto/atendara";
         const dataUrl = `https://raw.githubusercontent.com/${repository}/main/project-dashboard/status.json`;
         const apiUrl = `https://api.github.com/repos/${repository}`;
-        const fallback = JSON.parse(
-          document.getElementById("snapshot").textContent,
-        );
         let state = fallback;
         let kind = "todos";
         const labels = {

@@ -141,6 +141,9 @@ export default function LandingPage() {
             <Link href="/privacidade" className="underline underline-offset-2">
               Política de Privacidade
             </Link>
+            <Link href="/contrato" className="underline underline-offset-2">
+              Contrato de Licença
+            </Link>
           </p>
         </footer>
       </main>

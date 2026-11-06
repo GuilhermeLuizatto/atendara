@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { LegalPage } from "@/components/layout/legal-page";
 import { AI_ASSISTANT_NAME, APP_NAME } from "@/config/app";
-import { CONTACT_EMAIL, OPERATOR_LEGAL_NAME } from "@/config/legal";
+import { CONTACT_EMAIL, OPERATOR_LEGAL_NAME, SUBPROCESSORS, SUBPROCESSOR_LOCATION_LABEL } from "@/config/legal";
 
 export const metadata: Metadata = {
   title: "Política de Privacidade",
@@ -82,10 +82,12 @@ export default function PrivacidadePage() {
       <section className="space-y-3">
         <h2>4. Com quem compartilhamos</h2>
         <ul>
-          <li>
-            <strong>Google Cloud e Firebase</strong> — hospedagem, banco de dados,
-            autenticação e funções. O banco e as funções ficam em São Paulo.
-          </li>
+          {SUBPROCESSORS.map((item) => (
+            <li key={item.id}>
+              <strong>{item.name}</strong> — {item.purpose} Local:{" "}
+              {SUBPROCESSOR_LOCATION_LABEL[item.location]}. {item.locationNote}
+            </li>
+          ))}
           <li>
             <strong>ViaCEP</strong> — busca do endereço pelo CEP na tela do
             emissor dos recibos, quando a pessoa digita um CEP completo. Só o CEP

@@ -15,12 +15,17 @@ export function LegalPage({
   intro,
   otherHref,
   otherLabel,
+  version = LEGAL_VERSION,
+  updatedAt = LEGAL_UPDATED_AT,
   children,
 }: {
   title: string;
   intro: string;
-  otherHref: "/termos" | "/privacidade";
+  otherHref: "/termos" | "/privacidade" | "/contrato";
   otherLabel: string;
+  /** O contrato tem versao propria: quem aceita e o que se aceita sao outros. */
+  version?: string;
+  updatedAt?: string;
   children: ReactNode;
 }) {
   return (
@@ -43,8 +48,8 @@ export function LegalPage({
         <p className="bg-warning-soft text-warning-soft-foreground mt-6 rounded-lg px-4 py-3 text-sm">
           <strong className="font-semibold">Versão preliminar.</strong> Este texto
           foi escrito a partir do que o sistema faz hoje e ainda não passou por
-          revisão de advogado. Ele descreve um piloto fechado, gratuito e por
-          convite. Quando a revisão acontecer, o texto e a versão mudam.
+          revisão de advogado. Ele descreve a fase inicial, sem cobrança real pela
+          plataforma. Quando a revisão acontecer, o texto e a versão mudam.
         </p>
 
         <div className="mt-8 space-y-8 text-sm leading-relaxed [&_h2]:text-foreground [&_h2]:text-base [&_h2]:font-semibold [&_h2]:tracking-tight [&_li]:text-muted-foreground [&_p]:text-muted-foreground [&_strong]:text-foreground [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5">
@@ -52,7 +57,7 @@ export function LegalPage({
         </div>
 
         <footer className="border-border text-muted-foreground mt-12 border-t pt-6 text-xs">
-          Versão {LEGAL_VERSION} · atualizada em {LEGAL_UPDATED_AT}.
+          Versão {version} · atualizada em {updatedAt}.
         </footer>
       </main>
     </div>

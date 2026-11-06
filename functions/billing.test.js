@@ -168,9 +168,23 @@ const account = () => store.get(paths.account(USER));
 const subscription = () => store.get(paths.platformSubscription(ORG));
 const invoice = (id) => store.get(paths.platformInvoice(id));
 
+/**
+ * O relogio fica no meio do primeiro periodo dos eventos de exemplo. Os
+ * periodos sao datas fixas, e o backend compara com `Date.now()`: com o relogio
+ * real, o teste A.6 passou a falhar quando o calendario cruzou PERIODO_1_FIM.
+ * So `Date` e falso; os temporizadores continuam reais.
+ */
+const RELOGIO = "2026-09-15T12:00:00.000Z";
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(RELOGIO));
   store.clear();
   seedAccount();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("Vinculo entre assinante, organizacao e assinatura", () => {
@@ -637,10 +651,11 @@ describe("Codificacao do formulario enviado ao gateway", () => {
   });
 });
 
-// Datas relativas ao relogio: o portao compara a validade com o agora, e datas
-// fixas fariam estes testes mudarem de sentido com o passar dos meses.
+// Datas relativas ao relogio fixado: o portao compara a validade com o agora.
+// Partem de RELOGIO, e nao de `Date.now()`, porque `grantUntil` e calculado na
+// coleta do `describe`, antes do `beforeEach` fixar o relogio.
 const DAY = 86_400_000;
-const relative = (days) => new Date(Date.now() + days * DAY).toISOString();
+const relative = (days) => new Date(Date.parse(RELOGIO) + days * DAY).toISOString();
 /** Como o webhook grava: segundos do gateway, sem milissegundos. */
 const asGateway = (iso, extraDays = 0) =>
   new Date(Math.floor(Date.parse(iso) / 1000) * 1000 + extraDays * DAY).toISOString();

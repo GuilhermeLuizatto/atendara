@@ -16,7 +16,7 @@
 
 | Frente                                       | Estado em 10/10                                       | Responsável | Próximo passo e evidência esperada                                                                                                                                                                                                     |
 | -------------------------------------------- | ----------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Revisão de segurança de arquivos e trilhas   | Correções locais em andamento; revisão ainda aberta   | A definir   | Integrar e testar as correções de acesso. Avaliar migração da criação de `auditLogs` e `aiDecisions` para operações de backend e tratar links antigos antes de declarar o bloco fechado. Registrar PR, testes e decisão de publicação. |
+| Revisão de segurança de arquivos e trilhas   | Correções locais em andamento; revisão ainda aberta   | A definir   | **Em 06/11:** 16 arquivos alterados só na cópia local do titular, sem branch nem PR. Isso bloqueia a E3 dos termos, que mexe em `firestore.rules`, `functions/index.js` e `scripts/test-firestore-rules.mjs`. Integrar e testar as correções de acesso. Avaliar migração da criação de `auditLogs` e `aiDecisions` para operações de backend e tratar links antigos antes de declarar o bloco fechado. Registrar PR, testes e decisão de publicação. |
 | Validações reais do piloto                   | Pendentes                                             | A definir   | Escolher um fluxo controlado, executar com dados fictícios e registrar evidência real. Não confundir testes automatizados com validação de produção.                                                                                   |
 | Dara: leads e escalonamento humano           | Código integrado à `main`; validação real a confirmar | A definir   | Conferir recebimento, consentimento, encaminhamento e tomada humana em teste controlado. O merge do PR #89 não substitui essa validação.                                                                                               |
 | Cobrador automático do cliente               | Proposta; lembrete automático ainda não implementado  | A definir   | Decidir escopo mínimo e consentimento específico de cobrança. Implementar somente após critérios de aceite e revisão das travas de envio.                                                                                              |
@@ -41,6 +41,15 @@
 - **10/10:** papéis de desenvolvimento, guia de orquestração e este painel integrados à `main` pelo [PR #92](https://github.com/GuilhermeLuizatto/atendara/pull/92).
 - **10/10:** Google Calendar corrigido no radar para concluído. A rodada de validações de 28/09 registrou o roteiro das três frentes e o isolamento com contas de teste; falta só repetir com um segundo membro da mesma organização, junto da validação de equipe.
 - **10/10:** desenho inicial do cobrador e da Dara fiscal preparado; o lembrete automático e a emissão fiscal não foram implementados.
+
+## Fechamento de 06/11
+
+- **Entregue e verificado:** PRs #106, #105, #108 e #104 mergeados, com CI e Deploy da `main` aprovados (último: `601f326`). Termos e `/contrato` no ar na versão `2026-11-06-preliminar`, conferida na página.
+- **Em andamento:** revisão de segurança, só na cópia local, sem branch; este painel no PR #109, com CI aprovado e aguardando merge.
+- **Bloqueios:** a E3 dos termos espera a revisão de segurança ganhar branch e PR. O texto jurídico espera advogado. A região do Cloud Storage precisa ser conferida no console.
+- **Responsável:** titular para merge, publicação, contador e advogado. A revisão de segurança ainda está sem responsável.
+- **Próximo passo:** mergear o #109; criar branch e PR da revisão de segurança; depois disso, E3 (registro do aceite em `platformContractAcceptances`).
+- **A conferir:** publicação das Functions de 06/11 por `functions:list` e um autocadastro de teste em produção com a versão nova dos Termos.
 
 ## Registro de passagem
 

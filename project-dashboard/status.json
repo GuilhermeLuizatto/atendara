@@ -10,8 +10,8 @@
       "kind": "bug",
       "status": "em-andamento",
       "priority": "alta",
-      "summary": "Correções locais em andamento; a revisão de segurança ainda está aberta.",
-      "next": "Integrar e testar acesso a arquivos, auditLogs, aiDecisions e links antigos.",
+      "summary": "Correções em 16 arquivos só na cópia local do titular, sem branch nem PR (06/11); a revisão ainda está aberta.",
+      "next": "Criar branch e PR das correções; isso também libera a E3 dos termos, que mexe nos mesmos arquivos.",
       "owner": "A definir",
       "evidence": "PAINEL-ATENDARA.md",
       "confidence": "confirmado"

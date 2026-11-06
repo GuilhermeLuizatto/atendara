@@ -1,6 +1,6 @@
 # Painel de trabalho do Atendara
 
-**Atualizado em:** 10/10/2026. Este é o resumo compartilhado para a equipe e para novos chats de desenvolvimento. O estado abaixo é uma fotografia inicial; confirme código, testes, PRs e produção antes de mudar um item para **concluído**.
+**Atualizado em:** 06/11/2026 (termos e contrato no ar; CI destravado). Este é o resumo compartilhado para a equipe e para novos chats de desenvolvimento. O estado abaixo é uma fotografia inicial; confirme código, testes, PRs e produção antes de mudar um item para **concluído**.
 
 **Visão rápida:** [Radar do projeto](project-dashboard/README.md) e [dashboard HTML](project-dashboard/atendara-dashboard.html). O HTML inclui uma cópia do estado e tenta consultar `project-dashboard/status.json` na `main`; se não conseguir, indica que mostra a cópia incluída. O JSON e este painel devem ser atualizados no mesmo PR sempre que a situação de uma frente mudar.
 
@@ -21,6 +21,10 @@
 | Dara: leads e escalonamento humano           | Código integrado à `main`; validação real a confirmar | A definir   | Conferir recebimento, consentimento, encaminhamento e tomada humana em teste controlado. O merge do PR #89 não substitui essa validação.                                                                                               |
 | Cobrador automático do cliente               | Proposta; lembrete automático ainda não implementado  | A definir   | Decidir escopo mínimo e consentimento específico de cobrança. Implementar somente após critérios de aceite e revisão das travas de envio.                                                                                              |
 | Guia e papéis dos agentes de desenvolvimento | Integrados à `main` pelo PR #92                       | Equipe      | Usar `docs/AGENTES-DESENVOLVIMENTO.md` e `.claude/agents/` nas próximas frentes; revisar a rotina conforme o uso.                                                                                                                      |
+| Termos, contrato de licença e anexo LGPD     | E1 e E2 no ar desde 06/11; E3 a E5 aguardam           | Titular     | **No ar:** PR #105 mergeado (`605855f`), Deploy aprovado, e `atendara.app/termos` e `/contrato` servem a versão `2026-11-06-preliminar` (lido na página). Functions publicadas pelo titular antes do merge, segundo ele, sem conferência por `functions:list`. O suboperador Gemini e o Amazon SES (`us-east-2`) entraram no anexo e na Política. **Próximo:** E3, registro do aceite em `platformContractAcceptances`, só depois de a revisão de segurança ter branch e PR próprios, porque mexe nos mesmos arquivos. Conferir a região do Cloud Storage. Texto sem revisão jurídica. |
+| Operação inicial sem CNPJ                    | Proposta do titular em 06/11                          | Titular     | Validar com contador a forma de recebimento e os gatilhos de abertura do CNPJ. Ver `docs/decisions/0006-operacao-inicial-sem-cnpj.md`.                                                                                                |
+| Marca no INPI                                | Não iniciado                                          | Titular     | Busca de anterioridade de "Atendara" e depósito (classe 42; avaliar 35 e 9). Registrar número do processo.                                                                                                                             |
+| NFS-e Nacional pelo cliente                  | Proposta; nada implementado                           | A definir   | Escolher o provedor de emissão e definir o escopo do MVP. Ver `docs/planos/NFSE-NACIONAL-2026-11-06.md`.                                                                                                                               |
 
 ## Dependências externas
 
@@ -31,6 +35,8 @@
 | Piloto com profissionais | Depende de validações reais e decisões do titular                                | Executar fluxos controlados; documentar consentimentos e resultados sem dados pessoais neste painel. |
 
 ## Concluído recentemente
+
+- **06/11:** [PR #106](https://github.com/GuilhermeLuizatto/atendara/pull/106) destravou o CI de todos os PRs. Corrigiu o teste de cobrança vencido pela data e os alertas no next (crítico, 16.3.8 → 16.4.5), zod, re2js e body-parser. Depois entraram #105 (termos e contrato), #108 e #104 (Dependabot). As Functions com o zod e o body-parser novos dependem da publicação pelo titular.
 
 - **10/10:** papéis de desenvolvimento, guia de orquestração e este painel integrados à `main` pelo [PR #92](https://github.com/GuilhermeLuizatto/atendara/pull/92).
 - **10/10:** Google Calendar corrigido no radar para concluído. A rodada de validações de 28/09 registrou o roteiro das três frentes e o isolamento com contas de teste; falta só repetir com um segundo membro da mesma organização, junto da validação de equipe.

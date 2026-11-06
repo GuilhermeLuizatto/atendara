@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "Atendara",
-  "reviewedAt": "2026-10-10",
+  "reviewedAt": "2026-11-06",
   "reviewNote": "Fotografia de acompanhamento. Merge, publicação e validação real são etapas diferentes.",
   "items": [
     {
@@ -10,8 +10,8 @@
       "kind": "bug",
       "status": "em-andamento",
       "priority": "alta",
-      "summary": "Correções locais em andamento; a revisão de segurança ainda está aberta.",
-      "next": "Integrar e testar acesso a arquivos, auditLogs, aiDecisions e links antigos.",
+      "summary": "Correções em 16 arquivos só na cópia local do titular, sem branch nem PR (06/11); a revisão ainda está aberta.",
+      "next": "Criar branch e PR das correções; isso também libera a E3 dos termos, que mexe nos mesmos arquivos.",
       "owner": "A definir",
       "evidence": "PAINEL-ATENDARA.md",
       "confidence": "confirmado"
@@ -110,6 +110,54 @@
       "next": "Aplicar o guia nas próximas frentes e revisar a rotina conforme o uso.",
       "owner": "Equipe",
       "evidence": "https://github.com/GuilhermeLuizatto/atendara/pull/92",
+      "confidence": "confirmado"
+    },
+    {
+      "id": "termos-contrato-licenca",
+      "title": "Termos, contrato de licença e anexo LGPD",
+      "kind": "desenvolvimento",
+      "status": "em-andamento",
+      "priority": "alta",
+      "summary": "Termos alinhados ao ADR 0006 e página /contrato no ar desde 06/11 (versão 2026-11-06-preliminar); texto sem revisão jurídica.",
+      "next": "E3: registrar o aceite da organização em platformContractAcceptances, depois da revisão de segurança ter PR próprio.",
+      "owner": "Titular",
+      "evidence": "PR #105; atendara.app/termos e /contrato",
+      "confidence": "confirmado"
+    },
+    {
+      "id": "operacao-sem-cnpj",
+      "title": "Operação inicial sem CNPJ",
+      "kind": "risco",
+      "status": "pendente",
+      "priority": "media",
+      "summary": "Proposta do titular em 06/11: operar como pessoa física até um dos gatilhos de abertura do CNPJ.",
+      "next": "Validar com contador a forma de recebimento e os gatilhos.",
+      "owner": "Titular",
+      "evidence": "docs/decisions/0006-operacao-inicial-sem-cnpj.md",
+      "confidence": "confirmado"
+    },
+    {
+      "id": "marca-inpi",
+      "title": "Marca no INPI",
+      "kind": "risco",
+      "status": "pendente",
+      "priority": "media",
+      "summary": "Busca de anterioridade e depósito da marca Atendara ainda não iniciados.",
+      "next": "Buscar anterioridade e depositar (classe 42; avaliar 35 e 9).",
+      "owner": "Titular",
+      "evidence": "PAINEL-ATENDARA.md",
+      "confidence": "confirmado"
+    },
+    {
+      "id": "nfse-nacional",
+      "title": "NFS-e Nacional pelo cliente",
+      "kind": "desenvolvimento",
+      "status": "planejado",
+      "priority": "baixa",
+      "summary": "Proposta; nada implementado. Emissão sempre em nome do cliente e com confirmação dele.",
+      "next": "Escolher o provedor de emissão e definir o escopo do MVP.",
+      "owner": "A definir",
+      "evidence": "docs/planos/NFSE-NACIONAL-2026-11-06.md",
       "confidence": "confirmado"
     }
   ]

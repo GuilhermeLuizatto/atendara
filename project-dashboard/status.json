@@ -10,10 +10,10 @@
       "kind": "bug",
       "status": "em-revisao",
       "priority": "alta",
-      "summary": "Correções commitadas na branch local fix/acesso-arquivos-e-trilhas; testes locais passaram em 07/11.",
-      "next": "Publicar a branch, abrir PR e rodar os testes de acesso da plataforma no ambiente com segredos. Ainda abertos: trilhas pelo backend e links antigos.",
+      "summary": "Quatro commits na branch local: arquivos e trilhas, revogação dos links antigos e teto por token nas callables públicas.",
+      "next": "Publicar a branch, abrir PR, rodar test:access completo e, depois da publicação, executar a revogação dos links antigos.",
       "owner": "Titular",
-      "evidence": "commit 1fc5a7c (branch local)",
+      "evidence": "branch fix/acesso-arquivos-e-trilhas",
       "confidence": "confirmado"
     },
     {
@@ -116,12 +116,12 @@
       "id": "teste-acesso-cobranca",
       "title": "Teste de acesso da cobrança da plataforma",
       "kind": "bug",
-      "status": "pendente",
+      "status": "em-revisao",
       "priority": "media",
-      "summary": "O caso 'a assinatura ativa abre o painel' falha também na main: lê cliente inexistente e a regra de clients nega.",
-      "next": "Decidir se o teste cria o cliente antes ou se a regra trata documento ausente.",
-      "owner": "A definir",
-      "evidence": "src/lib/billing/platform-billing.access-test.ts:381",
+      "summary": "Datas do roteiro passam a andar com o relógio; 18 de 18 casos passam no emulador.",
+      "next": "Push e PR da branch fix/teste-acesso-cobranca-data.",
+      "owner": "Titular",
+      "evidence": "commit bae5129 (branch local)",
       "confidence": "confirmado"
     },
     {
@@ -158,6 +158,18 @@
       "next": "Titular escolhe o modelo de emissão após estudo.",
       "owner": "Titular",
       "evidence": "Plano local de 06/11/2026",
+      "confidence": "confirmado"
+    },
+    {
+      "id": "lancamento-piloto",
+      "title": "Lançamento do piloto",
+      "kind": "teste",
+      "status": "pendente",
+      "priority": "alta",
+      "summary": "Checklist com publicação, decisões do titular, revisão jurídica e validação real.",
+      "next": "Seguir o checklist local de 07/11, começando pela publicação das correções de segurança.",
+      "owner": "Titular",
+      "evidence": "Checklist local de 07/11/2026",
       "confidence": "confirmado"
     }
   ]

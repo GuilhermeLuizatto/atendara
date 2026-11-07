@@ -66,8 +66,14 @@ const EMPLOYEE = { email: "secretaria@atendara.test", password: "SenhaDeTeste#Se
 const PLAN = "profissional-mensal";
 const CUSTOMER = "cus_assinante";
 const SUBSCRIPTION = "sub_assinante";
-const PERIOD_1_END = "2026-10-09T12:00:00.000Z";
-const PERIOD_2_END = "2026-11-09T12:00:00.000Z";
+// O roteiro foi escrito com o relogio em 09/09/2026. Datas fixas vencem com o
+// tempo e o teste passa a provar acesso vencido em vez de acesso pago; por
+// isso cada data do roteiro anda o mesmo numero de dias que o relogio andou.
+const SCRIPT_ORIGIN = Date.parse("2026-09-09T12:00:00.000Z");
+const SHIFT_MS = Math.max(0, Math.floor((Date.now() - SCRIPT_ORIGIN) / 86_400_000)) * 86_400_000;
+const at = (iso: string) => new Date(Date.parse(iso) + SHIFT_MS).toISOString();
+const PERIOD_1_END = at("2026-10-09T12:00:00.000Z");
+const PERIOD_2_END = at("2026-11-09T12:00:00.000Z");
 
 import { adminAuth, adminDb, deleteAdminApps, initializeAdminSdk } from "../testing/admin-sdk";
 
@@ -151,7 +157,7 @@ function subscriptionEvent(
         status,
         cancel_at_period_end: false,
         currency: "brl",
-        current_period_start: unix("2026-09-09T12:00:00.000Z"),
+        current_period_start: unix(at("2026-09-09T12:00:00.000Z")),
         current_period_end: unix(periodEnd),
         items: { data: [{ price: { unit_amount: 19_900, recurring: { interval: "month" } } }] },
         metadata: { organizationId: ownerOrg, subscriberUserId: ownerUid, planId: PLAN },
@@ -184,7 +190,7 @@ function invoiceEvent(
         created: unix(createdIso),
         hosted_invoice_url: `https://exemplo.invalido/${invoiceId}`,
         lines: {
-          data: [{ period: { start: unix("2026-09-09T12:00:00.000Z"), end: unix(periodEnd) } }],
+          data: [{ period: { start: unix(at("2026-09-09T12:00:00.000Z")), end: unix(periodEnd) } }],
         },
         subscription_details: { metadata: { organizationId: ownerOrg } },
       },
@@ -340,7 +346,7 @@ describe("Etapa 3 — o webhook e a unica autoridade", () => {
   });
 
   it("o checkout concluido associa, mas nao abre o painel", async () => {
-    const result = await deliver(checkoutCompleted("evt_vinculo", "2026-09-09T12:00:00.000Z"));
+    const result = await deliver(checkoutCompleted("evt_vinculo", at("2026-09-09T12:00:00.000Z")));
     expect(result).toMatchObject({ status: 200, outcome: "APPLIED" });
 
     expect(await subscriptionOf(ownerOrg)).toMatchObject({
@@ -360,7 +366,7 @@ describe("Etapa 3 — o webhook e a unica autoridade", () => {
 
   it("a assinatura ativa abre o painel e libera os modulos do plano", async () => {
     const result = await deliver(
-      subscriptionEvent("evt_ativa", "customer.subscription.created", "active", PERIOD_1_END, "2026-09-09T12:00:05.000Z"),
+      subscriptionEvent("evt_ativa", "customer.subscription.created", "active", PERIOD_1_END, at("2026-09-09T12:00:05.000Z")),
     );
     expect(result).toMatchObject({ status: 200, outcome: "APPLIED" });
 
@@ -382,9 +388,9 @@ describe("Etapa 3 — o webhook e a unica autoridade", () => {
   });
 
   it("a renovacao paga estende o ciclo e registra a fatura", async () => {
-    await deliver(invoiceEvent("evt_fatura_1", "invoice.paid", "in_ciclo_1", PERIOD_1_END, "2026-09-09T12:00:08.000Z"));
+    await deliver(invoiceEvent("evt_fatura_1", "invoice.paid", "in_ciclo_1", PERIOD_1_END, at("2026-09-09T12:00:08.000Z")));
     const result = await deliver(
-      invoiceEvent("evt_fatura_2", "invoice.paid", "in_ciclo_2", PERIOD_2_END, "2026-10-09T12:00:00.000Z"),
+      invoiceEvent("evt_fatura_2", "invoice.paid", "in_ciclo_2", PERIOD_2_END, at("2026-10-09T12:00:00.000Z")),
     );
     expect(result).toMatchObject({ status: 200, outcome: "APPLIED" });
 
@@ -402,7 +408,7 @@ describe("Etapa 3 — o webhook e a unica autoridade", () => {
 
   it("o mesmo evento reentregue nao estende o acesso de novo", async () => {
     const antes = await accountOf(ownerUid);
-    const repetido = invoiceEvent("evt_fatura_2", "invoice.paid", "in_ciclo_2", PERIOD_2_END, "2026-10-09T12:00:00.000Z");
+    const repetido = invoiceEvent("evt_fatura_2", "invoice.paid", "in_ciclo_2", PERIOD_2_END, at("2026-10-09T12:00:00.000Z"));
 
     const result = await deliver(repetido);
 
@@ -416,8 +422,8 @@ describe("Etapa 3 — o webhook e a unica autoridade", () => {
       "evt_atrasado",
       "customer.subscription.updated",
       "active",
-      "2027-01-01T00:00:00.000Z",
-      "2026-09-09T12:00:01.000Z",
+      at("2027-01-01T00:00:00.000Z"),
+      at("2026-09-09T12:00:01.000Z"),
     );
 
     const result = await deliver(atrasado);
@@ -435,9 +441,9 @@ describe("Etapa 3 — o webhook e a unica autoridade", () => {
   it("mantem o painel por duas falhas e fecha na terceira tentativa", async () => {
     const antes = await accountOf(ownerUid);
 
-    await deliver(invoiceEvent("evt_falha_1", "invoice.payment_failed", "in_falhou_1", PERIOD_2_END, "2026-11-09T12:00:00.000Z", 1));
+    await deliver(invoiceEvent("evt_falha_1", "invoice.payment_failed", "in_falhou_1", PERIOD_2_END, at("2026-11-09T12:00:00.000Z"), 1));
     await deliver(
-      subscriptionEvent("evt_atraso", "customer.subscription.updated", "past_due", PERIOD_2_END, "2026-11-09T12:00:10.000Z"),
+      subscriptionEvent("evt_atraso", "customer.subscription.updated", "past_due", PERIOD_2_END, at("2026-11-09T12:00:10.000Z")),
     );
 
     expect(
@@ -450,11 +456,11 @@ describe("Etapa 3 — o webhook e a unica autoridade", () => {
     await signInWithEmailAndPassword(auth, OWNER.email, OWNER.password);
     await expect(getDoc(doc(db, paths.document(ownerOrg, "clients", "qualquer")))).resolves.toBeDefined();
 
-    await deliver(invoiceEvent("evt_falha_2", "invoice.payment_failed", "in_falhou_2", PERIOD_2_END, "2026-11-09T12:00:20.000Z", 2));
+    await deliver(invoiceEvent("evt_falha_2", "invoice.payment_failed", "in_falhou_2", PERIOD_2_END, at("2026-11-09T12:00:20.000Z"), 2));
     expect(await accountOf(ownerUid)).toMatchObject({ subscriptionStatus: "ACTIVE" });
     await expect(getDoc(doc(db, paths.document(ownerOrg, "clients", "qualquer")))).resolves.toBeDefined();
 
-    await deliver(invoiceEvent("evt_falha_3", "invoice.payment_failed", "in_falhou_3", PERIOD_2_END, "2026-11-09T12:00:30.000Z", 3));
+    await deliver(invoiceEvent("evt_falha_3", "invoice.payment_failed", "in_falhou_3", PERIOD_2_END, at("2026-11-09T12:00:30.000Z"), 3));
     expect(await accountOf(ownerUid)).toMatchObject({
       subscriptionStatus: "PENDING",
       accessUntil: antes.accessUntil,
@@ -578,7 +584,7 @@ describe("Etapa 3 — quem enxerga e quem escreve", () => {
     const desvio = {
       id: "evt_desvio",
       type: "checkout.session.completed",
-      created: unix("2026-09-09T13:00:00.000Z"),
+      created: unix(at("2026-09-09T13:00:00.000Z")),
       data: {
         object: {
           mode: "subscription",
@@ -604,7 +610,7 @@ describe("Etapa 3 — encerramento", () => {
     const result = await deliver({
       id: "evt_reembolso",
       type: "charge.refunded",
-      created: unix("2026-11-10T09:00:00.000Z"),
+      created: unix(at("2026-11-10T09:00:00.000Z")),
       data: { object: { invoice: "in_ciclo_2", amount_refunded: 19_900 } },
     });
     expect(result).toMatchObject({ status: 200, outcome: "APPLIED" });
@@ -614,7 +620,7 @@ describe("Etapa 3 — encerramento", () => {
     ).toMatchObject({ status: "REFUNDED", amountRefundedInCents: 19_900 });
     expect(await accountOf(ownerUid)).toMatchObject({
       subscriptionStatus: "PENDING",
-      accessUntil: "2026-11-10T09:00:00.000Z",
+      accessUntil: at("2026-11-10T09:00:00.000Z"),
     });
 
     await signInWithEmailAndPassword(auth, OWNER.email, OWNER.password);
@@ -625,7 +631,7 @@ describe("Etapa 3 — encerramento", () => {
 
   it("o cancelamento encerra no fim do ciclo pago e fecha o painel", async () => {
     const result = await deliver(
-      subscriptionEvent("evt_cancelada", "customer.subscription.deleted", "canceled", PERIOD_2_END, "2026-11-11T09:00:00.000Z"),
+      subscriptionEvent("evt_cancelada", "customer.subscription.deleted", "canceled", PERIOD_2_END, at("2026-11-11T09:00:00.000Z")),
     );
     expect(result).toMatchObject({ status: 200, outcome: "APPLIED" });
 

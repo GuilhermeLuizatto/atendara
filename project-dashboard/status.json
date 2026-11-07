@@ -1,19 +1,19 @@
 {
   "schemaVersion": 1,
   "project": "Atendara",
-  "reviewedAt": "2026-10-10",
+  "reviewedAt": "2026-11-07",
   "reviewNote": "Fotografia de acompanhamento. Merge, publicação e validação real são etapas diferentes.",
   "items": [
     {
       "id": "seguranca-arquivos-trilhas",
       "title": "Revisão de acesso a arquivos e trilhas",
       "kind": "bug",
-      "status": "em-andamento",
+      "status": "em-revisao",
       "priority": "alta",
-      "summary": "Correções locais em andamento; a revisão de segurança ainda está aberta.",
-      "next": "Integrar e testar acesso a arquivos, auditLogs, aiDecisions e links antigos.",
-      "owner": "A definir",
-      "evidence": "PAINEL-ATENDARA.md",
+      "summary": "Correções commitadas na branch local fix/acesso-arquivos-e-trilhas; testes locais passaram em 07/11.",
+      "next": "Publicar a branch, abrir PR e rodar os testes de acesso da plataforma no ambiente com segredos. Ainda abertos: trilhas pelo backend e links antigos.",
+      "owner": "Titular",
+      "evidence": "commit 1fc5a7c (branch local)",
       "confidence": "confirmado"
     },
     {
@@ -110,6 +110,54 @@
       "next": "Aplicar o guia nas próximas frentes e revisar a rotina conforme o uso.",
       "owner": "Equipe",
       "evidence": "https://github.com/GuilhermeLuizatto/atendara/pull/92",
+      "confidence": "confirmado"
+    },
+    {
+      "id": "teste-acesso-cobranca",
+      "title": "Teste de acesso da cobrança da plataforma",
+      "kind": "bug",
+      "status": "pendente",
+      "priority": "media",
+      "summary": "O caso 'a assinatura ativa abre o painel' falha também na main: lê cliente inexistente e a regra de clients nega.",
+      "next": "Decidir se o teste cria o cliente antes ou se a regra trata documento ausente.",
+      "owner": "A definir",
+      "evidence": "src/lib/billing/platform-billing.access-test.ts:381",
+      "confidence": "confirmado"
+    },
+    {
+      "id": "marca-inpi",
+      "title": "Marca no INPI",
+      "kind": "risco",
+      "status": "pendente",
+      "priority": "alta",
+      "summary": "Busca de anterioridade feita em 07/11; aguarda decisão do titular sobre o nome.",
+      "next": "Decidir o nome antes do depósito.",
+      "owner": "Titular",
+      "evidence": "Busca pePI de 07/11/2026",
+      "confidence": "confirmado"
+    },
+    {
+      "id": "termos-contrato-adr-0006",
+      "title": "Termos e contrato de licença (ADR 0006)",
+      "kind": "desenvolvimento",
+      "status": "concluido",
+      "priority": "alta",
+      "summary": "Termos alinhados à operação inicial sem CNPJ e página /contrato com anexo de operador.",
+      "next": "Revisar com advogado antes do primeiro cliente pagante.",
+      "owner": "Titular",
+      "evidence": "https://github.com/GuilhermeLuizatto/atendara/pull/105",
+      "confidence": "confirmado"
+    },
+    {
+      "id": "nfse-nacional",
+      "title": "Emissão de NFS-e pelo cliente",
+      "kind": "desenvolvimento",
+      "status": "planejado",
+      "priority": "baixa",
+      "summary": "Proposta de emissão pela API nacional ou provedor, sempre em nome do cliente e com confirmação dele.",
+      "next": "Titular escolhe o modelo de emissão após estudo.",
+      "owner": "Titular",
+      "evidence": "Plano local de 06/11/2026",
       "confidence": "confirmado"
     }
   ]

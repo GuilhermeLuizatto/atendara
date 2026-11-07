@@ -11,7 +11,7 @@ import { paths } from "./generated/paths.js";
 import { fromStored, toStored } from "./firestore-dates.js";
 import { auditEntry } from "./platform.js";
 import { runAs } from "./service-accounts.js";
-import { consumeRateLimit, networkSubject } from "./rate-limit.js";
+import { consumeRateLimit, networkSubject, tokenSubject } from "./rate-limit.js";
 import { escapeHtml, emailShell, sendEmail } from "./ses.js";
 import { tenantActor, tenantAudit } from "./tenant-auth.js";
 import { unresolvedScopeMembers } from "./scope-migration.js";
@@ -291,6 +291,7 @@ export const decidePlatformTeamRequest = onCall(OPTIONS, async (request) => {
 export const inspectTeamInvitation = onCall(OPTIONS, async (request) => {
   await consumeRateLimit(networkSubject(request), "teamInvitationByNetwork");
   const { token } = parse(invitationTokenSchema, request.data);
+  await consumeRateLimit(tokenSubject(token), "teamInvitationByToken");
   const matches = await db().collectionGroup("memberInvitations").where("tokenHash", "==", tokenHash(token)).limit(1).get();
   if (matches.empty) throw new HttpsError("not-found", "Convite inválido ou já utilizado.");
   const invitation = matches.docs[0].data();
@@ -304,6 +305,7 @@ export const inspectTeamInvitation = onCall(OPTIONS, async (request) => {
 export const acceptTeamInvitation = onCall(OPTIONS, async (request) => {
   await consumeRateLimit(networkSubject(request), "teamInvitationByNetwork");
   const input = parse(acceptSchema, request.data);
+  await consumeRateLimit(tokenSubject(input.token), "teamInvitationByToken");
   const weak = passwordPolicyError(input.password);
   if (weak) throw new HttpsError("invalid-argument", weak);
   const matches = await db().collectionGroup("memberInvitations").where("tokenHash", "==", tokenHash(input.token)).limit(1).get();

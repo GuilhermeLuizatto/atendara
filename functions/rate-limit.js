@@ -54,7 +54,13 @@ export async function consumeRateLimit(subject, limitKey, nowMs = Date.now()) {
  * primeiro salto e o cliente. Um cliente pode forjar o cabecalho e escolher o
  * proprio balde, e por isso este teto nunca e a unica trava: App Check,
  * confirmacao de e-mail e concessao unica por organizacao seguem valendo.
+ * Onde ha token (link de pagamento, convite), `tokenSubject` soma um teto por
+ * token, que o cliente nao escolhe.
  */
+export function tokenSubject(token) {
+  return `token-${createHash("sha256").update(String(token)).digest("hex").slice(0, 32)}`;
+}
+
 export function networkSubject(request) {
   const forwarded = request.rawRequest?.headers?.["x-forwarded-for"];
   const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(",")[0]?.trim();

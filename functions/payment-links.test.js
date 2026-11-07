@@ -77,7 +77,7 @@ vi.mock("firebase-functions/v2/https", () => ({
     }
   },
 }));
-vi.mock("./rate-limit.js", () => ({ consumeRateLimit: vi.fn(async () => {}), networkSubject: () => "rede" }));
+vi.mock("./rate-limit.js", () => ({ consumeRateLimit: vi.fn(async () => {}), networkSubject: () => "rede", tokenSubject: () => "token" }));
 vi.mock("./tenant-auth.js", () => ({
   assertProfessionalScope: vi.fn((actor, professionalId) => {
     if (!actor.membership.linkedProfessionalIds.includes(professionalId)) {

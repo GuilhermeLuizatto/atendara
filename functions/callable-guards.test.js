@@ -141,6 +141,13 @@ describe("Travas de toda callable exportada", () => {
     }
   });
 
+  it("quem atende sem login por token limita tambem por token", () => {
+    for (const name of ["inspectPaymentLink", "submitPaymentProof", "inspectTeamInvitation", "acceptTeamInvitation"]) {
+      const { body } = bodyOf(name);
+      expect(body.includes("consumeRateLimit(tokenSubject("), name).toBe(true);
+    }
+  });
+
   it("todas validam a entrada com esquema estrito", () => {
     for (const [name] of callables) {
       const found = bodyOf(name);

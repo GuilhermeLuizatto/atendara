@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TRANSACTION_STATUS_LABELS } from "@/config/labels";
+import { latestProof } from "@/lib/finance/payment-proof";
 import {
   chargeHistory,
   periodLabel,
@@ -63,6 +64,9 @@ export function RecurringView() {
   const canUpdate = session?.permissions.includes("transaction:update") ?? false;
   const charges = data.recurringCharges ?? [];
   const month = summarizeMonth(charges, data.transactions, period);
+  const proofsToReview = month.rows.filter(({ transaction }) =>
+    transaction && latestProof(data.paymentProofs ?? [], transaction.id)?.status === "SUBMITTED",
+  ).length;
   const percent = month.collectionRate === null ? "—" : `${Math.round(month.collectionRate * 100)}%`;
 
   const setStatus = (charge: RecurringCharge, status: RecurringCharge["status"], message: string) =>
@@ -94,7 +98,7 @@ export function RecurringView() {
         )}
       </Card>
 
-      <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {(
           [
             ["Previsto no mês", formatCurrency(month.expectedInCents), "neutral"],
@@ -102,6 +106,7 @@ export function RecurringView() {
             ["A receber", formatCurrency(month.pendingInCents), "warning"],
             ["Em atraso", formatCurrency(month.overdueInCents), month.overdueInCents ? "danger" : "neutral"],
             ["Taxa de recebimento", percent, "neutral"],
+            ["Comprovantes para conferir", String(proofsToReview), proofsToReview ? "warning" : "neutral"],
           ] as const
         ).map(([label, value, tone]) => (
           <Card key={label} className="p-4">
@@ -124,6 +129,11 @@ export function RecurringView() {
           <p className="text-muted-foreground text-xs">
             O pagamento vai direto para você. O Atendara lança cada mês e mostra quem pagou. Nenhuma mensagem sai sozinha: copie o link de pagamento e envie como preferir; o comprovante chega aqui para você conferir.
           </p>
+          {proofsToReview > 0 && (
+            <p role="status" className="text-warning-soft-foreground mt-2 text-sm">
+              {proofsToReview} comprovante(s) deste mês aguardam sua conferência. Confira o arquivo antes de aprovar o pagamento.
+            </p>
+          )}
         </div>
         {month.rows.length === 0 ? (
           <EmptyState

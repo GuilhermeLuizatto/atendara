@@ -784,8 +784,14 @@ service cloud.firestore {
       match /aiDecisions/{decisionId} {
         allow read: if moduleAccess(orgId, 'agente')
           && existingProfessionalScope(orgId, 'professionalId');
-        allow create: if moduleAccess(orgId, 'agente') && belongsToOrg(orgId)
-          && requestedProfessionalScope(orgId, 'professionalId');
+        allow create: if moduleAccess(orgId, 'agente') && canWriteOperational(orgId)
+          && belongsToOrg(orgId)
+          && requestedProfessionalScope(orgId, 'professionalId')
+          && request.resource.data.get('id', null) == decisionId
+          && request.resource.data.get('createdBy', null) == uid()
+          && request.resource.data.get('updatedBy', null) == uid()
+          && (request.resource.data.get('action', null) != 'AUTO_RESPONSE'
+            || request.resource.data.get('classification', null) == 'ADMINISTRATIVE');
         // Registro imutavel. Se pudesse ser alterado, nao seria auditoria. A
         // pseudonimizacao a pedido do titular e do backend, restrita aos campos
         // de `src/config/privacy.ts`; pelo cliente, nada muda.
@@ -959,7 +965,11 @@ service cloud.firestore {
       match /auditLogs/{logId} {
         // Somente administracao da propria organizacao le a trilha completa.
         allow read: if isAdmin(orgId);
-        allow create: if isMember(orgId) && belongsToOrg(orgId);
+        allow create: if isMember(orgId) && belongsToOrg(orgId)
+          && request.resource.data.get('id', null) == logId
+          && request.resource.data.get('actorId', null) == uid()
+          && request.resource.data.get('createdBy', null) == uid()
+          && request.resource.data.get('updatedBy', null) == uid();
         // Append-only, sem excecao de papel. Como em `aiDecisions`, so o
         // backend pseudonimiza, e nunca apaga.
         allow update, delete: if false;

@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import { getPhaseFiveFileUrl } from "@/services/phase-five";
+import { downloadStorageFile } from "@/lib/firebase/download-file";
 import type { SupportAttachment } from "@/types";
 
 export function AttachmentLink({ attachment }: { attachment: SupportAttachment }) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    void getPhaseFiveFileUrl(attachment.storagePath).then(setUrl).catch(() => setUrl(null));
-  }, [attachment.storagePath]);
-  return url ? (
-    <a href={url} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">{attachment.name}</a>
-  ) : (
-    <span className="text-muted-foreground">{attachment.name}</span>
-  );
+  const [error, setError] = useState(false);
+  return <>
+    <button type="button" className="text-primary underline underline-offset-2" onClick={async () => {
+      try { setError(false); await downloadStorageFile(attachment.storagePath, attachment.name, attachment.contentType); }
+      catch { setError(true); }
+    }}>{attachment.name}</button>
+    {error && <span role="status" className="text-danger ml-2">Arquivo indisponível.</span>}
+  </>;
 }

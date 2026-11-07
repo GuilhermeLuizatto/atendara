@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { AttachmentLink } from "@/features/support/attachment-link";
-import { phaseFiveService, uploadPhaseFiveFile, type SupportThread } from "@/services/phase-five";
+import { phaseFiveService, type SupportThread } from "@/services/phase-five";
 import type { SupportAttachment, SupportPriority, SupportTicket, SupportTicketStatus } from "@/types";
 
 async function upload(ticket: SupportTicket, messageId: string, files: FileList | null): Promise<SupportAttachment[]> {
@@ -15,10 +15,7 @@ async function upload(ticket: SupportTicket, messageId: string, files: FileList 
   if (files.length > 5) throw new Error("Envie no máximo 5 arquivos.");
   return Promise.all(Array.from(files).map(async (file) => {
     if (!["image/png", "image/jpeg", "image/webp", "application/pdf"].includes(file.type) || file.size > 5 * 1024 * 1024) throw new Error("Use imagens ou PDF de até 5 MB.");
-    const id = crypto.randomUUID(); const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-    const storagePath = `support/${ticket.organizationId}/${ticket.id}/${messageId}/${id}-${safeName}`;
-    await uploadPhaseFiveFile(storagePath, file, file.type);
-    return { id, storagePath, name: file.name, contentType: file.type as SupportAttachment["contentType"], size: file.size };
+    return phaseFiveService.support.upload(ticket.id, messageId, file);
   }));
 }
 

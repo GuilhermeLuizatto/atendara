@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/form";
 import { useWorkspace } from "@/providers/workspace-provider";
-import { deletePhaseFiveFile, phaseFiveService, uploadPhaseFiveFile } from "@/services/phase-five";
+import { phaseFiveService } from "@/services/phase-five";
 
 async function squareLogo(file: File): Promise<{ blob: Blob; contentType: "image/png" | "image/jpeg" | "image/webp" }> {
   if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) throw new Error("Use PNG, JPEG ou WebP. SVG não é aceito.");
@@ -32,11 +32,7 @@ export function OrganizationBranding() {
     setBusy(true); setNotice("");
     try {
       const prepared = await squareLogo(file);
-      const path = `branding/${organization.id}/logo/${crypto.randomUUID()}.webp`;
-      const logoUrl = await uploadPhaseFiveFile(path, prepared.blob, prepared.contentType);
-      const previous = organization.branding?.logoStoragePath;
-      await phaseFiveService.branding.update({ logoUrl, logoStoragePath: path, logoContentType: prepared.contentType });
-      if (previous && previous !== path) await deletePhaseFiveFile(previous).catch(() => undefined);
+      await phaseFiveService.branding.upload(prepared.blob);
       setNotice("Logo atualizado. O recorte quadrado aparece no painel, e-mails e documentos que usam a marca.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Não foi possível atualizar o logo."); }
     finally { setBusy(false); }
@@ -46,9 +42,7 @@ export function OrganizationBranding() {
     if (!organization) return;
     setBusy(true);
     try {
-      const previous = organization.branding?.logoStoragePath;
       await phaseFiveService.branding.update({ logoUrl: null, logoStoragePath: null, logoContentType: null });
-      if (previous) await deletePhaseFiveFile(previous).catch(() => undefined);
       setNotice("Logo removido. O ícone padrão voltou a ser usado.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Não foi possível remover o logo."); }
     finally { setBusy(false); }

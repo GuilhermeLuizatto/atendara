@@ -1,7 +1,5 @@
 import { httpsCallable } from "firebase/functions";
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
-
-import { getFirebaseFunctions, getFirebaseStorage } from "@/lib/firebase/client";
+import { getFirebaseFunctions } from "@/lib/firebase/client";
 import { isDemoMode } from "@/lib/firebase/config";
 import type {
   ImportEntityType,
@@ -75,6 +73,15 @@ export interface SupportThread {
   messages: SupportMessage[];
 }
 
+function blobToBase64(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ""));
+    reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
+    reader.readAsDataURL(file);
+  });
+}
+
 export const phaseFiveService = {
   team: {
     list: () => call<Record<string, never>, TeamView>("listTeam", {}),
@@ -101,23 +108,14 @@ export const phaseFiveService = {
     thread: (ticketId: string) => call<{ ticketId: string }, SupportThread>("getSupportThread", { ticketId }),
     create: (input: { ticketId: string; messageId: string; category: SupportCategory; reportedSeverity: SupportReportedSeverity; subject: string; body: string; attachments: SupportAttachment[] }) => call<typeof input, { ticketId: string }>("createSupportTicket", input),
     reply: (input: { ticketId: string; messageId: string; body: string; attachments: SupportAttachment[] }) => call<typeof input, { ok: true }>("replySupportTicket", input),
+    upload: async (ticketId: string, messageId: string, file: File): Promise<SupportAttachment> => {
+      if (file.size === 0 || file.size > 5 * 1024 * 1024) throw new Error("Use arquivos de até 5 MB.");
+      return call("uploadSupportAttachment", { ticketId, messageId, attachmentId: crypto.randomUUID(), name: file.name, file: await blobToBase64(file) });
+    },
     update: (ticketId: string, patch: { priority?: SupportPriority | null; status?: SupportTicketStatus }) => call("updateSupportTicket", { ticketId, ...patch }),
   },
   branding: {
     update: (branding: { logoUrl: string | null; logoStoragePath: string | null; logoContentType: "image/png" | "image/jpeg" | "image/webp" | null }) => call("updateOrganizationBranding", branding),
+    upload: async (file: Blob) => call<{ file: string }, { branding: { logoUrl: string; logoStoragePath: string; logoContentType: "image/png" | "image/jpeg" | "image/webp" } }>("uploadBrandingLogo", { file: await blobToBase64(file) }),
   },
 };
-
-export async function uploadPhaseFiveFile(path: string, file: Blob, contentType: string): Promise<string> {
-  const target = ref(getFirebaseStorage(), path);
-  await uploadBytes(target, file, { contentType });
-  return getDownloadURL(target);
-}
-
-export async function deletePhaseFiveFile(path: string): Promise<void> {
-  await deleteObject(ref(getFirebaseStorage(), path));
-}
-
-export async function getPhaseFiveFileUrl(path: string): Promise<string> {
-  return getDownloadURL(ref(getFirebaseStorage(), path));
-}

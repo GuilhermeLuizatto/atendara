@@ -17,20 +17,28 @@ service firebase.storage {
     function activeMember(orgId) {
       return signedIn()
         && account().organizationId == orgId
+        && account().platformRole == "PROFESSIONAL"
         && account().status == "ACTIVE"
+        && account().mustChangePassword == false
+        && account().subscriptionStatus == "ACTIVE"
+        && account().accessUntilMs > request.time.toMillis()
+        && account().professionId == firestore.get(/databases/(default)/documents/organizations/$(orgId)).data.primaryProfession
         && member(orgId).status == "ACTIVE";
+    }
+
+    function professionalScope(orgId, professionalId) {
+      return member(orgId).role in ["OWNER", "ADMIN"]
+        || (professionalId != null
+          && professionalId in member(orgId).get("linkedProfessionalIds", []));
     }
 
     function platformSupport() {
       return signedIn()
         && account().platformRole == "PLATFORM_ADMIN"
         && account().status == "ACTIVE"
+        && account().mustChangePassword == false
         && request.auth.token.firebase.keys().hasAny(["sign_in_second_factor"])
         && request.auth.token.firebase.sign_in_second_factor == "totp";
-    }
-
-    function safeImage() {
-      return request.resource.contentType in ["image/png", "image/jpeg", "image/webp"];
     }
 
     function tenantTicketAccess(orgId, ticketId) {
@@ -44,28 +52,24 @@ service firebase.storage {
 
     match /branding/{orgId}/logo/{fileName} {
       allow read: if activeMember(orgId);
-      allow create, update: if activeMember(orgId)
-        && (firestore.get(/databases/(default)/documents/organizations/$(orgId)).data.ownerId == request.auth.uid
-          || member(orgId).role in ["OWNER", "ADMIN"])
-        && safeImage()
-        && request.resource.size <= 2 * 1024 * 1024;
-      allow delete: if activeMember(orgId)
-        && (firestore.get(/databases/(default)/documents/organizations/$(orgId)).data.ownerId == request.auth.uid
-          || member(orgId).role in ["OWNER", "ADMIN"]);
+      allow create, update: if false;
+      allow delete: if false;
     }
 
     match /support/{orgId}/{ticketId}/{messageId}/{fileName} {
       allow read: if tenantTicketAccess(orgId, ticketId) || platformSupport();
-      allow create: if (activeMember(orgId) || platformSupport())
-        && request.resource.size <= 5 * 1024 * 1024
-        && request.resource.contentType in ["image/png", "image/jpeg", "image/webp", "application/pdf"];
+      allow create: if false;
       allow update, delete: if false;
     }
 
     // Comprovante do cobrador (C2). Entra so pelo backend, que confere o link,
     // o tipo real e o tamanho; le quem ve o financeiro da organizacao.
     match /paymentProofs/{orgId}/{transactionId}/{proofId} {
-      allow read: if activeMember(orgId) && "financeiro" in account().modules;
+      allow read: if activeMember(orgId)
+        && "financeiro" in account().modules
+        && firestore.get(/databases/(default)/documents/organizations/$(orgId)/paymentProofs/$(proofId)).data.organizationId == orgId
+        && firestore.get(/databases/(default)/documents/organizations/$(orgId)/paymentProofs/$(proofId)).data.transactionId == transactionId
+        && professionalScope(orgId, firestore.get(/databases/(default)/documents/organizations/$(orgId)/paymentProofs/$(proofId)).data.get("professionalId", null));
       allow write: if false;
     }
 

@@ -48,7 +48,7 @@ export function PaymentProofActions({ transaction }: { transaction: Transaction 
 
   async function viewProof(item: PaymentProof) {
     try {
-      window.open(await paymentLinks.proofUrl(item.storagePath), "_blank", "noopener,noreferrer");
+      await paymentLinks.downloadProof(item.storagePath, item.contentType);
     } catch {
       show("Não foi possível abrir o comprovante.", "danger");
     }

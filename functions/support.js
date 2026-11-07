@@ -1,4 +1,5 @@
 import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 
@@ -10,9 +11,12 @@ import { runAs } from "./service-accounts.js";
 import { consumeRateLimit } from "./rate-limit.js";
 import { emailShell, escapeHtml, sendEmail } from "./ses.js";
 import { tenantActor } from "./tenant-auth.js";
+import { detectProofType } from "./generated/finance-payment-proof.js";
 
 const db = () => getFirestore();
 const OPTIONS = { ...ACCOUNT_CALL_OPTIONS, secrets: ["SES_ACCESS_KEY_ID", "SES_SECRET_ACCESS_KEY"], ...runAs("contas") };
+const UPLOAD_OPTIONS = { ...ACCOUNT_CALL_OPTIONS, ...runAs("contas"), memory: "512MiB" };
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const id = z.string().uuid();
 const attachment = z.object({
   id,
@@ -34,6 +38,11 @@ const replySchema = z.object({ ticketId: id, messageId: id, body: z.string().tri
 const ticketIdSchema = z.object({ ticketId: id }).strict();
 const updateSchema = z.object({ ticketId: id, priority: z.enum(SUPPORT_PRIORITIES).nullable().optional(), status: z.enum(SUPPORT_TICKET_STATUSES).optional() }).strict();
 const emptySchema = z.object({}).strict();
+const uploadSchema = z.object({
+  ticketId: id, messageId: id, attachmentId: id,
+  name: z.string().trim().min(1).max(160),
+  file: z.string().min(8).max(Math.ceil(MAX_ATTACHMENT_BYTES * 4 / 3) + 8).regex(/^[A-Za-z0-9+/]+={0,2}$/),
+}).strict();
 
 function supportEmail() {
   return process.env.SUPPORT_NOTIFICATION_EMAIL ?? "guilhermeluizatto@gmail.com";
@@ -53,11 +62,66 @@ function attachmentPathOk(item, organizationId, ticketId, messageId) {
   return item.storagePath.startsWith(`support/${organizationId}/${ticketId}/${messageId}/`);
 }
 
-function assertAttachments(items, organizationId, ticketId, messageId) {
+async function assertAttachments(items, organizationId, ticketId, messageId, actorId) {
   if (items.some((item) => !attachmentPathOk(item, organizationId, ticketId, messageId))) {
     throw new HttpsError("invalid-argument", "Um anexo não pertence a este chamado.");
   }
+  if (new Set(items.map((item) => item.storagePath)).size !== items.length) {
+    throw new HttpsError("invalid-argument", "Um anexo foi repetido.");
+  }
+  await Promise.all(items.map(async (item) => {
+    let metadata;
+    try { [metadata] = await getStorage().bucket().file(item.storagePath).getMetadata(); }
+    catch { throw new HttpsError("invalid-argument", "Um anexo não foi enviado."); }
+    const uploaded = metadata.metadata ?? {};
+    if (item.storagePath !== `support/${organizationId}/${ticketId}/${messageId}/${item.id}`
+      || uploaded.organizationId !== organizationId || uploaded.ticketId !== ticketId
+      || uploaded.messageId !== messageId || uploaded.attachmentId !== item.id
+      || uploaded.uploaderId !== actorId || uploaded.originalName !== item.name
+      || metadata.contentType !== item.contentType || Number(metadata.size) !== item.size) {
+      throw new HttpsError("invalid-argument", "Um anexo não corresponde a esta mensagem.");
+    }
+  }));
 }
+
+/** O backend verifica o arquivo antes de colocá-lo no caminho definitivo. */
+export const uploadSupportAttachment = onCall(UPLOAD_OPTIONS, async (request) => {
+  const actor = await actorOf(request);
+  await consumeRateLimit(actor.userId, "supportWrite");
+  const input = parse(uploadSchema, request.data);
+  const ticket = (await db().doc(paths.platformSupportTicket(input.ticketId)).get()).data();
+  let organizationId;
+  if (ticket) {
+    if (actor.kind !== "SUPPORT") {
+      const manages = actor.isHolder || ["OWNER", "ADMIN"].includes(actor.membership.role);
+      if (ticket.organizationId !== actor.organizationId || (!manages && ticket.openedBy !== actor.userId)) {
+        throw new HttpsError("permission-denied", "Este chamado não pertence a você.");
+      }
+    }
+    organizationId = ticket.organizationId;
+  } else {
+    if (actor.kind === "SUPPORT" || !actor.permissions.includes("support:create")) {
+      throw new HttpsError("permission-denied", "Não é possível anexar a um chamado inexistente.");
+    }
+    organizationId = actor.organizationId;
+  }
+  const bytes = Buffer.from(input.file, "base64");
+  if (bytes.length === 0 || bytes.length > MAX_ATTACHMENT_BYTES) {
+    throw new HttpsError("invalid-argument", "Envie um arquivo de até 5 MB.");
+  }
+  const contentType = detectProofType(new Uint8Array(bytes.subarray(0, 16)));
+  if (!contentType) throw new HttpsError("invalid-argument", "Use PNG, JPEG, WebP ou PDF válido.");
+  const storagePath = `support/${organizationId}/${input.ticketId}/${input.messageId}/${input.attachmentId}`;
+  const file = getStorage().bucket().file(storagePath);
+  const [exists] = await file.exists();
+  if (exists) throw new HttpsError("already-exists", "Este anexo já foi enviado.");
+  await file.save(bytes, { resumable: false, contentType, preconditionOpts: { ifGenerationMatch: 0 }, metadata: {
+    cacheControl: "private, max-age=0",
+    metadata: { organizationId, ticketId: input.ticketId, messageId: input.messageId,
+      attachmentId: input.attachmentId, uploaderId: actor.userId, originalName: input.name },
+  } });
+  return { id: input.attachmentId, storagePath, name: input.name, contentType, size: bytes.length };
+});
 
 async function notify({ to, subject, body, organization }) {
   await sendEmail({
@@ -72,7 +136,7 @@ export const createSupportTicket = onCall(OPTIONS, async (request) => {
   const actor = await tenantActor(request, "support:create");
   await consumeRateLimit(actor.userId, "supportWrite");
   const input = parse(ticketSchema, request.data);
-  assertAttachments(input.attachments, actor.organizationId, input.ticketId, input.messageId);
+  await assertAttachments(input.attachments, actor.organizationId, input.ticketId, input.messageId, actor.userId);
   const createdAt = new Date().toISOString();
   const ticket = {
     id: input.ticketId,
@@ -147,7 +211,7 @@ export const replySupportTicket = onCall(OPTIONS, async (request) => {
     const managesOrganization = actor.isHolder || ["OWNER", "ADMIN"].includes(actor.membership.role);
     if (ticket.organizationId !== actor.organizationId || (!managesOrganization && ticket.openedBy !== actor.userId)) throw new HttpsError("permission-denied", "Este chamado não pertence a você.");
   }
-  assertAttachments(input.attachments, ticket.organizationId, input.ticketId, input.messageId);
+  await assertAttachments(input.attachments, ticket.organizationId, input.ticketId, input.messageId, actor.userId);
   const createdAt = new Date().toISOString();
   const message = {
     id: input.messageId, ticketId: input.ticketId, organizationId: ticket.organizationId,

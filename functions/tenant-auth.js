@@ -11,7 +11,9 @@ const db = () => getFirestore();
 /** Resolve conta, organizacao e vinculo sem confiar em organizationId do cliente. */
 export async function tenantActor(request, permission = null) {
   const account = await accountOf(request);
-  if (account.platformRole !== "PROFESSIONAL" || !account.organizationId) {
+  if (account.platformRole !== "PROFESSIONAL" || !account.organizationId
+    || account.mustChangePassword || account.subscriptionStatus !== "ACTIVE"
+    || !(account.accessUntilMs > Date.now())) {
     throw new HttpsError("permission-denied", "Esta operação pertence a uma organização.");
   }
   const organizationRef = db().doc(paths.organization(account.organizationId));
@@ -22,7 +24,8 @@ export async function tenantActor(request, permission = null) {
   ]);
   const organization = organizationSnapshot.data();
   const membership = membershipSnapshot.data();
-  if (!organization || !membership || membership.status !== "ACTIVE") {
+  if (!organization || !membership || membership.status !== "ACTIVE"
+    || organization.primaryProfession !== account.professionId) {
     throw new HttpsError("permission-denied", "Vínculo com a organização não está ativo.");
   }
   const isHolder = organization.ownerId === request.auth.uid;

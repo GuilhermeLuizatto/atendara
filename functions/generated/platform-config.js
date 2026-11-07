@@ -128,6 +128,9 @@ export const PLATFORM_AUDIT_ACTION_LABELS = {
     SCOPE_MIGRATION_STARTED: "Migração de escopo por vínculo iniciada",
     SCOPE_MIGRATION_COMPLETED: "Migração de escopo por vínculo concluída",
     SCOPE_MIGRATION_FAILED: "Migração de escopo por vínculo falhou",
+    DOWNLOAD_TOKENS_REVOCATION_STARTED: "Revogação de links antigos iniciada",
+    DOWNLOAD_TOKENS_REVOCATION_COMPLETED: "Revogação de links antigos concluída",
+    DOWNLOAD_TOKENS_REVOCATION_FAILED: "Revogação de links antigos falhou",
     ORGANIZATION_DELETED: "Exclusão de organização pelo titular",
 };
 /**

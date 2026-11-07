@@ -73,6 +73,11 @@ export const PLATFORM_AUDIT_ACTIONS = [
     "SCOPE_MIGRATION_STARTED",
     "SCOPE_MIGRATION_COMPLETED",
     "SCOPE_MIGRATION_FAILED",
+    // Revogacao dos links de download antigos de arquivos sensiveis: inicio e
+    // conclusao (ou falha), com contagens e nenhum token.
+    "DOWNLOAD_TOKENS_REVOCATION_STARTED",
+    "DOWNLOAD_TOKENS_REVOCATION_COMPLETED",
+    "DOWNLOAD_TOKENS_REVOCATION_FAILED",
     // Unico ato desta trilha que nao e da operadora: o titular encerra a propria
     // organizacao. Fica aqui porque o tenant deixa de existir para guardar o
     // registro, e porque encerrar organizacao e assunto do contrato com a

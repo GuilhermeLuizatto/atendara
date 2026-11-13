@@ -2,6 +2,10 @@
 
 Este registro resume mudanças relevantes integradas à `main`. Código integrado, publicação e validação real são estados diferentes.
 
+## 13/11/2026
+
+- PR (número a preencher ao abrir): o CI ganhou o job `emulator`, que roda as suítes de regras, storage, repositório e a matriz de acesso nos emuladores (Java 21, `firebase-tools` 15.29.0, projeto `demo-atendara`, sem segredos) em todo push e PR. A falha aparece no PR, mas o job ainda não é verificação obrigatória do ruleset da `main`.
+
 ## 06/11/2026
 
 - [PR #106](https://github.com/GuilhermeLuizatto/atendara/pull/106): o CI voltou a aprovar PRs. A correção cobre o teste de cobrança que vencia com a data e os alertas de segurança no next (crítico, 16.3.8 → 16.4.5), zod, re2js e body-parser. O site subiu com o next corrigido; o zod e o body-parser das Functions só valem depois da publicação delas.

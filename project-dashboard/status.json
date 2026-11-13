@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "Atendara",
-  "reviewedAt": "2026-11-06",
+  "reviewedAt": "2026-11-13",
   "reviewNote": "Fotografia de acompanhamento. Merge, publicação e validação real são etapas diferentes.",
   "items": [
     {
@@ -98,6 +98,18 @@
       "next": "Repetir a conexão com um segundo membro da mesma organização junto da validação de equipe e escopo por profissional.",
       "owner": "Equipe",
       "evidence": "docs/GOOGLE-CALENDAR.md",
+      "confidence": "confirmado"
+    },
+    {
+      "id": "ci-emuladores",
+      "title": "Suítes do emulador no CI",
+      "kind": "teste",
+      "status": "em-revisao",
+      "priority": "alta",
+      "summary": "Job emulator no ci.yml (regras, storage, repositório e matriz de acesso, Java 21, firebase-tools 15.29.0) na branch ci/emuladores-no-ci; o passo a passo passou localmente em 13/11.",
+      "next": "Titular revisa e mergeia depois do PR #112; após algumas execuções verdes na main, incluir o job nas verificações obrigatórias do ruleset main protegida.",
+      "owner": "Titular",
+      "evidence": ".github/workflows/ci.yml",
       "confidence": "confirmado"
     },
     {

@@ -2,6 +2,10 @@
 
 Este registro resume mudanças relevantes integradas à `main`. Código integrado, publicação e validação real são estados diferentes.
 
+## 13/11/2026
+
+- [PR #112](https://github.com/GuilhermeLuizatto/atendara/pull/112): a matriz de acesso no emulador voltou a passar inteira (201/201). O teste da cobrança usava datas fixas de ciclo que venceram em 14/10; agora elas acompanham o relógio. Regras e comportamento não mudaram. O CI ainda não roda as suítes do emulador.
+
 ## 06/11/2026
 
 - [PR #106](https://github.com/GuilhermeLuizatto/atendara/pull/106): o CI voltou a aprovar PRs. A correção cobre o teste de cobrança que vencia com a data e os alertas de segurança no next (crítico, 16.3.8 → 16.4.5), zod, re2js e body-parser. O site subiu com o next corrigido; o zod e o body-parser das Functions só valem depois da publicação delas.

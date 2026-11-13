@@ -106,7 +106,7 @@
       "kind": "teste",
       "status": "em-revisao",
       "priority": "alta",
-      "summary": "Job emulator no ci.yml (regras, storage, repositório e matriz de acesso, Java 21, firebase-tools 15.29.0) no PR #113; o passo a passo passou localmente em 13/11.",
+      "summary": "Job emulator no ci.yml (regras, storage, repositório e matriz de acesso, Java 21, firebase-tools 15.29.0) no PR #113; o job passou no próprio PR em 13/11 (556 regras, 20 de storage, 49 de repositório, 201 de acesso).",
       "next": "Titular revisa e mergeia (o PR #112 já está na main); após algumas execuções verdes na main, incluir o job nas verificações obrigatórias do ruleset main protegida.",
       "owner": "Titular",
       "evidence": "https://github.com/GuilhermeLuizatto/atendara/pull/113",

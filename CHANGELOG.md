@@ -4,7 +4,7 @@ Este registro resume mudanças relevantes integradas à `main`. Código integrad
 
 ## 13/11/2026
 
-- PR (número a preencher ao abrir): o CI ganhou o job `emulator`, que roda as suítes de regras, storage, repositório e a matriz de acesso nos emuladores (Java 21, `firebase-tools` 15.29.0, projeto `demo-atendara`, sem segredos) em todo push e PR. A falha aparece no PR, mas o job ainda não é verificação obrigatória do ruleset da `main`.
+- [PR #113](https://github.com/GuilhermeLuizatto/atendara/pull/113): o CI ganhou o job `emulator`, que roda as suítes de regras, storage, repositório e a matriz de acesso nos emuladores (Java 21, `firebase-tools` 15.29.0, projeto `demo-atendara`, sem segredos) em todo push e PR. A falha aparece no PR, mas o job ainda não é verificação obrigatória do ruleset da `main`.
 
 ## 06/11/2026
 

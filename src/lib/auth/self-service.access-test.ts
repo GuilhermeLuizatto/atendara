@@ -44,7 +44,8 @@ const ESTETICISTA = {
   displayName: "Bianca Ferraz",
   email: "bianca-autocadastro@atendara.test",
   password: "Senha#Teste-Bianca1",
-  professionId: "AESTHETICS" as const,
+  professionId: "PSYCHOLOGIST" as const,
+  councilRegistration: "CRP 06/654321",
   businessName: "Espaço Lume",
   acceptedLegalVersion: LEGAL_VERSION,
 };
@@ -223,22 +224,16 @@ describe("duas contas criadas em sequencia nao se enxergam", () => {
 
   it("cada uma abre a propria organizacao", async () => {
     const minha = await getDoc(doc(bianca.firestore, paths.organization(biancaOrg)));
-    expect(minha.data()).toMatchObject({ primaryProfession: "AESTHETICS" });
+    expect(minha.data()).toMatchObject({ primaryProfession: "PSYCHOLOGIST" });
   });
 
-  // E2.1: o catalogo nasce com a organizacao, so onde a flag da profissao
-  // liga, e sem nenhum preco que ela nao tenha escolhido.
-  it("a esteticista nasce com o catalogo; a psicologa, sem catalogo nenhum", async () => {
-    const dela = await getDocs(collection(bianca.firestore, paths.collection(biancaOrg, "services")));
-    expect(dela.empty).toBe(false);
-    for (const servico of dela.docs) {
-      expect(servico.data()).toMatchObject({ priceInCents: null, durationMinutes: null, enabled: false });
+  // E2.1: o catalogo so nasce onde a flag da profissao liga. Hoje so Psicologia
+  // e oferecida no cadastro (sem catalogo), entao as duas nascem sem nenhum.
+  it("psicologas nascem sem catalogo, e o de uma nao chega na outra", async () => {
+    for (const [sessao, org] of [[bianca, biancaOrg], [helena, helenaOrg]] as const) {
+      const servicos = await getDocs(collection(sessao.firestore, paths.collection(org, "services")));
+      expect(servicos.empty).toBe(true);
     }
-
-    const daOutra = await getDocs(collection(helena.firestore, paths.collection(helenaOrg, "services")));
-    expect(daOutra.empty).toBe(true);
-
-    // E o catalogo de uma nao chega na outra, como o resto do tenant.
     await expect(
       getDocs(collection(helena.firestore, paths.collection(biancaOrg, "services"))),
     ).rejects.toMatchObject({ code: "permission-denied" });
@@ -368,7 +363,7 @@ describe("assinatura depois do bloqueio devolve tudo ao normal", () => {
 
     // As regras reais voltam a entregar a organizacao.
     const organizacao = await getDoc(doc(bianca.firestore, paths.organization(biancaOrg)));
-    expect(organizacao.data()).toMatchObject({ primaryProfession: "AESTHETICS" });
+    expect(organizacao.data()).toMatchObject({ primaryProfession: "PSYCHOLOGIST" });
   });
 
   it("a rotina diaria nao encontra mais a conta", async () => {

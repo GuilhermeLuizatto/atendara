@@ -173,3 +173,32 @@ export async function runRevocation({
   report.finishedAt = now();
   return { report, exitCode };
 }
+
+const PRODUCTION_PROJECT = "atendo-a3481";
+
+/**
+ * Lê e confere os argumentos do script antes de tocar em qualquer serviço:
+ * em produção só o projeto real; contra o emulador só `demo-*`; `--apply`
+ * só com `--actor`.
+ */
+export function parseRevokeArguments(args, env = process.env) {
+  const option = (name) => {
+    const at = args.indexOf(name);
+    return at >= 0 ? args[at + 1] : null;
+  };
+  const projectId = args[0];
+  const apply = args.includes("--apply");
+  const actorId = option("--actor");
+  const bucketName = option("--bucket");
+  if (!bucketName || bucketName.startsWith("--")) throw new Error("Informe --bucket <nome-do-bucket>.");
+  if (apply && (!actorId || actorId.startsWith("--") || actorId.includes("/"))) {
+    throw new Error("Com --apply, informe --actor <uid-da-operadora>.");
+  }
+  const emulator = Boolean(env.FIREBASE_STORAGE_EMULATOR_HOST);
+  if (emulator ? !projectId?.startsWith("demo-") : projectId !== PRODUCTION_PROJECT) {
+    throw new Error(emulator
+      ? "Contra o emulador use um projeto demo-*."
+      : `Informe explicitamente o projeto ${PRODUCTION_PROJECT}.`);
+  }
+  return { projectId, apply, actorId, bucketName, emulator };
+}

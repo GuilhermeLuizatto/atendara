@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { rewriteWithoutToken, runRevocation, validateActor } from "./download-token-revocation.js";
+import { parseRevokeArguments, rewriteWithoutToken, runRevocation, validateActor } from "./download-token-revocation.js";
 
 /**
  * A revogação dos links antigos roda contra produção uma vez, com a operadora
@@ -150,5 +150,42 @@ describe("runRevocation", () => {
     delete options.newId;
     await runRevocation(options);
     expect(w.audits[0].id).toMatch(/^[0-9a-f-]{36}$/);
+  });
+});
+
+describe("parseRevokeArguments", () => {
+  const PROD = "atendo-a3481";
+
+  it("simulação em produção só precisa do projeto e do bucket", () => {
+    expect(parseRevokeArguments([PROD, "--bucket", "b"], {})).toEqual({
+      projectId: PROD, apply: false, actorId: null, bucketName: "b", emulator: false,
+    });
+  });
+
+  it("aplicar exige o ator", () => {
+    expect(parseRevokeArguments([PROD, "--bucket", "b", "--actor", "op-1", "--apply"], {})).toMatchObject({ apply: true, actorId: "op-1" });
+    expect(() => parseRevokeArguments([PROD, "--bucket", "b", "--apply"], {})).toThrow("--actor");
+    expect(() => parseRevokeArguments([PROD, "--bucket", "b", "--apply", "--actor"], {})).toThrow("--actor");
+    expect(() => parseRevokeArguments([PROD, "--bucket", "b", "--actor", "--apply", "--apply"], {})).toThrow("--actor");
+    expect(() => parseRevokeArguments([PROD, "--bucket", "b", "--actor", "a/b", "--apply"], {})).toThrow("--actor");
+  });
+
+  it("exige o bucket", () => {
+    expect(() => parseRevokeArguments([PROD], {})).toThrow("--bucket");
+    expect(() => parseRevokeArguments([PROD, "--bucket"], {})).toThrow("--bucket");
+    expect(() => parseRevokeArguments([PROD, "--bucket", "--apply"], {})).toThrow("--bucket");
+  });
+
+  it("em produção recusa qualquer outro projeto, inclusive demo", () => {
+    expect(() => parseRevokeArguments(["outro", "--bucket", "b"], {})).toThrow(PROD);
+    expect(() => parseRevokeArguments(["demo-x", "--bucket", "b"], {})).toThrow(PROD);
+    expect(() => parseRevokeArguments(["--bucket", "b"], {})).toThrow(PROD);
+  });
+
+  it("contra o emulador aceita só projeto demo", () => {
+    const env = { FIREBASE_STORAGE_EMULATOR_HOST: "127.0.0.1:9199" };
+    expect(parseRevokeArguments(["demo-atendara", "--bucket", "b"], env)).toMatchObject({ emulator: true });
+    expect(() => parseRevokeArguments([PROD, "--bucket", "b"], env)).toThrow("demo-*");
+    expect(() => parseRevokeArguments(["--bucket", "b"], env)).toThrow("demo-*");
   });
 });

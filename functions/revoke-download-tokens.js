@@ -24,33 +24,11 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 
 import { createCliCredential } from "./adc-credential.js";
-import { runRevocation } from "./download-token-revocation.js";
+import { parseRevokeArguments, runRevocation } from "./download-token-revocation.js";
 import { paths } from "./generated/paths.js";
 
-const PRODUCTION_PROJECT = "atendo-a3481";
-
-const args = process.argv.slice(2);
-const projectId = args[0];
-const option = (name) => {
-  const at = args.indexOf(name);
-  return at >= 0 ? args[at + 1] : null;
-};
-const apply = args.includes("--apply");
-const actorId = option("--actor");
-const bucketName = option("--bucket");
+const { projectId, apply, actorId, bucketName, emulator } = parseRevokeArguments(process.argv.slice(2));
 const runId = randomUUID();
-
-if (!bucketName || bucketName.startsWith("--")) throw new Error("Informe --bucket <nome-do-bucket>.");
-if (apply && (!actorId || actorId.startsWith("--") || actorId.includes("/"))) {
-  throw new Error("Com --apply, informe --actor <uid-da-operadora>.");
-}
-
-const emulator = Boolean(process.env.FIREBASE_STORAGE_EMULATOR_HOST);
-if (emulator ? !projectId?.startsWith("demo-") : projectId !== PRODUCTION_PROJECT) {
-  throw new Error(emulator
-    ? "Contra o emulador use um projeto demo-*."
-    : `Informe explicitamente o projeto ${PRODUCTION_PROJECT}.`);
-}
 
 let adcPath = null;
 let cliEmail = null;

@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   actor: null,
   account: null,
   batched: [],
+  updated: [],
 }));
 
 vi.mock("firebase-functions/v2/https", () => ({
@@ -68,12 +69,13 @@ vi.mock("firebase-admin/firestore", () => ({
     }),
     batch: () => ({
       create: (ref, data) => { state.batched.push({ path: ref.path, data }); },
+      update: (ref, data) => { state.updated.push({ path: ref.path, data }); },
       commit: async () => {},
     }),
   }),
 }));
 
-const { createSupportTicket, uploadSupportAttachment } = await import("./support.js");
+const { createSupportTicket, replySupportTicket, uploadSupportAttachment } = await import("./support.js");
 
 const T = "11111111-1111-4111-8111-111111111111";
 const M = "22222222-2222-4222-8222-222222222222";
@@ -97,6 +99,7 @@ beforeEach(() => {
   state.ticket = undefined;
   state.stored = new Map();
   state.batched = [];
+  state.updated = [];
   state.account = { platformRole: "PROFESSIONAL" };
   state.actor = member();
 });
@@ -125,7 +128,7 @@ describe("uploadSupportAttachment", () => {
   });
 
   it("recusa mais de 5 MB", async () => {
-    const big = encode([...PNG, ...new Array(5 * 1024 * 1024).fill(0)]);
+    const big = encode([...PNG, ...new Array(5 * 1024 * 1024 + 1 - PNG.length).fill(0)]);
     await expect(upload({ file: big })).rejects.toMatchObject({ code: "invalid-argument" });
   });
 
@@ -203,5 +206,41 @@ describe("anexos na abertura do chamado", () => {
     const item = await declared();
     state.stored.get(item.storagePath).metadata.uploaderId = "u-9";
     await expect(call(createSupportTicket, ticketInput([item]))).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+});
+
+describe("resposta com anexo", () => {
+  const reply = (attachments, extra = {}) => call(replySupportTicket, { ticketId: T, messageId: M, body: "Segue o print.", attachments, ...extra });
+  const mine = { organizationId: "org-a", openedBy: "u-1", subject: "Erro", organizationName: "Clínica A", openedByEmail: "ana@x.com" };
+
+  it("grava a mensagem, passa o chamado para o suporte e confere o anexo", async () => {
+    state.ticket = mine;
+    const sent = await upload();
+    await expect(reply([{ id: A, storagePath: sent.storagePath, name: sent.name, contentType: sent.contentType, size: sent.size }])).resolves.toEqual({ ok: true });
+    expect(state.batched).toHaveLength(1);
+    expect(state.updated[0].data.status).toBe("WAITING_SUPPORT");
+  });
+
+  it("anexo que não foi enviado derruba a resposta", async () => {
+    state.ticket = mine;
+    const item = { id: B, storagePath: `support/org-a/${T}/${M}/${B}`, name: "x.png", contentType: "image/png", size: 10 };
+    await expect(reply([item])).rejects.toMatchObject({ code: "invalid-argument" });
+    expect(state.batched).toHaveLength(0);
+  });
+
+  it("o suporte responde e passa o chamado para o cliente", async () => {
+    state.account = { platformRole: "PLATFORM_ADMIN", displayName: "Suporte" };
+    state.ticket = mine;
+    await expect(reply([])).resolves.toEqual({ ok: true });
+    expect(state.updated[0].data.status).toBe("WAITING_CUSTOMER");
+  });
+
+  it("outro membro da organização não responde ao chamado alheio", async () => {
+    state.ticket = { ...mine, openedBy: "u-9" };
+    await expect(reply([])).rejects.toMatchObject({ code: "permission-denied" });
+  });
+
+  it("chamado inexistente", async () => {
+    await expect(reply([])).rejects.toMatchObject({ code: "not-found" });
   });
 });

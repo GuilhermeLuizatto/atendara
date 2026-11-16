@@ -8,6 +8,7 @@ import { useMemo } from "react";
 import { APP_NAME } from "@/config/app";
 import { NAV_ITEMS, navLabel, type AppRoute } from "@/config/navigation";
 import { canAccessModule, canManageSubscription, isPlatformAdmin } from "@/config/access";
+import { isModuleHidden } from "@/config/scope";
 import type { AppModule } from "@/types/access";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils/cn";
@@ -79,7 +80,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <nav aria-label="Principal" className="scrollbar-slim flex-1 overflow-y-auto px-2 pb-4">
         <ul className="space-y-0.5">
           {isPlatformAdmin(user?.access) ? <li><Link href="/admin" onClick={onNavigate} className="text-primary block rounded-lg px-3 py-2 text-sm font-medium">Administração</Link></li> : null}
-          {NAV_ITEMS.filter((item) => canAccessModule(user?.access, item.href.split("/")[1] as AppModule)).map(
+          {NAV_ITEMS.filter((item) => { const area = item.href.split("/")[1] as AppModule; return !isModuleHidden(area) && canAccessModule(user?.access, area); }).map(
             (item) => {
               // A rota mais especifica ganha: o primeiro contato fica dentro de
               // mensagens, e so um dos dois aparece como atual.

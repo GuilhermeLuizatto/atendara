@@ -2,7 +2,9 @@
 
 import { Bell, CalendarDays, MessageSquare, Wallet } from "lucide-react";
 
+import { isModuleHidden } from "@/config/scope";
 import { StatCard } from "@/components/ui/stat-card";
+import { cn } from "@/lib/utils/cn";
 import { formatCurrency } from "@/lib/utils/format";
 
 import type { DashboardModel } from "./use-dashboard";
@@ -26,7 +28,7 @@ export function KpiRow({
   return (
     <section
       aria-label="Indicadores do dia"
-      className="grid grid-cols-2 gap-3 xl:grid-cols-4"
+      className={cn("grid grid-cols-2 gap-3", isModuleHidden("mensagens") ? "xl:grid-cols-3" : "xl:grid-cols-4")}
     >
       <StatCard
         label={`${appointmentPlural} hoje`}
@@ -48,23 +50,25 @@ export function KpiRow({
         }
       />
 
-      <StatCard
-        label="Mensagens pendentes"
-        value={String(model.waitingConversations.length)}
-        hint={
-          model.criticalConversations > 0
-            ? `${model.criticalConversations} com possível risco`
-            : "Aguardando sua resposta"
-        }
-        icon={MessageSquare}
-        tone={
-          model.criticalConversations > 0
-            ? "danger"
-            : model.waitingConversations.length > 0
-              ? "warning"
-              : "default"
-        }
-      />
+      {isModuleHidden("mensagens") ? null : (
+        <StatCard  
+          label="Mensagens pendentes"  
+          value={String(model.waitingConversations.length)}  
+          hint={  
+            model.criticalConversations > 0  
+              ? `${model.criticalConversations} com possível risco`  
+              : "Aguardando sua resposta"  
+          }  
+          icon={MessageSquare}  
+          tone={  
+            model.criticalConversations > 0  
+              ? "danger"  
+              : model.waitingConversations.length > 0  
+                ? "warning"  
+                : "default"  
+          }  
+        />
+      )}
 
       <StatCard
         label="Faturamento do mês"

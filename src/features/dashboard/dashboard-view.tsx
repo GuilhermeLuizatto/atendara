@@ -15,6 +15,7 @@ import { MaintenancePanel } from "./maintenance-panel";
 import { NextAppointment } from "./next-appointment";
 import { UpcomingAppointments } from "./upcoming-appointments";
 import { useDashboard } from "./use-dashboard";
+import { isModuleHidden } from "@/config/scope";
 import { WaitingMessages } from "./waiting-messages";
 
 export function DashboardView() {
@@ -57,10 +58,12 @@ export function DashboardView() {
             now={model.now}
             appointmentTerm={terminology.appointment}
           />
-          <WaitingMessages
-            conversations={model.waitingConversations}
-            now={model.now}
-          />
+          {isModuleHidden("mensagens") ? null : (
+            <WaitingMessages
+              conversations={model.waitingConversations}
+              now={model.now}
+            />
+          )}
         </div>
 
         <div

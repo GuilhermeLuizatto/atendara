@@ -1,3 +1,5 @@
+import { isSettingsSectionHidden } from "@/config/scope";
+
 export const SETTINGS_SECTIONS = [
   "geral",
   "servicos",
@@ -11,8 +13,13 @@ export const SETTINGS_SECTIONS = [
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
+/** Abas que o recorte de produto esconde chegam por URL como se nao existissem. */
 export function settingsSectionFromQuery(
   value: string | null,
 ): SettingsSection | null {
-  return SETTINGS_SECTIONS.find((section) => section === value) ?? null;
+  return (
+    SETTINGS_SECTIONS.find(
+      (section) => section === value && !isSettingsSectionHidden(section),
+    ) ?? null
+  );
 }

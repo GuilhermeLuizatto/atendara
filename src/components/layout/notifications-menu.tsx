@@ -7,6 +7,7 @@ import { useCallback, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ATTENTION_TONE } from "@/components/ui/tones";
+import { isModuleHidden } from "@/config/scope";
 import { ATTENTION_LABELS } from "@/config/labels";
 import { cn } from "@/lib/utils/cn";
 import { formatRelativeToNow } from "@/lib/utils/format";
@@ -149,15 +150,17 @@ export function NotificationsMenu() {
             </ul>
           )}
 
-          <div className="border-border border-t px-4 py-2.5">
-            <Link
-              href="/mensagens"
-              onClick={close}
-              className="text-primary text-xs font-medium hover:underline"
-            >
-              Ir para a central de mensagens
-            </Link>
-          </div>
+          {isModuleHidden("mensagens") ? null : (
+            <div className="border-border border-t px-4 py-2.5">
+              <Link
+                href="/mensagens"
+                onClick={close}
+                className="text-primary text-xs font-medium hover:underline"
+              >
+                Ir para a central de mensagens
+              </Link>
+            </div>
+          )}
         </div>
       ) : null}
     </div>

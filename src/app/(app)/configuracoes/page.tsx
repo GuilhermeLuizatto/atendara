@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard } from "@/components/ui/skeleton";
 import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { isPlatformAdmin, MODULE_LABELS } from "@/config/access";
+import { isModuleHidden, isSettingsSectionHidden } from "@/config/scope";
 import { ROLE_LABELS } from "@/config/permissions";
 import { AgendaSettingsForm } from "@/features/settings/agenda-settings-form";
 import { AuditTrail } from "@/features/settings/audit-trail";
@@ -77,14 +78,14 @@ function SettingsContent() {
     { value: "geral", label: "Geral" },
     ...(hasCatalog ? [{ value: "servicos" as const, label: "Serviços" }] : []),
     { value: "avisos", label: "Avisos de atendimento" },
-    ...(session?.permissions.includes("receipt:read")
+    ...(!isSettingsSectionHidden("recibos") && session?.permissions.includes("receipt:read")
       ? [{ value: "recibos" as const, label: "Recibos" }]
       : []),
     { value: "whatsapp", label: "WhatsApp" },
     ...(canConnectCalendar
       ? [{ value: "google" as const, label: "Google Calendar" }]
       : []),
-    ...(session?.permissions.includes("automationQueue:read")
+    ...(!isSettingsSectionHidden("fila") && session?.permissions.includes("automationQueue:read")
       ? [{ value: "fila" as const, label: "Fila de automações" }]
       : []),
     ...(canReadAudit
@@ -138,6 +139,7 @@ function SettingsContent() {
                   {admin
                     ? "todas"
                     : access?.modules
+                        .filter((area) => !isModuleHidden(area))
                         .map((area) => MODULE_LABELS[area])
                         .join(", ")}
                 </p>

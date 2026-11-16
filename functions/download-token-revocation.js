@@ -63,3 +63,113 @@ export function metadataWithoutToken(customMetadata) {
   delete rest[DOWNLOAD_TOKEN_KEY];
   return rest;
 }
+
+const REASON = "Revogação dos links de download antigos (revisão de segurança de 10/10/2026)";
+
+/** Mesmos bytes e metadados, sem o token; falha se o objeto mudou no meio. */
+export async function rewriteWithoutToken(bucket, name) {
+  const file = bucket.file(name);
+  const [metadata] = await file.getMetadata();
+  const [bytes] = await file.download();
+  await file.save(bytes, {
+    resumable: false,
+    contentType: metadata.contentType,
+    preconditionOpts: { ifGenerationMatch: metadata.generation },
+    metadata: {
+      cacheControl: metadata.cacheControl ?? "private, max-age=0",
+      contentDisposition: metadata.contentDisposition,
+      metadata: metadataWithoutToken(metadata.metadata),
+    },
+  });
+}
+
+async function listObjects(bucket) {
+  const objects = [];
+  for (const prefix of SENSITIVE_PREFIXES) {
+    const [files] = await bucket.getFiles({ prefix });
+    for (const file of files) objects.push({ name: file.name, metadata: file.metadata?.metadata ?? {} });
+  }
+  return objects;
+}
+
+/**
+ * Quem pode aplicar: conta ativa e liberada da plataforma e, fora do
+ * emulador, a mesma conta do `firebase login`.
+ */
+export async function validateActor({ db, paths, actorId, cliEmail, emulator }) {
+  const account = (await db.doc(paths.account(actorId)).get()).data();
+  if (
+    !account ||
+    account.userId !== actorId ||
+    account.platformRole !== "PLATFORM_ADMIN" ||
+    account.status !== "ACTIVE" ||
+    account.mustChangePassword
+  ) {
+    throw new Error("O --actor deve identificar uma conta administrativa ativa e liberada da plataforma.");
+  }
+  if (!emulator && (!cliEmail || account.email?.trim().toLowerCase() !== cliEmail)) {
+    throw new Error("O --actor não corresponde à conta usada pelo firebase login.");
+  }
+}
+
+/**
+ * Simula ou aplica a revogação e devolve o relatório e o código de saída. Os
+ * efeitos (Firestore, Storage, relógio, console) entram por parâmetro para o
+ * teste provar cada desfecho sem emulador.
+ */
+export async function runRevocation({
+  db, bucket, paths, apply, actorId, cliEmail, emulator, runId, projectId, bucketName,
+  now = () => new Date().toISOString(), log = console.log, logError = console.error,
+  newId = () => crypto.randomUUID(),
+}) {
+  const audit = async (action, details) => {
+    const id = newId();
+    await db.doc(paths.platformAuditLog(id)).create({
+      id, action, actorId, organizationId: null, targetUserId: null, reason: REASON,
+      details: { runId, tool: "revoke-download-tokens", ...details },
+      createdAt: now(),
+    });
+  };
+  const report = {
+    runId, projectId, bucket: bucketName, actorId: actorId ?? null,
+    mode: apply ? "APPLY" : "DRY_RUN", startedAt: now(),
+  };
+  let exitCode = 0;
+  try {
+    if (apply) await validateActor({ db, paths, actorId, cliEmail, emulator });
+    const plan = planRevocation(await listObjects(bucket));
+    report.planned = { inspected: plan.inspected, alreadyClean: plan.alreadyClean, toRevoke: plan.revoke.length, byOrganization: plan.byOrganization };
+    log(`Objetos sensíveis: ${plan.inspected}. Com link antigo: ${plan.revoke.length}. Já limpos: ${plan.alreadyClean}.`);
+
+    if (apply && plan.revoke.length > 0) {
+      await audit("DOWNLOAD_TOKENS_REVOCATION_STARTED", { planned: report.planned });
+      const failed = [];
+      for (const name of plan.revoke) {
+        try {
+          await rewriteWithoutToken(bucket, name);
+        } catch (error) {
+          failed.push({ name, message: String(error.message).slice(0, 200) });
+        }
+      }
+      const remaining = planRevocation(await listObjects(bucket)).revoke;
+      report.after = { stillExposed: remaining.length };
+      report.failed = failed;
+      if (failed.length > 0 || remaining.length > 0) {
+        exitCode = 1;
+        await audit("DOWNLOAD_TOKENS_REVOCATION_FAILED", { failed: failed.length, remaining: remaining.length }).catch(() => {});
+        logError(`✘ ${failed.length} falha(s); ${remaining.length} objeto(s) com o link antigo.`);
+      } else {
+        await audit("DOWNLOAD_TOKENS_REVOCATION_COMPLETED", { revoked: plan.revoke.length });
+        log(`✔ ${plan.revoke.length} link(s) antigo(s) revogado(s) e conferido(s).`);
+      }
+    } else if (!apply) {
+      log("Simulação: nada foi alterado. Rode com --actor <uid> --apply para revogar.");
+    }
+  } catch (error) {
+    exitCode = 1;
+    report.error = String(error.message).slice(0, 300);
+    logError(`✘ ${error.message}`);
+  }
+  report.finishedAt = now();
+  return { report, exitCode };
+}

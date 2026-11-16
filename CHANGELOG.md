@@ -2,6 +2,11 @@
 
 Este registro resume mudanças relevantes integradas à `main`. Código integrado, publicação e validação real são estados diferentes.
 
+## 16/11/2026
+
+- [PR #118](https://github.com/GuilhermeLuizatto/atendara/pull/118): o produto passa a ser só Psicologia, para quem atende sozinho. As outras profissões, Mensagens (com o selo), Primeiro contato, Equipe e as abas Recibos e Fila de automações ficam escondidas, sem apagar código nem dado; a lista está em `src/config/scope.ts` e no campo `listed` de `definitions.ts`. As Functions rejeitam cadastro e troca para profissão não listada, então só valem depois de publicadas. Rotas escondidas voltam ao dashboard.
+- [PR #117](https://github.com/GuilhermeLuizatto/atendara/pull/117): revisão de segurança de arquivos e trilhas, com revogação dos links de download antigos (`functions/revoke-download-tokens.js`) e teto por token nas callables públicas. Regras e site foram publicados pelo Deploy; a publicação das Functions e a revogação em produção ainda dependem do titular (a simulação de 16/11 não achou objetos a revogar).
+
 ## 13/11/2026
 
 - [PR #113](https://github.com/GuilhermeLuizatto/atendara/pull/113): o CI ganhou o job `emulator`, que roda as suítes de regras, storage, repositório e a matriz de acesso nos emuladores (Java 21, `firebase-tools` 15.29.0, projeto `demo-atendara`, sem segredos) em todo push e PR. A falha aparece no PR, mas o job ainda não é verificação obrigatória do ruleset da `main`.

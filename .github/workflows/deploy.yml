@@ -132,13 +132,16 @@ jobs:
       # nova do frontend nao entra no ar com o banco ainda desprotegido.
       # O projeto entra por variavel de ambiente, nunca expandido dentro do
       # script: valor de segredo colado no shell vira codigo se tiver aspas.
-      - name: Publicar Security Rules e indices
+      # As regras do Storage seguem junto das do Firestore: arquivo de paciente
+      # e comprovante de pagamento nao podem continuar sob regra velha depois de
+      # uma mudanca — foi o que obrigou a publicar o PR #117 a mao.
+      - name: Publicar Security Rules (Firestore e Storage) e indices
         if: steps.guard.outputs.ready == 'true'
         env:
           PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
         run: |
           npx --yes "firebase-tools@$FIREBASE_TOOLS_VERSION" deploy \
-            --only firestore:rules,firestore:indexes \
+            --only firestore:rules,firestore:indexes,storage \
             --project "$PROJECT_ID" \
             --non-interactive
 

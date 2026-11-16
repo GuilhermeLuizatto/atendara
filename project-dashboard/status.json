@@ -29,6 +29,18 @@
       "confidence": "confirmado"
     },
     {
+      "id": "deploy-regras-storage",
+      "title": "Deploy publica as regras do Storage",
+      "kind": "risco",
+      "status": "em-revisao",
+      "priority": "alta",
+      "summary": "O workflow da main publicava só firestore:rules e firestore:indexes, então storage.rules mudado no PR #117 precisou ser publicado à mão. O passo de regras passou a incluir storage.",
+      "next": "Titular revisa o diff e decide: ao mergear, o Deploy da main passa a publicar storage.rules junto das regras do Firestore.",
+      "owner": "Titular",
+      "evidence": ".github/workflows/deploy.yml",
+      "confidence": "confirmado"
+    },
+    {
       "id": "lancamento-piloto",
       "title": "Lançamento do piloto",
       "kind": "teste",

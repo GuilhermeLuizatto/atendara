@@ -26,9 +26,8 @@ import { getFirestore } from "firebase-admin/firestore";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { resolve } from "node:path";
 
-import { adcFileName, installCleanup, removeLeftovers } from "./adc-credential.js";
+import { createCliCredential } from "./adc-credential.js";
 import { messagesPath, paths } from "./generated/paths.js";
 import { DERIVED_COLLECTIONS, planScopeMigration, SCOPE_MIGRATION_VERSION } from "./scope-migration.js";
 
@@ -66,24 +65,14 @@ if (emulator) {
   initializeApp({ projectId });
 } else {
   const require = createRequire(import.meta.url);
-  const firebaseCliAuth = require("../.local/firebase-tools/node_modules/firebase-tools/lib/auth.js");
-  const firebaseCliApi = require("../.local/firebase-tools/node_modules/firebase-tools/lib/api.js");
-  const cliAccount = firebaseCliAuth.getGlobalDefaultAccount();
-  if (!cliAccount?.tokens?.refresh_token) throw new Error("Execute firebase login antes da migração.");
-  cliEmail = cliAccount.user?.email?.trim().toLowerCase() ?? null;
-  await mkdir(".local", { recursive: true });
-  const leftovers = removeLeftovers(resolve(".local"));
-  if (leftovers.length > 0) console.warn(`Credencial de execução anterior apagada: ${leftovers.join(", ")}`);
-  adcPath = resolve(".local", adcFileName());
-  await writeFile(adcPath, JSON.stringify({
-    type: "authorized_user",
-    client_id: firebaseCliApi.clientId(),
-    client_secret: firebaseCliApi.clientSecret(),
-    refresh_token: cliAccount.tokens.refresh_token,
-    quota_project_id: projectId,
-  }), { flag: "wx" });
-  installCleanup(adcPath);
-  process.env.GOOGLE_APPLICATION_CREDENTIALS = adcPath;
+  ({ adcPath, cliEmail } = await createCliCredential({
+    projectId,
+    loginMessage: "Execute firebase login antes da migração.",
+    loadCli: () => ({
+    auth: require("../.local/firebase-tools/node_modules/firebase-tools/lib/auth.js"),
+    api: require("../.local/firebase-tools/node_modules/firebase-tools/lib/api.js"),
+  }),
+  }));
   initializeApp({ credential: applicationDefault(), projectId });
 }
 

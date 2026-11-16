@@ -128,6 +128,9 @@ export const PLATFORM_AUDIT_ACTION_LABELS = {
     SCOPE_MIGRATION_STARTED: "Migração de escopo por vínculo iniciada",
     SCOPE_MIGRATION_COMPLETED: "Migração de escopo por vínculo concluída",
     SCOPE_MIGRATION_FAILED: "Migração de escopo por vínculo falhou",
+    DOWNLOAD_TOKENS_REVOCATION_STARTED: "Revogação de links antigos iniciada",
+    DOWNLOAD_TOKENS_REVOCATION_COMPLETED: "Revogação de links antigos concluída",
+    DOWNLOAD_TOKENS_REVOCATION_FAILED: "Revogação de links antigos falhou",
     ORGANIZATION_DELETED: "Exclusão de organização pelo titular",
 };
 /**
@@ -192,6 +195,12 @@ export const CALLABLE_RATE_LIMITS = {
     // Consultar e barato; enviar arquivo, nao.
     paymentLinkByNetwork: { max: 120, windowSeconds: 3600 },
     paymentProofByNetwork: { max: 10, windowSeconds: 3600 },
+    // O mesmo teto por LINK. O sujeito por rede vem de cabecalho que o cliente
+    // pode forjar; o token do link nao. Quem tem um link nao enche o Storage nem
+    // a fila de conferencia trocando de origem.
+    paymentLinkByLink: { max: 60, windowSeconds: 3600 },
+    paymentProofByLink: { max: 5, windowSeconds: 86400 },
+    teamInvitationByToken: { max: 10, windowSeconds: 3600 },
     paymentLinkWrite: { max: 120, windowSeconds: 3600 },
     receiptWrite: { max: 120, windowSeconds: 3600 },
 };

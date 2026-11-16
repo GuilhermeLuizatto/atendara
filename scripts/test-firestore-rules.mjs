@@ -564,7 +564,9 @@ try {
   await allowed(updateDoc(doc(db("ownerRole"), paths.organization("org-a")), { "settings.notifications": { enabled: true, verifiedSenderChannels: ["SMS"], rules: [] }, ownerId: "a" }));
 
   // Trilha de auditoria: o profissional escreve, so a administracao le.
-  await allowed(setDoc(doc(db("a"), paths.document("org-a", "auditLogs", "novo")), { organizationId: "org-a", action: "CREATE" }));
+  await allowed(setDoc(doc(db("a"), paths.document("org-a", "auditLogs", "novo")), { id: "novo", organizationId: "org-a", actorId: "a", createdBy: "a", updatedBy: "a", action: "CREATE" }));
+  await deniedBecause("auditoria atribuida a outro membro", setDoc(doc(db("a"), paths.document("org-a", "auditLogs", "forjado")), { id: "forjado", organizationId: "org-a", actorId: "b", createdBy: "a", updatedBy: "a", action: "CREATE" }));
+  await deniedBecause("decisao atribuida a outro membro", setDoc(doc(db("a"), paths.document("org-a", "aiDecisions", "forjada")), { id: "forjada", organizationId: "org-a", professionalId: "a", createdBy: "b", updatedBy: "b", classification: "ADMINISTRATIVE" }));
   await denied(getDoc(doc(db("a"), own("auditLogs"))));
   await allowed(getDoc(doc(db("ownerRole"), own("auditLogs"))));
   await allowed(getDoc(doc(db("adminRole"), own("auditLogs"))));
@@ -858,7 +860,7 @@ try {
   const sessaoA = db("a");
   const assumida = () => doc(sessaoA, paths.document("org-a", "conversations", "conv-assumida"));
   const devolver = { escalated: false, escalationReason: null, status: "OPEN", attention: "NORMAL" };
-  const resumeAudit = (id, extra = {}) => [doc(sessaoA, paths.document("org-a", "auditLogs", id)), { id, organizationId: "org-a", actorType: "USER", actorId: "a", action: "UPDATE", resource: { type: "conversation", id: "conv-assumida" }, summary: "Automação retomada pelo profissional.", ...extra }];
+  const resumeAudit = (id, extra = {}) => [doc(sessaoA, paths.document("org-a", "auditLogs", id)), { id, organizationId: "org-a", actorType: "USER", actorId: "a", createdBy: "a", updatedBy: "a", action: "UPDATE", resource: { type: "conversation", id: "conv-assumida" }, summary: "Automação retomada pelo profissional.", ...extra }];
   await deniedBecause("retomada sem trilha", updateDoc(assumida(), devolver));
   await deniedBecause("retomada apontando trilha inexistente", updateDoc(assumida(), { ...devolver, automationResumeAuditId: "nao-existe" }));
   const semAutor = writeBatch(sessaoA);
@@ -895,6 +897,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 556);
+  assert.equal(checks, 558);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

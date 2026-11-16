@@ -53,7 +53,7 @@ vi.mock("firebase-functions/v2/https", () => ({
     }
   },
 }));
-vi.mock("./rate-limit.js", () => ({ consumeRateLimit: vi.fn(), networkSubject: vi.fn() }));
+vi.mock("./rate-limit.js", () => ({ consumeRateLimit: vi.fn(), networkSubject: vi.fn(), tokenSubject: vi.fn() }));
 vi.mock("./ses.js", () => ({ escapeHtml: (value) => value, emailShell: ({ body }) => body, sendEmail: vi.fn() }));
 
 import { decidePlatformTeamRequest, removePlatformTeamMember, setPlatformTeamMemberStatus } from "./team.js";

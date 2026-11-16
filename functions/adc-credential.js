@@ -1,5 +1,6 @@
 import { readdirSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 
 /**
  * Cuidado com a credencial temporaria dos scripts de console.
@@ -72,4 +73,42 @@ export function installCleanup(
     });
   }
   return remove;
+}
+
+/**
+ * Deriva do login da CLI a credencial temporaria dos scripts de console e a
+ * grava em `.local`. Devolve o caminho (para apagar no `finally`) e o e-mail
+ * da conta, que o script compara com o `--actor`. `loadCli` entrega os
+ * módulos de autenticação da CLI; vem de fora porque ficam em `.local`.
+ */
+export async function createCliCredential({
+  projectId,
+  loginMessage,
+  loadCli,
+  root = ".local",
+  makeDirectory = mkdir,
+  write = writeFile,
+  removeOld = removeLeftovers,
+  cleanup = installCleanup,
+  warn = console.warn,
+  env = process.env,
+}) {
+  const { auth, api } = loadCli();
+  const account = auth.getGlobalDefaultAccount();
+  if (!account?.tokens?.refresh_token) throw new Error(loginMessage);
+  const cliEmail = account.user?.email?.trim().toLowerCase() ?? null;
+  await makeDirectory(root, { recursive: true });
+  const leftovers = removeOld(resolve(root));
+  if (leftovers.length > 0) warn(`Credencial de execução anterior apagada: ${leftovers.join(", ")}`);
+  const adcPath = resolve(root, adcFileName());
+  await write(adcPath, JSON.stringify({
+    type: "authorized_user",
+    client_id: api.clientId(),
+    client_secret: api.clientSecret(),
+    refresh_token: account.tokens.refresh_token,
+    quota_project_id: projectId,
+  }), { flag: "wx" });
+  cleanup(adcPath);
+  env.GOOGLE_APPLICATION_CREDENTIALS = adcPath;
+  return { adcPath, cliEmail };
 }

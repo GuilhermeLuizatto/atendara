@@ -17,7 +17,7 @@ import {
 import { paths } from "./generated/paths.js";
 import { fromStored, toStored } from "./firestore-dates.js";
 import { ACCOUNT_CALL_OPTIONS, parse } from "./platform-auth.js";
-import { consumeRateLimit, networkSubject } from "./rate-limit.js";
+import { consumeRateLimit, networkSubject, tokenSubject } from "./rate-limit.js";
 import { runAs } from "./service-accounts.js";
 import { assertProfessionalScope, tenantActor } from "./tenant-auth.js";
 
@@ -131,6 +131,7 @@ export const createPaymentLink = onCall(OPTIONS, async (request) => {
 export const inspectPaymentLink = onCall(OPTIONS, async (request) => {
   await consumeRateLimit(networkSubject(request), "paymentLinkByNetwork");
   const { token } = parse(tokenSchema, request.data);
+  await consumeRateLimit(tokenSubject(token), "paymentLinkByLink");
   const link = await linkByToken(token);
   const context = await chargeContext(link);
   return publicPaymentView(context.organizationName, context.transaction, context.proofs);
@@ -151,6 +152,7 @@ const PROOF_OPTIONS = { ...OPTIONS, memory: "512MiB" };
 export const submitPaymentProof = onCall(PROOF_OPTIONS, async (request) => {
   await consumeRateLimit(networkSubject(request), "paymentProofByNetwork");
   const input = parse(submitSchema, request.data);
+  await consumeRateLimit(tokenSubject(input.token), "paymentProofByLink");
   const bytes = Buffer.from(input.file, "base64");
   if (bytes.length === 0 || bytes.length > PAYMENT_PROOF_LIMITS.maxBytes) {
     throw new HttpsError("invalid-argument", "Envie um arquivo de até 5 MB.");

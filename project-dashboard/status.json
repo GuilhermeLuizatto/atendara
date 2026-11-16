@@ -1,19 +1,31 @@
 {
   "schemaVersion": 1,
   "project": "Atendara",
-  "reviewedAt": "2026-11-13",
+  "reviewedAt": "2026-11-16",
   "reviewNote": "Fotografia de acompanhamento. Merge, publicação e validação real são etapas diferentes.",
   "items": [
     {
       "id": "seguranca-arquivos-trilhas",
       "title": "Revisão de acesso a arquivos e trilhas",
       "kind": "bug",
-      "status": "em-andamento",
+      "status": "em-revisao",
       "priority": "alta",
-      "summary": "Correções em 16 arquivos só na cópia local do titular, sem branch nem PR (06/11); a revisão ainda está aberta.",
-      "next": "Criar branch e PR das correções; isso também libera a E3 dos termos, que mexe nos mesmos arquivos.",
-      "owner": "A definir",
-      "evidence": "PAINEL-ATENDARA.md",
+      "summary": "Quatro commits na branch fix/acesso-arquivos-e-trilhas (arquivos e trilhas, revogação dos links antigos, teto por token nas callables públicas), em PR desde 16/11. Sem publicação.",
+      "next": "Titular revisa o diff, roda test:access completo no Windows e mergeia; publicar Functions, regras e site na ordem e só então executar a revogação dos links antigos. Libera a E3 dos termos.",
+      "owner": "Titular",
+      "evidence": "https://github.com/GuilhermeLuizatto/atendara/pull/117",
+      "confidence": "confirmado"
+    },
+    {
+      "id": "lancamento-piloto",
+      "title": "Lançamento do piloto",
+      "kind": "teste",
+      "status": "pendente",
+      "priority": "alta",
+      "summary": "Checklist com publicação, decisões do titular, revisão jurídica e validação real; nenhum dado real de paciente antes disso.",
+      "next": "Seguir o checklist local de 07/11, começando pela revisão de segurança e pela publicação na ordem functions, regras e site.",
+      "owner": "Titular",
+      "evidence": "Checklist local de 07/11/2026",
       "confidence": "confirmado"
     },
     {
@@ -153,11 +165,11 @@
       "title": "Marca no INPI",
       "kind": "risco",
       "status": "pendente",
-      "priority": "media",
-      "summary": "Busca de anterioridade e depósito da marca Atendara ainda não iniciados.",
-      "next": "Buscar anterioridade e depositar (classe 42; avaliar 35 e 9).",
+      "priority": "alta",
+      "summary": "Busca de anterioridade feita em 07/11; aguarda decisão do titular sobre o nome.",
+      "next": "Decidir o nome antes do depósito.",
       "owner": "Titular",
-      "evidence": "PAINEL-ATENDARA.md",
+      "evidence": "Busca pePI de 07/11/2026",
       "confidence": "confirmado"
     },
     {

@@ -8,30 +8,23 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FormActions, Input, Select, Textarea } from "@/components/ui/form";
 import { PageHeader } from "@/components/ui/page-header";
 import { AttachmentLink } from "@/features/support/attachment-link";
-import { useWorkspace } from "@/providers/workspace-provider";
-import { phaseFiveService, uploadPhaseFiveFile, type SupportThread } from "@/services/phase-five";
+import { phaseFiveService, type SupportThread } from "@/services/phase-five";
 import type { SupportAttachment, SupportCategory, SupportReportedSeverity, SupportTicket } from "@/types";
 
 const CATEGORY: Record<SupportCategory, string> = { TECHNICAL_PROBLEM: "Problema técnico", HOW_TO: "Dúvida de uso", BILLING: "Cobrança", ACCOUNT_ACCESS: "Conta e acesso", SUGGESTION: "Sugestão", PRIVACY: "Privacidade" };
 const STATUS = { OPEN: "Aberto", WAITING_SUPPORT: "Aguardando suporte", WAITING_CUSTOMER: "Aguardando você", RESOLVED: "Resolvido" } as const;
 
-async function uploadAttachments(organizationId: string, ticketId: string, messageId: string, files: FileList | null): Promise<SupportAttachment[]> {
+async function uploadAttachments(ticketId: string, messageId: string, files: FileList | null): Promise<SupportAttachment[]> {
   if (!files?.length) return [];
   if (files.length > 5) throw new Error("Envie no máximo 5 arquivos por mensagem.");
   const allowed = ["image/png", "image/jpeg", "image/webp", "application/pdf"];
   return Promise.all(Array.from(files).map(async (file) => {
     if (!allowed.includes(file.type) || file.size > 5 * 1024 * 1024) throw new Error("Use imagens ou PDF de até 5 MB.");
-    const id = crypto.randomUUID();
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-    const storagePath = `support/${organizationId}/${ticketId}/${messageId}/${id}-${safeName}`;
-    await uploadPhaseFiveFile(storagePath, file, file.type);
-    return { id, storagePath, name: file.name, contentType: file.type as SupportAttachment["contentType"], size: file.size };
+    return phaseFiveService.support.upload(ticketId, messageId, file);
   }));
 }
 
 export default function SupportPage() {
-  const { session } = useWorkspace();
-  const organizationId = session?.organizationId ?? "";
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [thread, setThread] = useState<SupportThread | null>(null);
   const [notice, setNotice] = useState("");
@@ -58,7 +51,7 @@ export default function SupportPage() {
     setBusy(true); setNotice("");
     try {
       const ticketId = crypto.randomUUID(); const messageId = crypto.randomUUID();
-      const attachments = await uploadAttachments(organizationId, ticketId, messageId, files);
+      const attachments = await uploadAttachments(ticketId, messageId, files);
       await phaseFiveService.support.create({ ticketId, messageId, ...form, attachments });
       setForm({ category: "TECHNICAL_PROBLEM", reportedSeverity: "MEDIUM", subject: "", body: "" }); setFiles(null);
       setNotice("Chamado criado. A conversa oficial permanece aqui no painel."); await load(); await open(ticketId);
@@ -71,7 +64,7 @@ export default function SupportPage() {
     setBusy(true);
     try {
       const messageId = crypto.randomUUID();
-      const attachments = await uploadAttachments(organizationId, thread.ticket.id, messageId, replyFiles);
+      const attachments = await uploadAttachments(thread.ticket.id, messageId, replyFiles);
       await phaseFiveService.support.reply({ ticketId: thread.ticket.id, messageId, body: reply, attachments });
       setReply(""); setReplyFiles(null); await open(thread.ticket.id); await load();
     } catch (error) { setNotice(error instanceof Error ? error.message : "Não foi possível responder."); }

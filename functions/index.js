@@ -158,6 +158,7 @@ export { inboundWebhook } from "./inbound.js";
 // Resposta humana pelo painel cancela a resposta da Dara que esperava a vez.
 export { cancelRepliesOnHumanTakeover } from "./handoff.js";
 export { previewAI } from "./ai-preview.js";
+export { uploadSupportAttachment } from "./support.js";
 export {
   startCalendarConnection,
   googleOAuthCallback,
@@ -208,4 +209,4 @@ export {
   replySupportTicket,
   updateSupportTicket,
 } from "./support.js";
-export { updateOrganizationBranding } from "./branding.js";
+export { updateOrganizationBranding, uploadBrandingLogo } from "./branding.js";

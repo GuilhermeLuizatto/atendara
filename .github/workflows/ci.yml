@@ -91,6 +91,67 @@ jobs:
           path: out/
           retention-days: 7
 
+  # As suites de regras, storage, repositorio e acesso so rodam contra os
+  # emuladores. Fora do CI elas ficaram semanas quebradas sem ninguem ver
+  # (data fixa de cobranca que venceu), por isso rodam em todo push e PR.
+  # Projeto `demo-*`: o emulador recusa qualquer chamada a servico real, e
+  # nenhum segredo entra neste job.
+  emulator:
+    name: Emuladores - regras, storage, repositorio e acesso
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      # Versao exata: a CLI decide quais binarios de emulador baixa, e uma
+      # versao nova do emulador muda o comportamento das regras sem commit.
+      FIREBASE_TOOLS_VERSION: "15.29.0"
+      RULES_UNIT_TESTING_VERSION: "5.0.2"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Configurar Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # Firestore, Storage e Cloud Tasks emulados sao processos Java.
+      - name: Configurar Java
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Instalar dependencias
+        run: npm ci --ignore-scripts
+
+      - name: Instalar dependencias do backend
+        run: npm ci --ignore-scripts --prefix functions
+
+      # Os scripts de teste procuram a CLI em `.local/firebase-tools`, o mesmo
+      # lugar da maquina de desenvolvimento, fora do package.json da raiz para
+      # nao levar a CLI ao build. Sem scripts de instalacao, como acima: o
+      # unico que faria falta e o `re2` nativo, usado so pelo Hosting.
+      - name: Instalar a CLI do Firebase
+        run: >-
+          npm install --prefix .local/firebase-tools --ignore-scripts
+          --no-audit --no-fund --save-exact
+          firebase-tools@${{ env.FIREBASE_TOOLS_VERSION }}
+          @firebase/rules-unit-testing@${{ env.RULES_UNIT_TESTING_VERSION }}
+
+      # Os binarios dos emuladores vem de fora do npm; guardar evita baixar a
+      # cada execucao. A chave segue a versao da CLI, que fixa a deles.
+      - name: Cache dos emuladores
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ env.FIREBASE_TOOLS_VERSION }}
+
+      - name: Testes nos emuladores
+        run: npm run test:emulator
+
   codeql:
     name: Analise estatica de seguranca
     runs-on: ubuntu-latest

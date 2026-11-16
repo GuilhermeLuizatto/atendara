@@ -11,7 +11,8 @@ export function ProfessionalContextTabs() {
     setActiveProfessionalId,
   } = useWorkspace();
 
-  if (!activeProfessionalId || availableProfessionals.length === 0) return null;
+  // Profissional sozinho não tem o que alternar: a barra só existe com 2 ou mais.
+  if (!activeProfessionalId || availableProfessionals.length < 2) return null;
 
   return (
     <div className="border-border bg-surface sticky top-14 z-30 border-b px-3 py-2 sm:px-5">

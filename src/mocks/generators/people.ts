@@ -69,28 +69,8 @@ export function buildProfessionals(ctx: GeneratorContext): Professional[] {
     active: true,
   };
 
-  // Organizacoes de um profissional so existem; o segundo membro demonstra que
-  // o mesmo modelo suporta equipe sem estrutura de dados diferente.
-  const colleagueName = `${rng.pick(FIRST_NAMES)} ${rng.pick(LAST_NAMES)}`;
-  const colleague: Professional = {
-    id: "prof-colleague",
-    organizationId,
-    ...stamp(now),
-    userId: null,
-    displayName: colleagueName,
-    email: `${slugifyEmail(colleagueName)}@exemplo.com.br`,
-    phone: "11987650002",
-    profession: profession.id,
-    licenseNumber:
-      license === null
-        ? null
-        : `${license} ${rng.int(10, 99)}/${rng.int(10000, 99999)}`,
-    specialties: SPECIALTIES[profession.id].slice(1, 3),
-    avatarUrl: null,
-    active: true,
-  };
-
-  return [owner, colleague];
+  // Atendimento individual: uma profissional so, sem equipe de demonstracao.
+  return [owner];
 }
 
 export function buildClients(
@@ -121,9 +101,7 @@ export function buildClients(
       phone: `1198${rng.int(1000000, 9999999)}`,
       status: statuses[index % statuses.length],
       preferredModality: rng.pick(profession.modalities),
-      assignedProfessionalIds: rng.bool(0.15)
-        ? professionals.slice(0, 2).map((professional) => professional.id)
-        : [rng.bool(0.75) ? professionals[0].id : professionals[1].id],
+      assignedProfessionalIds: [professionals[0].id],
       acquisitionChannel: rng.pick(CHANNELS),
       tags: rng.bool(0.35) ? rng.sample(TAG_POOL, 1) : [],
       // Preenchidos depois que a agenda e gerada.

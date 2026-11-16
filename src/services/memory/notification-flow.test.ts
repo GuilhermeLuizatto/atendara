@@ -216,7 +216,7 @@ describe("planejamento", () => {
     const original = deliveries()[0].id;
 
     await repo.updateAppointment(appointmentId, {
-      startsAt: "2026-09-10T18:00:00.000Z",
+      startsAt: "2026-09-10T23:00:00.000Z",
     });
 
     const byId = new Map(deliveries().map((item) => [item.id, item]));
@@ -224,7 +224,7 @@ describe("planejamento", () => {
 
     const planned = deliveries().filter((item) => item.status === "PLANNED");
     expect(planned).toHaveLength(1);
-    expect(planned[0].scheduledFor).toBe("2026-09-10T17:00:00.000Z");
+    expect(planned[0].scheduledFor).toBe("2026-09-10T22:00:00.000Z");
   });
 });
 

@@ -5,6 +5,18 @@
   "reviewNote": "Fotografia de acompanhamento. Merge, publicação e validação real são etapas diferentes.",
   "items": [
     {
+      "id": "foco-psicologia-solo",
+      "title": "Foco em Psicologia, profissional solo",
+      "kind": "desenvolvimento",
+      "status": "em-revisao",
+      "priority": "alta",
+      "summary": "Decisão do titular em 16/11: só Psicologia e quem atende sozinho. Profissões, Mensagens, Primeiro contato, Equipe e as abas Recibos e Fila de automações ficam escondidas; nada foi apagado.",
+      "next": "Revisar e mergear o PR #118. Para reativar algo, tirar o item de src/config/scope.ts ou religar listed em definitions.ts.",
+      "owner": "Titular",
+      "evidence": "https://github.com/GuilhermeLuizatto/atendara/pull/118",
+      "confidence": "confirmado"
+    },
+    {
       "id": "seguranca-arquivos-trilhas",
       "title": "Revisão de acesso a arquivos e trilhas",
       "kind": "bug",

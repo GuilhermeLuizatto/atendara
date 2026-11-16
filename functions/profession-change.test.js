@@ -32,7 +32,7 @@ const auditWrites = () => mock.writes.filter(write => write.path.startsWith("pla
 const pedidoPath = paths.platformProfessionRequest(ORG);
 
 const pedidoPendente = (extra = {}) => mock.documents.set(pedidoPath, {
-  organizationId: ORG, requestedBy: TITULAR, from: "PHYSIOTHERAPIST", to: "AESTHETICS",
+  organizationId: ORG, requestedBy: TITULAR, from: "PHYSIOTHERAPIST", to: "PSYCHOLOGIST",
   reason: MOTIVO, status: "PENDING", requestedAt: "2026-09-16T10:00:00.000Z",
   decidedAt: null, decidedBy: null, decisionReason: null, ...extra,
 });
@@ -48,10 +48,10 @@ beforeEach(() => {
 
 describe("Pedido de troca de profissao", () => {
   it("guarda o pedido pendente, com registro, sem tocar na profissao", async () => {
-    await requestProfessionChange(request({ professionId: "AESTHETICS", reason: MOTIVO }));
+    await requestProfessionChange(request({ professionId: "PSYCHOLOGIST", reason: MOTIVO }));
 
     const [pedido] = writesTo(pedidoPath);
-    expect(pedido.data).toMatchObject({ from: "PHYSIOTHERAPIST", to: "AESTHETICS", status: "PENDING", requestedBy: TITULAR, decidedAt: null });
+    expect(pedido.data).toMatchObject({ from: "PHYSIOTHERAPIST", to: "PSYCHOLOGIST", status: "PENDING", requestedBy: TITULAR, decidedAt: null });
     // Nada mudou ainda: nem conta, nem organizacao, nem perfil.
     expect(writesTo(paths.account(TITULAR))).toHaveLength(0);
     expect(writesTo(paths.organization(ORG))).toHaveLength(0);
@@ -61,23 +61,23 @@ describe("Pedido de troca de profissao", () => {
 
   it("so o titular pede, e nao para a profissao que ja tem nem para uma escondida", async () => {
     await expect(requestProfessionChange({ data: {} })).rejects.toMatchObject({ code: "unauthenticated" });
-    await expect(requestProfessionChange(request({ professionId: "AESTHETICS", reason: MOTIVO }, { uid: "colega" }))).rejects.toMatchObject({ code: "permission-denied" });
+    await expect(requestProfessionChange(request({ professionId: "PSYCHOLOGIST", reason: MOTIVO }, { uid: "colega" }))).rejects.toMatchObject({ code: "permission-denied" });
     await expect(requestProfessionChange(request({ professionId: "PHYSIOTHERAPIST", reason: MOTIVO }))).rejects.toMatchObject({ code: "failed-precondition" });
     await expect(requestProfessionChange(request({ professionId: "THERAPIST", reason: MOTIVO }))).rejects.toMatchObject({ code: "invalid-argument" });
     // Justificativa curta demais nao explica nada a quem ler a trilha depois.
-    await expect(requestProfessionChange(request({ professionId: "AESTHETICS", reason: "mudei" }))).rejects.toMatchObject({ code: "invalid-argument" });
+    await expect(requestProfessionChange(request({ professionId: "PSYCHOLOGIST", reason: "mudei" }))).rejects.toMatchObject({ code: "invalid-argument" });
     expect(mock.writes.filter(write => !write.path.startsWith("platformRateLimits/"))).toHaveLength(0);
   });
 
   it("nao acumula dois pedidos abertos", async () => {
     pedidoPendente();
-    await expect(requestProfessionChange(request({ professionId: "AESTHETICS", reason: MOTIVO }))).rejects.toMatchObject({ code: "failed-precondition" });
+    await expect(requestProfessionChange(request({ professionId: "PSYCHOLOGIST", reason: MOTIVO }))).rejects.toMatchObject({ code: "failed-precondition" });
     expect(writesTo(pedidoPath)).toHaveLength(0);
   });
 
   it("deixa pedir de novo depois de uma recusa", async () => {
     pedidoPendente({ status: "REJECTED" });
-    await requestProfessionChange(request({ professionId: "AESTHETICS", reason: MOTIVO }));
+    await requestProfessionChange(request({ professionId: "PSYCHOLOGIST", reason: MOTIVO }));
     expect(writesTo(pedidoPath)[0].data.status).toBe("PENDING");
   });
 });
@@ -96,14 +96,14 @@ describe("Decisao da operadora", () => {
     pedidoPendente();
     await decideProfessionChange(request(decisao(), { uid: "operadora", token: TOTP }));
 
-    expect(writesTo(paths.account(TITULAR))[0].data).toEqual({ professionId: "AESTHETICS" });
-    expect(writesTo(paths.organization(ORG))[0].data).toMatchObject({ primaryProfession: "AESTHETICS", professions: ["AESTHETICS"] });
+    expect(writesTo(paths.account(TITULAR))[0].data).toEqual({ professionId: "PSYCHOLOGIST" });
+    expect(writesTo(paths.organization(ORG))[0].data).toMatchObject({ primaryProfession: "PSYCHOLOGIST", professions: ["PSYCHOLOGIST"] });
     // O registro no conselho anterior nao vale para a profissao nova.
-    expect(writesTo(paths.document(ORG, "professionals", TITULAR))[0].data).toMatchObject({ profession: "AESTHETICS", licenseNumber: null });
+    expect(writesTo(paths.document(ORG, "professionals", TITULAR))[0].data).toMatchObject({ profession: "PSYCHOLOGIST", licenseNumber: null });
     expect(writesTo(pedidoPath)[0].data).toMatchObject({ status: "APPROVED", decidedBy: "operadora" });
 
     const [audit] = auditWrites();
-    expect(audit.data).toMatchObject({ action: "PROFESSION_CHANGE_APPROVED", actorId: "operadora", targetUserId: TITULAR, details: { from: "PHYSIOTHERAPIST", to: "AESTHETICS" } });
+    expect(audit.data).toMatchObject({ action: "PROFESSION_CHANGE_APPROVED", actorId: "operadora", targetUserId: TITULAR, details: { from: "PHYSIOTHERAPIST", to: "PSYCHOLOGIST" } });
     expect(new Set(mock.writes.map(write => write.origin))).toHaveLength(1);
   });
 

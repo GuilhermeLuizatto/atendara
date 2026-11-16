@@ -35,7 +35,7 @@ import { MAX_ACCESS_GRANT_DAYS, SELF_SERVICE_ACTOR, TRIAL_DAYS } from "./generat
 
 const DAY = 86_400_000;
 const NEW_UID = "novo";
-const signup = extra => ({ displayName: "Bianca Ferraz", email: "Bianca@Exemplo.com.br", password: "Senha#DeTeste1", professionId: "AESTHETICS", businessName: "Espaço Lume", acceptedLegalVersion: LEGAL_VERSION, ...extra });
+const signup = extra => ({ displayName: "Bianca Ferraz", email: "Bianca@Exemplo.com.br", password: "Senha#DeTeste1", professionId: "PSYCHOLOGIST", councilRegistration: "CRP 06/123456", businessName: "Espaço Lume", acceptedLegalVersion: LEGAL_VERSION, ...extra });
 const anonymous = data => ({ data, rawRequest: { headers: { "x-forwarded-for": "203.0.113.7" }, ip: "203.0.113.7" } });
 const signedIn = (data, { uid = NEW_UID, token = {} } = {}) => ({ ...anonymous(data), auth: { uid, token: { email_verified: true, email: "bianca@exemplo.com.br", ...token } } });
 const writesTo = path => mock.writes.filter(write => write.path === path);
@@ -69,7 +69,7 @@ describe("Cadastro aberto", () => {
     expect(mock.writes.some(write => write.path.startsWith("initialPasswords/"))).toBe(false);
 
     const [organization] = writesUnder("organizations/");
-    expect(organization.data).toMatchObject({ ownerId: NEW_UID, name: "Espaço Lume", primaryProfession: "AESTHETICS" });
+    expect(organization.data).toMatchObject({ ownerId: NEW_UID, name: "Espaço Lume", primaryProfession: "PSYCHOLOGIST" });
     expect(auditWrites().map(write => write.data.action)).toEqual(["SELF_SERVICE_REGISTERED"]);
     expect(auditWrites()[0].data).toMatchObject({ actorId: SELF_SERVICE_ACTOR, targetUserId: NEW_UID, details: { signInMethod: "PASSWORD" } });
   });
@@ -91,10 +91,8 @@ describe("Cadastro aberto", () => {
     expect(profile.data.licenseNumber).toBe("CRP 06/123456");
 
     mock.writes.length = 0; mock.createUser.mockClear();
-    await expect(registerSelfService(anonymous(signup({ professionId: "PSYCHOLOGIST" })))).rejects.toMatchObject({ code: "invalid-argument" });
+    await expect(registerSelfService(anonymous(signup({ councilRegistration: undefined })))).rejects.toMatchObject({ code: "invalid-argument" });
     await expect(registerSelfService(anonymous(signup({ professionId: "PSYCHOLOGIST", councilRegistration: "<script>" })))).rejects.toMatchObject({ code: "invalid-argument" });
-    // Estetica nao tem conselho: mandar registro e sinal de tela fora de sincronia.
-    await expect(registerSelfService(anonymous(signup({ councilRegistration: "CRP 06/123456" })))).rejects.toMatchObject({ code: "invalid-argument" });
     expect(mock.createUser).not.toHaveBeenCalled();
   });
 

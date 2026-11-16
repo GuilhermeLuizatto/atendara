@@ -124,7 +124,8 @@ beforeAll(async () => {
   const created = await operator.call<{ userId: string; temporaryPassword: string }>("registerProfessional", {
     displayName: "Titular da Concessao",
     email: TITULAR.email,
-    professionId: "PSYCHOLOGIST",
+    // Parte de outra profissão: só Psicologia é oferecida, então ela é o destino da troca.
+    professionId: "DENTIST",
     modules: ["dashboard", "agenda", "clientes"],
   });
   titularUid = created.userId;
@@ -279,24 +280,24 @@ describe("Etapa 5B — concessao manual registrada", () => {
  * mudam juntos, com a trilha na mesma transacao.
  */
 describe("troca de profissao", () => {
-  const MOTIVO = "Passei a atender estetica e nao exerco mais a profissao anterior.";
+  const MOTIVO = "Passei a atender como psicologo e nao exerco mais a profissao anterior.";
 
   async function pedido() {
     return (await adminDb().doc(paths.platformProfessionRequest(organizationId)).get()).data();
   }
 
   it("so o titular pede, e pedir nao muda nada", async () => {
-    await expect(operator.call("requestProfessionChange", { professionId: "AESTHETICS", reason: MOTIVO })).rejects.toMatchObject({
+    await expect(operator.call("requestProfessionChange", { professionId: "PSYCHOLOGIST", reason: MOTIVO })).rejects.toMatchObject({
       code: "permission-denied",
     });
 
-    await titularCall("requestProfessionChange", { professionId: "AESTHETICS", reason: MOTIVO });
-    expect(await pedido()).toMatchObject({ to: "AESTHETICS", status: "PENDING", requestedBy: titularUid });
+    await titularCall("requestProfessionChange", { professionId: "PSYCHOLOGIST", reason: MOTIVO });
+    expect(await pedido()).toMatchObject({ to: "PSYCHOLOGIST", status: "PENDING", requestedBy: titularUid });
     // A profissao gravada continua a mesma: pedir nao e trocar.
-    expect(await accountOf(titularUid)).toMatchObject({ professionId: "PSYCHOLOGIST" });
+    expect(await accountOf(titularUid)).toMatchObject({ professionId: "DENTIST" });
 
     // Um segundo pedido aberto deixaria a operadora decidindo qual vale.
-    await expect(titularCall("requestProfessionChange", { professionId: "DENTIST", reason: MOTIVO })).rejects.toMatchObject({
+    await expect(titularCall("requestProfessionChange", { professionId: "PSYCHOLOGIST", reason: MOTIVO })).rejects.toMatchObject({
       code: "failed-precondition",
     });
   });
@@ -336,14 +337,14 @@ describe("troca de profissao", () => {
     });
 
     expect(await pedido()).toMatchObject({ status: "APPROVED", decidedBy: OPERATOR_UID });
-    expect(await accountOf(titularUid)).toMatchObject({ professionId: "AESTHETICS" });
+    expect(await accountOf(titularUid)).toMatchObject({ professionId: "PSYCHOLOGIST" });
     expect((await adminDb().doc(paths.organization(organizationId)).get()).data()).toMatchObject({
-      primaryProfession: "AESTHETICS",
-      professions: ["AESTHETICS"],
+      primaryProfession: "PSYCHOLOGIST",
+      professions: ["PSYCHOLOGIST"],
     });
     // O registro no conselho anterior nao vale para a profissao nova.
     expect((await adminDb().doc(paths.document(organizationId, "professionals", titularUid)).get()).data()).toMatchObject({
-      profession: "AESTHETICS",
+      profession: "PSYCHOLOGIST",
       licenseNumber: null,
     });
     expect(await auditActions()).toContain("PROFESSION_CHANGE_APPROVED");

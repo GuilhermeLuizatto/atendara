@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { hasActiveAccess, canAccessModule, canManageSubscription, isPlatformAdmin } from "@/config/access";
+import { isModuleHidden } from "@/config/scope";
 import { APP_MODULES, type AppModule } from "@/types/access";
 import { EmailConfirmation } from "@/features/auth/email-confirmation";
 import { PasswordSetup } from "@/features/auth/password-setup";
@@ -21,6 +22,16 @@ import { useAuth } from "@/providers/auth-provider";
  * chega ao navegador sem as Firestore Security Rules autorizarem. Esconder a
  * tela e conveniencia; negar o dado e seguranca.
  */
+function RedirectToDashboard() {
+  const router = useRouter();
+  useEffect(() => { router.replace("/dashboard"); }, [router]);
+  return (
+    <div className="bg-background flex min-h-dvh items-center justify-center">
+      <p role="status" className="text-muted-foreground text-sm">Abrindo o painel...</p>
+    </div>
+  );
+}
+
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { status, user, signOut } = useAuth();
   const router = useRouter();
@@ -53,6 +64,10 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     return <TrialEnded />;
   }
   const area = pathname.split("/")[1];
+  // Area escondida pelo recorte de produto: quem chega por URL volta ao painel.
+  if (APP_MODULES.includes(area as AppModule) && isModuleHidden(area as AppModule)) {
+    return <RedirectToDashboard />;
+  }
   // "Minha assinatura" e a unica area que NAO exige acesso vigente: quem esta
   // com a mensalidade vencida precisa chegar ate ela para regularizar. As
   // Security Rules e a callable continuam decidindo o que ela consegue ler e

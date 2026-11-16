@@ -7,6 +7,7 @@ import { useState, type FormEvent } from "react";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Field, FormActions, Input } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
+import { isSettingsSectionHidden } from "@/config/scope";
 import { getProfession } from "@/config/professions";
 import { RECEIPT_LIMITS, validateReceiptRequest } from "@/lib/finance/receipts";
 import { formatCurrency } from "@/lib/utils/format";
@@ -91,9 +92,11 @@ function ReceiptForm({ transaction, onClose }: { transaction: Transaction; onClo
             <Button type="button" variant="outline" onClick={onClose}>
               Fechar
             </Button>
-            <Link href="/configuracoes?secao=recibos" className={buttonStyles()}>
-              Ir para Configurações → Recibos
-            </Link>
+            {isSettingsSectionHidden("recibos") ? null : (
+              <Link href="/configuracoes?secao=recibos" className={buttonStyles()}>
+                Ir para Configurações → Recibos
+              </Link>
+            )}
           </FormActions>
         </div>
       ) : (

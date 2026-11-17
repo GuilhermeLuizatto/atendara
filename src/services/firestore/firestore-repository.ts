@@ -47,7 +47,6 @@ import {
   type AppointmentInput,
   type AuditInput,
   type ClientInput,
-  type DecisionInput,
   type MessageInput,
   type NotificationInput,
   type RepositoryActor,
@@ -92,8 +91,6 @@ import {
 } from "./plans/governance";
 import {
   planAppendMessage,
-  planReceiveMessage,
-  planRecordDecision,
   planReplyToConversation,
   planUpdateConversation,
 } from "./plans/messaging";
@@ -919,19 +916,17 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
     return plan.result;
   }
 
-  async receiveMessage(
-    conversationId: ID,
-    text: string,
-    evaluatedAt?: string,
-  ): Promise<ID> {
-    const plan = planReceiveMessage(
-      this.context(),
-      conversationId,
-      text,
-      evaluatedAt,
+  /**
+   * Classificar mensagem recebida e gravar a decisao e do backend
+   * (`functions/inbound.js`), nao do navegador. Nenhuma tela chama isto; o
+   * caminho sobrevivia so na interface do repositorio, e as regras agora negam
+   * a criacao de `aiDecisions` pelo cliente. Recusar aqui, com o motivo, evita
+   * que alguem volte a usa-lo e descubra pelo "permission-denied".
+   */
+  async receiveMessage(): Promise<ID> {
+    throw new RepositoryError(
+      "Mensagem recebida é classificada pelo backend; a demonstração local simula esse caminho.",
     );
-    await this.commit(plan.writes);
-    return plan.result;
   }
 
   async replyToConversation(conversationId: ID, text: string): Promise<void> {
@@ -940,10 +935,11 @@ export class FirestoreWorkspaceRepository implements WorkspaceRepository {
     );
   }
 
-  async recordDecision(input: DecisionInput): Promise<ID> {
-    const plan = planRecordDecision(this.context(), input);
-    await this.commit(plan.writes);
-    return plan.result;
+  /** Mesma razao de `receiveMessage`: a decisao da Dara nasce no backend. */
+  async recordDecision(): Promise<ID> {
+    throw new RepositoryError(
+      "Decisão da assistente é gravada pelo backend; o navegador não cria registro de decisão.",
+    );
   }
 
   async resumeConversationAutomation(conversationId: ID): Promise<void> {

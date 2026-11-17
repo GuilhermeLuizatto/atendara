@@ -41,6 +41,18 @@
       "confidence": "confirmado"
     },
     {
+      "id": "trilhas-pelo-navegador",
+      "title": "Trilhas gravadas pelo navegador",
+      "kind": "risco",
+      "status": "em-revisao",
+      "priority": "alta",
+      "summary": "Risco residual da revisão de segurança: um membro podia inserir evento inventado em nome próprio em auditLogs e aiDecisions. Em 16/11 a criação de aiDecisions pelo cliente passou a ser negada (quem decide é functions/inbound.js); auditLogs segue gravado pelo navegador.",
+      "next": "Titular lê o plano em docs/planos/TRILHAS-NO-BACKEND-2026-11-16.md e escolhe: migrar as 13 operações de configuração para callables ou selar a trilha por gatilho e deixar a migração para depois do piloto.",
+      "owner": "Titular",
+      "evidence": "docs/planos/TRILHAS-NO-BACKEND-2026-11-16.md; firestore.rules; 574 verificações de regras no emulador",
+      "confidence": "confirmado"
+    },
+    {
       "id": "lancamento-piloto",
       "title": "Lançamento do piloto",
       "kind": "teste",

@@ -180,6 +180,15 @@ export function planUpdateConversation(
   };
 }
 
+/**
+ * ATENCAO: nenhum caminho de producao usa este plano.
+ *
+ * A decisao da Dara nasce em `functions/inbound.js`, com o SDK administrativo,
+ * e as Security Rules NEGAM a criacao de `aiDecisions` pelo cliente. Este plano
+ * sobrevive para a demonstracao local e para os testes do motor de decisao.
+ * Religa-lo no `FirestoreWorkspaceRepository` nao da erro de tipo: da
+ * `permission-denied` em producao.
+ */
 export function planRecordDecision(
   ctx: PlanContext,
   input: DecisionInput,
@@ -223,6 +232,10 @@ export function planRecordDecision(
  * Simulador do agente: classifica a mensagem recebida, decide e publica tudo o
  * que a decisao produziu. Mensagem, decisao, resposta e alerta vao no mesmo
  * plano — e portanto no mesmo lote atomico — para evitar trilha parcial.
+ *
+ * Simulador mesmo: como `planRecordDecision`, grava `aiDecisions`, e por isso
+ * nao serve mais ao caminho de producao — quem recebe e classifica mensagem de
+ * verdade e `functions/inbound.js`.
  */
 export function planReceiveMessage(
   ctx: PlanContext,

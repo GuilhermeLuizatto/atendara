@@ -568,7 +568,15 @@ try {
   // Trilha de auditoria: o profissional escreve, so a administracao le.
   await allowed(setDoc(doc(db("a"), paths.document("org-a", "auditLogs", "novo")), { id: "novo", organizationId: "org-a", actorId: "a", createdBy: "a", updatedBy: "a", action: "CREATE" }));
   await deniedBecause("auditoria atribuida a outro membro", setDoc(doc(db("a"), paths.document("org-a", "auditLogs", "forjado")), { id: "forjado", organizationId: "org-a", actorId: "b", createdBy: "a", updatedBy: "a", action: "CREATE" }));
+  // Decisao da Dara: nem em nome proprio. Quem decide e o backend
+  // (`functions/inbound.js`), com o SDK administrativo, que nao passa por regra.
   await deniedBecause("decisao atribuida a outro membro", setDoc(doc(db("a"), paths.document("org-a", "aiDecisions", "forjada")), { id: "forjada", organizationId: "org-a", professionalId: "a", createdBy: "b", updatedBy: "b", classification: "ADMINISTRATIVE" }));
+  await deniedBecause("decisao criada pelo proprio membro", setDoc(doc(db("a"), paths.document("org-a", "aiDecisions", "inventada")), { id: "inventada", organizationId: "org-a", professionalId: "a", createdBy: "a", updatedBy: "a", classification: "ADMINISTRATIVE", action: "ESCALATE" }));
+  await deniedBecause("decisao criada pela administracao", setDoc(doc(db("ownerRole"), paths.document("org-a", "aiDecisions", "inventada-owner")), { id: "inventada-owner", organizationId: "org-a", professionalId: "a", createdBy: "ownerRole", updatedBy: "ownerRole", classification: "ADMINISTRATIVE", action: "ESCALATE" }));
+  await deniedBecause("decisao criada pela operadora", setDoc(doc(withTotp("admin"), paths.document("org-a", "aiDecisions", "inventada-admin")), { id: "inventada-admin", organizationId: "org-a", professionalId: "a", createdBy: "admin", updatedBy: "admin", classification: "ADMINISTRATIVE", action: "ESCALATE" }));
+  // A revisao da classificacao continua sendo do cliente, e continua exigindo
+  // decisao existente — gravada pelo backend.
+  await allowed(getDoc(doc(db("a"), paths.document("org-a", "aiDecisions", "revisada"))));
   await denied(getDoc(doc(db("a"), own("auditLogs"))));
   await allowed(getDoc(doc(db("ownerRole"), own("auditLogs"))));
   await allowed(getDoc(doc(db("adminRole"), own("auditLogs"))));
@@ -917,6 +925,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 570);
+  assert.equal(checks, 574);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

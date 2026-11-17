@@ -333,6 +333,14 @@ describe("repositorio do Firestore contra o emulador", () => {
     await expect(repository.reset()).rejects.toThrow(/demonstração/);
   });
 
+  it("decisao da Dara nao nasce no navegador", async () => {
+    // Quem classifica e grava a decisao e `functions/inbound.js`, com o SDK
+    // administrativo. O caminho do cliente recusa com o motivo, em vez de
+    // tentar gravar e levar um "permission-denied" das regras.
+    await expect(repository.recordDecision()).rejects.toThrow(/backend/);
+    await expect(repository.receiveMessage()).rejects.toThrow(/backend/);
+  });
+
   it("le o vinculo de quem usa o painel e pagina a colecao ate o fim", async () => {
     for (const name of ["Ana", "Bruno", "Carla", "Diego"]) {
       await repository.createClient({

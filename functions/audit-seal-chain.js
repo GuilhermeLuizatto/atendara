@@ -40,6 +40,20 @@ export const SEAL_VERSION = 1;
 /** Campos da entrada que o resumo cobre. Imutaveis por decisao, nao por acaso. */
 export const SEALED_ENTRY_FIELDS = APPEND_ONLY_PROTECTED_FIELDS.auditLogs;
 
+/**
+ * Ordem por codigo de caractere, NAO por `localeCompare`.
+ *
+ * A ordem local depende do idioma de quem roda o codigo: com ela, a mesma
+ * entrada geraria resumos diferentes em maquinas diferentes, e a corrente
+ * passaria a acusar adulteracao onde nao houve. Aqui a comparacao precisa ser
+ * sempre a mesma, nao "correta para humanos".
+ */
+function byCodeUnit(left, right) {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
 /** Valor de um caminho com ponto (`resource.type`), sem depender de lodash. */
 function valueAt(data, path) {
   let current = data;
@@ -70,8 +84,9 @@ export function canonical(value) {
   if (typeof value !== "object") return "null";
   const keys = Object.keys(value)
     .filter((key) => value[key] !== undefined)
-    .sort();
-  return `{${keys.map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
+    .sort(byCodeUnit);
+  const pairs = keys.map((key) => JSON.stringify(key) + ":" + canonical(value[key]));
+  return "{" + pairs.join(",") + "}";
 }
 
 function sha256(text) {
@@ -137,54 +152,74 @@ const problem = (kind, detail) => ({ kind, ...detail });
  * que nao fecha (entrada adulterada nos campos protegidos), entrada sem selo e
  * selo sem entrada.
  */
+/** Buraco ou indice repetido: os dois jeitos de a sequencia nao fechar. */
+function sequenceProblem(seal, expected) {
+  if (seal.index === expected) return null;
+  const kind = seal.index < expected ? "DUPLICATE_INDEX" : "GAP";
+  return problem(kind, { index: seal.index, expected });
+}
+
+/** Elo com o selo anterior e resumo do proprio selo. */
+function sealProblems(seal, previousSealHash) {
+  const found = [];
+  if ((seal.previousSealHash ?? null) !== previousSealHash) {
+    found.push(problem("BROKEN_LINK", { index: seal.index, logId: seal.logId }));
+  }
+  if (sealDigest(seal) !== seal.sealHash) {
+    found.push(problem("SEAL_CHANGED", { index: seal.index, logId: seal.logId }));
+  }
+  return found;
+}
+
+/** A entrada que o selo aponta: existe? continua a mesma nos campos protegidos? */
+function entryProblem(seal, entry) {
+  if (!entry) return problem("ENTRY_MISSING", { index: seal.index, logId: seal.logId });
+  const entryHash = entryDigest({ logId: seal.logId, entry, writtenAt: seal.writtenAt });
+  if (entryHash !== seal.entryHash) return problem("ENTRY_CHANGED", { index: seal.index, logId: seal.logId });
+  return null;
+}
+
+/** Entrada que nenhum selo cobre: falta de selo, ou trilha anterior ao selo. */
+function unsealedProblems(entries, sealedIds, from) {
+  const found = [];
+  let outsideChain = 0;
+  for (const entry of entries) {
+    if (sealedIds.has(entry.id)) continue;
+    const at = Date.parse(entry.createdAt ?? entry.occurredAt ?? "");
+    if (from !== null && Number.isFinite(at) && at < from) outsideChain += 1;
+    else found.push(problem("SEAL_MISSING", { logId: entry.id }));
+  }
+  return { found, outsideChain };
+}
+
 export function verifyAuditSealChain({ seals = [], entries = [], sealedFrom = null } = {}) {
   const problems = [];
   const ordered = [...seals].sort((left, right) => left.index - right.index);
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
   const sealedIds = new Set();
-  const from = sealedFrom ? Date.parse(sealedFrom) : null;
 
   let expected = 1;
   let previousSealHash = null;
   for (const seal of ordered) {
-    if (seal.index !== expected) {
-      problems.push(problem(seal.index < expected ? "DUPLICATE_INDEX" : "GAP", { index: seal.index, expected }));
-      // Segue do indice encontrado: um buraco nao deve virar erro em cascata.
-      expected = seal.index;
-    }
-    if ((seal.previousSealHash ?? null) !== previousSealHash) {
-      problems.push(problem("BROKEN_LINK", { index: seal.index, logId: seal.logId }));
-    }
-    const recomputed = sealDigest(seal);
-    if (recomputed !== seal.sealHash) {
-      problems.push(problem("SEAL_CHANGED", { index: seal.index, logId: seal.logId }));
-    }
+    const outOfSequence = sequenceProblem(seal, expected);
+    if (outOfSequence) problems.push(outOfSequence);
+    problems.push(...sealProblems(seal, previousSealHash));
+
     const entry = byId.get(seal.logId);
-    if (!entry) {
-      problems.push(problem("ENTRY_MISSING", { index: seal.index, logId: seal.logId }));
-    } else {
-      sealedIds.add(seal.logId);
-      const entryHash = entryDigest({ logId: seal.logId, entry, writtenAt: seal.writtenAt });
-      if (entryHash !== seal.entryHash) {
-        problems.push(problem("ENTRY_CHANGED", { index: seal.index, logId: seal.logId }));
-      }
-    }
+    if (entry) sealedIds.add(seal.logId);
+    const broken = entryProblem(seal, entry);
+    if (broken) problems.push(broken);
+
     // O elo seguinte guarda o resumo GRAVADO, nao o recalculado: e assim que a
-    // cadeia se rompe num ponto so, em vez de acusar todos os selos adiante.
+    // cadeia se rompe num ponto so, em vez de acusar todos os selos adiante. E
+    // a sequencia segue do indice encontrado, para um buraco nao virar erro em
+    // cascata.
     previousSealHash = seal.sealHash;
     expected = seal.index + 1;
   }
 
-  let outsideChain = 0;
-  for (const entry of entries) {
-    if (sealedIds.has(entry.id)) continue;
-    const at = Date.parse(entry.createdAt ?? entry.occurredAt ?? "");
-    if (from !== null && Number.isFinite(at) && at < from) {
-      outsideChain += 1;
-      continue;
-    }
-    problems.push(problem("SEAL_MISSING", { logId: entry.id }));
-  }
+  const unsealed = unsealedProblems(entries, sealedIds, sealedFrom ? Date.parse(sealedFrom) : null);
+  problems.push(...unsealed.found);
 
-  return { ok: problems.length === 0, problems, sealed: sealedIds.size, outsideChain };
+  return { ok: problems.length === 0, problems, sealed: sealedIds.size, outsideChain: unsealed.outsideChain };
 }

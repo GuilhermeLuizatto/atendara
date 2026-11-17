@@ -65,6 +65,18 @@ describe("serializacao canonica", () => {
   it("trata campo ausente e campo `undefined` igual", () => {
     expect(canonical({ a: 1, b: undefined })).toBe(canonical({ a: 1 }));
   });
+
+  // Ordem por codigo de caractere: `localeCompare` mudaria com o idioma de quem
+  // roda, e o resumo da mesma entrada deixaria de ser o mesmo.
+  it("ordena por codigo de caractere, nao pela ordem do idioma", () => {
+    expect(canonical({ a: 1, B: 2, á: 3 })).toBe('{"B":2,"a":1,"á":3}');
+  });
+
+  it("recusa valor que nao sabe serializar em vez de inventar um resumo", () => {
+    expect(canonical(() => 1)).toBe("null");
+    expect(canonical(Number.NaN)).toBe("null");
+    expect(canonical([1, "dois", true, null])).toBe('[1,"dois",true,null]');
+  });
 });
 
 describe("resumo da entrada", () => {

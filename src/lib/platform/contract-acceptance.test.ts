@@ -46,9 +46,21 @@ describe("Aceite do contrato", () => {
   });
 
   it("a versao nao vem de fora: e sempre a do servidor", () => {
-    // Nao existe parametro de versao de proposito. Se um dia existir, este
-    // teste falha e obriga a decidir de novo.
-    expect(contractAcceptanceDocument.length).toBe(1);
+    // O jeito realista de a versao vazar nao e um segundo parametro: e alguem
+    // acrescentar `contractVersion` ao objeto de entrada e a funcao passar a
+    // confiar nele. Entao o teste manda exatamente isso, forjado, e exige que a
+    // saida continue com a versao do servidor.
+    const forjada = contractAcceptanceDocument({
+      organizationId: "org-1",
+      acceptedByUserId: "user-1",
+      acceptedAt: "2026-11-16T12:00:00.000Z",
+      source: "SELF_SERVICE_SIGNUP",
+      contractVersion: "2020-01-01",
+      acceptedLegalVersion: "2020-01-01",
+    } as Parameters<typeof contractAcceptanceDocument>[0]);
+
+    expect(forjada.contractVersion).toBe(CONTRACT_VERSION);
+    expect(forjada.acceptedLegalVersion).toBe(LEGAL_VERSION);
     expect(acceptance().contractVersion).toBe(CONTRACT_VERSION);
   });
 

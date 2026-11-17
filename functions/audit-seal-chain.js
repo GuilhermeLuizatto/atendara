@@ -137,26 +137,13 @@ export function nextSeal({ logId, entry, writtenAt, previous = null }) {
 
 const problem = (kind, detail) => ({ kind, ...detail });
 
-/**
- * Conferencia da corrente. So calculo: recebe o que foi lido e devolve o que
- * nao fecha.
- *
- * - `seals`: os selos da organizacao, em qualquer ordem.
- * - `entries`: as entradas da trilha, com `id`, no formato do dominio.
- * - `sealedFrom`: ISO a partir do qual a trilha e selada. Entrada escrita antes
- *   do selo existir nao tem selo e nao e defeito; sem este limite, ligar o selo
- *   numa organizacao antiga acusaria buraco em toda a trilha anterior.
- *
- * Detecta: buraco e indice repetido (remocao), elo errado (reordenacao ou selo
- * trocado), resumo do selo que nao fecha (selo adulterado), resumo da entrada
- * que nao fecha (entrada adulterada nos campos protegidos), entrada sem selo e
- * selo sem entrada.
- */
 /** Buraco ou indice repetido: os dois jeitos de a sequencia nao fechar. */
 function sequenceProblem(seal, expected) {
   if (seal.index === expected) return null;
   const kind = seal.index < expected ? "DUPLICATE_INDEX" : "GAP";
-  return problem(kind, { index: seal.index, expected });
+  // O `logId` diz QUAL selo apareceu fora de lugar; sem ele, a conferencia
+  // acusaria um buraco sem dizer onde procurar.
+  return problem(kind, { index: seal.index, expected, logId: seal.logId });
 }
 
 /** Elo com o selo anterior e resumo do proprio selo. */
@@ -192,6 +179,21 @@ function unsealedProblems(entries, sealedIds, from) {
   return { found, outsideChain };
 }
 
+/**
+ * Conferencia da corrente. So calculo: recebe o que foi lido e devolve o que
+ * nao fecha.
+ *
+ * - `seals`: os selos da organizacao, em qualquer ordem.
+ * - `entries`: as entradas da trilha, com `id`, no formato do dominio.
+ * - `sealedFrom`: ISO a partir do qual a trilha e selada. Entrada escrita antes
+ *   do selo existir nao tem selo e nao e defeito; sem este limite, ligar o selo
+ *   numa organizacao antiga acusaria buraco em toda a trilha anterior.
+ *
+ * Detecta: buraco e indice repetido (remocao), elo errado (reordenacao ou selo
+ * trocado), resumo do selo que nao fecha (selo adulterado), resumo da entrada
+ * que nao fecha (entrada adulterada nos campos protegidos), entrada sem selo e
+ * selo sem entrada.
+ */
 export function verifyAuditSealChain({ seals = [], entries = [], sealedFrom = null } = {}) {
   const problems = [];
   const ordered = [...seals].sort((left, right) => left.index - right.index);

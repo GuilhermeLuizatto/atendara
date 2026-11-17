@@ -44,10 +44,10 @@
       "id": "trilhas-pelo-navegador",
       "title": "Trilhas gravadas pelo navegador",
       "kind": "risco",
-      "status": "em-revisao",
+      "status": "em-andamento",
       "priority": "alta",
-      "summary": "Risco residual da revisão de segurança: um membro podia inserir evento inventado em nome próprio em auditLogs e aiDecisions. Em 16/11 (PR #123, mergeado em 17/11) a criação de aiDecisions pelo cliente passou a ser negada (quem decide é functions/inbound.js); auditLogs segue gravado pelo navegador.",
-      "next": "Titular lê o plano em docs/planos/TRILHAS-NO-BACKEND-2026-11-16.md e escolhe: migrar as 13 operações de configuração para callables ou selar a trilha por gatilho e deixar a migração para depois do piloto.",
+      "summary": "Risco residual da revisão de segurança: um membro podia inserir evento inventado em nome próprio em auditLogs e aiDecisions. Em 16/11 (PR #123, mergeado em 17/11) a criação de aiDecisions pelo cliente passou a ser negada (quem decide é functions/inbound.js); auditLogs segue gravado pelo navegador. Decisão do titular em 17/11: fatia 0 aceita; selar a trilha agora; migração depois do piloto. O selo não impede entrada inventada, só a torna detectável.",
+      "next": "Implementar o selo (gatilho em auditLogs com índice, horário do servidor e corrente de resumos em coleção fechada ao navegador), com testes e regra negando escrita do cliente; PR à parte.",
       "owner": "Titular",
       "evidence": "docs/planos/TRILHAS-NO-BACKEND-2026-11-16.md; firestore.rules; 574 verificações de regras no emulador",
       "confidence": "confirmado"

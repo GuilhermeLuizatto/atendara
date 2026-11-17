@@ -131,6 +131,7 @@ export const PLATFORM_AUDIT_ACTION_LABELS = {
     DOWNLOAD_TOKENS_REVOCATION_STARTED: "Revogação de links antigos iniciada",
     DOWNLOAD_TOKENS_REVOCATION_COMPLETED: "Revogação de links antigos concluída",
     DOWNLOAD_TOKENS_REVOCATION_FAILED: "Revogação de links antigos falhou",
+    CONTRACT_ACCEPTED: "Aceite do contrato pela organização",
     ORGANIZATION_DELETED: "Exclusão de organização pelo titular",
 };
 /**

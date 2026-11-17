@@ -113,6 +113,11 @@ export const PLATFORM_AUDIT_ACTIONS = [
   "DOWNLOAD_TOKENS_REVOCATION_STARTED",
   "DOWNLOAD_TOKENS_REVOCATION_COMPLETED",
   "DOWNLOAD_TOKENS_REVOCATION_FAILED",
+  // Aceite do Contrato de Licenca e do Anexo de Tratamento pela organizacao
+  // (E3). Nao e ato da operadora: e de quem responde pela organizacao. Fica
+  // nesta trilha porque e o contrato com a plataforma, e porque e append-only —
+  // o documento do aceite diz o que vale hoje; a trilha prova o que valeu.
+  "CONTRACT_ACCEPTED",
   // Unico ato desta trilha que nao e da operadora: o titular encerra a propria
   // organizacao. Fica aqui porque o tenant deixa de existir para guardar o
   // registro, e porque encerrar organizacao e assunto do contrato com a
@@ -167,6 +172,39 @@ export interface ProfessionChangeRequest {
   decidedAt: ISODateString | null;
   decidedBy: ID | null;
   decisionReason: string | null;
+}
+
+/**
+ * Aceite do Contrato de Licenca e do Anexo de Tratamento, um por organizacao
+ * (`platformContractAcceptances/{organizationId}`).
+ *
+ * E uma PROVA, nao uma configuracao: diz sobre qual texto a organizacao
+ * concordou, por meio de quem e quando. Por isso so o backend escreve, e por
+ * isso guarda identificadores e versao, nunca nome, e-mail, IP ou documento —
+ * quem le cruza `acceptedByUserId` com `accounts`.
+ *
+ * `source` diz em que momento o aceite aconteceu. Hoje existe um: o cadastro
+ * aberto, em que os Termos de Uso — que incorporam este contrato para quem
+ * responde pela organizacao — sao aceitos na tela.
+ */
+export const CONTRACT_ACCEPTANCE_SOURCES = ["SELF_SERVICE_SIGNUP"] as const;
+export type ContractAcceptanceSource =
+  (typeof CONTRACT_ACCEPTANCE_SOURCES)[number];
+
+export interface PlatformContractAcceptance {
+  organizationId: ID;
+  /** `CONTRACT_VERSION` no momento do aceite. Nunca a dos Termos. */
+  contractVersion: string;
+  /** Titular que aceitou em nome da organizacao. Id, nunca nome ou e-mail. */
+  acceptedByUserId: ID;
+  acceptedAt: ISODateString;
+  source: ContractAcceptanceSource;
+  /**
+   * Versao dos Termos aceita no mesmo ato. Os Termos dizem que o contrato faz
+   * parte deles para quem responde pela organizacao; guardar as duas versoes e
+   * o que permite reconstruir o que a pessoa leu.
+   */
+  acceptedLegalVersion: string;
 }
 
 export const PLATFORM_PERMISSIONS = [

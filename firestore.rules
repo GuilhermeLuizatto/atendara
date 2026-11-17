@@ -1076,6 +1076,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Aceite do contrato, um por organizacao (E3). O titular le sobre qual
+    // versao a organizacao dele concordou; a operadora le todas. Ninguem
+    // escreve pelo cliente: um aceite que a propria parte pode criar, editar ou
+    // apagar nao prova aceite nenhum. Quem grava e o backend, no mesmo lote do
+    // cadastro, com entrada append-only em `platformAuditLogs`.
+    match /platformContractAcceptances/{orgId} {
+      allow read: if subscriptionOwner(orgId);
+      allow write: if false;
+    }
+
     // Trilha append-only dos atos da operadora. Nem a operadora escreve pelo
     // cliente: uma trilha que o autor edita nao prova nada.
     match /platformAuditLogs/{logId} {

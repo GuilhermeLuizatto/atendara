@@ -4,7 +4,7 @@ import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { TRIAL_DAYS } from "@/config/platform";
-import { LEGAL_VERSION } from "@/config/legal";
+import { CONTRACT_VERSION, LEGAL_VERSION } from "@/config/legal";
 import { paths } from "@/lib/firebase/paths";
 import { adminDb, deleteAdminApps, initializeAdminSdk } from "@/lib/testing/admin-sdk";
 import {
@@ -109,7 +109,19 @@ describe("cadastro aberto sem ninguem liberar", () => {
 
     const grant = await adminDb().doc(paths.platformAccessGrant(helenaOrg)).get();
     expect(grant.exists).toBe(false);
-    expect(await auditActions(helenaOrg)).toEqual(["SELF_SERVICE_REGISTERED"]);
+    // A lista vem ordenada: o aceite do contrato (E3) e gravado no mesmo lote
+    // do cadastro, antes de qualquer concessao.
+    expect(await auditActions(helenaOrg)).toEqual(["CONTRACT_ACCEPTED", "SELF_SERVICE_REGISTERED"]);
+
+    const aceite = (await adminDb().doc(paths.platformContractAcceptance(helenaOrg)).get()).data();
+    expect(aceite).toEqual({
+      organizationId: helenaOrg,
+      contractVersion: CONTRACT_VERSION,
+      acceptedByUserId: String(account!.userId),
+      acceptedAt: expect.any(String),
+      source: "SELF_SERVICE_SIGNUP",
+      acceptedLegalVersion: LEGAL_VERSION,
+    });
 
     const profile = await adminDb().doc(paths.document(helenaOrg, "professionals", String(account!.userId))).get();
     expect(profile.data().licenseNumber).toBe(PSICOLOGA.councilRegistration);
@@ -166,14 +178,14 @@ describe("teste de 14 dias", () => {
       subscriptionStatus: "ACTIVE",
       accessUntil,
     });
-    expect(await auditActions(helenaOrg)).toEqual(["SELF_SERVICE_REGISTERED", "TRIAL_STARTED"]);
+    expect(await auditActions(helenaOrg)).toEqual(["CONTRACT_ACCEPTED", "SELF_SERVICE_REGISTERED", "TRIAL_STARTED"]);
   });
 
   it("chamar de novo nao emenda mais catorze dias", async () => {
     const primeira = (await adminDb().doc(paths.platformAccessGrant(helenaOrg)).get()).data();
     const { accessUntil } = await helena.call<{ accessUntil: string }>("activateTrial", {});
     expect(accessUntil).toBe(primeira.until);
-    expect(await auditActions(helenaOrg)).toEqual(["SELF_SERVICE_REGISTERED", "TRIAL_STARTED"]);
+    expect(await auditActions(helenaOrg)).toEqual(["CONTRACT_ACCEPTED", "SELF_SERVICE_REGISTERED", "TRIAL_STARTED"]);
   });
 
   it("o titular ve a propria concessao e nada de outra organizacao", async () => {

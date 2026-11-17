@@ -506,8 +506,9 @@ Dois workflows:
   build → artefato. Roda em fork sem segredos, porque o build sai em modo
   demonstracao quando as variaveis publicas estao ausentes.
 - **`deploy.yml`** — em `main`: repete a verificacao e publica. As **Security
-  Rules vao antes do Hosting**: se as regras falharem, a versao nova do frontend
-  nao entra no ar com o banco ainda desprotegido.
+  Rules do Firestore e do Storage vao antes do Hosting**: se as regras
+  falharem, a versao nova do frontend nao entra no ar com o banco ainda
+  desprotegido.
 
 O contexto `secrets` nao existe no `if` de um job, entao a checagem de
 credenciais vira uma saida de step. Sem segredos o workflow termina com sucesso

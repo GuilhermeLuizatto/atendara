@@ -376,12 +376,20 @@ export interface WorkspaceRepository {
   setRuleEnabled(id: ID, enabled: boolean): Promise<void>;
 
   appendMessage(input: MessageInput): Promise<ID>;
+  /**
+   * So a demonstracao local recebe e classifica mensagem. Sobre o Firestore,
+   * quem faz isso e `functions/inbound.js`, e a implementacao recusa a chamada
+   * em vez de gravar: as Security Rules negam a criacao de `aiDecisions` pelo
+   * cliente. Os argumentos continuam no contrato por causa da demonstracao —
+   * a implementacao do Firestore os ignora.
+   */
   receiveMessage(
     conversationId: ID,
     text: string,
     evaluatedAt?: string,
   ): Promise<ID>;
   replyToConversation(conversationId: ID, text: string): Promise<void>;
+  /** Mesma divisao de `receiveMessage`: a decisao da Dara nasce no backend. */
   recordDecision(input: DecisionInput): Promise<ID>;
   updateConversation(
     id: ID,

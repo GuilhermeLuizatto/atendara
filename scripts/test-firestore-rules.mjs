@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { messagePath, messagesPath, paths } from "../functions/generated/paths.js";
+import { CONTRACT_VERSION, LEGAL_VERSION } from "../functions/generated/legal-config.js";
 
 // As ferramentas do emulador ficam fora do bundle e das dependencias do aplicativo.
 const requireTools = createRequire(new URL("../.local/firebase-tools/package.json", import.meta.url));
@@ -158,6 +159,7 @@ try {
       await setDoc(doc(db, paths.platformInvoice(`in-${org}`)), { id: `in-${org}`, organizationId: org, status: "PAID", amountDueInCents: 19900, issuedAt: new Date().toISOString() });
       await setDoc(doc(db, paths.platformAccessGrant(org)), { organizationId: org, subscriberUserId: owner, kind: "PILOT", reason: "Piloto combinado.", until: "2026-12-01T00:00:00.000Z", revokedAt: null });
       await setDoc(doc(db, paths.platformProfessionRequest(org)), { organizationId: org, requestedBy: owner, from: "PSYCHOLOGIST", to: "AESTHETICS", reason: "Mudei de area de atuacao.", status: "PENDING", requestedAt: new Date().toISOString(), decidedAt: null, decidedBy: null, decisionReason: null });
+      await setDoc(doc(db, paths.platformContractAcceptance(org)), { organizationId: org, contractVersion: CONTRACT_VERSION, acceptedByUserId: owner, acceptedAt: new Date().toISOString(), source: "SELF_SERVICE_SIGNUP", acceptedLegalVersion: LEGAL_VERSION });
     }
     await setDoc(doc(db, paths.platformGatewayEvent("evt-1")), { id: "evt-1", type: "invoice.paid", outcome: "APPLIED", organizationId: "org-a", receivedAt: new Date().toISOString() });
     await setDoc(doc(db, paths.platformCustomer("cus_1")), { customerId: "cus_1", organizationId: "org-a", subscriberUserId: "a" });
@@ -566,7 +568,15 @@ try {
   // Trilha de auditoria: o profissional escreve, so a administracao le.
   await allowed(setDoc(doc(db("a"), paths.document("org-a", "auditLogs", "novo")), { id: "novo", organizationId: "org-a", actorId: "a", createdBy: "a", updatedBy: "a", action: "CREATE" }));
   await deniedBecause("auditoria atribuida a outro membro", setDoc(doc(db("a"), paths.document("org-a", "auditLogs", "forjado")), { id: "forjado", organizationId: "org-a", actorId: "b", createdBy: "a", updatedBy: "a", action: "CREATE" }));
+  // Decisao da Dara: nem em nome proprio. Quem decide e o backend
+  // (`functions/inbound.js`), com o SDK administrativo, que nao passa por regra.
   await deniedBecause("decisao atribuida a outro membro", setDoc(doc(db("a"), paths.document("org-a", "aiDecisions", "forjada")), { id: "forjada", organizationId: "org-a", professionalId: "a", createdBy: "b", updatedBy: "b", classification: "ADMINISTRATIVE" }));
+  await deniedBecause("decisao criada pelo proprio membro", setDoc(doc(db("a"), paths.document("org-a", "aiDecisions", "inventada")), { id: "inventada", organizationId: "org-a", professionalId: "a", createdBy: "a", updatedBy: "a", classification: "ADMINISTRATIVE", action: "ESCALATE" }));
+  await deniedBecause("decisao criada pela administracao", setDoc(doc(db("ownerRole"), paths.document("org-a", "aiDecisions", "inventada-owner")), { id: "inventada-owner", organizationId: "org-a", professionalId: "a", createdBy: "ownerRole", updatedBy: "ownerRole", classification: "ADMINISTRATIVE", action: "ESCALATE" }));
+  await deniedBecause("decisao criada pela operadora", setDoc(doc(withTotp("admin"), paths.document("org-a", "aiDecisions", "inventada-admin")), { id: "inventada-admin", organizationId: "org-a", professionalId: "a", createdBy: "admin", updatedBy: "admin", classification: "ADMINISTRATIVE", action: "ESCALATE" }));
+  // A revisao da classificacao continua sendo do cliente, e continua exigindo
+  // decisao existente — gravada pelo backend.
+  await allowed(getDoc(doc(db("a"), paths.document("org-a", "aiDecisions", "revisada"))));
   await denied(getDoc(doc(db("a"), own("auditLogs"))));
   await allowed(getDoc(doc(db("ownerRole"), own("auditLogs"))));
   await allowed(getDoc(doc(db("adminRole"), own("auditLogs"))));
@@ -682,6 +692,24 @@ try {
   await denied(setDoc(doc(db("a"), paths.platformAccessGrant("org-a")), { organizationId: "org-a", until: "2099-01-01T00:00:00.000Z" }));
   await denied(updateDoc(doc(withTotp("admin"), paths.platformAccessGrant("org-b")), { until: "2099-01-01T00:00:00.000Z" }));
   await denied(deleteDoc(doc(withTotp("admin"), paths.platformAccessGrant("org-b"))));
+
+  // ----------------------------------------------------------------- E3
+  // Aceite do contrato: o titular le sobre qual versao a organizacao dele
+  // concordou; a operadora le todos; ninguem escreve pelo cliente. Um aceite
+  // que a propria parte cria, edita ou apaga nao prova aceite nenhum.
+
+  await allowed(getDoc(doc(db("a"), paths.platformContractAcceptance("org-a"))));
+  await denied(getDoc(doc(db("a"), paths.platformContractAcceptance("org-b"))));
+  await allowed(getDoc(doc(db("ownerExpired"), paths.platformContractAcceptance("org-c"))));
+  await denied(getDoc(doc(db("restricted"), paths.platformContractAcceptance("org-a"))));
+  await allowed(getDocs(collection(withTotp("admin"), paths.platformContractAcceptances())));
+  await denied(getDocs(collection(db("admin"), paths.platformContractAcceptances())));
+  await denied(setDoc(doc(db("a"), paths.platformContractAcceptance("org-a")), { organizationId: "org-a", contractVersion: CONTRACT_VERSION, acceptedByUserId: "a", acceptedAt: new Date().toISOString(), source: "SELF_SERVICE_SIGNUP", acceptedLegalVersion: LEGAL_VERSION }));
+  await denied(setDoc(doc(db("a"), paths.platformContractAcceptance("org-forjada")), { organizationId: "org-forjada", contractVersion: CONTRACT_VERSION, acceptedByUserId: "a", acceptedAt: new Date().toISOString(), source: "SELF_SERVICE_SIGNUP", acceptedLegalVersion: LEGAL_VERSION }));
+  await denied(updateDoc(doc(db("a"), paths.platformContractAcceptance("org-a")), { contractVersion: "2020-01-01" }));
+  await denied(updateDoc(doc(withTotp("admin"), paths.platformContractAcceptance("org-a")), { contractVersion: "2020-01-01" }));
+  await denied(deleteDoc(doc(db("a"), paths.platformContractAcceptance("org-a"))));
+  await denied(deleteDoc(doc(withTotp("admin"), paths.platformContractAcceptance("org-a"))));
 
   // ------------------------------------------------------------- Etapa A.7
   // Pedido de troca de profissao: o titular le o proprio, a operadora le todos,
@@ -897,6 +925,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 558);
+  assert.equal(checks, 574);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

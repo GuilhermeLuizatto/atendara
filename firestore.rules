@@ -784,18 +784,16 @@ service cloud.firestore {
       match /aiDecisions/{decisionId} {
         allow read: if moduleAccess(orgId, 'agente')
           && existingProfessionalScope(orgId, 'professionalId');
-        allow create: if moduleAccess(orgId, 'agente') && canWriteOperational(orgId)
-          && belongsToOrg(orgId)
-          && requestedProfessionalScope(orgId, 'professionalId')
-          && request.resource.data.get('id', null) == decisionId
-          && request.resource.data.get('createdBy', null) == uid()
-          && request.resource.data.get('updatedBy', null) == uid()
-          && (request.resource.data.get('action', null) != 'AUTO_RESPONSE'
-            || request.resource.data.get('classification', null) == 'ADMINISTRATIVE');
-        // Registro imutavel. Se pudesse ser alterado, nao seria auditoria. A
+        // Quem decide e o backend. `functions/inbound.js` classifica a mensagem
+        // e grava a decisao com o SDK administrativo, que nao passa por regra;
+        // nenhuma tela cria decisao. Enquanto o `create` do cliente existia,
+        // um membro podia inserir decisao inventada em seu proprio nome — o
+        // risco residual da revisao de 10/10. Negar aqui o encerra.
+        //
+        // Registro imutavel: se pudesse ser alterado, nao seria auditoria. A
         // pseudonimizacao a pedido do titular e do backend, restrita aos campos
         // de `src/config/privacy.ts`; pelo cliente, nada muda.
-        allow update, delete: if false;
+        allow create, update, delete: if false;
       }
 
       // Revisao humana da classificacao (Fase 4): o que sustenta o indicador
@@ -1072,6 +1070,16 @@ service cloud.firestore {
     // callables — a profissao decide vocabulario, taxonomia e travas de aviso, e
     // trocar pelo cliente seria trocar tudo isso sem ninguem olhar.
     match /platformProfessionRequests/{orgId} {
+      allow read: if subscriptionOwner(orgId);
+      allow write: if false;
+    }
+
+    // Aceite do contrato, um por organizacao (E3). O titular le sobre qual
+    // versao a organizacao dele concordou; a operadora le todas. Ninguem
+    // escreve pelo cliente: um aceite que a propria parte pode criar, editar ou
+    // apagar nao prova aceite nenhum. Quem grava e o backend, no mesmo lote do
+    // cadastro, com entrada append-only em `platformAuditLogs`.
+    match /platformContractAcceptances/{orgId} {
       allow read: if subscriptionOwner(orgId);
       allow write: if false;
     }

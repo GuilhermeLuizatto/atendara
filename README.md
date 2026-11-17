@@ -272,9 +272,9 @@ install → varredura → lint → type-check → testes → auditoria → build
 
 - **`.github/workflows/ci.yml`** — todo push e PR. Executa varredura de segredos,
   lint, tipos, testes, auditoria de dependências, build e análise com CodeQL.
-- **`.github/workflows/deploy.yml`** — `main`. Publica Security Rules e indices e
-  depois o Hosting; sem credenciais configuradas, registra que pulou e termina
-  com sucesso.
+- **`.github/workflows/deploy.yml`** — `main`. Publica Security Rules (Firestore
+  e Storage), indices e depois o Hosting; sem credenciais configuradas, registra
+  que pulou e termina com sucesso.
 
 Configuração do deploy no GitHub Actions:
 

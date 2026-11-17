@@ -29,7 +29,7 @@ vi.mock("firebase-functions/v2/https", () => ({ onCall: (options, handler) => Ob
 
 import { activateTrial, registerSelfService } from "./self-service.js";
 import { paths } from "./generated/paths.js";
-import { LEGAL_VERSION } from "./generated/legal-config.js";
+import { CONTRACT_VERSION, LEGAL_VERSION } from "./generated/legal-config.js";
 import { APP_MODULES } from "./generated/access.js";
 import { MAX_ACCESS_GRANT_DAYS, SELF_SERVICE_ACTOR, TRIAL_DAYS } from "./generated/platform-config.js";
 
@@ -42,6 +42,7 @@ const writesTo = path => mock.writes.filter(write => write.path === path);
 const writesUnder = prefix => mock.writes.filter(write => write.path.startsWith(prefix));
 const auditWrites = () => writesUnder("platformAuditLogs/");
 const grantWrites = () => writesUnder("platformAccessGrants/");
+const acceptanceWrites = () => writesUnder("platformContractAcceptances/");
 const accountWrites = () => writesTo(paths.account(NEW_UID));
 const rateLimitWrites = () => writesUnder("platformRateLimits/");
 
@@ -70,7 +71,7 @@ describe("Cadastro aberto", () => {
 
     const [organization] = writesUnder("organizations/");
     expect(organization.data).toMatchObject({ ownerId: NEW_UID, name: "Espaço Lume", primaryProfession: "PSYCHOLOGIST" });
-    expect(auditWrites().map(write => write.data.action)).toEqual(["SELF_SERVICE_REGISTERED"]);
+    expect(auditWrites().map(write => write.data.action)).toEqual(["SELF_SERVICE_REGISTERED", "CONTRACT_ACCEPTED"]);
     expect(auditWrites()[0].data).toMatchObject({ actorId: SELF_SERVICE_ACTOR, targetUserId: NEW_UID, details: { signInMethod: "PASSWORD" } });
   });
 
@@ -150,7 +151,7 @@ describe("Cadastro aberto", () => {
 
     const [account] = accountWrites();
     expect(account.data).toMatchObject({ subscriptionStatus: "ACTIVE", accessUntil: grant.data.until });
-    expect(auditWrites().map(write => write.data.action)).toEqual(["SELF_SERVICE_REGISTERED", "TRIAL_STARTED"]);
+    expect(auditWrites().map(write => write.data.action)).toEqual(["SELF_SERVICE_REGISTERED", "CONTRACT_ACCEPTED", "TRIAL_STARTED"]);
     // Ato e registro no mesmo lote: nao existe concessao sem trilha.
     expect(new Set(mock.writes.filter(write => !write.path.startsWith("platformRateLimits/")).map(write => write.origin))).toEqual(new Set(["batch"]));
     expect(mock.createUser).not.toHaveBeenCalled();
@@ -159,6 +160,60 @@ describe("Cadastro aberto", () => {
   it("recusa o Google sem e-mail confirmado e com e-mail diferente do informado", async () => {
     await expect(registerSelfService(signedIn(signup({ password: undefined }), { token: { email_verified: false } }))).rejects.toMatchObject({ code: "failed-precondition" });
     await expect(registerSelfService(signedIn(signup({ email: "outra@exemplo.com.br", password: undefined })))).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("registra o aceite do contrato no mesmo lote, com as duas versoes (E3)", async () => {
+    await registerSelfService(anonymous(signup()));
+
+    const [aceite] = acceptanceWrites();
+    const [organization] = writesUnder("organizations/");
+    const organizationId = organization.path.split("/")[1];
+    expect(aceite.path).toBe(paths.platformContractAcceptance(organizationId));
+    expect(aceite.op).toBe("create");
+    expect(aceite.data).toEqual({
+      organizationId,
+      contractVersion: CONTRACT_VERSION,
+      acceptedByUserId: NEW_UID,
+      acceptedAt: expect.any(String),
+      source: "SELF_SERVICE_SIGNUP",
+      acceptedLegalVersion: LEGAL_VERSION,
+    });
+    // Cadastro e aceite no MESMO lote: nao existe organizacao sem registro de
+    // sobre qual texto ela concordou.
+    expect(aceite.origin).toBe("batch");
+    expect(aceite.origin).toBe(organization.origin);
+
+    const trilha = auditWrites().find(write => write.data.action === "CONTRACT_ACCEPTED");
+    expect(trilha.data).toMatchObject({
+      actorId: NEW_UID,
+      organizationId,
+      targetUserId: NEW_UID,
+      details: { contractVersion: CONTRACT_VERSION, legalVersion: LEGAL_VERSION, source: "SELF_SERVICE_SIGNUP" },
+    });
+  });
+
+  it("nao guarda nome, e-mail nem endereco no aceite do contrato", async () => {
+    await registerSelfService(anonymous(signup()));
+    const registro = JSON.stringify(acceptanceWrites()[0].data);
+    for (const pessoal of ["Bianca", "bianca@exemplo.com.br", "Espaço Lume", "203.0.113.7", "CRP 06/123456"]) {
+      expect(registro).not.toContain(pessoal);
+    }
+  });
+
+  it("nao aceita versao de contrato vinda do payload", async () => {
+    // A versao e do servidor. Mandar uma outra na chamada nao pode registrar
+    // concordancia com um texto que nao estava no ar.
+    for (const extra of [{ contractVersion: "2020-01-01" }, { acceptedContractVersion: "2020-01-01" }]) {
+      await expect(registerSelfService(anonymous(signup(extra)))).rejects.toMatchObject({ code: "invalid-argument" });
+    }
+    expect(acceptanceWrites()).toHaveLength(0);
+  });
+
+  it("nao registra aceite quando a gravacao do cadastro falha", async () => {
+    mock.commit.mockRejectedValueOnce(new Error("indisponivel"));
+    await expect(registerSelfService(anonymous(signup()))).rejects.toMatchObject({ code: "internal" });
+    // O lote e um ato so: se ele nao foi, nada do aceite ficou de pe.
+    expect(mock.commit).toHaveBeenCalledTimes(1);
   });
 
   it("nao cadastra duas vezes a mesma conta do Google", async () => {

@@ -29,6 +29,30 @@
       "confidence": "confirmado"
     },
     {
+      "id": "deploy-regras-storage",
+      "title": "Deploy publica as regras do Storage",
+      "kind": "risco",
+      "status": "concluido",
+      "priority": "alta",
+      "summary": "PR #121 (passo de regras com storage) e PR #125 (bucket nomeado no firebase.json) mergeados. O Deploy da main publica as regras do Storage: a execução 44013048934, em 17/11, registrou \"released rules storage.rules to firebase.storage\", as regras do Firestore, os índices e o site. Dois obstáculos no caminho: permissão da conta atendara-deploy e a consulta ao bucket padrão, que o firebase-tools só faz quando storage não é lista.",
+      "next": "Nada pendente nesta frente. O envio de arquivo em produção segue sem teste real: o bucket está vazio desde 25/09, então vale anexar um comprovante no painel publicado antes do piloto.",
+      "owner": "Titular",
+      "evidence": "https://github.com/GuilhermeLuizatto/atendara/actions/runs/44013048934",
+      "confidence": "confirmado"
+    },
+    {
+      "id": "trilhas-pelo-navegador",
+      "title": "Trilhas gravadas pelo navegador",
+      "kind": "risco",
+      "status": "em-revisao",
+      "priority": "alta",
+      "summary": "Risco residual da revisão de segurança: um membro podia inserir evento inventado em nome próprio em auditLogs e aiDecisions. Em 16/11 a criação de aiDecisions pelo cliente passou a ser negada (quem decide é functions/inbound.js); auditLogs segue gravado pelo navegador.",
+      "next": "Titular lê o plano em docs/planos/TRILHAS-NO-BACKEND-2026-11-16.md e escolhe: migrar as 13 operações de configuração para callables ou selar a trilha por gatilho e deixar a migração para depois do piloto.",
+      "owner": "Titular",
+      "evidence": "docs/planos/TRILHAS-NO-BACKEND-2026-11-16.md; firestore.rules; 574 verificações de regras no emulador",
+      "confidence": "confirmado"
+    },
+    {
       "id": "lancamento-piloto",
       "title": "Lançamento do piloto",
       "kind": "teste",
@@ -154,10 +178,10 @@
       "kind": "desenvolvimento",
       "status": "em-andamento",
       "priority": "alta",
-      "summary": "Termos alinhados ao ADR 0006 e página /contrato no ar desde 06/11 (versão 2026-11-06-preliminar); texto sem revisão jurídica.",
-      "next": "E3: registrar o aceite da organização em platformContractAcceptances, depois da revisão de segurança ter PR próprio.",
+      "summary": "Termos e /contrato no ar desde 06/11 (versão 2026-11-06-preliminar). E3 implementada em 16/11: o cadastro aberto grava o aceite em platformContractAcceptances, com as duas versões, só identificadores e entrada append-only na trilha. Texto segue sem revisão jurídica.",
+      "next": "Titular revisa o PR da E3 e decide onde o aceite é pedido quando a versão mudar (E4/E5). Minutas de 14/10 enviadas em 16/11 dizem aceite no primeiro acesso com IP: decisão pendente.",
       "owner": "Titular",
-      "evidence": "PR #105; atendara.app/termos e /contrato",
+      "evidence": "PR #105; atendara.app/termos e /contrato; src/lib/platform/contract-acceptance.ts",
       "confidence": "confirmado"
     },
     {

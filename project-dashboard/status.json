@@ -32,12 +32,12 @@
       "id": "deploy-regras-storage",
       "title": "Deploy publica as regras do Storage",
       "kind": "risco",
-      "status": "em-revisao",
+      "status": "bloqueado",
       "priority": "alta",
-      "summary": "O workflow da main publicava só firestore:rules e firestore:indexes, então storage.rules mudado no PR #117 precisou ser publicado à mão. O passo de regras passou a incluir storage.",
-      "next": "Titular revisa o diff e decide: ao mergear, o Deploy da main passa a publicar storage.rules junto das regras do Firestore.",
+      "summary": "PR #121 mergeado em 16/11: o passo de regras passou a incluir storage. A primeira execução do Deploy falhou — a conta de serviço do CI não tem firebasestorage.defaultBucket.get, e o CLI recusa antes de publicar; nessa execução nada subiu. Todo Deploy da main falha nesse passo até a permissão existir.",
+      "next": "Titular concede à conta de serviço do CI a permissão firebasestorage.defaultBucket.get (papel Firebase Storage Admin ou equivalente) e manda reexecutar o Deploy; se preferir não mexer no IAM agora, reverter o passo para firestore:rules,firestore:indexes devolve a esteira ao verde e volta a publicar storage.rules à mão.",
       "owner": "Titular",
-      "evidence": ".github/workflows/deploy.yml",
+      "evidence": "https://github.com/GuilhermeLuizatto/atendara/actions/runs/43994747971",
       "confidence": "confirmado"
     },
     {

@@ -34,8 +34,8 @@
       "kind": "risco",
       "status": "bloqueado",
       "priority": "alta",
-      "summary": "PR #121 mergeado em 16/11: o passo de regras passou a incluir storage. A primeira execução do Deploy falhou — a conta de serviço do CI não tem firebasestorage.defaultBucket.get, e o CLI recusa antes de publicar; nessa execução nada subiu. Todo Deploy da main falha nesse passo até a permissão existir.",
-      "next": "Titular concede à conta de serviço do CI a permissão firebasestorage.defaultBucket.get (papel Firebase Storage Admin ou equivalente) e manda reexecutar o Deploy; se preferir não mexer no IAM agora, reverter o passo para firestore:rules,firestore:indexes devolve a esteira ao verde e volta a publicar storage.rules à mão.",
+      "summary": "PR #121 mergeado em 16/11. O Deploy falhou por permissão na conta do CI; concedida em 17/11 (roles/firebasestorage.viewer na conta atendara-deploy), o erro mudou para \"Firebase Storage has not been set up on project\": o Cloud Storage para Firebase nunca foi inicializado. O bucket atendo-a3481.firebasestorage.app existe e está vazio, mas é improvável que storage.rules alguma vez tenha sido publicado, inclusive o do PR #117.",
+      "next": "Titular abre o Storage no console do Firebase e decide a inicialização — a região do bucket é permanente e o anexo afirma dados no Brasil, então southamerica-east1 ou revisão do texto. Conferir em produção se envio de comprovante, anexo de suporte e logo funciona. Enquanto isso, todo Deploy da main falha nesse passo; reverter o passo devolve a esteira ao verde.",
       "owner": "Titular",
       "evidence": "https://github.com/GuilhermeLuizatto/atendara/actions/runs/43994747971",
       "confidence": "confirmado"

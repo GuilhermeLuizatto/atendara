@@ -521,6 +521,28 @@ export const PERSONAL_DATA_MAP = {
             },
         },
     },
+    // Selo da trilha. Guarda indice, horario do servidor e resumos (hashes) — sem
+    // nome, texto ou contato. O resumo cobre so os campos que a pseudonimizacao
+    // nunca toca (`APPEND_ONLY_PROTECTED_FIELDS.auditLogs`), entao atender um
+    // titular NAO quebra a corrente.
+    auditSeals: {
+        personalFields: [],
+        retention: WHILE_ORGANIZATION,
+        onClientErasure: NOT_APPLICABLE,
+        onOrganizationDeletion: {
+            action: "KEEP",
+            why: "O selo não guarda dado pessoal: só índice, horário do servidor e resumos. Apagá-lo removeria a prova de integridade da trilha que a própria exclusão pseudonimiza e mantém.",
+        },
+    },
+    auditSealChains: {
+        personalFields: [],
+        retention: WHILE_ORGANIZATION,
+        onClientErasure: NOT_APPLICABLE,
+        onOrganizationDeletion: {
+            action: "KEEP",
+            why: "É o último elo da corrente de selos, sem dado pessoal. Sem ele não se prova que a trilha pseudonimizada termina onde terminou.",
+        },
+    },
     privacyRequests: {
         personalFields: ["subjectId", "requestedBy"],
         retention: {

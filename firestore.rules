@@ -973,6 +973,32 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      // Selo da trilha: indice sequencial, horario do servidor e a corrente de
+      // resumos de cada entrada de `auditLogs`. Fechada ao navegador nas duas
+      // pontas, de proposito:
+      //
+      // - escrita de NINGUEM pelo cliente, nem do OWNER. Um selo que o cliente
+      //   pudesse gravar nao provaria nada: quem alterasse a trilha reescreveria
+      //   a corrente junto. So o gatilho `sealAuditLog` grava, com o SDK
+      //   administrativo;
+      // - leitura tambem fechada. O selo nao e informacao de operacao, e sim a
+      //   prova usada para conferir a trilha; abrir a leitura so entregaria os
+      //   resumos a quem poderia querer recalcula-los. A conferencia e do
+      //   backend (`verifyAuditSealChain`), e a exportacao da organizacao leva o
+      //   selo pela callable de privacidade, que roda com o SDK administrativo.
+      //
+      // Como em `auditLogs` e `aiDecisions`, `update` e `delete` sao negados
+      // para todo papel (regra 6 do AGENTS.md).
+      match /auditSeals/{logId} {
+        allow read, write: if false;
+      }
+
+      // Cabeca da corrente (um documento, id `organization`): ultimo indice e
+      // ultimo resumo. Mesmo motivo, mesma trava.
+      match /auditSealChains/{chainId} {
+        allow read, write: if false;
+      }
+
       // ------------------------------------ pedidos de titulares de dados
 
       // Registro de cada exportacao e eliminacao atendida. Gravado pelo backend

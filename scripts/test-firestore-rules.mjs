@@ -581,6 +581,30 @@ try {
   await allowed(getDoc(doc(db("ownerRole"), own("auditLogs"))));
   await allowed(getDoc(doc(db("adminRole"), own("auditLogs"))));
 
+  // Selo da trilha (secao 4 do plano das trilhas, decidido em 17/11). A corrente
+  // so torna remocao e reordenacao detectaveis se o cliente nao a alcancar: um
+  // selo gravavel pelo navegador seria reescrito junto com a trilha. A leitura
+  // tambem fica fechada — entregar os resumos a quem poderia querer recalcula-los
+  // nao ajuda ninguem a trabalhar, e a conferencia e do backend.
+  const sealOf = (uid, id = "selo") => doc(db(uid), paths.document("org-a", "auditSeals", id));
+  const chainOf = (uid) => doc(db(uid), paths.document("org-a", "auditSealChains", "organization"));
+  const sealDoc = { id: "selo", organizationId: "org-a", index: 1, entryHash: "a".repeat(64), previousSealHash: null, sealHash: "b".repeat(64) };
+  for (const uid of ["a", "ownerRole", "adminRole"]) {
+    await deniedBecause(`${uid} lendo o selo`, getDoc(sealOf(uid)));
+    await deniedBecause(`${uid} lendo a cabeca da corrente`, getDoc(chainOf(uid)));
+    await deniedBecause(`${uid} selando pelo navegador`, setDoc(sealOf(uid, `forjado-${uid}`), sealDoc));
+    await deniedBecause(`${uid} reescrevendo o selo`, updateDoc(sealOf(uid), { entryHash: "c".repeat(64) }));
+    await deniedBecause(`${uid} apagando o selo`, deleteDoc(sealOf(uid)));
+    await deniedBecause(`${uid} movendo a cabeca da corrente`, setDoc(chainOf(uid), { index: 0, sealHash: null }));
+  }
+  await deniedBecause("listando selos", getDocs(query(collection(db("adminRole"), paths.collection("org-a", "auditSeals")), limit(5))));
+  await deniedBecause("selo de outra organizacao", getDoc(doc(db("a"), paths.document("org-b", "auditSeals", "selo"))));
+  // A operadora tambem nao alcanca: o selo e dado do tenant.
+  await deniedBecause("operadora lendo o selo", getDoc(doc(withTotp("admin"), paths.document("org-a", "auditSeals", "selo"))));
+  await deniedBecause("operadora selando", setDoc(doc(withTotp("admin"), paths.document("org-a", "auditSeals", "da-operadora")), sealDoc));
+  await deniedBecause("operadora lendo a corrente", getDoc(doc(withTotp("admin"), paths.document("org-a", "auditSealChains", "organization"))));
+  await deniedBecause("operadora movendo a corrente", setDoc(doc(withTotp("admin"), paths.document("org-a", "auditSealChains", "organization")), { index: 0 }));
+
   // Perfil profissional exige papel administrativo: por isso o cadastro de
   // profissional e criado pelo backend, e nao pelo aplicativo.
   await denied(setDoc(doc(db("a"), paths.document("org-a", "professionals", "auto")), { organizationId: "org-a", displayName: "Eu mesmo" }));
@@ -925,6 +949,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 574);
+  assert.equal(checks, 598);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

@@ -113,6 +113,15 @@ export const TENANT_COLLECTIONS = {
   // no webhook; a equipe so muda a situacao. Nao vira cliente sozinho.
   leads: "leads",
   auditLogs: "auditLogs",
+  // Selo da trilha: um registro por entrada de `auditLogs`, com indice
+  // sequencial, horario do servidor e a corrente de resumos. So o backend grava
+  // e le; o navegador nao alcanca. Torna remocao e reordenacao detectaveis — nao
+  // impede entrada inventada em nome proprio (`functions/audit-seal-chain.js`).
+  auditSeals: "auditSeals",
+  // Cabeca da corrente de selos: um documento so, de id `organization`, com o
+  // ultimo indice e o ultimo resumo. Existe para dar o proximo indice numa
+  // leitura, como `receiptCounters` faz com a numeracao dos recibos.
+  auditSealChains: "auditSealChains",
   // Registro de cada pedido de titular de dados atendido pela organizacao.
   // Escrito so pelo backend, junto da exportacao ou da eliminacao.
   privacyRequests: "privacyRequests",

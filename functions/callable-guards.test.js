@@ -47,6 +47,7 @@ vi.mock("firebase-functions/v2/https", () => ({
 }));
 vi.mock("firebase-functions/v2/firestore", () => ({
   onDocumentWritten: (options, handler) => Object.assign(handler, { kind: "event", options }),
+  onDocumentCreated: (options, handler) => Object.assign(handler, { kind: "event", options }),
   onDocumentDeleted: (options, handler) => Object.assign(handler, { kind: "event", options }),
   onDocumentUpdated: (options, handler) => Object.assign(handler, { kind: "event", options }),
 }));

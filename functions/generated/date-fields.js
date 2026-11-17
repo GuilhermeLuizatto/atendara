@@ -84,6 +84,10 @@ export const COLLECTION_DATE_FIELDS = {
         "statusChangedAt",
     ],
     auditLogs: [...STAMP_FIELDS, "occurredAt"],
+    // `writtenAt` e o horario do servidor da entrada selada; `createdAt`, o do
+    // proprio selo. Nao ha `updatedAt`: selo nao muda.
+    auditSeals: ["createdAt", "writtenAt"],
+    auditSealChains: ["updatedAt"],
     privacyRequests: [...STAMP_FIELDS, "executedAt"],
     platformSupportTickets: [...STAMP_FIELDS, "lastMessageAt"],
     platformSupportMessages: ["createdAt"],

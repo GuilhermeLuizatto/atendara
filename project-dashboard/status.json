@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "Atendara",
-  "reviewedAt": "2026-11-16",
+  "reviewedAt": "2026-11-17",
   "reviewNote": "Fotografia de acompanhamento. Merge, publicação e validação real são etapas diferentes.",
   "items": [
     {
@@ -178,8 +178,8 @@
       "kind": "desenvolvimento",
       "status": "em-andamento",
       "priority": "alta",
-      "summary": "Termos e /contrato no ar desde 06/11. E3 mergeada em 17/11 (PR #122) e Functions publicadas: registerSelfService na revisão registerselfservice-00025-tef. O cadastro aberto grava o aceite em platformContractAcceptances com as duas versões, só identificadores e entrada append-only na trilha.",
-      "next": "Prova de comportamento: autocadastro de teste em produção e conferência do documento em platformContractAcceptances — só organizações criadas depois da publicação ganham o registro. Depois, decidir onde pedir o aceite quando a versão mudar (E4/E5) e o que fazer com as minutas de 14/10.",
+      "summary": "Termos e /contrato no ar desde 06/11. E3 mergeada em 17/11 (PR #122) e Functions publicadas: registerSelfService na revisão registerselfservice-00025-tef. Provado em produção em 17/11 (autocadastro de teste: documento e entrada CONTRACT_ACCEPTED lidos). O cadastro aberto grava o aceite em platformContractAcceptances com as duas versões, só identificadores e entrada append-only na trilha.",
+      "next": "Decidir onde pedir o aceite quando a versão mudar (E4/E5) e o que fazer com as minutas de 14/10; texto segue sem revisão jurídica.",
       "owner": "Titular",
       "evidence": "PR #105; atendara.app/termos e /contrato; src/lib/platform/contract-acceptance.ts",
       "confidence": "confirmado"

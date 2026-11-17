@@ -2,6 +2,11 @@
 
 Este registro resume mudanças relevantes integradas à `main`. Código integrado, publicação e validação real são estados diferentes.
 
+## 17/11/2026
+
+- [PR #121](https://github.com/GuilhermeLuizatto/atendara/pull/121): o Deploy da `main` passou a publicar as regras do Storage junto das do Firestore (`--only firestore:rules,firestore:indexes,storage`), antes do Hosting; até aqui `storage.rules` dependia de publicação à mão. **A publicação só funcionou depois de duas correções:** conceder `roles/firebasestorage.viewer` à conta de serviço do CI (`atendara-deploy`), e nomear o bucket no `firebase.json` — com `storage` fora de uma lista, o `firebase-tools` consulta o "bucket padrão" por uma API que este projeto não responde, e o erro enganoso é "Firebase Storage has not been set up". O bucket `atendo-a3481.firebasestorage.app` existe desde 25/09 em `southamerica-east1`, com as regras do repositório publicadas. Guarda de credenciais e ordem dos passos não mudaram.
+- [PR #125](https://github.com/GuilhermeLuizatto/atendara/pull/125): o `firebase.json` passou a nomear o bucket do Storage (`"storage": [{ "bucket": ..., "rules": ... }]`), o que faz o `firebase-tools` publicar direto nele em vez de resolver um "bucket padrão" por API. É também mais honesto: as regras vão para um bucket escrito no repositório. Os arquivos de emulador têm config própria e seguem sem bucket.
+
 ## 16/11/2026
 
 - [PR #118](https://github.com/GuilhermeLuizatto/atendara/pull/118): o produto passa a ser só Psicologia, para quem atende sozinho. As outras profissões, Mensagens (com o selo), Primeiro contato, Equipe e as abas Recibos e Fila de automações ficam escondidas, sem apagar código nem dado; a lista está em `src/config/scope.ts` e no campo `listed` de `definitions.ts`. As Functions rejeitam cadastro e troca para profissão não listada, então só valem depois de publicadas. Rotas escondidas voltam ao dashboard.

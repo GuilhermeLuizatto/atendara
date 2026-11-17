@@ -687,6 +687,15 @@ export const PERSONAL_DATA_MAP: Record<
       why: "Ato registrado da operadora sobre a organização, não sobre quem ela atende. A justificativa é texto livre e deve ser escrita sem dado pessoal.",
     },
   },
+  platformContractAcceptances: {
+    personalFields: ["acceptedByUserId"],
+    retention: { kind: "UNDEFINED" },
+    onClientErasure: NOT_APPLICABLE,
+    onOrganizationDeletion: {
+      action: "KEEP",
+      why: "Prova de sobre qual texto a organização concordou. Apagá-la ao excluir a organização apagaria a base do que foi contratado; guarda o id de quem aceitou, nunca nome, e-mail, IP ou documento.",
+    },
+  },
   platformAuditLogs: {
     personalFields: ["actorId", "targetUserId", "reason", "details"],
     retention: { kind: "UNDEFINED" },

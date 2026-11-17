@@ -4,6 +4,7 @@ Este registro resume mudanças relevantes integradas à `main`. Código integrad
 
 ## 16/11/2026
 
+- [PR #121](https://github.com/GuilhermeLuizatto/atendara/pull/121): o Deploy da `main` passou a publicar as regras do Storage junto das do Firestore (`--only firestore:rules,firestore:indexes,storage`), antes do Hosting. Até aqui `storage.rules` ficava de fora e dependia de publicação à mão — foi o que aconteceu no PR #117, com arquivo de paciente e comprovante sob a regra antiga até alguém lembrar. A guarda de credenciais e a ordem não mudaram.
 - [PR #118](https://github.com/GuilhermeLuizatto/atendara/pull/118): o produto passa a ser só Psicologia, para quem atende sozinho. As outras profissões, Mensagens (com o selo), Primeiro contato, Equipe e as abas Recibos e Fila de automações ficam escondidas, sem apagar código nem dado; a lista está em `src/config/scope.ts` e no campo `listed` de `definitions.ts`. As Functions rejeitam cadastro e troca para profissão não listada, então só valem depois de publicadas. Rotas escondidas voltam ao dashboard.
 - [PR #117](https://github.com/GuilhermeLuizatto/atendara/pull/117): revisão de segurança de arquivos e trilhas, com revogação dos links de download antigos (`functions/revoke-download-tokens.js`) e teto por token nas callables públicas. Regras e site foram publicados pelo Deploy; a publicação das Functions e a revogação em produção ainda dependem do titular (a simulação de 16/11 não achou objetos a revogar).
 

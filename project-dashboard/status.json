@@ -34,10 +34,10 @@
       "kind": "risco",
       "status": "em-revisao",
       "priority": "alta",
-      "summary": "O workflow da main publicava só firestore:rules e firestore:indexes, então storage.rules mudado no PR #117 precisou ser publicado à mão. O passo de regras passou a incluir storage.",
-      "next": "Titular revisa o diff e decide: ao mergear, o Deploy da main passa a publicar storage.rules junto das regras do Firestore.",
+      "summary": "PR #121 mergeado em 16/11 incluiu storage no passo de regras. O Deploy falhou duas vezes em 17/11: 403 por falta de permissão na conta do CI (resolvido com roles/firebasestorage.viewer na conta atendara-deploy) e depois \"Firebase Storage has not been set up\", que é falso — o bucket atendo-a3481.firebasestorage.app existe em southamerica-east1 e as regras do repositório estão publicadas, conferidas no console.",
+      "next": "Mergear a correção que nomeia o bucket no firebase.json: quando storage não é lista, o firebase-tools procura o bucket padrão por uma API que este projeto não responde. Depois do merge, conferir o Deploy verde e o release das regras no log.",
       "owner": "Titular",
-      "evidence": ".github/workflows/deploy.yml",
+      "evidence": "firebase.json; https://github.com/GuilhermeLuizatto/atendara/actions/runs/43994747971; console do Firebase: bucket e regras publicadas",
       "confidence": "confirmado"
     },
     {

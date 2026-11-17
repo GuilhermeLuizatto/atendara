@@ -134,6 +134,8 @@ Colecoes sob `organizations/{organizationId}`:
 | `bookingRequests` | Oferta temporária de horários para agendamento pela conversa (só backend) |
 | `leads`         | Primeiro contato sem cadastro: telefone, fila, situação e consentimento (backend cria) |
 | `auditLogs`     | Trilha append-only                       |
+| `auditSeals`    | Selo de cada entrada da trilha: índice, horário do servidor e corrente de resumos (só backend; fechada ao navegador) |
+| `auditSealChains` | Cabeça da corrente de selos, um documento por organização (só backend) |
 | `privacyRequests` | Registro dos pedidos de titulares atendidos |
 
 `notifications` e `notificationDeliveries` sao coisas diferentes e o nome quase
@@ -224,6 +226,24 @@ Garantias implementadas:
   negam `update`/`delete` sem excecao. Um registro alteravel nao seria auditoria.
   A pseudonimizacao a pedido do titular e do backend e nao passa pelas regras
   (secao 14).
+- **Trilha selada pelo backend.** Cada entrada criada em `auditLogs` dispara
+  `sealAuditLog` (`functions/audit-seal.js`), que grava em `auditSeals` um
+  registro com indice sequencial por organizacao, o horario de escrita do
+  servidor (`createTime`, que o cliente nao escolhe), o resumo da entrada e o
+  resumo do selo anterior. Indice e elo nascem numa transacao sobre a cabeca da
+  corrente, entao duas entradas simultaneas nunca recebem o mesmo indice, e o
+  selo e idempotente pelo id da entrada, entao a reentrega do evento nao
+  duplica nada. `verifyAuditSealChain` confere buraco, indice repetido, elo
+  errado, selo adulterado, entrada adulterada, entrada sem selo e selo sem
+  entrada. O resumo cobre exatamente os campos de
+  `APPEND_ONLY_PROTECTED_FIELDS.auditLogs`, para que a pseudonimizacao a pedido
+  do titular — que troca `summary`, `actorName` e `resource.id` — nao quebre a
+  corrente. **O selo nao impede entrada inventada em nome proprio:** quem esta
+  autenticado pode registrar um fato que nao aconteceu, e o selo sela essa
+  entrada como qualquer outra. Ele torna a trilha detectavel, nao verdadeira; a
+  migracao das 26 operacoes do navegador para callables continua sendo o que
+  fecha esse risco, e o risco residual foi aceito por escrito pelo titular em
+  17/11/2026.
 - **Mensagens imutaveis.** Preservar o que foi dito e o que permite auditar as
   decisoes do agente depois.
 - **`collectionGroup` de mensagens com filtro de tenant.** A caixa de entrada le

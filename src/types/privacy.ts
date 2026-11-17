@@ -76,6 +76,8 @@ export const ORGANIZATION_EXPORT_SECTIONS = [
   "calendarBusyBlocks",
   "automationTasks",
   "auditLogs",
+  "auditSeals",
+  "auditSealChains",
   "privacyRequests",
 ] as const;
 

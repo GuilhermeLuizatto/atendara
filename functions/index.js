@@ -147,6 +147,11 @@ export {
   deleteOrganization,
 } from "./privacy.js";
 
+// Selo da trilha: cada entrada de `auditLogs` ganha indice, horario do servidor
+// e corrente de resumos numa colecao fechada ao navegador. Torna remocao e
+// reordenacao detectaveis; entrada inventada em nome proprio segue possivel.
+export { sealAuditLog } from "./audit-seal.js";
+
 // Fila de automacao: o gatilho da agenda planeja os avisos e o despachante os
 // executa no horario, conferindo as travas de novo. O navegador so le a fila.
 export { planAppointmentNotices, planCalendarEvents, dispatchAutomationTask } from "./automation.js";

@@ -44,6 +44,8 @@ organizations/{orgId}
 ├── automationTasks/{taskId}             fila de automacao (painel autorizado le; so backend escreve)
 ├── leads/{leadId}                       primeiro contato sem cadastro (backend cria; equipe so muda a situacao)
 ├── auditLogs/{logId}                    append-only (so o backend pseudonimiza)
+├── auditSeals/{logId}                   selo de cada entrada: indice, horario do servidor e corrente de resumos (so backend; cliente nao le nem escreve)
+├── auditSealChains/organization         cabeca da corrente: ultimo indice e ultimo resumo (so backend)
 └── privacyRequests/{requestId}          pedidos de titulares atendidos (so backend)
 
 platformPlans/{planId}                    cobranca DA PLATAFORMA (Etapa 3)
@@ -145,6 +147,8 @@ backend grava na fila e o que a tela le.
 | `automationTasks` | + `scheduledFor`, `expiresAt`, `appointmentStartsAt`, `dispatchingSince`, `completedAt` |
 | `leads`         | + `firstContactAt`, `lastContactAt`, `statusChangedAt`     |
 | `auditLogs`     | + `occurredAt`                                             |
+| `auditSeals`    | `createdAt` (do selo) e `writtenAt` (da entrada selada); sem `updatedAt` |
+| `auditSealChains` | so `updatedAt`                                           |
 | `privacyRequests` | + `executedAt`, `expiresAt`                              |
 | `platformSupportTickets` | + `lastMessageAt`                                  |
 | mensagens de suporte | `createdAt`                                             |

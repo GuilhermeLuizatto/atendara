@@ -30,6 +30,10 @@ const GROUP_OF_FILE = {
   "billing.js": "cobranca",
   "automation.js": "automacao",
   "automation-expiry.js": "automacao",
+  // O selo da trilha so grava `auditSeals` e `auditSealChains` do tenant:
+  // mesmo alcance (Firestore) dos outros gatilhos deste grupo. Conta propria
+  // exigiria cria-la no Google Cloud antes de publicar, sem papel novo nenhum.
+  "audit-seal.js": "automacao",
   // A volta da ponte do n8n muda estado de tarefa e grava a trilha do aviso:
   // mesmo alcance do despachante, e nada alem dele.
   "automation-callback.js": "automacao",

@@ -34,10 +34,10 @@
       "kind": "teste",
       "status": "pendente",
       "priority": "alta",
-      "summary": "Checklist com publicação, decisões do titular, revisão jurídica e validação real; nenhum dado real de paciente antes disso.",
-      "next": "Seguir o checklist local de 07/11, começando pela revisão de segurança e pela publicação na ordem functions, regras e site.",
+      "summary": "Checklist com publicação, decisões do titular, revisão jurídica e validação real; nenhum dado real de paciente antes disso. Em 16/11 os itens 4.2 (termo de participação) e 5.5 (acompanhamento) ganharam rascunho privado, marcado para revisão de advogado.",
+      "next": "Decidir duração, contrapartida e número de participantes (itens 3.2 e 3.3), levar os rascunhos ao advogado e decidir se o piloto terá medição de uso: hoje não há telemetria, então uso e falha de gravação não têm origem.",
       "owner": "Titular",
-      "evidence": "Checklist local de 07/11/2026",
+      "evidence": "Checklist local de 07/11/2026; docs/RASCUNHO-TERMO-DE-PARTICIPACAO-PILOTO-2026-11-16.md; docs/RASCUNHO-ACOMPANHAMENTO-PILOTO-2026-11-16.md",
       "confidence": "confirmado"
     },
     {

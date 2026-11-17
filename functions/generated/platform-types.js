@@ -78,6 +78,11 @@ export const PLATFORM_AUDIT_ACTIONS = [
     "DOWNLOAD_TOKENS_REVOCATION_STARTED",
     "DOWNLOAD_TOKENS_REVOCATION_COMPLETED",
     "DOWNLOAD_TOKENS_REVOCATION_FAILED",
+    // Aceite do Contrato de Licenca e do Anexo de Tratamento pela organizacao
+    // (E3). Nao e ato da operadora: e de quem responde pela organizacao. Fica
+    // nesta trilha porque e o contrato com a plataforma, e porque e append-only —
+    // o documento do aceite diz o que vale hoje; a trilha prova o que valeu.
+    "CONTRACT_ACCEPTED",
     // Unico ato desta trilha que nao e da operadora: o titular encerra a propria
     // organizacao. Fica aqui porque o tenant deixa de existir para guardar o
     // registro, e porque encerrar organizacao e assunto do contrato com a
@@ -90,6 +95,20 @@ export const PLATFORM_AUDIT_ACTIONS = [
  */
 /** Situacao de um pedido de troca de profissao. */
 export const PROFESSION_CHANGE_STATUSES = ["PENDING", "APPROVED", "REJECTED"];
+/**
+ * Aceite do Contrato de Licenca e do Anexo de Tratamento, um por organizacao
+ * (`platformContractAcceptances/{organizationId}`).
+ *
+ * E uma PROVA, nao uma configuracao: diz sobre qual texto a organizacao
+ * concordou, por meio de quem e quando. Por isso so o backend escreve, e por
+ * isso guarda identificadores e versao, nunca nome, e-mail, IP ou documento —
+ * quem le cruza `acceptedByUserId` com `accounts`.
+ *
+ * `source` diz em que momento o aceite aconteceu. Hoje existe um: o cadastro
+ * aberto, em que os Termos de Uso — que incorporam este contrato para quem
+ * responde pela organizacao — sao aceitos na tela.
+ */
+export const CONTRACT_ACCEPTANCE_SOURCES = ["SELF_SERVICE_SIGNUP"];
 export const PLATFORM_PERMISSIONS = [
     "account:list",
     "account:register",

@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { messagePath, messagesPath, paths } from "../functions/generated/paths.js";
+import { CONTRACT_VERSION, LEGAL_VERSION } from "../functions/generated/legal-config.js";
 
 // As ferramentas do emulador ficam fora do bundle e das dependencias do aplicativo.
 const requireTools = createRequire(new URL("../.local/firebase-tools/package.json", import.meta.url));
@@ -158,6 +159,7 @@ try {
       await setDoc(doc(db, paths.platformInvoice(`in-${org}`)), { id: `in-${org}`, organizationId: org, status: "PAID", amountDueInCents: 19900, issuedAt: new Date().toISOString() });
       await setDoc(doc(db, paths.platformAccessGrant(org)), { organizationId: org, subscriberUserId: owner, kind: "PILOT", reason: "Piloto combinado.", until: "2026-12-01T00:00:00.000Z", revokedAt: null });
       await setDoc(doc(db, paths.platformProfessionRequest(org)), { organizationId: org, requestedBy: owner, from: "PSYCHOLOGIST", to: "AESTHETICS", reason: "Mudei de area de atuacao.", status: "PENDING", requestedAt: new Date().toISOString(), decidedAt: null, decidedBy: null, decisionReason: null });
+      await setDoc(doc(db, paths.platformContractAcceptance(org)), { organizationId: org, contractVersion: CONTRACT_VERSION, acceptedByUserId: owner, acceptedAt: new Date().toISOString(), source: "SELF_SERVICE_SIGNUP", acceptedLegalVersion: LEGAL_VERSION });
     }
     await setDoc(doc(db, paths.platformGatewayEvent("evt-1")), { id: "evt-1", type: "invoice.paid", outcome: "APPLIED", organizationId: "org-a", receivedAt: new Date().toISOString() });
     await setDoc(doc(db, paths.platformCustomer("cus_1")), { customerId: "cus_1", organizationId: "org-a", subscriberUserId: "a" });
@@ -683,6 +685,24 @@ try {
   await denied(updateDoc(doc(withTotp("admin"), paths.platformAccessGrant("org-b")), { until: "2099-01-01T00:00:00.000Z" }));
   await denied(deleteDoc(doc(withTotp("admin"), paths.platformAccessGrant("org-b"))));
 
+  // ----------------------------------------------------------------- E3
+  // Aceite do contrato: o titular le sobre qual versao a organizacao dele
+  // concordou; a operadora le todos; ninguem escreve pelo cliente. Um aceite
+  // que a propria parte cria, edita ou apaga nao prova aceite nenhum.
+
+  await allowed(getDoc(doc(db("a"), paths.platformContractAcceptance("org-a"))));
+  await denied(getDoc(doc(db("a"), paths.platformContractAcceptance("org-b"))));
+  await allowed(getDoc(doc(db("ownerExpired"), paths.platformContractAcceptance("org-c"))));
+  await denied(getDoc(doc(db("restricted"), paths.platformContractAcceptance("org-a"))));
+  await allowed(getDocs(collection(withTotp("admin"), paths.platformContractAcceptances())));
+  await denied(getDocs(collection(db("admin"), paths.platformContractAcceptances())));
+  await denied(setDoc(doc(db("a"), paths.platformContractAcceptance("org-a")), { organizationId: "org-a", contractVersion: CONTRACT_VERSION, acceptedByUserId: "a", acceptedAt: new Date().toISOString(), source: "SELF_SERVICE_SIGNUP", acceptedLegalVersion: LEGAL_VERSION }));
+  await denied(setDoc(doc(db("a"), paths.platformContractAcceptance("org-forjada")), { organizationId: "org-forjada", contractVersion: CONTRACT_VERSION, acceptedByUserId: "a", acceptedAt: new Date().toISOString(), source: "SELF_SERVICE_SIGNUP", acceptedLegalVersion: LEGAL_VERSION }));
+  await denied(updateDoc(doc(db("a"), paths.platformContractAcceptance("org-a")), { contractVersion: "2020-01-01" }));
+  await denied(updateDoc(doc(withTotp("admin"), paths.platformContractAcceptance("org-a")), { contractVersion: "2020-01-01" }));
+  await denied(deleteDoc(doc(db("a"), paths.platformContractAcceptance("org-a"))));
+  await denied(deleteDoc(doc(withTotp("admin"), paths.platformContractAcceptance("org-a"))));
+
   // ------------------------------------------------------------- Etapa A.7
   // Pedido de troca de profissao: o titular le o proprio, a operadora le todos,
   // e ninguem escreve pelo cliente — trocar a profissao pela tela mudaria
@@ -897,6 +917,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 558);
+  assert.equal(checks, 570);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

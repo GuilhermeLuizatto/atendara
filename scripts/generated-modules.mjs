@@ -17,6 +17,7 @@ export const SOURCES = [
   ["src/types/platform.ts", "platform-types"],
   ["src/config/platform.ts", "platform-config"],
   ["src/lib/platform/access-gate.ts", "access-gate"],
+  ["src/lib/platform/contract-acceptance.ts", "contract-acceptance"],
   ["src/config/legal.ts", "legal-config"],
   ["src/lib/auth/self-service.ts", "self-service"],
   ["src/lib/auth/password-policy.ts", "password-policy"],

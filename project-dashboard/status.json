@@ -154,10 +154,10 @@
       "kind": "desenvolvimento",
       "status": "em-andamento",
       "priority": "alta",
-      "summary": "Termos alinhados ao ADR 0006 e página /contrato no ar desde 06/11 (versão 2026-11-06-preliminar); texto sem revisão jurídica.",
-      "next": "E3: registrar o aceite da organização em platformContractAcceptances, depois da revisão de segurança ter PR próprio.",
+      "summary": "Termos e /contrato no ar desde 06/11 (versão 2026-11-06-preliminar). E3 implementada em 16/11: o cadastro aberto grava o aceite em platformContractAcceptances, com as duas versões, só identificadores e entrada append-only na trilha. Texto segue sem revisão jurídica.",
+      "next": "Titular revisa o PR da E3 e decide onde o aceite é pedido quando a versão mudar (E4/E5). Minutas de 14/10 enviadas em 16/11 dizem aceite no primeiro acesso com IP: decisão pendente.",
       "owner": "Titular",
-      "evidence": "PR #105; atendara.app/termos e /contrato",
+      "evidence": "PR #105; atendara.app/termos e /contrato; src/lib/platform/contract-acceptance.ts",
       "confidence": "confirmado"
     },
     {

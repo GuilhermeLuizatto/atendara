@@ -32,6 +32,10 @@ export const PLATFORM_COLLECTIONS = {
     platformCustomers: "platformCustomers",
     platformAccessGrants: "platformAccessGrants",
     platformProfessionRequests: "platformProfessionRequests",
+    // Aceite do Contrato de Licenca e do Anexo de Tratamento, um por organizacao
+    // (E3). E da operadora, nao do tenant: prova sobre qual texto a organizacao
+    // concordou, e por isso nenhum papel do cliente a escreve ou apaga.
+    platformContractAcceptances: "platformContractAcceptances",
     platformAuditLogs: "platformAuditLogs",
     platformRateLimits: "platformRateLimits",
     platformSupportTickets: "platformSupportTickets",
@@ -156,6 +160,14 @@ export const paths = {
      * decidindo qual vale.
      */
     platformProfessionRequest: (organizationId) => `${PLATFORM_COLLECTIONS.platformProfessionRequests}/${organizationId}`,
+    platformContractAcceptances: () => PLATFORM_COLLECTIONS.platformContractAcceptances,
+    /**
+     * Aceite em vigor, chaveado pelo `organizationId`: um documento por
+     * organizacao, que diz qual versao do contrato vale hoje. O historico nao
+     * vive aqui — cada aceite deixa entrada append-only em `platformAuditLogs`,
+     * que e o que prova o que foi aceito antes.
+     */
+    platformContractAcceptance: (organizationId) => `${PLATFORM_COLLECTIONS.platformContractAcceptances}/${organizationId}`,
     platformAuditLogs: () => PLATFORM_COLLECTIONS.platformAuditLogs,
     platformAuditLog: (logId) => `${PLATFORM_COLLECTIONS.platformAuditLogs}/${logId}`,
     /** Contador por usuario e callable. So o backend le e escreve. */

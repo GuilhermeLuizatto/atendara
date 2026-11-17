@@ -9,7 +9,8 @@ import { PROFESSION_IDS } from "./generated/profession.js";
 import { getProfession } from "./generated/professions.js";
 import { defaultOrganizationKind } from "./generated/organization-config.js";
 import { resolveAccountGate } from "./generated/access-gate.js";
-import { LEGAL_VERSION } from "./generated/legal-config.js";
+import { CONTRACT_VERSION, LEGAL_VERSION } from "./generated/legal-config.js";
+import { contractAcceptanceDocument } from "./generated/contract-acceptance.js";
 import {
   SELF_SERVICE_ACTOR,
   PASSWORD_LENGTH,
@@ -229,6 +230,22 @@ export const registerSelfService = onCall(SIGNUP_CALL_OPTIONS, async (request) =
 
   seedServices(batch, { db: db(), organizationId, professionId: input.professionId, stamp });
 
+  // E3: o aceite do contrato pela organizacao, no mesmo lote do cadastro.
+  //
+  // Quem se cadastra responde pela organizacao que nasce aqui, e os Termos
+  // dizem que o Contrato de Licenca e o Anexo de Tratamento fazem parte deles
+  // para quem responde por ela — por isso o aceite da tela alcanca os dois, e
+  // por isso o registro guarda as DUAS versoes. A versao do contrato sai do
+  // servidor: `acceptedLegalVersion` do payload ja foi conferido contra
+  // `LEGAL_VERSION` acima, e nada mais do cliente entra neste documento.
+  const acceptance = contractAcceptanceDocument({
+    organizationId,
+    acceptedByUserId: userId,
+    acceptedAt: createdAt,
+    source: "SELF_SERVICE_SIGNUP",
+  });
+  batch.create(db().doc(paths.platformContractAcceptance(organizationId)), acceptance);
+
   const registered = auditEntry({
     action: "SELF_SERVICE_REGISTERED",
     actorId: SELF_SERVICE_ACTOR,
@@ -238,10 +255,28 @@ export const registerSelfService = onCall(SIGNUP_CALL_OPTIONS, async (request) =
       professionId: input.professionId,
       signInMethod: google ? "GOOGLE" : "PASSWORD",
       legalVersion: LEGAL_VERSION,
+      contractVersion: CONTRACT_VERSION,
     },
     createdAt,
   });
   batch.create(registered.ref, registered.data);
+
+  // O documento do aceite diz o que vale hoje; esta entrada prova o que valeu.
+  // Quando o texto mudar e houver novo aceite, o documento e substituido e a
+  // trilha continua com as duas entradas.
+  const accepted = auditEntry({
+    action: "CONTRACT_ACCEPTED",
+    actorId: userId,
+    organizationId,
+    targetUserId: userId,
+    details: {
+      contractVersion: acceptance.contractVersion,
+      legalVersion: acceptance.acceptedLegalVersion,
+      source: acceptance.source,
+    },
+    createdAt,
+  });
+  batch.create(accepted.ref, accepted.data);
 
   if (grant) {
     batch.create(db().doc(paths.platformAccessGrant(organizationId)), grant);

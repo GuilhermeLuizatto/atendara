@@ -106,6 +106,37 @@ describe("o provedor da Cloud API", () => {
     expect(message.template.components[2]).toMatchObject({ index: "1" });
   });
 
+  it("modelo sem valores nao manda corpo vazio, so os botoes", () => {
+    const message = metaCloudMessage({
+      ...NOTICE,
+      template: { ...NOTICE.template!, parameters: [], buttons: [] },
+    }) as { template: { components: unknown[] } };
+
+    expect(message.template.components).toEqual([]);
+  });
+
+  it("aceite sem protocolo reconhecivel continua aceite, sem inventar id", async () => {
+    const result = await provider(responded(200, { messages: [] })).send(REPLY);
+
+    expect(result).toEqual({
+      outcome: "ACCEPTED",
+      providerMessageId: null,
+      failureCode: null,
+    });
+  });
+
+  it("corpo que nao e JSON nao derruba a leitura do erro", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(
+      async () => new Response("<html>erro</html>", { status: 500 }),
+    );
+    const result = await provider(fetchImpl).send(REPLY);
+
+    expect(result).toMatchObject({
+      outcome: "TEMPORARY_FAILURE",
+      failureCode: "PROVIDER_UNAVAILABLE",
+    });
+  });
+
   it("recusa montar envio com modelo e texto livre ao mesmo tempo", () => {
     expect(() => metaCloudMessage({ ...NOTICE, freeText: true })).toThrow(
       /modelo e texto livre/,

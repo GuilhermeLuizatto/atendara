@@ -1,5 +1,3 @@
-import { WHATSAPP_BUTTON_LABELS } from "@/config/whatsapp";
-
 import type { NotificationProvider, SendRequest, SendResult } from "./types";
 
 /**
@@ -95,11 +93,6 @@ export function metaCloudMessage(request: SendRequest): Record<string, unknown> 
   throw new Error(
     "Envio de WhatsApp sem modelo e sem resposta em conversa: a Cloud API não teria o que mandar.",
   );
-}
-
-/** Rotulo do botao, para o teste provar que o modelo nao perde o texto. */
-export function metaCloudButtonLabel(button: keyof typeof WHATSAPP_BUTTON_LABELS): string {
-  return WHATSAPP_BUTTON_LABELS[button];
 }
 
 function failure(

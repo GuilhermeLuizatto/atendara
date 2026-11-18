@@ -1,5 +1,4 @@
 // Gerado por scripts/build-functions.mjs.
-import { WHATSAPP_BUTTON_LABELS } from "./whatsapp-config.js";
 /**
  * Cloud API da Meta — o canal oficial do WhatsApp, sem executor no meio.
  *
@@ -73,10 +72,6 @@ export function metaCloudMessage(request) {
         };
     }
     throw new Error("Envio de WhatsApp sem modelo e sem resposta em conversa: a Cloud API não teria o que mandar.");
-}
-/** Rotulo do botao, para o teste provar que o modelo nao perde o texto. */
-export function metaCloudButtonLabel(button) {
-    return WHATSAPP_BUTTON_LABELS[button];
 }
 function failure(outcome, failureCode) {
     return { outcome, providerMessageId: null, failureCode };

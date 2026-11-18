@@ -164,10 +164,10 @@
       "id": "ci-emuladores",
       "title": "Suítes do emulador no CI",
       "kind": "teste",
-      "status": "em-revisao",
+      "status": "em-andamento",
       "priority": "alta",
-      "summary": "Job emulator no ci.yml (regras, storage, repositório e matriz de acesso, Java 21, firebase-tools 15.29.0) no PR #113; o job passou no próprio PR em 13/11 (556 regras, 20 de storage, 49 de repositório, 201 de acesso).",
-      "next": "Titular revisa e mergeia (o PR #112 já está na main); após algumas execuções verdes na main, incluir o job nas verificações obrigatórias do ruleset main protegida.",
+      "summary": "Job emulator no ci.yml (regras, storage, repositório e matriz de acesso, Java 21, firebase-tools 15.29.0), mergeado pelo PR #113 em 13/11 às 19:08 UTC. Desde o merge o CI rodou 23 vezes na main: 20 verdes, 3 canceladas pela concorrência e nenhuma falha. A linha dizia em revisão até 18/11, quando a divergência foi conferida e corrigida.",
+      "next": "Incluir o contexto \"Emuladores - regras, storage, repositorio e acesso\" nas verificações obrigatórias do ruleset main protegida, que hoje exige apenas \"Lint, tipos, testes e build\" e \"Analise estatica de seguranca\". É ação do titular, em Settings e Rules; enquanto não for obrigatório, uma falha das suítes aparece no PR mas não impede o merge.",
       "owner": "Titular",
       "evidence": "https://github.com/GuilhermeLuizatto/atendara/pull/113",
       "confidence": "confirmado"

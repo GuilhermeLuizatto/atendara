@@ -938,6 +938,55 @@ Publicação: aguardar o índice pronto e publicar a nova function separadamente
 O fluxo atual de Hosting não publica functions; atualizar apenas a interface
 não ativa o agendamento. Este recurso independe da publicação do app na Meta.
 
+### Ponte de WhatsApp por QR — somente resposta
+
+> **Estado:** desenho aceito em 18/11/2026; **nada implementado**. O canal
+> `WHATSAPP` continua no provedor que `CHANNEL_META` declara, e nenhuma
+> organização tem a ponte ligada.
+
+A API oficial da Meta exige verificação da Atendara como provedora de
+tecnologia, que exige CNPJ, e o n8n de produção previsto na seção anterior nunca
+foi provisionado. Para que o profissional que atende sozinho não perca contato
+enquanto está em atendimento, o desenho aceito é uma ponte pareada por QR code
+(protocolo do WhatsApp Web, **não oficial**), que entra como **transporte**, no
+lugar que o n8n ocupa no diagrama acima.
+
+O que muda em relação ao n8n é só o executor. O que **não** muda:
+
+- **o Atendara decide e escreve o texto**; a ponte entrega exatamente o que
+  recebe, e nenhuma frase ao paciente é gerada por modelo de linguagem da ponte;
+- **a trava do `ADMINISTRATIVE`** (regra 4) e todas as condições de
+  `src/lib/notifications/eligibility.ts` (regra 11);
+- **a tomada humana pelo eco**, o horário de silêncio e a releitura de
+  elegibilidade imediatamente antes do envio.
+
+O que é mais estreito do que o canal atual:
+
+- **somente resposta.** A ponte nunca inicia conversa: toda mensagem que sai é
+  resposta a uma mensagem que a pessoa mandou primeiro, dentro da janela de 24
+  horas que ela abriu. Cobrança, convite de encaixe e lista de espera estão fora
+  por decisão de produto, porque começariam conversa;
+- **somente durante atendimento em curso.** Por chave da organização, a resposta
+  por esta ponte sai apenas no gatilho `ACTIVE_APPOINTMENT`
+  (`src/lib/automation/assistant-availability.ts`). Fora disso a mensagem espera
+  o profissional. Sem a chave, o comportamento é o já descrito acima;
+- **sem porta pública.** A ponte busca no Atendara o que enviar; não recebe
+  webhook.
+
+**Remetente comprovado, nesta ponte,** não é um `phone_number_id` aprovado pela
+Meta com assinatura conferida, e sim, em conjunto: número pareado pelo titular da
+organização, número declarado no cadastro e conferido a cada início de sessão, e
+uma tarefa do Atendara correspondente a cada envio — envio sem tarefa é
+incidente, com alerta. **O que se perde está assumido:** sem assinatura da Meta,
+quem controla a máquina da ponte pode forjar uma mensagem recebida e provocar uma
+resposta administrativa. Enquanto a ponte roda na máquina do titular, isso exige
+já ter aquela máquina.
+
+**Riscos a aceitar por escrito antes de qualquer número real:** restrição do
+número pelo WhatsApp (a ponte não é oficial), a forja de entrada acima, a pasta
+de sessão como credencial completa da conta, e a quebra da ponte quando o
+protocolo do WhatsApp mudar. O canal não tem disponibilidade prometida.
+
 ---
 
 ## 16. Produto operacional da Fase 5

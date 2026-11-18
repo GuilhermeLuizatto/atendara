@@ -1,9 +1,21 @@
 {
   "schemaVersion": 1,
   "project": "Atendara",
-  "reviewedAt": "2026-11-17",
+  "reviewedAt": "2026-11-18",
   "reviewNote": "Fotografia de acompanhamento. Merge, publicação e validação real são etapas diferentes.",
   "items": [
+    {
+      "id": "ponte-whatsapp-qr",
+      "title": "Ponte de WhatsApp por QR (somente resposta)",
+      "kind": "desenvolvimento",
+      "status": "em-andamento",
+      "priority": "alta",
+      "summary": "Desenho aceito em 18/11, nada implementado. A API oficial da Meta depende de CNPJ e o n8n saiu por custo, então o WhatsApp entra por ponte pareada por QR (protocolo do WhatsApp Web, não oficial) que serve só de transporte: o Atendara decide e escreve o texto. Somente resposta a quem escreveu primeiro, somente durante atendimento em curso, por chave da organização, desligada por padrão. Cobrança, encaixe proativo e lista de espera ficaram fora. A regra 4 não muda; a regra 11 precisa de redefinição de remetente comprovado.",
+      "next": "Fase A, executada pelo titular com número descartável: provar que a ponte funciona sem o agente de linguagem, que repassa o eco do celular (sem isso a tomada humana quebra), que não revela nada da máquina a estranhos, e qual o custo. Nenhum número real antes do aceite escrito dos riscos e da revisão jurídica.",
+      "owner": "Titular",
+      "evidence": "docs/ARCHITECTURE.md, secao 15",
+      "confidence": "confirmado"
+    },
     {
       "id": "foco-psicologia-solo",
       "title": "Foco em Psicologia, profissional solo",

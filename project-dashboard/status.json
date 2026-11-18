@@ -56,10 +56,10 @@
       "id": "trilhas-pelo-navegador",
       "title": "Trilhas gravadas pelo navegador",
       "kind": "risco",
-      "status": "a-verificar",
+      "status": "em-andamento",
       "priority": "alta",
-      "summary": "Risco residual da revisão de segurança: um membro podia inserir evento inventado em nome próprio em auditLogs e aiDecisions. A criação de aiDecisions pelo cliente passou a ser negada (PR #123) e, em 17/11, o titular decidiu selar a trilha: o gatilho sealAuditLog grava índice sequencial, horário do servidor e corrente de resumos em auditSeals, coleção fechada ao navegador (PR #128, mergeado em 17/11 e publicado em 18/11, com sealAuditLog conferido no ar como gatilho de criação de documento; sem validação real). Remoção, reordenação e alteração dos campos protegidos ficam detectáveis; entrada inventada em nome próprio continua possível e é risco aceito por escrito.",
-      "next": "A corrente ainda não está provada: a conferência somente leitura de 18/11, às 07:40 UTC, acusou SEAL_MISSING nas 26 entradas das quatro organizações, todas anteriores ao gatilho, que sela apenas o que nasce depois dele. Gravar uma trilha nova na organização de teste e repetir com --selado-desde no horário da publicação, em UTC. A migração das 26 operações do navegador para callables fica para depois do piloto.",
+      "summary": "Risco residual da revisão de segurança: um membro podia inserir evento inventado em nome próprio em auditLogs e aiDecisions. A criação de aiDecisions pelo cliente passou a ser negada (PR #123) e, em 17/11, o titular decidiu selar a trilha: o gatilho sealAuditLog grava índice sequencial, horário do servidor e corrente de resumos em auditSeals, coleção fechada ao navegador (PR #128, mergeado em 17/11, publicado em 18/11 e provado em produção no mesmo dia: entradas novas nascem seladas, com índice e elo conferidos pela ferramenta somente leitura). Remoção, reordenação e alteração dos campos protegidos ficam detectáveis; entrada inventada em nome próprio continua possível e é risco aceito por escrito.",
+      "next": "Migrar as 26 operações do navegador para callables, depois do piloto. A corrente foi provada em produção em 18/11, às 19:05 UTC: três ações reais com dado inventado (paciente fictício, sessão agendada e sessão cancelada) geraram três entradas que nasceram seladas, com índice sequencial e elo correto, nenhuma divergência nas quatro organizações e saída zero. As 26 entradas anteriores ao gatilho seguem sem selo, como esperado.",
       "owner": "Titular",
       "evidence": "https://github.com/GuilhermeLuizatto/atendara/pull/128",
       "confidence": "confirmado"

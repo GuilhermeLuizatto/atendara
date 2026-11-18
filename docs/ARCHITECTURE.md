@@ -687,12 +687,21 @@ Firestore — backup, arquivo baixado, gateway, provedores — nao sao alcancada
 
 ## 15. Automacao
 
-> **Estado:** a fila de tarefas no servidor esta implementada (gatilho, Cloud
-> Tasks e despachante), nao publicada. A ponte com o n8n e os canais reais nao
-> existem: o despachante executa com o provedor simulado.
+> **Estado (18/11/2026):** a fila de tarefas no servidor está implementada e
+> publicada (gatilho, Cloud Tasks e despachante). `EMAIL` e `SMS` seguem no
+> provedor simulado. O `WHATSAPP` declara `META_CLOUD_API` desde 18/11, mas
+> **nenhum envio real aconteceu**: sem `META_WHATSAPP_TOKEN` no ambiente o
+> canal falha fechado, e não há número conectado nem remetente aprovado. O n8n
+> de produção nunca foi provisionado.
 
-WhatsApp, escrita de eventos Google Calendar e e-mail têm execução prevista em
-n8n próprio. O n8n **executa**; quem **decide** é o Atendara.
+E-mail e escrita de eventos no Google Calendar ainda têm execução prevista fora
+do Atendara; o WhatsApp deixou de depender disso em 18/11/2026, quando o canal
+passou a chamar a Cloud API da Meta direto do backend
+(`src/lib/notifications/providers/meta-cloud-api.ts`, com o token em
+`functions/meta-cloud-api.js`). Quem **decide** continua sendo o Atendara: o
+provedor transporta o texto que o Atendara escreveu, e todas as travas da regra
+11 e a da regra 4 valem igual. O código da ponte com o n8n fica, com os testes,
+para o caso de voltar a existir um executor externo.
 
 **Exceção da 3C ao n8n:** o Google Calendar é executado pelo próprio backend
 enquanto a 3B e o n8n de produção estão em espera (decisão do titular, 24/09),

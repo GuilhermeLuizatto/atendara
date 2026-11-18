@@ -17,6 +17,18 @@
       "confidence": "confirmado"
     },
     {
+      "id": "whatsapp-cloud-api",
+      "title": "WhatsApp pela Cloud API da Meta (rota oficial)",
+      "kind": "desenvolvimento",
+      "status": "em-revisao",
+      "priority": "alta",
+      "summary": "Decisão do titular em 18/11/2026: conectar o WhatsApp pela Cloud API chamada do próprio backend, em vez de esperar o n8n, que nunca foi provisionado. O canal WHATSAPP passou de N8N_BRIDGE para META_CLOUD_API. A decisão fica pura em src/lib/notifications/providers/meta-cloud-api.ts, com 14 testes, e a metade com segredo em functions/meta-cloud-api.js, que lê META_WHATSAPP_TOKEN do Secret Manager. Declarar não é enviar: sem o token o canal falha fechado. Nenhuma trava da regra 11 mudou; a entrada passou a conferir o provedor declarado em CHANNEL_META em vez de um nome escrito à mão.",
+      "next": "Criar o segredo META_WHATSAPP_TOKEN antes da próxima publicação de Functions, senão o deploy falha, porque o despachante passou a declará-lo. Depois: app na Meta, número de teste, webhook apontado para inboundWebhook, remetente aprovado em messagingSenders e um envio de ponta a ponta com destinatário autorizado. Sem isso, nada foi provado fora dos testes.",
+      "owner": "Titular",
+      "evidence": "src/lib/notifications/providers/meta-cloud-api.ts",
+      "confidence": "confirmado"
+    },
+    {
       "id": "foco-psicologia-solo",
       "title": "Foco em Psicologia, profissional solo",
       "kind": "desenvolvimento",

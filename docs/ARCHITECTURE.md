@@ -244,6 +244,11 @@ Garantias implementadas:
   migracao das 26 operacoes do navegador para callables continua sendo o que
   fecha esse risco, e o risco residual foi aceito por escrito pelo titular em
   17/11/2026.
+  A conferencia em producao e `functions/verify-audit-seals.js`, script de
+  console SOMENTE LEITURA: le `auditLogs` e `auditSeals` de uma organizacao (ou
+  de todas), recalcula a corrente e termina com codigo diferente de zero se
+  algo nao fecha. O relatorio vai para `.local/` com id de entrada, indice e
+  tipo de problema — nunca resumo, nome de quem agiu ou id do recurso.
 - **Mensagens imutaveis.** Preservar o que foi dito e o que permite auditar as
   decisoes do agente depois.
 - **`collectionGroup` de mensagens com filtro de tenant.** A caixa de entrada le

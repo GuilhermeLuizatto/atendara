@@ -482,7 +482,10 @@ service cloud.firestore {
       let before = resource.data.get('settings', {}).get('ai', null);
       let after = request.resource.data.get('settings', {}).get('ai', null);
       return before == after || (after is map
-        && after.keys().hasOnly(['enabled', 'displayName', 'autoResponseConfidenceThreshold', 'allowAutonomousReplies', 'unansweredDelayMinutes', 'quietHoursStart', 'quietHoursEnd'])
+        // `replyOnlyDuringAppointment` e opcional: documento antigo nao tem a
+        // chave, e ausencia e a trava desligada (ADR 0007).
+        && after.keys().hasOnly(['enabled', 'displayName', 'autoResponseConfidenceThreshold', 'allowAutonomousReplies', 'unansweredDelayMinutes', 'quietHoursStart', 'quietHoursEnd', 'replyOnlyDuringAppointment'])
+        && (!('replyOnlyDuringAppointment' in after) || after.replyOnlyDuringAppointment is bool)
         && after.enabled is bool && after.allowAutonomousReplies is bool
         && after.displayName is string && after.displayName.size() > 0 && after.displayName.size() <= 60
         && after.autoResponseConfidenceThreshold is number

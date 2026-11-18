@@ -447,6 +447,8 @@ export const SKIP_REASON_LABELS: Record<NotificationSkipReason, string> = {
     "A Dara está configurada apenas para sugerir respostas.",
   ASSISTANT_QUIET_HOURS:
     "A Dara está dentro da janela de silêncio configurada.",
+  OUTSIDE_ACTIVE_APPOINTMENT:
+    "A organização pediu resposta somente durante um atendimento em curso, e não há nenhum agora.",
 };
 
 export const DELIVERY_FAILURE_LABELS: Record<DeliveryFailureCode, string> = {

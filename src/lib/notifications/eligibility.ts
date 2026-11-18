@@ -279,6 +279,16 @@ export interface ConversationReplyInput {
   details?: Pick<ReplyContext, "slots" | "startsAt">;
   /** Resposta produzida pelo motor para `ADMINISTRATIVE_REPLY`. */
   responseText?: string | null;
+  /**
+   * Se o profissional esta dentro de um atendimento AGORA
+   * (`hasActiveAppointment`). So e lido quando a organizacao pede resposta
+   * somente durante atendimento (`ai.replyOnlyDuringAppointment`, ADR 0007).
+   *
+   * Opcional porque a maioria das organizacoes nao usa a trava. Quando ela esta
+   * ligada, a ausencia **nega**: omissao de quem chamou nao pode virar
+   * permissao de envio.
+   */
+  activeAppointment?: boolean;
 }
 
 export type ConversationReplyEligibility =
@@ -316,6 +326,18 @@ export function evaluateConversationReply(
     if (isWithinAssistantQuietHours(input.organization, input.now)) {
       return { eligible: false, reason: "ASSISTANT_QUIET_HOURS" };
     }
+  }
+
+  // Janela estreita do ADR 0007, pedida pela organizacao: a assistente so
+  // responde enquanto o profissional atende. Vale para TODA resposta na
+  // conversa — deixar as jornadas de agenda passarem responderia sozinha fora
+  // do intervalo que a trava existe para cobrir. `!== true` e deliberado:
+  // `undefined` de quem esqueceu de informar nega, como qualquer outra trava.
+  if (
+    input.organization.settings.ai.replyOnlyDuringAppointment &&
+    input.activeAppointment !== true
+  ) {
+    return { eligible: false, reason: "OUTSIDE_ACTIVE_APPOINTMENT" };
   }
 
   const problem = gateProblem(rule, input.event, {

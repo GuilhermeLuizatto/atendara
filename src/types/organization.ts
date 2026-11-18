@@ -87,6 +87,19 @@ export interface AIAgentSettings {
   /** Janela de silencio: fora dela o agente apenas registra e nao responde. */
   quietHoursStart: string | null;
   quietHoursEnd: string | null;
+  /**
+   * Responder SOMENTE enquanto o profissional esta dentro de um atendimento
+   * (ADR 0007). E uma janela mais estreita do que a padrao, pensada para quem
+   * atende sozinho: o problema a resolver e nao perder contato justamente no
+   * intervalo em que ele nao pode olhar o celular. Fora do atendimento, a
+   * mensagem espera por ele.
+   *
+   * Ausente em documentos antigos = desligado, e nada muda para quem ja esta
+   * configurado. Vale para toda resposta na conversa, nao so a administrativa:
+   * uma trava que deixasse as jornadas de agenda passarem responderia sozinha
+   * as tres da manha.
+   */
+  replyOnlyDuringAppointment?: boolean;
 }
 
 export interface PrivacySettings {

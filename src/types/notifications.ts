@@ -395,6 +395,8 @@ export const NOTIFICATION_SKIP_REASONS = [
   "ASSISTANT_DISABLED",
   "AUTONOMOUS_REPLIES_DISABLED",
   "ASSISTANT_QUIET_HOURS",
+  // A organizacao pediu resposta so durante atendimento em curso (ADR 0007).
+  "OUTSIDE_ACTIVE_APPOINTMENT",
 ] as const;
 
 export type NotificationSkipReason = (typeof NOTIFICATION_SKIP_REASONS)[number];

@@ -174,6 +174,15 @@ export function evaluateConversationReply(input) {
             return { eligible: false, reason: "ASSISTANT_QUIET_HOURS" };
         }
     }
+    // Janela estreita do ADR 0007, pedida pela organizacao: a assistente so
+    // responde enquanto o profissional atende. Vale para TODA resposta na
+    // conversa — deixar as jornadas de agenda passarem responderia sozinha fora
+    // do intervalo que a trava existe para cobrir. `!== true` e deliberado:
+    // `undefined` de quem esqueceu de informar nega, como qualquer outra trava.
+    if (input.organization.settings.ai.replyOnlyDuringAppointment &&
+        input.activeAppointment !== true) {
+        return { eligible: false, reason: "OUTSIDE_ACTIVE_APPOINTMENT" };
+    }
     const problem = gateProblem(rule, input.event, {
         organization: input.organization,
         profession: input.profession,

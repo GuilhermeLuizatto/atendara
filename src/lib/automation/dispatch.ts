@@ -329,6 +329,13 @@ export interface ReplyDispatchInput extends Omit<DispatchInput, "client"> {
     | "responseText"
   > | null;
   sourceMessage?: Pick<Message, "id" | "sentAt" | "aiDecisionId"> | null;
+  /**
+   * Se o profissional esta dentro de um atendimento no instante do envio, lido
+   * na mesma transacao (ADR 0007). Importa porque a resposta e planejada para
+   * sair na hora, mas o despachante chega depois: um atendimento que terminou
+   * nesse intervalo devolve a conversa ao profissional, e a trava reconfere.
+   */
+  activeAppointment?: boolean;
 }
 
 /**
@@ -446,6 +453,7 @@ export function decideReplyDispatch(input: ReplyDispatchInput): DispatchStep {
     validUntil,
     details,
     responseText: details.responseText,
+    activeAppointment: input.activeAppointment,
   });
   if (!decision.eligible) return cancel(task, delivery, decision.reason, now);
   if (hashBody(decision.body) !== delivery.bodyHash)

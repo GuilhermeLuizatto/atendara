@@ -589,11 +589,10 @@ async function runCalendarSync(
 // ------------------------------------------------------------ despachante
 
 /**
- * Provedor de cada canal. Todos os canais estao em `SIMULATED` hoje
- * (`CHANNEL_META`), entao a ponte do n8n so entra se alguem trocar aquela
- * linha — e mesmo assim so existe com `N8N_WEBHOOK_URL` e o segredo A no
- * ambiente. Sem eles, o canal falha dizendo isso, em vez de sair por outro
- * caminho.
+ * Provedor de cada canal, conforme `CHANNEL_META`: `EMAIL` e `SMS` em
+ * `SIMULATED`, `WHATSAPP` na ponte. A ponte so existe com `N8N_WEBHOOK_URL` e
+ * o segredo A no ambiente; sem eles, o canal falha dizendo isso, em vez de
+ * sair por outro caminho.
  */
 function defaultProviders(channel) {
   const bridge = bridgeProviderFrom();

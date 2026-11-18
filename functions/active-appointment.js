@@ -20,6 +20,39 @@ import { paths } from "./generated/paths.js";
  * confere o fim e a situacao. Sem profissional conhecido devolve `false`: nao
  * da para afirmar que alguem esta atendendo.
  */
+/**
+ * A leitura que a trava do ADR 0007 precisa, ou `undefined` quando a
+ * organizacao nao pediu a trava.
+ *
+ * A decisao de CONSULTAR mora aqui, e nao em cada chamador, pelo mesmo motivo
+ * que a consulta: `inbound.js` e `automation.js` precisam concordar. Enquanto
+ * cada um lia a chave por conta propria, um deles lia o documento cru e o outro
+ * o documento com os padroes aplicados -- e as duas metades discordariam no dia
+ * em que o padrao mudasse. Agora os dois passam a organizacao montada e a
+ * resposta e a mesma.
+ *
+ * `undefined` nao e "nao esta atendendo": e "a trava nao se aplica". Quem
+ * recebe esse valor e o portao, que so olha para ele quando a trava esta
+ * ligada.
+ */
+export async function activeAppointmentForReply(
+  transaction,
+  firestore,
+  organization,
+  organizationId,
+  professionalId,
+  now,
+) {
+  if (!organization?.settings?.ai?.replyOnlyDuringAppointment) return undefined;
+  return activeAppointmentOf(
+    transaction,
+    firestore,
+    organizationId,
+    professionalId,
+    now,
+  );
+}
+
 export async function activeAppointmentOf(
   transaction,
   firestore,

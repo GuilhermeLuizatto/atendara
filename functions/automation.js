@@ -16,7 +16,7 @@ import {
   syncResultFrom,
 } from "./calendar-google.js";
 import { calendarOwnerAllowed } from "./calendar-store.js";
-import { activeAppointmentOf } from "./active-appointment.js";
+import { activeAppointmentForReply } from "./active-appointment.js";
 import { calendarReconnectAlert } from "./generated/agenda-calendar-connection-alert.js";
 import { fromStored, toStored } from "./firestore-dates.js";
 import {
@@ -903,15 +903,14 @@ export async function runAutomationTask(data, deps = {}) {
         // cobra-la de quem nao usa a trava seria custo sem resposta. Sem
         // profissional na tarefa nao da para saber, e `activeAppointment` fica
         // ausente: o portao nega, como em qualquer outra trava.
-        if (context.organization?.settings?.ai?.replyOnlyDuringAppointment) {
-          context.activeAppointment = await activeAppointmentOf(
-            transaction,
-            firestore,
-            payload.organizationId,
-            task.professionalId,
-            now,
-          );
-        }
+        context.activeAppointment = await activeAppointmentForReply(
+          transaction,
+          firestore,
+          context.organization,
+          payload.organizationId,
+          task.professionalId,
+          now,
+        );
       }
     }
 

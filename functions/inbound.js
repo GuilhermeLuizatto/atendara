@@ -50,7 +50,10 @@ import { ROLE_PERMISSIONS } from "./generated/permissions.js";
 import { messagePath, paths } from "./generated/paths.js";
 import { planConversationReply } from "./generated/automation-conversation-replies.js";
 import { assistantReplySchedule } from "./generated/automation-assistant-availability.js";
-import { activeAppointmentOf } from "./active-appointment.js";
+import {
+  activeAppointmentForReply,
+  activeAppointmentOf,
+} from "./active-appointment.js";
 import { scheduleTask } from "./automation-queue.js";
 import { verifyBridgeSignature } from "./n8n-bridge.js";
 import { runAs } from "./service-accounts.js";
@@ -395,31 +398,25 @@ export async function applyInboundEvent(event, deps = {}) {
           : null;
 
       // Trava do ADR 0007, lida UMA vez porque vale para toda resposta
-      // planejada nesta transacao. So para quem pediu a trava: cobrar a
-      // consulta de quem nao usa seria custo por mensagem sem resposta.
-      // Lido com os padroes aplicados, e nao do documento cru, porque e assim
-      // que o portao le a mesma chave (`planReply` monta a organizacao do mesmo
-      // jeito). Ler o cru aqui e o completo la faria as duas metades
-      // discordarem no dia em que o padrao mudasse.
+      // planejada nesta transacao. A organizacao vai montada com os padroes,
+      // como `planReply` a monta, para que a decisao de consultar e a do portao
+      // leiam a MESMA chave.
       const organizationRaw = stored("organizations", organizationSnapshot);
-      const replyAiSettings =
+      const replyActiveAppointment = await activeAppointmentForReply(
+        transaction,
+        firestore,
         organizationRaw && isProfessionId(organizationRaw.primaryProfession)
           ? withOrganizationDefaults(
               organizationRaw,
               organizationId,
               organizationRaw.primaryProfession,
               now,
-            ).settings.ai
-          : null;
-      const replyActiveAppointment = replyAiSettings?.replyOnlyDuringAppointment
-        ? await activeAppointmentOf(
-            transaction,
-            firestore,
-            organizationId,
-            professionalId,
-            now,
-          )
-        : undefined;
+            )
+          : null,
+        organizationId,
+        professionalId,
+        now,
+      );
 
       // Resposta da assistente, planejada nesta transacao. Tudo o que ela
       // confere ja foi lido acima: organizacao, cadastro, conversa e remetente.

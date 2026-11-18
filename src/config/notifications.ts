@@ -38,8 +38,15 @@ export interface ChannelMeta {
    * - `N8N_BRIDGE` (13.3): a tarefa vai assinada ao n8n, que executa o canal
    *   real. O canal ainda exige remetente aprovado, configuração externa e
    *   todas as travas de consentimento e emergência.
+   * - `META_CLOUD_API`: o próprio backend chama a Cloud API da Meta, sem
+   *   executor no meio. Escolhido para o WhatsApp porque o n8n de produção
+   *   nunca foi provisionado; o código da ponte fica, com os testes, para o
+   *   caso de voltar a existir um executor externo.
+   *
+   * Declarar um provedor real **não** liga o canal: sem o segredo no Secret
+   * Manager, `providerFor` não acha a fábrica e o canal falha fechado.
    */
-  providerId: "SIMULATED" | "N8N_BRIDGE";
+  providerId: "SIMULATED" | "N8N_BRIDGE" | "META_CLOUD_API";
   /** Limite de caracteres do corpo. Deriva do canal, nao do gosto do texto. */
   maxBodyLength: number;
   /**
@@ -77,10 +84,10 @@ export const CHANNEL_META: Record<OutboundChannel, ChannelMeta> = {
   WHATSAPP: {
     label: "WhatsApp",
     contactField: "phone",
-    providerId: "N8N_BRIDGE",
+    providerId: "META_CLOUD_API",
     maxBodyLength: 400,
     activationRequirement:
-      "Conta da Meta conectada, remetente aprovado, modelo homologado e saída segura do n8n configurada.",
+      "Conta da Meta conectada, remetente aprovado, modelo homologado e token da Cloud API no Secret Manager.",
     consentIntermediary: "pelo WhatsApp, serviço da Meta",
   },
 };

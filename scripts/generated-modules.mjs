@@ -84,6 +84,10 @@ export const SOURCES = [
     "src/lib/notifications/providers/n8n-bridge.ts",
     "notifications-providers-n8n-bridge",
   ],
+  [
+    "src/lib/notifications/providers/meta-cloud-api.ts",
+    "notifications-providers-meta-cloud-api",
+  ],
   ["src/lib/notifications/providers/types.ts", "notifications-providers-types"],
   ["src/lib/automation/index.ts", "automation"],
   ["src/lib/automation/expiry.ts", "automation-expiry"],

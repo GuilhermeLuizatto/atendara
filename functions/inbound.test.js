@@ -2,6 +2,8 @@ import { createHmac } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { CHANNEL_META } from "./generated/notifications-config.js";
+
 /**
  * A entrada de mensagens (13.5), sem emulador e sem rede.
  *
@@ -159,7 +161,9 @@ function sender(patch = {}) {
     id: "WHATSAPP",
     organizationId: ORG,
     channel: "WHATSAPP",
-    providerId: "N8N_BRIDGE",
+    // Segue a configuracao, e nao um nome escrito aqui: trocar o executor do
+    // canal nao deve exigir reescrever a fixture de todo teste de entrada.
+    providerId: CHANNEL_META.WHATSAPP.providerId,
     providerSenderId: SENDER_ID,
     displayNumber: "+15551876897",
     displayName: "Clínica Fictícia",

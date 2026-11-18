@@ -23,6 +23,7 @@ import {
   INBOUND_OPT_OUT_NOTE,
   INBOUND_PREVIEW_LENGTH,
 } from "./generated/inbound-config.js";
+import { CHANNEL_META } from "./generated/notifications-config.js";
 import { decide } from "./generated/decision-engine.js";
 import { decisionInputPreview } from "./generated/privacy-decision-preview.js";
 import {
@@ -145,9 +146,12 @@ export async function organizationOfSender(providerSenderId) {
     found.docs[0].id,
     found.docs[0].data(),
   );
+  // O provedor vem de `CHANNEL_META`, e nao de um nome escrito aqui: trocar o
+  // executor do canal e uma linha de configuracao, e a entrada tem de aceitar
+  // o mesmo provedor que a saida usa, sem precisar lembrar deste arquivo.
   return sender.status === "APPROVED" &&
     sender.channel === "WHATSAPP" &&
-    sender.providerId === "N8N_BRIDGE"
+    sender.providerId === CHANNEL_META.WHATSAPP.providerId
     ? sender
     : null;
 }

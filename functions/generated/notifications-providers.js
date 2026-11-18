@@ -4,6 +4,7 @@ import { createSimulatedProvider } from "./notifications-providers-simulated.js"
 export * from "./notifications-providers-types.js";
 export { createSimulatedProvider, SIMULATED_DESTINATIONS } from "./notifications-providers-simulated.js";
 export { createN8nBridgeProvider, BRIDGE_TIMEOUT_MS } from "./notifications-providers-n8n-bridge.js";
+export { createMetaCloudApiProvider, metaCloudMessage, metaCloudFailure, META_CLOUD_TIMEOUT_MS, META_GRAPH_HOST, } from "./notifications-providers-meta-cloud-api.js";
 export function providerFor(channel, overrides = {}) {
     const expected = CHANNEL_META[channel].providerId;
     if (expected === "SIMULATED")

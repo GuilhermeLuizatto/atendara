@@ -46,12 +46,12 @@ export interface SendResult {
  *
  * **Mudou na 13.3, e a mudanca e deliberada:** ate a 13.2 `simulated` era
  * obrigatoriamente `true` no tipo, e o compilador recusava qualquer outro
- * provedor. A ponte com o n8n (`N8N_BRIDGE`) e o primeiro provedor que abre
+ * provedor. A ponte com o n8n (`N8N_BRIDGE`) foi o primeiro provedor que abre
  * conexao, entao o campo virou `boolean`. A trava nao sumiu, mudou de lugar:
- * quem decide se um canal usa provedor real e `CHANNEL_META[canal].providerId`,
- * e hoje **os tres canais continuam em `SIMULATED`**. Ligar um canal real e uma
- * linha de configuracao que aparece no diff, e ainda depende de segredo
- * configurado no Secret Manager.
+ * quem decide se um canal usa provedor real e `CHANNEL_META[canal].providerId`.
+ * Hoje `EMAIL` e `SMS` estao em `SIMULATED` e `WHATSAPP` declara
+ * `META_CLOUD_API`. Declarar nao e enviar: sem o segredo no Secret Manager o
+ * provedor nao e construido e o canal falha fechado, dizendo isso.
  *
  * `handoff` separa dois contratos diferentes dentro do mesmo `send`:
  *

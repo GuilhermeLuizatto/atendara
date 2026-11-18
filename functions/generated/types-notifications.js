@@ -133,6 +133,8 @@ export const NOTIFICATION_SKIP_REASONS = [
     "ASSISTANT_DISABLED",
     "AUTONOMOUS_REPLIES_DISABLED",
     "ASSISTANT_QUIET_HOURS",
+    // A organizacao pediu resposta so durante atendimento em curso (ADR 0007).
+    "OUTSIDE_ACTIVE_APPOINTMENT",
 ];
 /**
  * Por que um aviso ja planejado nao foi enviado. Alem das travas do

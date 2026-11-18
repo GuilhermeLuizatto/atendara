@@ -58,6 +58,8 @@ export function defaultOrganizationSettings(profession) {
             // disponível como uma interrupcao explicita, mas nao nasce ligada.
             quietHoursStart: null,
             quietHoursEnd: null,
+            // Janela estreita do ADR 0007, desligada: ligar e escolha da organizacao.
+            replyOnlyDuringAppointment: false,
         },
         privacy: {
             messageRetentionDays: 365,

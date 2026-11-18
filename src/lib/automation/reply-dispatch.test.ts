@@ -10,7 +10,12 @@ import {
   consentRecord,
   organization,
 } from "@/lib/notifications/fixtures";
-import type { Conversation, MessagingSender, NotificationRule } from "@/types";
+import type {
+  Conversation,
+  MessagingSender,
+  NotificationRule,
+  Organization,
+} from "@/types";
 
 import { grantLeadConsent, leadRecipient, withdrawLeadConsent } from "@/lib/leads/lifecycle";
 
@@ -599,5 +604,71 @@ describe("resposta a quem escreveu sem cadastro (lead)", () => {
         ),
       ),
     ).toBe("CONVERSATION_WITH_HUMAN");
+  });
+});
+
+/**
+ * A trava do ADR 0007 conferida DE NOVO no envio. O caso que importa é o
+ * atendimento que termina entre planejar e enviar: a resposta foi planejada
+ * para sair na hora, mas o despachante só chega depois, e aí o profissional já
+ * está livre para responder ele mesmo.
+ */
+describe("a trava de responder só durante atendimento, no envio", () => {
+  const COM_TRAVA: Organization = {
+    ...ORGANIZACAO,
+    settings: {
+      ...ORGANIZACAO.settings,
+      ai: { ...ORGANIZACAO.settings.ai, replyOnlyDuringAppointment: true },
+    },
+  };
+  const ORIGEM_ADMINISTRATIVA = {
+    sourceMessage: {
+      id: "wa-wamid.administrativa",
+      sentAt: ANCHOR,
+      aiDecisionId: "wa-wamid.administrativa-decision",
+    },
+    sourceDecision: {
+      id: "wa-wamid.administrativa-decision",
+      messageId: "wa-wamid.administrativa",
+      classification: "ADMINISTRATIVE" as const,
+      confidence: 0.96,
+      action: "AUTO_RESPONSE" as const,
+      responseText: "O valor do atendimento é R$ 180,00.",
+    },
+  };
+
+  function envio(overrides: Partial<ReplyDispatchInput>) {
+    return decideReplyDispatch(
+      entrada(administrativo(), {
+        appointment: null,
+        offer: null,
+        ...ORIGEM_ADMINISTRATIVA,
+        ...overrides,
+      }),
+    );
+  }
+
+  it("o atendimento terminou entre planejar e enviar: nada sai", () => {
+    expect(
+      parouPor(envio({ organization: COM_TRAVA, activeAppointment: false })),
+    ).toBe("OUTSIDE_ACTIVE_APPOINTMENT");
+  });
+
+  it("quem despachou não informou o atendimento: nada sai", () => {
+    // Falha fechada no envio, como no planejamento.
+    expect(parouPor(envio({ organization: COM_TRAVA }))).toBe(
+      "OUTSIDE_ACTIVE_APPOINTMENT",
+    );
+  });
+
+  it("o atendimento continua em curso: a resposta sai", () => {
+    const passo = envio({ organization: COM_TRAVA, activeAppointment: true });
+
+    if (passo.kind !== "SEND") throw new Error(parouPor(passo));
+    expect(passo.request.body).toContain("R$ 180,00");
+  });
+
+  it("sem a trava, o envio não depende de atendimento nenhum", () => {
+    expect(envio({ activeAppointment: false }).kind).toBe("SEND");
   });
 });

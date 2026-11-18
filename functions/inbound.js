@@ -49,10 +49,11 @@ import { getProfession, isProfessionId } from "./generated/professions.js";
 import { ROLE_PERMISSIONS } from "./generated/permissions.js";
 import { messagePath, paths } from "./generated/paths.js";
 import { planConversationReply } from "./generated/automation-conversation-replies.js";
+import { assistantReplySchedule } from "./generated/automation-assistant-availability.js";
 import {
-  assistantReplySchedule,
-  hasActiveAppointment,
-} from "./generated/automation-assistant-availability.js";
+  activeAppointmentForReply,
+  activeAppointmentOf,
+} from "./active-appointment.js";
 import { scheduleTask } from "./automation-queue.js";
 import { verifyBridgeSignature } from "./n8n-bridge.js";
 import { runAs } from "./service-accounts.js";
@@ -396,6 +397,27 @@ export async function applyInboundEvent(event, deps = {}) {
           ? bookingRaw
           : null;
 
+      // Trava do ADR 0007, lida UMA vez porque vale para toda resposta
+      // planejada nesta transacao. A organizacao vai montada com os padroes,
+      // como `planReply` a monta, para que a decisao de consultar e a do portao
+      // leiam a MESMA chave.
+      const organizationRaw = stored("organizations", organizationSnapshot);
+      const replyActiveAppointment = await activeAppointmentForReply(
+        transaction,
+        firestore,
+        organizationRaw && isProfessionId(organizationRaw.primaryProfession)
+          ? withOrganizationDefaults(
+              organizationRaw,
+              organizationId,
+              organizationRaw.primaryProfession,
+              now,
+            )
+          : null,
+        organizationId,
+        professionalId,
+        now,
+      );
+
       // Resposta da assistente, planejada nesta transacao. Tudo o que ela
       // confere ja foi lido acima: organizacao, cadastro, conversa e remetente.
       // Lead so recebe resposta com consentimento vigente dado por ele mesmo;
@@ -403,6 +425,16 @@ export async function applyInboundEvent(event, deps = {}) {
       const replyTo = (reply) => {
         const consentProblem = leadId ? leadConsentProblem(leadConsent) : null;
         if (consentProblem) return { kind: "SKIPPED", reason: consentProblem };
+        // A leitura acima vale para o profissional DESTA conversa. Algumas
+        // respostas sao de outro -- a oferta de remarcacao usa o profissional
+        // do pedido, e a confirmacao usa o do atendimento --, e para essas a
+        // resposta lida nao serve: a agenda e outra. Em vez de reusar um
+        // "esta atendendo" de quem nao e, o valor fica ausente e o portao
+        // nega. Quem atende sozinho nunca cai aqui, porque e sempre o mesmo.
+        const replyProfessionalId =
+          reply.professionalId !== undefined
+            ? reply.professionalId
+            : professionalId;
         return planReply({
           transaction,
           scope,
@@ -424,6 +456,10 @@ export async function applyInboundEvent(event, deps = {}) {
           messageId,
           now,
           ...reply,
+          activeAppointment:
+            replyProfessionalId === professionalId
+              ? replyActiveAppointment
+              : undefined,
         });
       };
 
@@ -999,32 +1035,21 @@ export async function applyInboundEvent(event, deps = {}) {
             decided.action === "AUTO_RESPONSE" &&
             decided.responseText
           ) {
-            const recentAppointments = professionalId
-              ? (
-                  await transaction.get(
-                    firestore
-                      .collection(
-                        paths.collection(organizationId, "appointments"),
-                      )
-                      .where("professionalId", "==", professionalId)
-                      .where(
-                        "startsAt",
-                        "<=",
-                        Timestamp.fromDate(new Date(now)),
-                      )
-                      .orderBy("startsAt", "desc")
-                      .limit(20),
-                  )
-                ).docs.map((document) => stored("appointments", document))
-              : [];
+            // Quando a organizacao pediu a trava, o valor ja foi lido no inicio
+            // da transacao e vale para toda resposta: reler daria uma segunda
+            // consulta com a mesma resposta.
             const timing = assistantReplySchedule({
               organization,
               now,
-              activeAppointment: hasActiveAppointment(
-                recentAppointments,
-                professionalId,
-                now,
-              ),
+              activeAppointment:
+                replyActiveAppointment ??
+                (await activeAppointmentOf(
+                  transaction,
+                  firestore,
+                  organizationId,
+                  professionalId,
+                  now,
+                )),
             });
             replyTrigger = timing.trigger;
             administrativeReply = replyTo({
@@ -1525,6 +1550,7 @@ function planReply(ctx) {
     responseText: ctx.responseText ?? null,
     inboundMessageId: ctx.messageId,
     appointment: ctx.appointment,
+    activeAppointment: ctx.activeAppointment,
     professionalId: ctx.professionalId ?? null,
     scheduledFor: ctx.scheduledFor ?? ctx.now,
     sourceDecisionId: ctx.sourceDecisionId ?? null,

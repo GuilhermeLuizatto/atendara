@@ -296,6 +296,7 @@ export const SKIP_REASON_LABELS = {
     ASSISTANT_DISABLED: "A Dara está desativada para esta organização.",
     AUTONOMOUS_REPLIES_DISABLED: "A Dara está configurada apenas para sugerir respostas.",
     ASSISTANT_QUIET_HOURS: "A Dara está dentro da janela de silêncio configurada.",
+    OUTSIDE_ACTIVE_APPOINTMENT: "A organização pediu resposta somente durante um atendimento em curso, e não há nenhum agora.",
 };
 export const DELIVERY_FAILURE_LABELS = {
     PROVIDER_UNAVAILABLE: "Provedor indisponível",

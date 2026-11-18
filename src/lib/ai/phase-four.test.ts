@@ -158,6 +158,28 @@ describe("contexto e autorizações", () => {
       ).toBeGreaterThan(0);
     },
   );
+  it("a trava de responder só durante atendimento é opcional, e só booleana", () => {
+    const settings = request().organization.settings.ai;
+    // Ausente: documento antigo, trava desligada. Booleano: as duas posições.
+    expect(
+      validateAISettings({
+        ...settings,
+        replyOnlyDuringAppointment: undefined,
+      }),
+    ).toEqual([]);
+    for (const value of [true, false])
+      expect(
+        validateAISettings({ ...settings, replyOnlyDuringAppointment: value }),
+      ).toEqual([]);
+    // Qualquer outro tipo: as Security Rules recusam, e a tela não deve
+    // oferecer um salvamento que o banco vai negar.
+    expect(
+      validateAISettings({
+        ...settings,
+        replyOnlyDuringAppointment: "sim" as unknown as boolean,
+      }).length,
+    ).toBeGreaterThan(0);
+  });
   it("valida a janela completa de silêncio", () => {
     const settings = request().organization.settings.ai;
     expect(

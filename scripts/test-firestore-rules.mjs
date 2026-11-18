@@ -818,6 +818,14 @@ try {
   await denied(updateDoc(doc(db("adminRole"), orgA()), { "settings.ai": { ...aiSettings, quietHoursStart: "25:00" } }));
   await denied(updateDoc(doc(db("adminRole"), orgA()), { "settings.ai": { ...aiSettings, quietHoursStart: "22:00", quietHoursEnd: "22:00" } }));
   await denied(updateDoc(doc(db("adminRole"), orgA()), { "settings.ai": { ...aiSettings, enabled: "true" } }));
+  // Trava do ADR 0007: a chave e opcional, so aceita booleano, e continua
+  // fechada a quem nao administra. Sem a chave nas rules, a tela salvaria um
+  // campo que o banco recusa -- e a trava nunca chegaria a ligar.
+  await allowed(updateDoc(doc(db("adminRole"), orgA()), { "settings.ai": { ...aiSettings, replyOnlyDuringAppointment: true } }));
+  await allowed(updateDoc(doc(db("ownerRole"), orgA()), { "settings.ai": { ...aiSettings, replyOnlyDuringAppointment: false } }));
+  await denied(updateDoc(doc(db("adminRole"), orgA()), { "settings.ai": { ...aiSettings, replyOnlyDuringAppointment: "sim" } }));
+  await denied(updateDoc(doc(db("a"), orgA()), { "settings.ai": { ...aiSettings, replyOnlyDuringAppointment: true } }));
+  await denied(updateDoc(doc(db("adminRole"), orgA()), { "settings.ai": { ...aiSettings, respondeSempre: true } }));
 
   // ------------------------------------------------------- Fase 3, 13.1
   // Consentimento por canal. So se acrescenta ou retira registro, o navegador
@@ -949,6 +957,6 @@ try {
     for (const role of ["tenant", "operadora"]) if (!roles.has(role)) lacunas.push(`${name}: falta negacao para ${role}`);
   }
   assert.deepEqual(lacunas, [], "colecao sem negacao testada por papel");
-  assert.equal(checks, 598);
+  assert.equal(checks, 603);
   console.log(`${checks} verificacoes das Security Rules passaram no emulador.`);
 } finally { await environment.cleanup(); }

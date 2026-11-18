@@ -8,6 +8,15 @@ export function validateAISettings(settings: AIAgentSettings): string[] {
   ) {
     errors.push("Informe o estado e o modo de resposta da Dara.");
   }
+  // Ausente e desligado (documento antigo). Presente, so booleano: as Security
+  // Rules recusam qualquer outro tipo, e a tela nao deve oferecer um salvamento
+  // que o banco vai negar.
+  if (
+    settings.replyOnlyDuringAppointment !== undefined &&
+    typeof settings.replyOnlyDuringAppointment !== "boolean"
+  ) {
+    errors.push("Informe quando a Dara pode responder.");
+  }
   if (
     typeof settings.displayName !== "string" ||
     !settings.displayName.trim() ||

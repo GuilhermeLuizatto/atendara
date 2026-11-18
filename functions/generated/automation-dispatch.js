@@ -273,6 +273,7 @@ export function decideReplyDispatch(input) {
         validUntil,
         details,
         responseText: details.responseText,
+        activeAppointment: input.activeAppointment,
     });
     if (!decision.eligible)
         return cancel(task, delivery, decision.reason, now);

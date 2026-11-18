@@ -16,6 +16,7 @@ import {
   syncResultFrom,
 } from "./calendar-google.js";
 import { calendarOwnerAllowed } from "./calendar-store.js";
+import { activeAppointmentForReply } from "./active-appointment.js";
 import { calendarReconnectAlert } from "./generated/agenda-calendar-connection-alert.js";
 import { fromStored, toStored } from "./firestore-dates.js";
 import {
@@ -896,6 +897,20 @@ export async function runAutomationTask(data, deps = {}) {
             ),
           );
         }
+        // A trava do ADR 0007 reconferida aqui: a resposta foi planejada para
+        // sair durante um atendimento, e o despachante chega depois. A leitura
+        // so acontece para quem pediu a trava -- e uma consulta por envio, e
+        // cobra-la de quem nao usa a trava seria custo sem resposta. Sem
+        // profissional na tarefa nao da para saber, e `activeAppointment` fica
+        // ausente: o portao nega, como em qualquer outra trava.
+        context.activeAppointment = await activeAppointmentForReply(
+          transaction,
+          firestore,
+          context.organization,
+          payload.organizationId,
+          task.professionalId,
+          now,
+        );
       }
     }
 
@@ -925,6 +940,7 @@ export async function runAutomationTask(data, deps = {}) {
             offer: context.offer,
             sourceDecision: context.sourceDecision,
             sourceMessage: context.sourceMessage,
+            activeAppointment: context.activeAppointment,
           })
         : decideDispatch(common);
 

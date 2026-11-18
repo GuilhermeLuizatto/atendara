@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { getProfession } from "@/config/professions";
 
-import type { MessagingSender, NotificationRule } from "@/types";
+import type { MessagingSender, NotificationRule, Organization } from "@/types";
 
 import { evaluateConversationReply, type ConversationReplyInput } from "./eligibility";
 import { ANCHOR, FICTITIOUS, client, consent, consentRecord, organization } from "./fixtures";
@@ -172,6 +172,82 @@ describe("a resposta da assistente", () => {
 
     it("texto que não se completa não sai", () => {
       expect(motivo({ details: { slots: [] } })).toBe("TEMPLATE_REJECTED");
+    });
+  });
+
+  /**
+   * A trava do ADR 0007: a organização pode exigir que a assistente só responda
+   * enquanto o profissional está dentro de um atendimento. É o caso de quem
+   * atende sozinho e quer não perder contato justamente nesse intervalo.
+   *
+   * Cada caso abaixo prova UM envio ou NENHUM. A falha fechada é a parte que
+   * mais importa: um chamador que esqueça de informar o atendimento não pode,
+   * por omissão, liberar o envio.
+   */
+  describe("a trava de responder só durante atendimento", () => {
+    function comTrava(ligada: boolean, rules: NotificationRule[] = [regra()]): Organization {
+      const base = organization({ verifiedSenderChannels: ["WHATSAPP"], rules });
+      return {
+        ...base,
+        settings: {
+          ...base.settings,
+          ai: { ...base.settings.ai, replyOnlyDuringAppointment: ligada },
+        },
+      };
+    }
+
+    it("desligada, a resposta sai sem atendimento em curso — é o comportamento de hoje", () => {
+      expect(motivo({ organization: comTrava(false), activeAppointment: false })).toBe("ELIGIBLE");
+      expect(motivo({ organization: comTrava(false) })).toBe("ELIGIBLE");
+    });
+
+    it("ligada, a resposta sai durante o atendimento", () => {
+      expect(motivo({ organization: comTrava(true), activeAppointment: true })).toBe("ELIGIBLE");
+    });
+
+    it("ligada, nada sai fora do atendimento", () => {
+      expect(motivo({ organization: comTrava(true), activeAppointment: false })).toBe(
+        "OUTSIDE_ACTIVE_APPOINTMENT",
+      );
+    });
+
+    it("ligada, nada sai quando quem chamou não informou o atendimento", () => {
+      // Falha fechada: omissao nao e permissao.
+      expect(motivo({ organization: comTrava(true) })).toBe("OUTSIDE_ACTIVE_APPOINTMENT");
+    });
+
+    it("vale para toda resposta na conversa, não só a administrativa", () => {
+      const administrativa = regra({
+        id: "ADMINISTRATIVE_REPLY:WHATSAPP",
+        event: "ADMINISTRATIVE_REPLY",
+      });
+      const comum: Partial<ConversationReplyInput> = {
+        event: "ADMINISTRATIVE_REPLY",
+        details: {},
+        validUntil: null,
+        responseText: "O atendimento custa R$ 200.",
+      };
+
+      expect(
+        motivo({ ...comum, organization: comTrava(true, [administrativa]), activeAppointment: true }),
+      ).toBe("ELIGIBLE");
+      expect(
+        motivo({ ...comum, organization: comTrava(true, [administrativa]), activeAppointment: false }),
+      ).toBe("OUTSIDE_ACTIVE_APPOINTMENT");
+
+      const encaminhada = regra({
+        id: "RESCHEDULE_HANDED_OFF:WHATSAPP",
+        event: "RESCHEDULE_HANDED_OFF",
+      });
+      expect(
+        motivo({
+          event: "RESCHEDULE_HANDED_OFF",
+          details: {},
+          validUntil: null,
+          organization: comTrava(true, [encaminhada]),
+          activeAppointment: false,
+        }),
+      ).toBe("OUTSIDE_ACTIVE_APPOINTMENT");
     });
   });
 });

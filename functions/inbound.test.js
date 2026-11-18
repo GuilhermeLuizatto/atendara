@@ -1668,6 +1668,75 @@ describe("resposta da assistente planejada no webhook", () => {
     };
   }
 
+  /**
+   * A trava do ADR 0007 no planejamento. O que ela promete e estreito: a Dara
+   * so responde enquanto o profissional esta atendendo. Fora disso a pergunta
+   * fica para ele, e a decisao vira sugestao em vez de envio.
+   */
+  describe("responder só durante atendimento", () => {
+    const QUANDO = "2026-09-21T14:00:00.000Z"; // segunda, 11h em São Paulo
+    const EM_CURSO = {
+      startsAt: "2026-09-21T13:30:00.000Z",
+      endsAt: "2026-09-21T14:30:00.000Z",
+    };
+
+    function comTrava() {
+      const org = organizacao();
+      return {
+        ...org,
+        settings: {
+          ...org.settings,
+          ai: { replyOnlyDuringAppointment: true },
+        },
+      };
+    }
+
+    async function perguntar() {
+      consultas.rules = [regra("PRICING")];
+      return applyInboundEvent(
+        evento({
+          providerMessageId: "wamid.trava",
+          text: "Qual o valor da consulta?",
+          sentAt: QUANDO,
+        }),
+        { clock: () => QUANDO, enqueue },
+      );
+    }
+
+    it("sem atendimento em curso, nada é planejado e a decisão vira sugestão", async () => {
+      store.set(paths.organization(ORG), comTrava());
+
+      expect(await perguntar()).toMatchObject({
+        outcome: "CLASSIFIED",
+        action: "SUGGEST_RESPONSE",
+      });
+      expect(tarefas()).toEqual([]);
+    });
+
+    it("durante o atendimento, a resposta é planejada para sair na hora", async () => {
+      store.set(paths.organization(ORG), comTrava());
+      consultas.appointments = [atendimento(EM_CURSO)];
+
+      expect(await perguntar()).toMatchObject({
+        outcome: "CLASSIFIED",
+        action: "AUTO_RESPONSE",
+        reply: "PLANNED",
+        replyTrigger: "ACTIVE_APPOINTMENT",
+      });
+      expect(
+        store.get(caminho("automationTasks", "wa-wamid.trava-resposta")),
+      ).toMatchObject({ event: "ADMINISTRATIVE_REPLY", status: "SCHEDULED" });
+    });
+
+    it("sem a trava, a pergunta continua respondida fora de atendimento", async () => {
+      expect(await perguntar()).toMatchObject({
+        outcome: "CLASSIFIED",
+        action: "AUTO_RESPONSE",
+        reply: "PLANNED",
+      });
+    });
+  });
+
   it("espera o prazo configurado e o eco humano cancela a resposta administrativa", async () => {
     const quando = "2026-09-21T14:00:00.000Z"; // segunda, 11h em São Paulo
     consultas.rules = [

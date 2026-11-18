@@ -83,6 +83,32 @@ export function AgentSettings({ initial }: { initial: AIAgentSettings }) {
             )}
           </Field>
           <Field
+            label="Quando a Dara pode responder"
+            hint="Somente durante um atendimento é a janela mais estreita: fora dela a mensagem espera por você."
+          >
+            {(props) => (
+              <Select
+                {...props}
+                value={
+                  settings.replyOnlyDuringAppointment ? "APPOINTMENT" : "ALWAYS"
+                }
+                onChange={(e) =>
+                  update({
+                    replyOnlyDuringAppointment:
+                      e.target.value === "APPOINTMENT",
+                  })
+                }
+              >
+                <option value="ALWAYS">
+                  Em qualquer horário permitido pelas regras
+                </option>
+                <option value="APPOINTMENT">
+                  Somente durante um atendimento em curso
+                </option>
+              </Select>
+            )}
+          </Field>
+          <Field
             label="Confiança mínima (%)"
             hint="Pontuação heurística, não uma garantia de acerto."
           >

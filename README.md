@@ -4,25 +4,32 @@
 
 **Mais tempo para atender.**
 
-Plataforma multiprofissional em desenvolvimento para organizar **agenda, clientes,
-mensagens e financeiro**. É um case real de produto em validação e também parte
-do portfólio técnico do projeto.
+Plataforma em desenvolvimento para organizar **agenda, clientes, mensagens e
+financeiro**. O núcleo não conhece profissão; desde 16/11/2026 o produto está
+focado em **Psicologia, para quem atende sozinho**. É um case real de produto em
+validação e também parte do portfólio técnico do projeto.
 
 Dara é a assistente para a rotina administrativa: aplica regras configuradas pelo
 profissional e encaminha assuntos que exigem atenção humana.
 
 > **A IA auxilia. O humano decide.**
 
-**Estágio atual (10/10/2026):** desenvolvimento e validação controlada. Os
-módulos têm persistência no Firestore com isolamento por organização. A Dara
-combina regras locais com classificação semântica por Gemini, liberada somente
-para organizações de uma lista explícita. A fila de automação e a integração
-local com n8n existem; o WhatsApp real aguarda habilitação e validação pela Meta.
-A cobrança da plataforma permanece em testes. Código integrado, publicação e
-validação real são etapas distintas; confirme a situação de cada frente antes de
-usá-la no piloto.
+**Estágio atual (18/11/2026):** desenvolvimento e validação controlada. Os
+módulos têm persistência no Firestore com isolamento por organização. As
+profissões fora do recorte atual e os módulos que o piloto não usa continuam no
+código, escondidos por configuração, sem apagar dado. A Dara combina regras
+locais com classificação semântica por Gemini, liberada somente para
+organizações de uma lista explícita. A fila de automação existe e está
+publicada, mas **nenhum canal real envia**: os três seguem simulados. O WhatsApp
+deixou de esperar a Meta, cuja API oficial depende de CNPJ: em 18/11/2026 o
+desenho aceito passou a ser uma ponte pareada por QR, **não oficial**, que só
+responde quem escreveu primeiro e só enquanto o profissional atende — nada dela
+está implementado. A trilha de auditoria passou a ser selada pelo backend, com
+as Functions publicadas em 18/11/2026. A cobrança da plataforma permanece em
+testes. Código integrado, publicação e validação real são etapas distintas;
+confirme a situação de cada frente antes de usá-la no piloto.
 
-## Estado verificado em 10/10/2026
+## Estado verificado em 18/11/2026
 
 O projeto já tem as áreas principais no código, mas o piloto ainda depende de
 validações controladas. A tabela distingue entrega técnica de prova em uso real;
@@ -32,12 +39,14 @@ o [radar](project-dashboard/atendara-dashboard.html) guarda o próximo passo de 
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Núcleo, agenda, clientes, mensagens, financeiro e regras da Dara | Implementados no código, com persistência e testes automatizados; a validação real do piloto continua pendente     | [Arquitetura](docs/ARCHITECTURE.md), [testes do motor](src/lib/ai/decision-engine.test.ts) e [painel](PAINEL-ATENDARA.md). Exercitar os fluxos com dados fictícios antes de liberar o piloto. |
 | Dara: leads, encaminhamento e tomada humana                      | Código integrado à `main`; fluxo real ainda não confirmado                                                         | [PR #89](https://github.com/GuilhermeLuizatto/atendara/pull/89). Testar recebimento, consentimento, encaminhamento e tomada humana.                                                           |
-| Google Calendar, remarcação e e-mail                             | Google Calendar validado em 28/09/2026; remarcação depende do WhatsApp real e o aviso por e-mail segue simulado    | [Guia do Calendar](docs/GOOGLE-CALENDAR.md) e [PR #66](https://github.com/GuilhermeLuizatto/atendara/pull/66). Repetir a conexão com um segundo membro da mesma organização.                  |
-| Equipe multiprofissional e migração de escopo                    | Código e migração registrados como concluídos; acesso entre vínculos precisa de validação real com contas de teste | [Arquitetura](docs/ARCHITECTURE.md) e [Security Rules](firestore.rules). Provar que um vínculo não alcança dados de outro.                                                                    |
+| Google Calendar, remarcação e e-mail                             | Google Calendar validado em 28/09/2026; remarcação depende de um canal real e o aviso por e-mail segue simulado    | [Guia do Calendar](docs/GOOGLE-CALENDAR.md) e [PR #66](https://github.com/GuilhermeLuizatto/atendara/pull/66). Repetir a conexão com um segundo membro da mesma organização.                  |
+| Equipe multiprofissional e migração de escopo                    | Código e migração registrados como concluídos; o módulo está escondido no recorte atual e o acesso entre vínculos precisa de validação real com contas de teste | [Arquitetura](docs/ARCHITECTURE.md) e [Security Rules](firestore.rules). Provar que um vínculo não alcança dados de outro.                                                                    |
 | Cobrador de clientes                                             | Base integrada; lembrete automático permanece em proposta                                                          | [Roadmap abaixo](#roadmap) e [painel](PAINEL-ATENDARA.md). Definir escopo e consentimento específico antes de enviar avisos.                                                                  |
-| WhatsApp real e n8n operacional                                  | Dependem da habilitação da Meta e de ambiente controlado                                                           | [Painel](PAINEL-ATENDARA.md). Validar remetente, modelo, entrada, saída e opt-out com destinatário autorizado.                                                                                |
-| Acesso a arquivos e trilhas                                      | Revisão de segurança aberta; correções locais ainda não equivalem a entrega integrada                              | [Painel](PAINEL-ATENDARA.md). Integrar e testar acesso, trilhas e links antigos antes de fechar o risco.                                                                                      |
-| Avisos no backend e histórico de consentimento                   | Estado de publicação ou teste real ainda a verificar                                                               | [Radar](project-dashboard/status.json). Conferir Functions, fila e ciclo de consentimento antes de declarar conclusão.                                                                        |
+| WhatsApp por ponte pareada por QR, somente resposta              | Desenho aceito em 18/11/2026 e **nada implementado**; a API oficial da Meta depende de CNPJ e o n8n de produção saiu por custo | [Arquitetura, seção 15](docs/ARCHITECTURE.md) e [painel](PAINEL-ATENDARA.md). Antes de qualquer código: provar com número descartável que a ponte transporta sem gerar texto, que repassa o eco do celular e quanto custa. |
+| Trava de resposta durante o atendimento                          | Publicada em 18/11/2026, desligada por padrão; sem validação real                                                  | [PR #132](https://github.com/GuilhermeLuizatto/atendara/pull/132). Ligar numa organização de teste e conferir que a resposta não sai fora do atendimento em curso.                            |
+| Acesso a arquivos e trilhas                                      | Correções mergeadas em 16/11/2026 e publicadas em 17/11; a trilha passou a ser selada pelo backend, publicada em 18/11, com a corrente ainda sem prova em produção | [PR #117](https://github.com/GuilhermeLuizatto/atendara/pull/117) e [PR #128](https://github.com/GuilhermeLuizatto/atendara/pull/128). Gravar trilha nova numa organização de teste e conferir a corrente; a migração das gravações do navegador para callables fica para depois do piloto. |
+| Avisos no backend e histórico de consentimento                   | Fila e gatilhos publicados; **nenhum canal real envia** — os três seguem simulados                                 | [Radar](project-dashboard/status.json). Conferir o ciclo de consentimento e a entrega ponta a ponta quando houver canal real.                                                                 |
+| Termos, contrato de licença e anexo LGPD                         | No ar em `atendara.app/termos` e `/contrato`, versão `2026-11-06-preliminar`, com o aceite do cadastro aberto registrado e provado em produção em 17/11/2026; **sem revisão jurídica** | [PR #105](https://github.com/GuilhermeLuizatto/atendara/pull/105) e [PR #122](https://github.com/GuilhermeLuizatto/atendara/pull/122). Revisão de advogado e decisão de onde pedir o aceite quando a versão mudar.         |
 
 **Teste automatizado não é validação de produção.** A suite local verifica
 regras e comportamento; integração com provedores, autorização de canais e
@@ -308,7 +317,7 @@ testes de ponta a ponta.
 | **1**  | Operação: dashboard, agenda, CRM, financeiro, mensagens, regras e simulador               | ✅                                                                                                            |
 | **2**  | Persistência: Firestore, RBAC, auditoria, notificações e isolamento entre tenants         | ✅                                                                                                            |
 | **3A** | Automação interna: fila, HMAC, callback, controle de emergência e n8n local               | ✅                                                                                                            |
-| **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco                       | ⏸️ Em espera; validação externa pendente                                                                      |
+| **3B** | WhatsApp: remetente, modelos, saída, entrada, consentimento e risco                       | ⏸️ API oficial em espera (depende de CNPJ). Em 18/11/2026 o desenho aceito foi a ponte por QR, não oficial e somente resposta; nada implementado |
 | **3C** | Integrações operacionais: remarcação, Google Calendar, e-mail com domínio e monitoramento | 🟨 Código integrado; publicação registrada em 25/09/2026; validações reais pendentes                          |
 | **4**  | IA: assistente autorizado, regras contextuais, classificação avançada e analytics         | 🟨 Código integrado; Gemini limitado por allowlist. Expansão exige avaliação e autorização                    |
 | **5**  | Produto: equipes, importação administrativa, suporte, marca e preparação da cobrança      | 🟨 Base, escopo multiprofissional, administração de membros e migração concluídos; validações reais pendentes |

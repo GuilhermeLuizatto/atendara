@@ -397,9 +397,21 @@ export async function applyInboundEvent(event, deps = {}) {
       // Trava do ADR 0007, lida UMA vez porque vale para toda resposta
       // planejada nesta transacao. So para quem pediu a trava: cobrar a
       // consulta de quem nao usa seria custo por mensagem sem resposta.
+      // Lido com os padroes aplicados, e nao do documento cru, porque e assim
+      // que o portao le a mesma chave (`planReply` monta a organizacao do mesmo
+      // jeito). Ler o cru aqui e o completo la faria as duas metades
+      // discordarem no dia em que o padrao mudasse.
       const organizationRaw = stored("organizations", organizationSnapshot);
-      const replyActiveAppointment = organizationRaw?.settings?.ai
-        ?.replyOnlyDuringAppointment
+      const replyAiSettings =
+        organizationRaw && isProfessionId(organizationRaw.primaryProfession)
+          ? withOrganizationDefaults(
+              organizationRaw,
+              organizationId,
+              organizationRaw.primaryProfession,
+              now,
+            ).settings.ai
+          : null;
+      const replyActiveAppointment = replyAiSettings?.replyOnlyDuringAppointment
         ? await activeAppointmentOf(
             transaction,
             firestore,

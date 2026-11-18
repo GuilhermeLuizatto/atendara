@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { applyInboundEvent } from "./inbound.js";
 import { fromStored, toStored } from "./firestore-dates.js";
+import { CHANNEL_META } from "./generated/notifications-config.js";
 import { messagePath, paths } from "./generated/paths.js";
 
 const ORG = `inbound-emulator-${Date.now()}`;
@@ -49,7 +50,7 @@ beforeAll(async () => {
   await ref("messagingSenders", "WHATSAPP").set({
     organizationId: ORG,
     channel: "WHATSAPP",
-    providerId: "N8N_BRIDGE",
+    providerId: CHANNEL_META.WHATSAPP.providerId,
     providerSenderId: SENDER,
     status: "APPROVED",
     mode: "TEST",

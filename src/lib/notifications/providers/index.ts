@@ -7,6 +7,14 @@ import type { NotificationProvider } from "./types";
 export * from "./types";
 export { createSimulatedProvider, SIMULATED_DESTINATIONS } from "./simulated";
 export { createN8nBridgeProvider, BRIDGE_TIMEOUT_MS, type BridgeConfig } from "./n8n-bridge";
+export {
+  createMetaCloudApiProvider,
+  metaCloudMessage,
+  metaCloudFailure,
+  META_CLOUD_TIMEOUT_MS,
+  META_GRAPH_HOST,
+  type MetaCloudConfig,
+} from "./meta-cloud-api";
 
 /**
  * Registro de provedores.
@@ -16,10 +24,10 @@ export { createN8nBridgeProvider, BRIDGE_TIMEOUT_MS, type BridgeConfig } from ".
  * vice-versa.
  *
  * O simulado nasce aqui porque nao precisa de nada. Provedor que precisa de
- * segredo ou de rede — hoje so a ponte do n8n (13.3) — **nao** e construido
- * aqui: quem o monta e `functions/automation.js`, com o segredo do Secret
- * Manager, e o entrega em `overrides`. Assim este modulo continua sem I/O, e o
- * navegador nunca carrega codigo que fala com o n8n.
+ * segredo ou de rede — a ponte do n8n (13.3) e a Cloud API da Meta — **nao** e
+ * construido aqui: quem o monta e `functions/automation.js`, com o segredo do
+ * Secret Manager, e o entrega em `overrides`. Assim este modulo continua sem
+ * I/O, e o navegador nunca carrega codigo que fala com um canal real.
  */
 export type ProviderOverrides = Partial<Record<string, () => NotificationProvider>>;
 

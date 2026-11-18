@@ -45,6 +45,7 @@ import {
 } from "./generated/automation-config.js";
 import { providerFor } from "./generated/notifications-providers.js";
 import { replyContactOf } from "./leads.js";
+import { metaCloudProviderFrom } from "./meta-cloud-api.js";
 import { bridgeProviderFrom } from "./n8n-bridge.js";
 import { runAs, SERVICE_ACCOUNTS } from "./service-accounts.js";
 import { withOrganizationDefaults } from "./generated/organization-config.js";
@@ -589,15 +590,22 @@ async function runCalendarSync(
 // ------------------------------------------------------------ despachante
 
 /**
- * Provedor de cada canal. Todos os canais estao em `SIMULATED` hoje
- * (`CHANNEL_META`), entao a ponte do n8n so entra se alguem trocar aquela
- * linha — e mesmo assim so existe com `N8N_WEBHOOK_URL` e o segredo A no
- * ambiente. Sem eles, o canal falha dizendo isso, em vez de sair por outro
- * caminho.
+ * Provedor de cada canal, conforme `CHANNEL_META`: `EMAIL` e `SMS` em
+ * `SIMULATED`, `WHATSAPP` na Cloud API da Meta. Os provedores reais so existem
+ * com o segredo deles no ambiente — `META_WHATSAPP_TOKEN` para a Cloud API,
+ * `N8N_WEBHOOK_URL` e o segredo A para a ponte. Sem eles, o canal falha
+ * dizendo isso, em vez de sair por outro caminho.
+ *
+ * A ponte continua montada aqui, mesmo sem canal que a peca, porque o executor
+ * externo pode voltar; enquanto nenhum canal a declarar, ela nunca e usada.
  */
 function defaultProviders(channel) {
   const bridge = bridgeProviderFrom();
-  return providerFor(channel, bridge ? { N8N_BRIDGE: () => bridge } : {});
+  const metaCloud = metaCloudProviderFrom();
+  return providerFor(channel, {
+    ...(bridge ? { N8N_BRIDGE: () => bridge } : {}),
+    ...(metaCloud ? { META_CLOUD_API: () => metaCloud } : {}),
+  });
 }
 
 /**
@@ -1011,8 +1019,9 @@ export const dispatchAutomationTask = onTaskDispatched(
     timeoutSeconds: DISPATCHER_TIMEOUT_SECONDS,
     retryConfig: { ...DISPATCHER_QUEUE_RETRY },
     ...runAs("automacao"),
-    // A agenda Google troca a credencial cifrada por token de acesso aqui.
-    secrets: ["GOOGLE_OAUTH_CLIENT_SECRET"],
+    // A agenda Google troca a credencial cifrada por token de acesso aqui, e o
+    // WhatsApp precisa do token da Cloud API para o envio sair deste processo.
+    secrets: ["GOOGLE_OAUTH_CLIENT_SECRET", "META_WHATSAPP_TOKEN"],
     // Quem pode colocar tarefa nesta fila e chamar este despachante. Com isto a
     // CLI concede as duas permissoes so a conta da automacao, na fila e na
     // function — em vez de um papel no projeto inteiro.

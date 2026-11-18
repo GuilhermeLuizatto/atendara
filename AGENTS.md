@@ -60,6 +60,21 @@ SaaS multiprofissional de gestao e automacao. Leia
     evento e canal, remetente comprovado, o canal permitido pela profissao,
     contato valido e consentimento que nomeie o canal. Todas as condicoes vivem
     em `src/lib/notifications/eligibility.ts` e sao cobertas por testes.
+    **Remetente comprovado** depende do transporte. No WhatsApp oficial e um
+    `phone_number_id` aprovado pela Meta, com a assinatura do App Secret
+    conferida na entrada (`functions/inbound.js`). Numa ponte pareada por QR,
+    que nao assina nada, passa a significar, em conjunto: numero pareado pelo
+    titular da organizacao, em aparelho dele, com a sessao so na maquina da
+    ponte; numero declarado no cadastro da organizacao antes do pareamento e
+    conferido a cada inicio de sessao — sessao de outro numero nao envia; e uma
+    tarefa do Atendara correspondente a cada envio, com chave de idempotencia
+    valida e dentro do prazo, sendo envio sem tarefa um incidente com alerta.
+    Essa definicao vale somente para esse transporte e **nao relaxa** nenhuma
+    das outras condicoes. O que se perde sem a assinatura da Meta esta assumido:
+    quem controla a maquina da ponte pode forjar uma mensagem recebida e
+    provocar resposta administrativa — ver a secao 15 de
+    [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) e o ADR 0007 (privado).
+    Autorizado pelo titular em 18/11/2026.
 12. **Aviso da plataforma nao usa canal de clinica.** Situacao da assinatura e
     derivada de `platformSubscriptions` e fica dentro do painel; aviso de
     atendimento sai da organizacao. Sao remetentes, audiencias e bases legais

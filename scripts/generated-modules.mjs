@@ -96,6 +96,7 @@ export const SOURCES = [
     "automation-appointment-changes",
   ],
   ["src/lib/automation/bridge.ts", "automation-bridge"],
+  ["src/lib/automation/delivery-status.ts", "automation-delivery-status"],
   ["src/lib/automation/calendar-sync.ts", "automation-calendar-sync"],
   [
     "src/lib/automation/conversation-replies.ts",

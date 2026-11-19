@@ -218,6 +218,31 @@ describe("Fase 3, 13.2 — fila de automacao no Firestore", () => {
     expect(alerts[0].body).not.toContain("Rafa");
   });
 
+  it("canal declara provedor que o ambiente nao configurou: recusa nomeada, sem repetir", async () => {
+    await seedClient("cliente-sem-provedor");
+    const appointment = appointmentFor("atendimento-sem-provedor", "cliente-sem-provedor");
+    const run = harness();
+    await write(null, appointment, run.planning);
+    const [task] = await notices(appointment.id);
+
+    // E o que acontece quando o canal aponta para um provedor real e o segredo
+    // dele nao esta no ambiente: `providerFor` lanca.
+    const semProvedor = {
+      ...run.dispatchAt(REMINDER),
+      providers: () => {
+        throw new Error("Canal EMAIL declara o provedor X, que nao foi configurado.");
+      },
+    };
+    const result = await runAutomationTask(pointer(task), semProvedor);
+
+    expect(result.outcome).toBe("FAILED");
+    expect(run.send).not.toHaveBeenCalled();
+    const delivery = await read("notificationDeliveries", task.id);
+    expect(delivery).toMatchObject({ status: "FAILED", failureCode: "CHANNEL_NOT_CONFIGURED" });
+    // Nao e retentavel: repetir nao configuraria nada, e a tarefa encerra.
+    expect(await read("automationTasks", task.id)).toMatchObject({ status: "FAILED" });
+  });
+
   it("consentimento retirado entre planejar e enviar: cancela sem chegar ao provedor", async () => {
     await seedClient("cliente-retirou");
     const appointment = appointmentFor("atendimento-retirou", "cliente-retirou");

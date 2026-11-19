@@ -645,21 +645,40 @@ async function handoff(step, scope, { clock }) {
 }
 
 async function send(step, scope, { enqueue, clock, providers }) {
-  const provider = providers(step.request.channel);
-  let result;
+  // Canal que declara provedor real sem o segredo no ambiente: antes isto
+  // escapava do `send` como excecao e virava tentativa repetida sem
+  // explicacao. Agora e recusa nomeada, que aparece na entrega e nao volta.
+  let provider = null;
+  let result = null;
   try {
-    result = await provider.send(step.request);
-  } catch {
-    // Excecao do provedor e falha temporaria: a politica de tentativas decide.
+    provider = providers(step.request.channel);
+  } catch (error) {
+    logger.error("automation.provider.not_configured", {
+      channel: step.request.channel,
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
     result = {
-      outcome: "TEMPORARY_FAILURE",
+      outcome: "REJECTED",
       providerMessageId: null,
-      failureCode: "PROVIDER_UNAVAILABLE",
+      failureCode: "CHANNEL_NOT_CONFIGURED",
     };
   }
 
+  if (provider) {
+    try {
+      result = await provider.send(step.request);
+    } catch {
+      // Excecao do provedor e falha temporaria: a politica de tentativas decide.
+      result = {
+        outcome: "TEMPORARY_FAILURE",
+        providerMessageId: null,
+        failureCode: "PROVIDER_UNAVAILABLE",
+      };
+    }
+  }
+
   // Provedor de entrega em duas etapas: aceitar nao e enviar.
-  if (provider.handoff && result.outcome === "ACCEPTED")
+  if (provider?.handoff && result.outcome === "ACCEPTED")
     return handoff(step, scope, { clock });
 
   const firestore = db();

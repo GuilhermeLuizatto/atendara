@@ -24,6 +24,10 @@ import {
   INBOUND_PREVIEW_LENGTH,
 } from "./generated/inbound-config.js";
 import { CHANNEL_META } from "./generated/notifications-config.js";
+import {
+  deliveryStatusFields,
+  parseDeliveryStatuses,
+} from "./generated/automation-delivery-status.js";
 import { decide } from "./generated/decision-engine.js";
 import { decisionInputPreview } from "./generated/privacy-decision-preview.js";
 import {
@@ -1635,10 +1639,14 @@ export const inboundWebhook = onRequest(
     }
 
     let events = [];
+    let statuses = [];
     try {
-      events = parseInboundPayload(JSON.parse(body));
+      const payload = JSON.parse(body);
+      events = parseInboundPayload(payload);
+      statuses = parseDeliveryStatuses(payload);
     } catch {
       events = [];
+      statuses = [];
     }
 
     try {
@@ -1653,10 +1661,21 @@ export const inboundWebhook = onRequest(
         outcomes.push(result.outcome);
         if (result.reply) replies.push(result.reply);
       }
+      // Progresso de entrega nao produz conversa nem resposta: so carimba o
+      // que a Meta contou sobre um envio que ja saiu.
+      //
+      // Um de cada vez, de proposito: "entregue" e "lida" da mesma mensagem
+      // chegam no mesmo corpo, e em paralelo a leitura gravaria `deliveredAt`
+      // com o horario da leitura. A ordem do corpo e a ordem dos fatos.
+      const progress = [];
+      for (const status of statuses) {
+        progress.push((await applyDeliveryStatus(status)).outcome);
+      }
       logger.info("automation.inbound", {
         received: events.length,
         outcomes,
         replies,
+        statuses: progress,
       });
       // 200 sempre que o corpo foi aceito: a Meta reentrega o que nao recebe
       // 200, e reentrega e inofensiva pela trava de duplicidade.
@@ -2513,4 +2532,64 @@ function alertTeamAboutReschedule(ctx) {
  */
 function offsetOfTimezone(timezone) {
   return timezone === "UTC" ? 0 : -180;
+}
+
+/**
+ * Progresso de entrega contado pela Meta (`statuses`).
+ *
+ * Chega pelo mesmo webhook assinado das mensagens, e por isso herda as duas
+ * assinaturas conferidas la em cima. O que muda e o que se faz com ele: nao
+ * nasce conversa, nao nasce decisao da assistente e nao nasce resposta —
+ * carimba-se o que ja existia.
+ *
+ * A entrega e procurada **dentro da organizacao dona do remetente**, pelo
+ * protocolo que a Meta devolveu no aceite. Protocolo desconhecido e ignorado:
+ * pode ser envio de outro sistema no mesmo numero, e inventar entrega seria
+ * pior do que perder um aviso de leitura.
+ */
+export async function applyDeliveryStatus(event, deps = {}) {
+  const { clock = () => new Date().toISOString() } = deps;
+  const now = clock();
+  const sender = await organizationOfSender(event.providerSenderId);
+  if (!sender) return { outcome: "UNKNOWN_SENDER" };
+
+  const firestore = db();
+  const found = await firestore
+    .collection(
+      paths.collection(sender.organizationId, "notificationDeliveries"),
+    )
+    .where("providerMessageId", "==", event.providerMessageId)
+    .limit(2)
+    .get();
+  // Dois registros com o mesmo protocolo seriam erro de gravacao, e carimbar
+  // o errado e pior do que nao carimbar.
+  if (found.size !== 1) return { outcome: "DELIVERY_NOT_FOUND" };
+
+  const ref = firestore.doc(
+    paths.document(
+      sender.organizationId,
+      "notificationDeliveries",
+      found.docs[0].id,
+    ),
+  );
+  return firestore.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    const data = snapshot.data();
+    // A consulta achou e a leitura nao: sumiu entre uma e outra. Nada a fazer.
+    if (!data) return { outcome: "DELIVERY_NOT_FOUND" };
+    const current = fromStored("notificationDeliveries", ref.id, data);
+    const campos = deliveryStatusFields(current, event);
+    if (Object.keys(campos).length === 0) return { outcome: "NO_CHANGE" };
+
+    transaction.set(
+      ref,
+      toStored("notificationDeliveries", {
+        ...current,
+        ...campos,
+        updatedAt: now,
+        updatedBy: null,
+      }),
+    );
+    return { outcome: event.kind };
+  });
 }

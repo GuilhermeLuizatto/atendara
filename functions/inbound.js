@@ -1663,6 +1663,10 @@ export const inboundWebhook = onRequest(
       }
       // Progresso de entrega nao produz conversa nem resposta: so carimba o
       // que a Meta contou sobre um envio que ja saiu.
+      //
+      // Um de cada vez, de proposito: "entregue" e "lida" da mesma mensagem
+      // chegam no mesmo corpo, e em paralelo a leitura gravaria `deliveredAt`
+      // com o horario da leitura. A ordem do corpo e a ordem dos fatos.
       const progress = [];
       for (const status of statuses) {
         progress.push((await applyDeliveryStatus(status)).outcome);

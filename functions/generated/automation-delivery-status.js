@@ -20,6 +20,48 @@ function errorCodeOf(status) {
  * nao e numero ou estado desconhecido sao descartados em silencio. Um aviso
  * de status perdido nao machuca ninguem; um aviso inventado, sim.
  */
+/** Horario da Meta (segundos, em texto) -> instante, ou `null` se nao for um. */
+function instantOf(value) {
+    if (typeof value !== "string" || !/^\d+$/.test(value))
+        return null;
+    const seconds = Number(value);
+    if (!Number.isSafeInteger(seconds) || seconds <= 0)
+        return null;
+    const instant = new Date(seconds * 1000);
+    return Number.isFinite(instant.getTime()) ? instant : null;
+}
+/** Um item de `statuses` -> progresso, ou `null` quando nao da para confiar. */
+function eventOf(raw, providerSenderId) {
+    if (typeof raw !== "object" || raw === null)
+        return null;
+    const status = raw;
+    const id = typeof status.id === "string" ? status.id : null;
+    const kind = typeof status.status === "string" ? KINDS[status.status] : undefined;
+    const instant = instantOf(status.timestamp);
+    if (!id || !/^[\x21-\x7e]{1,256}$/.test(id) || !kind || !instant)
+        return null;
+    return {
+        providerSenderId,
+        providerMessageId: id,
+        kind,
+        occurredAt: instant.toISOString(),
+        failureCode: kind === "FAILED" ? metaErrorFailureCode(errorCodeOf(status)) : null,
+    };
+}
+/** Os progressos de uma mudanca, ja com o numero que enviou. */
+function eventsOf(change) {
+    const value = change?.value;
+    const providerSenderId = value?.metadata?.phone_number_id;
+    if (typeof providerSenderId !== "string" || !Array.isArray(value?.statuses))
+        return [];
+    const events = [];
+    for (const raw of value.statuses) {
+        const event = eventOf(raw, providerSenderId);
+        if (event)
+            events.push(event);
+    }
+    return events;
+}
 export function parseDeliveryStatuses(data) {
     if (typeof data !== "object" || data === null)
         return [];
@@ -31,37 +73,8 @@ export function parseDeliveryStatuses(data) {
         const changes = entry?.changes;
         if (!Array.isArray(changes))
             continue;
-        for (const change of changes) {
-            const value = change?.value;
-            const providerSenderId = value?.metadata?.phone_number_id;
-            if (typeof providerSenderId !== "string" || !Array.isArray(value?.statuses))
-                continue;
-            for (const raw of value.statuses) {
-                if (typeof raw !== "object" || raw === null)
-                    continue;
-                const status = raw;
-                const id = typeof status.id === "string" ? status.id : null;
-                const kind = typeof status.status === "string" ? KINDS[status.status] : undefined;
-                const seconds = typeof status.timestamp === "string" && /^\d+$/.test(status.timestamp)
-                    ? Number(status.timestamp)
-                    : NaN;
-                const instant = new Date(seconds * 1000);
-                if (!id ||
-                    !/^[\x21-\x7e]{1,256}$/.test(id) ||
-                    !kind ||
-                    !Number.isSafeInteger(seconds) ||
-                    seconds <= 0 ||
-                    !Number.isFinite(instant.getTime()))
-                    continue;
-                events.push({
-                    providerSenderId,
-                    providerMessageId: id,
-                    kind,
-                    occurredAt: instant.toISOString(),
-                    failureCode: kind === "FAILED" ? metaErrorFailureCode(errorCodeOf(status)) : null,
-                });
-            }
-        }
+        for (const change of changes)
+            events.push(...eventsOf(change));
     }
     return events;
 }

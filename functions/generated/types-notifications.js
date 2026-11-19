@@ -90,6 +90,10 @@ export const DELIVERY_FAILURE_CODES = [
     // ultima mensagem da pessoa (codigo 131047). Nao e destino invalido: o mesmo
     // numero volta a receber assim que a pessoa escrever de novo.
     "OUTSIDE_REPLY_WINDOW",
+    // O canal declara um provedor real que nao foi configurado no ambiente — sem
+    // token, sem webhook. Nao e retentavel de proposito: repetir nao configura
+    // nada, e tentativa calada esconderia erro de operacao ate o prazo vencer.
+    "CHANNEL_NOT_CONFIGURED",
 ];
 /** Por que um evento da agenda nao produziu envio. */
 export const NOTIFICATION_SKIP_REASONS = [

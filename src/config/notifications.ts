@@ -470,6 +470,8 @@ export const DELIVERY_FAILURE_LABELS: Record<DeliveryFailureCode, string> = {
   CALENDAR_NOT_PROVISIONED: "A agenda Atendara não existe no Google",
   OUTSIDE_REPLY_WINDOW:
     "Passaram as 24 horas desde a última mensagem da pessoa",
+  CHANNEL_NOT_CONFIGURED:
+    "O canal declara um provedor que não está configurado no servidor",
 };
 
 export const NOTIFICATION_DISPATCH_STOP_LABELS: Record<

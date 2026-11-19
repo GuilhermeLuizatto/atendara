@@ -1,3 +1,5 @@
+import type { DeliveryFailureCode } from "@/types";
+
 import type { NotificationProvider, SendRequest, SendResult } from "./types";
 
 /**
@@ -122,6 +124,18 @@ export function metaCloudFailure(status: number, code: number | null): SendResul
   }
   if (status >= 500) return failure("TEMPORARY_FAILURE", "PROVIDER_UNAVAILABLE");
   return failure("REJECTED", "INVALID_DESTINATION");
+}
+
+/**
+ * Codigo de erro da Meta -> motivo da falha, sem o status HTTP.
+ *
+ * Serve ao aviso de entrega que chega depois pelo webhook (`statuses`), onde
+ * nao ha resposta HTTP para olhar: a Meta so diz que desistiu e por que. A
+ * tabela e a mesma de `metaCloudFailure`, de proposito — dois lugares
+ * decidindo o mesmo motivo acabariam discordando.
+ */
+export function metaErrorFailureCode(code: number | null): DeliveryFailureCode {
+  return metaCloudFailure(400, code).failureCode ?? "INVALID_DESTINATION";
 }
 
 function errorCodeOf(payload: unknown): number | null {

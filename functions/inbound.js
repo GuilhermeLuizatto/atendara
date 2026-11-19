@@ -2561,13 +2561,19 @@ export async function applyDeliveryStatus(event, deps = {}) {
   // o errado e pior do que nao carimbar.
   if (found.size !== 1) return { outcome: "DELIVERY_NOT_FOUND" };
 
-  const ref = found.docs[0].ref;
-  return firestore.runTransaction(async (transaction) => {
-    const current = fromStored(
+  const ref = firestore.doc(
+    paths.document(
+      sender.organizationId,
       "notificationDeliveries",
-      ref.id,
-      (await transaction.get(ref)).data(),
-    );
+      found.docs[0].id,
+    ),
+  );
+  return firestore.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    const data = snapshot.data();
+    // A consulta achou e a leitura nao: sumiu entre uma e outra. Nada a fazer.
+    if (!data) return { outcome: "DELIVERY_NOT_FOUND" };
+    const current = fromStored("notificationDeliveries", ref.id, data);
     const campos = deliveryStatusFields(current, event);
     if (Object.keys(campos).length === 0) return { outcome: "NO_CHANGE" };
 

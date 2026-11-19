@@ -21,6 +21,7 @@ const consultas = vi.hoisted(() => ({
   appointments: [],
   transactions: [],
   professionals: [],
+  deliveries: [],
 }));
 // Todo caminho tocado pelo webhook, para provar o que ele NAO alcanca.
 const acessos = vi.hoisted(() => []);
@@ -90,7 +91,9 @@ vi.mock("firebase-admin/firestore", () => {
           ? consulta(consultas.rules)
           : path.endsWith("/appointments")
             ? consulta(consultas.appointments)
-            : path.endsWith("/transactions")
+            : path.endsWith("/notificationDeliveries")
+              ? consulta(consultas.deliveries)
+              : path.endsWith("/transactions")
               ? consulta(consultas.transactions)
               : consulta(consultas.clients),
       collectionGroup: () => consulta(consultas.senders),
@@ -140,6 +143,7 @@ vi.mock("firebase-admin/firestore", () => {
 });
 
 const {
+  applyDeliveryStatus,
   applyHumanEcho,
   applyInboundEvent,
   inboundWebhook,
@@ -267,6 +271,7 @@ beforeEach(() => {
   consultas.rules = [];
   consultas.appointments = [];
   consultas.transactions = [];
+  consultas.deliveries = [];
   process.env.N8N_CALLBACK_SECRET = PONTE;
   process.env.META_APP_SECRET = META;
   store.set(paths.organization(ORG), {
@@ -2825,5 +2830,118 @@ describe("primeiro contato pelo WhatsApp (leads)", () => {
     expect(
       [...store.keys()].some((chave) => chave.startsWith("platform")),
     ).toBe(false);
+  });
+});
+
+describe("progresso de entrega contado pela Meta", () => {
+  const WAMID = "wamid.progresso";
+
+  function entrega(patch = {}) {
+    return {
+      id: "entrega-1",
+      organizationId: ORG,
+      channel: "WHATSAPP",
+      status: "SENT",
+      providerId: CHANNEL_META.WHATSAPP.providerId,
+      providerMessageId: WAMID,
+      sentAt: "2026-11-19T11:00:00.000Z",
+      deliveredAt: null,
+      readAt: null,
+      failureCode: null,
+      attempts: 1,
+      ...patch,
+    };
+  }
+
+  function progresso(patch = {}) {
+    return {
+      providerSenderId: SENDER_ID,
+      providerMessageId: WAMID,
+      kind: "DELIVERED",
+      occurredAt: "2026-11-19T12:00:00.000Z",
+      failureCode: null,
+      ...patch,
+    };
+  }
+
+  const caminho = () =>
+    paths.document(ORG, "notificationDeliveries", "entrega-1");
+
+  it("carimba a entrega da organizacao dona do remetente", async () => {
+    consultas.deliveries = [entrega()];
+    store.set(caminho(), entrega());
+
+    const result = await applyDeliveryStatus(progresso());
+
+    expect(result.outcome).toBe("DELIVERED");
+    // Gravado como Timestamp, que e o que o banco guarda.
+    expect(store.get(caminho()).deliveredAt.date.toISOString()).toBe(
+      "2026-11-19T12:00:00.000Z",
+    );
+  });
+
+  it("lida carimba os dois horarios, e repetir nao move nenhum", async () => {
+    consultas.deliveries = [entrega()];
+    store.set(caminho(), entrega());
+
+    await applyDeliveryStatus(progresso({ kind: "READ" }));
+    const primeiro = store.get(caminho());
+    consultas.deliveries = [{ ...primeiro, id: "entrega-1" }];
+    const outra = await applyDeliveryStatus(
+      progresso({ kind: "READ", occurredAt: "2026-11-19T13:00:00.000Z" }),
+    );
+
+    expect(primeiro.deliveredAt.date.toISOString()).toBe(
+      "2026-11-19T12:00:00.000Z",
+    );
+    expect(primeiro.readAt.date.toISOString()).toBe("2026-11-19T12:00:00.000Z");
+    expect(outra.outcome).toBe("NO_CHANGE");
+    expect(store.get(caminho()).readAt.date.toISOString()).toBe(
+      "2026-11-19T12:00:00.000Z",
+    );
+  });
+
+  it("falha depois do aceite derruba a entrega com o motivo", async () => {
+    consultas.deliveries = [entrega()];
+    store.set(caminho(), entrega());
+
+    const result = await applyDeliveryStatus(
+      progresso({ kind: "FAILED", failureCode: "OUTSIDE_REPLY_WINDOW" }),
+    );
+
+    expect(result.outcome).toBe("FAILED");
+    expect(store.get(caminho())).toMatchObject({
+      status: "FAILED",
+      failureCode: "OUTSIDE_REPLY_WINDOW",
+    });
+  });
+
+  it("remetente desconhecido nao carimba nada", async () => {
+    consultas.senders = [];
+    consultas.deliveries = [entrega()];
+    store.set(caminho(), entrega());
+
+    const result = await applyDeliveryStatus(progresso());
+
+    expect(result).toEqual({ outcome: "UNKNOWN_SENDER" });
+    expect(store.get(caminho()).deliveredAt).toBeNull();
+  });
+
+  it("protocolo que nao achou entrega e ignorado, em vez de inventar uma", async () => {
+    consultas.deliveries = [];
+
+    const result = await applyDeliveryStatus(progresso());
+
+    expect(result).toEqual({ outcome: "DELIVERY_NOT_FOUND" });
+  });
+
+  it("duas entregas com o mesmo protocolo nao carimbam nenhuma", async () => {
+    consultas.deliveries = [entrega(), entrega({ id: "entrega-2" })];
+    store.set(caminho(), entrega());
+
+    const result = await applyDeliveryStatus(progresso());
+
+    expect(result).toEqual({ outcome: "DELIVERY_NOT_FOUND" });
+    expect(store.get(caminho()).deliveredAt).toBeNull();
   });
 });
